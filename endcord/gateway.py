@@ -1078,7 +1078,7 @@ class Gateway():
                                 "description": summary["summ_short"],
                             })
                         else:
-                            logger.warning(f"Unhandled summary type\n{json.dumps(summary, indent=2)}")
+                            logger.warning(f"Unhandled summary type\n{json.dumps(summary)}")
 
                 elif optext == "MESSAGE_ACK":
                     # received when other client ACKs messages
@@ -1186,12 +1186,10 @@ class Gateway():
                                         "status": member_data["presence"]["status"],
                                         "custom_status": custom_status,
                                         "activities": activities,
-
                                     })
                             self.activities[guild_index]["members"] = members_sync
                             self.activities[guild_index]["last_index"] = 0
                             self.activities_changed.append(guild_id)
-
                         elif memlist["op"] == "DELETE":
                             try:
                                 del self.activities[guild_index]["members"][memlist["index"]]

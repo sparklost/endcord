@@ -566,7 +566,7 @@ class Endcord:
                     self.dms.remove(dm)
 
 
-    def switch_channel(self, channel_id, channel_name, guild_id, guild_name, parent_hint=None, open_member_list=False, preload=False):
+    def switch_channel(self, channel_id, channel_name, guild_id, guild_name, parent_hint=None, preload=False):
         """
         All that should be done when switching channel.
         If it is DM, guild_id and guild_name should be None.
@@ -592,8 +592,8 @@ class Endcord:
             self.cache_deleted()
 
         # check if should open member list
-        if self.member_list_auto_open and guild_id != self.active_channel["guild_id"]:
-            open_member_list = True
+        open_member_list = self.member_list_auto_open and guild_id != self.active_channel["guild_id"]
+
 
         # clear member roles when switching guild so there are no issues with same members in both guilds
         if guild_id != self.active_channel["guild_id"]:
@@ -6466,7 +6466,7 @@ class Endcord:
                         channel_name = channel["name"]
                         break
             if channel_name:
-                self.switch_channel(channel_id, channel_name, guild_id, guild_name, open_member_list=self.member_list_auto_open, preload=True)
+                self.switch_channel(channel_id, channel_name, guild_id, guild_name, preload=True)
                 self.tui.tree_select_active()
             else:
                 self.chat.insert(0, "Select channel to load messages")

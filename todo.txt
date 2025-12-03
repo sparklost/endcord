@@ -1,6 +1,3 @@
-Fix wrong channel sorting
-Replace @username @role and #channel in input line
-
 Add more extension points
     add to parser.py
     add to assist_data

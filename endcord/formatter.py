@@ -39,16 +39,6 @@ match_discord_channel_combined = re.compile(r"<#(\d*?)>|https:\/\/discord(?:app)
 match_sticker_id = re.compile(r"<;\d*?;>")
 
 
-def sort_by_indexes(input_list, indexes):
-    """Sort input list by given indexes"""
-    return [val for (_, val) in sorted(zip(indexes, input_list), key=lambda x: x[0])]
-
-
-def sorted_indexes(input_list):
-    """Return indexes of sorted input list"""
-    return [i for i, x in sorted(enumerate(input_list), key=lambda x: x[1])]
-
-
 def lazy_replace(text, key, value_function):
     """Replace key in text with result from value_function, but run it only if key is found"""
     if key in text:
@@ -2309,7 +2299,6 @@ def generate_tree(dms, guilds, threads, unseen, mentioned, guild_folders, activi
 
         # sort categories and channels
         categories = []
-        categories_position = []
         for channel in guild["channels"]:
             if channel["type"] == 4:
                 # categories are also hidden if they have no visible channels
@@ -2324,6 +2313,7 @@ def generate_tree(dms, guilds, threads, unseen, mentioned, guild_folders, activi
                 categories.append({
                     "id": channel["id"],
                     "name": channel["name"],
+                    "position": channel["position"],
                     "channels": [],
                     "muted": muted,
                     "collapsed": False,
@@ -2331,11 +2321,9 @@ def generate_tree(dms, guilds, threads, unseen, mentioned, guild_folders, activi
                     "unseen": False,
                     "ping": False,
                 })
-                categories_position.append(channel["position"])
 
         # separately sort channels in their categories
         bare_channels = []
-        bare_channels_position = []
         for channel in guild["channels"]:
             if channel["type"] in (0, 5, 15):
                 # find this channel threads, if any
@@ -2391,6 +2379,7 @@ def generate_tree(dms, guilds, threads, unseen, mentioned, guild_folders, activi
                     bare_channels.append({
                         "id": channel["id"],
                         "name": channel["name"],
+                        "position": channel["position"],
                         "channels": None,
                         "muted": muted_ch,
                         "hidden": hidden_ch,
@@ -2398,12 +2387,10 @@ def generate_tree(dms, guilds, threads, unseen, mentioned, guild_folders, activi
                         "ping": mentioned_ch,
                         "active": active,
                     })
-                    bare_channels_position.append(channel["position"])
         categories += bare_channels
-        categories_position += bare_channels_position
 
         # sort categories by position key
-        categories = sort_by_indexes(categories, categories_position)
+        categories = sorted(categories, key=lambda x: x["position"])
 
         # add guild to the tree
         name = guild["name"]
@@ -2446,10 +2433,7 @@ def generate_tree(dms, guilds, threads, unseen, mentioned, guild_folders, activi
                     category_index = len(tree_format)
 
                     # sort channels by position key
-                    channels_position = []
-                    for channel in category["channels"]:
-                        channels_position.append(channel["position"])
-                    category["channels"] = sort_by_indexes(category["channels"], sorted_indexes(channels_position))
+                    category["channels"] = sorted(category["channels"], key=lambda x: x["position"])
 
                     # add to the tree
                     name = category["name"]
