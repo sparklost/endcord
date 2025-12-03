@@ -13,7 +13,14 @@ import urllib
 import urllib.parse
 import zlib
 
-import orjson as json
+try:
+    import orjson as json
+except ImportError:
+    try:
+        import ujson as json
+    except ImportError:
+        import json
+
 import socks
 import websocket
 from discord_protos import PreloadedUserSettings
@@ -897,7 +904,7 @@ class Gateway():
                         if user["id"] == user_id:
                             selected_activities[num] = {
                                 "id": user_id,
-                                "status": data["status"],
+                                "status": data.get("status"),   # spacebar_fix - status
                                 "custom_status": custom_status,
                                 "activities": activities,
                             }
@@ -905,7 +912,7 @@ class Gateway():
                     else:
                         selected_activities.append({
                             "id": data["user"]["id"],
-                            "status": data["status"],
+                            "status": data.get("status"),   # spacebar_fix - get
                             "custom_status": custom_status,
                             "activities": activities,
                         })

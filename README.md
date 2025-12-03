@@ -366,7 +366,7 @@ Only connecting to spacebar instances is known to work, but endcord may crash at
 
 ### Termux
 Endcord does work under termux, but some keybindings dont (`Ctrl/Alt+Space`). It is recommended to rebind them in endcord config or use endcord in desktop environment (like `openbox`) in a terminal emulator with xterm256-colors (like `alacritty`) and with Termux:X11 app.  
-Endcord cant be built in termux, so to run it: first install python >= 3.12 and `uv`, then clone this repo, cd to folder and run it from source: `uv run main.py` (it will take some time to download and build numpy and orjson). To skip waiting for some dependencies, or if it fails building them run: `uv remove numpy soundcard soundfile orjson`, and then patch files with: `find . -maxdepth 2 -type f -name "*.py" -exec sed -i 's/orjson/json/g' {} +`.  
+Endcord cant be built in termux, so to run it: first install python >= 3.12 and `uv`, then clone this repo, cd to folder and run it from source: `uv run main.py` (it will take some time to download and build numpy and orjson). To skip waiting for some dependencies, or if it fails building them run: `uv remove numpy soundcard soundfile orjson`.
 To enable android notifications simply run `pkg install termux-api` and install Termux:API app. Vibration is disabled by default, to enable it: run endcord at least once, then in Termux:Api notification settings enable vibration for endcord ntifications.  
 Notifications will work as ling as endcord is running, so it might be necessary for termux to "Acquire wakelock".  
 
@@ -423,9 +423,10 @@ Never tested on macOS. Feedback is welcome.
 To see all build script options, run: `uv run build.py -h`.  
 To build endcord-lite, add `--lite` flag. No voice calls and ascii media, slightly less RAM usage, smaller executable, faster startup.  
 To build into directory, not as a single executable, add `--onedir` flag. Will speed up startup.  
-To build with Nuitka, add `--nuitka` flag. More optimized, smaller executable, long compile time. See [Nuitka](#nuitka) for more info.  
+To build with Nuitka, add `--nuitka` flag. Optimized, smaller executable, long compile time. See [Nuitka](#nuitka) for more info.  
 If compiler is not available, or built binary is failing, try building with `--nocython`, which will produce slightly less optimized binaries.  
-To toggle [experimental windowed mode](#experimental-windowed-mode) run: `uv run build.py --toggle-experimental`
+To toggle [experimental windowed mode](#experimental-windowed-mode) run: `uv run build.py --toggle-experimental`.  
+If you want to build without `orjson` (uses rust), run `uv remove orjson` for the first time, before running anything else. This will make it fallback to standard json (more CPU usage by game detection). Optionally it can use `ujson`, run `uv add ujson` to install it.  
 
 ### Linux
 1. Clone this repository: `git clone https://github.com/sparklost/endcord.git`

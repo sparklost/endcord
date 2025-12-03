@@ -11,6 +11,7 @@ settings = {
     "send_typing": True,
     "desktop_notifications": True,
     "notification_in_active": True,
+    "remove_previous_notification": True,
     "ack_throttling": 5,
     "member_list": True,
     "member_list_auto_open": True,

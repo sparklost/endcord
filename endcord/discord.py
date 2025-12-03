@@ -9,7 +9,14 @@ import time
 import urllib.parse
 import uuid
 
-import orjson as json
+try:
+    import orjson as json
+except ImportError:
+    try:
+        import ujson as json
+    except ImportError:
+        import json
+
 import socks
 from discord_protos import FrecencyUserSettings, PreloadedUserSettings
 from google.protobuf.json_format import MessageToDict, ParseDict
@@ -2046,7 +2053,12 @@ class Discord():
             return None
         json_array_objects = peripherals.json_array_objects   # to skip name lookup
         if response.status == 200:
-            with open(save_path, "wb") as f:
+            using_orjson = json.__name__ == "orjson"
+            if using_orjson:
+                nl = b"\n"
+            else:
+                nl = "\n"
+            with open(save_path, "w" + ("b" if using_orjson else "")) as f:
                 try:
                     for app in json_array_objects(response):
                         executables = []
@@ -2061,7 +2073,7 @@ class Discord():
                         if not executables:
                             continue
                         ready_app = (app["id"], app["name"], executables)
-                        f.write(json.dumps(ready_app) + b"\n")
+                        f.write(json.dumps(ready_app) + nl)
                 except Exception as e:
                     logger.error(f"Error decoding detectable apps json: {e}")
                     return False

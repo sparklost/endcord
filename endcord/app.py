@@ -124,6 +124,7 @@ class Endcord:
         self.assist_score_cutoff = config["assist_score_cutoff"]
         self.external_editor = config["external_editor"]
         self.limit_command_history = config["limit_command_history"]
+        self.remove_prev_notif = ["remove_previous_notification"]
 
         if not self.external_editor or not shutil.which(self.external_editor):
             self.external_editor = os.environ.get("EDITOR", "nano")
@@ -602,9 +603,11 @@ class Endcord:
         if not self.forum and self.messages:
             self.add_to_channel_cache(self.active_channel["channel_id"], self.messages, self.active_channel.get("pinned", False))
 
-        # remove unread line for previous channel
+        # remove unread line for previous channel only if set as seen
         if self.active_channel["channel_id"] and self.active_channel["channel_id"] in self.read_state:
-            self.read_state[self.active_channel["channel_id"]]["last_acked_unreads_line"] = None
+            channel = self.read_state.get(channel_id)
+            if not channel or channel["last_message_id"] == channel["last_acked_message_id"]:
+                self.read_state[self.active_channel["channel_id"]]["last_acked_unreads_line"] = None
 
         # update active channel
         self.active_channel["guild_id"] = guild_id
@@ -5291,12 +5294,12 @@ class Endcord:
             if self.enable_notifications and remove_notification:
                 for num, notification in enumerate(self.notifications):
                     if notification["channel_id"] == channel_id:
-                        notification_id = self.notifications.pop(num)["notification_id"]
+                        notification_id = self.notifications.pop(num)["id"]
                         peripherals.notify_remove(notification_id)
                         break
 
 
-    def set_channel_unseen(self, channel_id, message_id, ping, skip_unread, last_acked_message_id=1):
+    def set_channel_unseen(self, channel_id, message_id, ping, skip_unread, last_acked_message_id=1, set_line=True):
         """Set one channel as unseen"""
         update_tree = False
         channel = self.read_state.get(channel_id)
@@ -5309,7 +5312,7 @@ class Endcord:
                 self.read_state[channel_id]["last_acked_message_id"] = last_acked_message_id
             if ping:
                 self.read_state[channel_id]["mentions"].append(message_id)
-            if channel.get("last_acked_unreads_line") is None:
+            if channel.get("last_acked_unreads_line") is None and set_line:
                 # last_acked_unreads_line is used to persist unreads line even after channel is acked
                 self.read_state[channel_id]["last_acked_unreads_line"] = self.read_state[channel_id]["last_acked_message_id"]
         else:
@@ -5583,7 +5586,6 @@ class Endcord:
             # limit chat size
             if len(self.messages) > self.limit_chat_buffer:
                 self.messages.pop(-1)
-            self.update_chat(change_amount=1, scroll=False)
             update_status_line = False
             if bool(self.tui.get_chat_selected()[1]):
                 if not self.new_unreads:
@@ -5604,6 +5606,7 @@ class Endcord:
                         self.slowmode_thread.start()
                 if self.read_state.get(channel_id):
                     self.read_state[channel_id]["last_acked_unreads_line"] = None
+            self.update_chat(change_amount=1, scroll=False)
             if update_status_line:
                 self.update_status_line()
         else:
@@ -5770,6 +5773,7 @@ class Endcord:
                         ping,
                         this_channel and not self.new_unreads,
                         last_acked_message_id,
+                        set_line=not(self.new_unreads and this_channel),
                     )
                     if this_channel and self.new_unreads:
                         self.update_chat(scroll=False)
@@ -5786,7 +5790,7 @@ class Endcord:
                     if self.enable_notifications:
                         for num_1, notification in enumerate(self.notifications):
                             if notification["channel_id"] == channel_id:
-                                notification_id = self.notifications.pop(num_1)["notification_id"]
+                                notification_id = self.notifications.pop(num_1)["id"]
                                 peripherals.notify_remove(notification_id)
                                 break
 
@@ -6255,10 +6259,21 @@ class Endcord:
 
     def send_desktop_notification(self, new_message):
         """
-        Send desktop notification, and handle its ID so it can be removed.
+        Send desktop notification, and keep its ID so it can be removed.
         """
         if self.enable_notifications and self.my_status["status"] != "dnd":
             data = new_message["d"]
+            channel_id = data["channel_id"]
+
+            # remove previous notification
+            if self.remove_prev_notif:
+                for num, notification in enumerate(self.notifications):
+                    if notification["channel_id"] == channel_id:
+                        peripherals.notify_remove(notification["id"])
+                        self.notifications.pop(num)
+                        break
+
+            # collect data
             for guild in self.guilds:
                 if guild["guild_id"] == data["guild_id"]:
                     guild_name = guild["name"]
@@ -6268,6 +6283,7 @@ class Endcord:
                 guild_name = None
                 channels = []
 
+            # build and send notification
             title, body = formatter.generate_message_notification(
                 data,
                 channels,
@@ -6281,9 +6297,11 @@ class Endcord:
                 sound=self.notification_sound,
                 custom_sound=self.notification_path,
             )
+
+            # save notification id
             self.notifications.append({
-                "notification_id": notification_id,
-                "channel_id": data["channel_id"],
+                "id": notification_id,
+                "channel_id": channel_id,
             })
 
 
@@ -6474,7 +6492,7 @@ class Endcord:
             self.active_channel["guild_id"] and
             self.screen.getmaxyx()[1] - self.config["tree_width"] - self.member_list_width - 2 >= 32
         ):
-            self.member_list_visible
+            self.member_list_visible = True
             self.update_member_list()
 
         # send new presence

@@ -6,7 +6,13 @@ import threading
 import time
 from datetime import datetime
 
-import orjson as json
+try:
+    import orjson as json
+except ImportError:
+    try:
+        import ujson as json
+    except ImportError:
+        import json
 
 from endcord import peripherals
 

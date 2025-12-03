@@ -28,6 +28,8 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
     Allow sending desktop notifications when user is pinged/mentioned.
 - `notification_in_active = True`  
     Allow sending desktop notifications for mentions even in active channel.
+- `remove_previous_notification = True`  
+    Remove previous desktop notification thats coming from same DM/Channel.  
 - `ack_throttling = 5`  
     Delay in seconds between each ack send. Minimum is 3s. The larger it is, the longer will `[New unreads]` stay in status line.
 - `member_list = True`  

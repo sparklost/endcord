@@ -209,5 +209,8 @@ user/flags - missing
 - `GUILD_MEMBERS_CHUNK`:
 /members/user/global_name - missing  
 
+- `PRESENCE_UPDATE`:
+/status - missing
+
 - Misc:
 Spacebar is still using old `user_settings` instead new protobuf settings.  

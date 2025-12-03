@@ -1,3 +1,4 @@
+import json
 import logging
 import queue
 import random
@@ -10,7 +11,6 @@ import urllib.parse
 
 import av
 import nacl.bindings
-import orjson as json
 import socks
 import websocket
 

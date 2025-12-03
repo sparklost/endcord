@@ -1,5 +1,4 @@
-Fix emojis in chat removing borders
-Fix wrong channel sorting, again
+Fix wrong channel sorting
 Replace @username @role and #channel in input line
 
 Add more extension points

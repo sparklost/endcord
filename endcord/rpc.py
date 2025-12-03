@@ -7,8 +7,6 @@ import sys
 import threading
 import time
 
-import orjson
-
 if sys.platform == "win32":
     import pywintypes
     import win32file
@@ -38,7 +36,7 @@ def receive_data_linux(connection):
         header = connection.recv(8)
         op, length = struct.unpack("<II", header)
         data = connection.recv(length)
-        final_data = orjson.loads(data)
+        final_data = json.loads(data)
         return op, final_data
     except struct.error as e:
         logger.error(e)
