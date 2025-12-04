@@ -1297,10 +1297,7 @@ def generate_status_line(my_user_data, my_status, unseen, typing, active_channel
     if len(typing) == 0:
         typing_string = ""
     elif len(typing) == 1:
-        if use_nick and typing[0]["nick"]:
-            typing_string = typing[0]["nick"]
-        else:
-            typing_string = typing[0]["username"]
+        typing_string = get_global_name(typing[0], use_nick)
         # -15 is for "(... is typing)"
         typing_string = typing_string[:limit_typing - 15]
         suffix = " is typing"
@@ -1308,10 +1305,7 @@ def generate_status_line(my_user_data, my_status, unseen, typing, active_channel
     else:
         usernames = []
         for user in typing:
-            if use_nick and user["nick"]:
-                usernames.append(user["nick"])
-            else:
-                usernames.append(user["username"])
+            usernames.append(get_global_name(user, use_nick))
         typing_string = "\n ".join(usernames)
         # -13 is for "( are typing)"
         if len(typing_string) > limit_typing - 13:

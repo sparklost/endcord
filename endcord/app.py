@@ -281,6 +281,7 @@ class Endcord:
         self.discord.get_voice_regions()
         if config["extensions"] and ENABLE_EXTENSIONS:
             self.load_extensions(version)
+            self.tui.load_extensions(self.extensions, self.extension_cache)
         self.main()
 
 
@@ -347,10 +348,10 @@ class Endcord:
 
         # try to load from cache (improves performance with many extensions)
         if cache:
-            for ext in self.extension_cache:
+            for extension_point in self.extension_cache:
                 data = args
-                if ext[0] == method_name:
-                    for method in ext[1]:
+                if extension_point[0] == method_name:
+                    for method in extension_point[1]:
                         result = method(*data)
                         if result is not None:
                             if not isinstance(result, tuple):
@@ -380,15 +381,35 @@ class Endcord:
         return args
 
 
-    def execute_extensions_method_first(self, method_name, *args):
-        """Execute specific method for each extension if extension has this method, return on method that returns True"""
+    def execute_extensions_method_first(self, method_name, *args, cache=False):
+        """Execute specific method for each extension if extension has this method, and chain them"""
+        if not self.extensions:
+            return args
+
+        # try to load from cache (improves performance with many extensions)
+        if cache:
+            result = False
+            for extension_point in self.extension_cache:
+                if extension_point[0] == method_name:
+                    for method in extension_point[1]:
+                        result = method(*args)
+                        if result:
+                            return result
+
+        # try to load method from extensions and add to cache
+        result = False
+        methods = []
         for extension in self.extensions:
             method = getattr(extension, method_name, None)
             if callable(method):
+                if cache:
+                    methods.append(method)
                 result = method(*args)
                 if result:
-                    return True
-        return False
+                    break
+        if cache:
+            self.extension_cache.append((method_name, methods))
+        return result
 
 
     def profiling_auto_exit(self):
@@ -2011,6 +2032,10 @@ class Endcord:
             elif action >= 100:
                 self.curses_media.control_codes(action)
 
+            # execute extensions bindings
+            elif self.execute_extensions_method_first("on_wait_input", action, input_text, chat_sel, tree_sel, cache=True):
+                pass
+
             # enter
             elif (action == 0 and input_text and input_text != "\n" and self.active_channel["channel_id"]) or self.command:
                 if self.assist_word is not None and self.assist_found:
@@ -2399,7 +2424,7 @@ class Endcord:
         if cmd_type == 0:
             if cmd_args:
                 self.update_extra_line("Invalid command arguments.")
-            elif self.execute_extensions_method_first("on_call_voice_gateway_event", cmd_text, chat_sel, tree_sel):
+            elif self.execute_extensions_method_first("on_execute_command", cmd_text, chat_sel, tree_sel):
                 pass
             else:
                 self.update_extra_line("Unknown command.")

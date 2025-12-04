@@ -61,7 +61,7 @@ Arguments are chained between extensions having same named method, extensions ar
 Method names can be searched in `./endcord/app.py` code to see where they are executed.  
 
 ### List of extension access points names and their locations in endcord code:
-- `__init__` - on end of app init
+- `__init__` - on end of app class init
 - `on_main_start` - just before main loop starts
 - `on_main_loop` - first in main loop
 - `on_message_event` - in main loop, when message event is received, before event is processed, has event at input and output
@@ -75,19 +75,40 @@ Method names can be searched in `./endcord/app.py` code to see where they are ex
 - `on_call_gateway_event` - in process_call_voice_gateway_events, before event is processed, has event at input and output
 - `on_call_voice_gateway_event` - in process_call_voice_gateway_events, before event is processed, has event at input and output
 - `on_execute_command` - at the start of execute_command, ran only of there are no matched builtin commands
+- `init_bindings` - in load_extensions in tui.py, executed right after initializing all extensions in app.py
+- `on_binding` - at the end of common_keybindings in tui.py, executed only if there are no default bindings matched
+- `on_wait_input` - at the end of wait_input in app.py, executed only if there are no default action codes matched
 
 
 ## Adding a command
-To add a command:
-1. Add method named `on_execute_command` to extension class, it takes 3 arguments - command text, line selected in chat and line selected in channel tree.
-2. In this method match keyword usually with `cmd_text.startswith("some_text")`, and if needed use regex to match arguments like channel id, numbers etc.
-3. If nothing is matched, return `False`.
-4. If command is matched, execute your code, then return True.
-5. Optionallly add global constant `EXT_COMMAND_ASSIST` with format: `(("command - descriotion", "command"), (...)...)`. It will be appended to builtin commands.
-6. Some commands shouldn't be executed when viewing forum, to check if forum is opened use `if self.app.forum:`
-7. To get message/forum thread object use: `self.messages[self.lines_to_msg(chat_sel)]`
-8. To get metadata for selected object in tree use: `self.tree_metadata[tree_sel]`
+1. Add method named `on_execute_command` to extension class, it takes 3 arguments: `command_text` (str), `chat_sel` (int) - line selected in the chat, `tree_sel` (int) -  line selected in the channel tree.
+    - Match keyword usually with `cmd_text.startswith("some_text")`, and if needed, use regex to match arguments like channel id, numbers etc.
+    - If nothing is matched, return `False`.
+    - If command is matched, execute your code, then return True.
+    - Some commands shouldn't be executed when viewing forum, to check if forum is opened use `if self.app.forum:`
+    - To get message/forum thread object use: `self.messages[self.lines_to_msg(chat_sel)]`
+    - To get metadata for selected object in tree use: `self.tree_metadata[tree_sel]`
+2. Optionally add global constant `EXT_COMMAND_ASSIST` with format: `(("command - descriotion", "command"), (...)...)`. It will be appended to builtin commands.
 
+
+## Adding a binding
+1. Add method `init_bindings` to extension class, it takes 1 argumet: `keybindings` - a dict: {keybinding_name: value}
+    - First try to load binding from `keybindings` which follows format given in #settings, it should have default value.
+    - Store those values in the class, they will be accessed by `on_binding`
+    - It must return a dict containing only this extensions bindings, with format: {keybinding_name: value}
+2. Add method named `on_binding` to extension class, it takes 3 arguments: `key`, `is_command` (bool), `is_forum` (bool)
+    - `key` will be same thing as printed in keybinding resolver. `is_forum` means that currently command is being typed. `is_forum` means that forum is currently opened.
+    - Test if `key` is same as specific keybinding that was defined in `init_bindings`.
+    - `on_binding` must return value that represents the action code. This action code is matched in `on_wait_input`. It is recommended to use action codes above 1000 to avoid any collisions with default ones, and other extensions.
+    - If no key is matched, return `None`
+    - If needed execute tui related code with `self.app.tui.some_function()`
+3. Add method named `on_wait_input` to extension class, it takes 3 arguments: `action_code` (int), `input_text` (str), `chat_sel` (int), `tree_sel` (int)
+    - test for action code
+    - If matched:
+    - `self.restore_input_text = (input_text, "standard")` - this will set mode to "standard" for input line and keep same `input_text` in input line when binding is pressed.
+    - Alternatively modify `input_text` or change mode: "standard", "standard extra", "standard insert", "prompt", "after prompt", "autocomplete", "search", "command", "react", "edit".
+    - If there is going to be a prompt and input text should be cached and later restored: set `self.restore_input_text = (None, "prompt")`, and `self.add_to_store(self.active_channel["channel_id"], input_text)`
+    - Return `True` only if binding is matched
 
 ## Modifying existing code
 Existing code in endcord `app` class can be modified, by replacing `app` class methods with custom methods.  

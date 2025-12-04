@@ -1,8 +1,14 @@
-Add extension API for custom bindings
-    Add binding to tui
-    Add to wait_input to execute binding
 Add extension API for custom gateway event handling
 Add extension API for custom request in discord.py
+
+Add right message side format string
+    calculate post_content_len
+    split content on it
+    add special format string for main message
+    after splitting append it to text
+    add special format string for message newline
+    after splitting newline append it to text
+    same for reply, react and interaction line
 
 Voice channels
     add voice channels to tree

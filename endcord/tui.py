@@ -231,6 +231,7 @@ class TUI():
         self.keybindings = {key: (val,) if not isinstance(val, tuple) else val for key, val in keybindings.items()}
         self.switch_tab_modifier = self.keybindings["switch_tab_modifier"][0][:-4]
         self.screen = screen
+        self.extensions = []
 
         # load config
         self.bordered = not(config["compact"])
@@ -263,16 +264,7 @@ class TUI():
             self.mouse_scroll = self.mouse_scroll_content
 
         # find all keybinding first-chain-parts
-        self.chainable = []
-        for binding_group in self.keybindings.values():
-            for binding in binding_group:
-                if isinstance(binding, str):
-                    split_binding = binding.split("-")
-                    if len(split_binding) == 1:
-                        continue
-                    elif len(split_binding) > 2:
-                        sys.exit(f"Invalid keybinding: {binding}")
-                    self.chainable.append(split_binding[0])
+        self.init_chainable()
 
         # initial values
         if not (self.blink_cursor_on and self.blink_cursor_off):
@@ -361,6 +353,66 @@ class TUI():
             self.blink_cursor_thread = threading.Thread(target=self.blink_cursor, daemon=True)
             self.blink_cursor_thread.start()
         self.need_update.set()
+
+
+    def init_chainable(self):
+        """Find all first-parts of chained keybindings"""
+        self.chainable = []
+        for binding_group in self.keybindings.values():
+            for binding in binding_group:
+                if isinstance(binding, str):
+                    split_binding = binding.split("-")
+                    if len(split_binding) == 1:
+                        continue
+                    elif len(split_binding) > 2:
+                        sys.exit(f"Invalid keybinding: {binding}")
+                    self.chainable.append(split_binding[0])
+
+
+    def load_extensions(self, extensions, extension_cache):
+        """Load already initialized extensions from app class"""
+        self.extensions = extensions
+        self.extension_cache = extension_cache
+
+        # init bindings
+        for extension in self.extensions:
+            method = getattr(extension, "init_bindings", None)
+            if callable(method):
+                new_bindings = method(self.keybindings)
+                if isinstance(new_bindings, dict):
+                    self.keybindings.update(new_bindings)
+        self.init_chainable()
+
+
+    def execute_extensions_method_first(self, method_name, *args, cache=False):
+        """Execute specific method for each extension if extension has this method, and chain them"""
+        if not self.extensions:
+            return args
+
+        # try to load from cache (improves performance with many extensions)
+        if cache:
+            result = False
+            for extension_point in self.extension_cache:
+                if extension_point[0] == method_name:
+                    for method in extension_point[1]:
+                        result = method(*args)
+                        if result:
+                            return result
+
+        # try to load method from extensions and add to cache
+        result = False
+        methods = []
+        for extension in self.extensions:
+            method = getattr(extension, method_name, None)
+            if callable(method):
+                if cache:
+                    methods.append(method)
+                result = method(*args)
+                if result:
+                    break
+        if cache:
+            self.extension_cache.append((method_name, methods))
+        return result
 
 
     def screen_update(self):
@@ -1870,7 +1922,7 @@ class TUI():
             self.add_to_delta_store("BACKSPACE", letter)
 
 
-    def common_keybindings(self, key, mouse=False, switch=False, command=False):
+    def common_keybindings(self, key, mouse=False, switch=False, command=False, forum=False):
         """Handle keybinding events that are common for all buffers"""
         if key == curses.KEY_UP:   # UP
             if command:
@@ -1994,6 +2046,12 @@ class TUI():
 
         elif key in self.keybindings["quit"]:
             return 49
+
+        # check extensions bindings
+        else:
+            ext_ret = self.execute_extensions_method_first("on_binding", key, command, forum, cache=True)
+            if isinstance(ext_ret, int):
+                return ext_ret
 
         return None
 
@@ -2132,7 +2190,7 @@ class TUI():
                     self.input_select_start = None
                     return self.return_input_code(0)
 
-            code = self.common_keybindings(key, command=command)
+            code = self.common_keybindings(key, command=command, forum=forum)
             if code:
                 return self.return_input_code(code)
 
