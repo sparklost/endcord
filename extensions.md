@@ -78,6 +78,7 @@ Method names can be searched in `./endcord/app.py` code to see where they are ex
 - `init_bindings` - in load_extensions in tui.py, executed right after initializing all extensions in app.py
 - `on_binding` - at the end of common_keybindings in tui.py, executed only if there are no default bindings matched
 - `on_wait_input` - at the end of wait_input in app.py, executed only if there are no default action codes matched
+- `gateway_event` - at the end of loop in receiver in gateway.py, event data is passed as argument, ready event is skipped (will pass `None`)
 
 
 ## Adding a command
@@ -109,6 +110,7 @@ Method names can be searched in `./endcord/app.py` code to see where they are ex
     - Alternatively modify `input_text` or change mode: "standard", "standard extra", "standard insert", "prompt", "after prompt", "autocomplete", "search", "command", "react", "edit".
     - If there is going to be a prompt and input text should be cached and later restored: set `self.restore_input_text = (None, "prompt")`, and `self.add_to_store(self.active_channel["channel_id"], input_text)`
     - Return `True` only if binding is matched
+
 
 ## Modifying existing code
 Existing code in endcord `app` class can be modified, by replacing `app` class methods with custom methods.  

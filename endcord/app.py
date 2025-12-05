@@ -281,7 +281,8 @@ class Endcord:
         self.discord.get_voice_regions()
         if config["extensions"] and ENABLE_EXTENSIONS:
             self.load_extensions(version)
-            self.tui.load_extensions(self.extensions, self.extension_cache)
+            self.tui.load_extensions(self.extensions)
+            self.gateway.load_extensions(self.extensions)
         self.main()
 
 
@@ -382,7 +383,7 @@ class Endcord:
 
 
     def execute_extensions_method_first(self, method_name, *args, cache=False):
-        """Execute specific method for each extension if extension has this method, and chain them"""
+        """Execute specific method for each extension if extension has this method, and chain them, without chaining, stop on first run extension"""
         if not self.extensions:
             return args
 

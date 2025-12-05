@@ -1,14 +1,9 @@
-Add extension API for custom gateway event handling
-Add extension API for custom request in discord.py
-
 Add right message side format string
+    add %filler to chat formats
+    split each format on it
     calculate post_content_len
-    split content on it
-    add special format string for main message
-    after splitting append it to text
-    add special format string for message newline
-    after splitting newline append it to text
-    same for reply, react and interaction line
+    include it in splitting content
+    after splitting append part after filler to text before its added to chat
 
 Voice channels
     add voice channels to tree

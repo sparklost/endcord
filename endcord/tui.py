@@ -369,10 +369,10 @@ class TUI():
                     self.chainable.append(split_binding[0])
 
 
-    def load_extensions(self, extensions, extension_cache):
+    def load_extensions(self, extensions):
         """Load already initialized extensions from app class"""
         self.extensions = extensions
-        self.extension_cache = extension_cache
+        self.extension_cache = []
 
         # init bindings
         for extension in self.extensions:
@@ -385,7 +385,7 @@ class TUI():
 
 
     def execute_extensions_method_first(self, method_name, *args, cache=False):
-        """Execute specific method for each extension if extension has this method, and chain them"""
+        """Execute specific method for each extension if extension has this method, without chaining, stop on first run extension"""
         if not self.extensions:
             return args
 

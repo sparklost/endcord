@@ -77,6 +77,7 @@ class Gateway():
             "Sec-WebSocket-Extensions: permessage-deflate",
             f"User-Agent: {user_agent}",
         ]
+        self.extensions = []
         self.client_prop = client_prop
         self.init_time = time.time() * 1000
         self.token = token
@@ -141,6 +142,38 @@ class Gateway():
         self.app_command_autocomplete_resp = []
         self.voice_gateway_data = {}
         self.voice_gateway_data_ready = 0
+
+
+    def load_extensions(self, extensions):
+        """Load already initialized extensions from app class"""
+        self.extensions = extensions
+        self.extension_cache = []
+
+
+    def execute_extensions_method_nochain(self, method_name, *args, cache=False):
+        """Execute specific method for each extension if extension has this method, without chaining"""
+        if not self.extensions:
+            return args
+
+        # try to load from cache (improves performance with many extensions)
+        if cache:
+            for extension_point in self.extension_cache:
+                if extension_point[0] == method_name:
+                    for method in extension_point[1]:
+                        _ = method(*args)
+            return
+
+        # try to load method from extensions and add to cache
+        methods = []
+        for extension in self.extensions:
+            method = getattr(extension, method_name, None)
+            if callable(method):
+                if cache:
+                    methods.append(method)
+                _ = method(*args)
+        if cache:
+            self.extension_cache.append((method_name, methods))
+
 
 
     def thread_guard(self):
@@ -783,6 +816,7 @@ class Gateway():
                     logger.debug(time_log_string)
                     # READY is huge so lets save some memory
                     del (response, data, guild, guild_channels, role, guild_roles, last_messages, time_log_string)
+                    data = None
                     gc.collect()
 
                 elif optext == "READY_SUPPLEMENTAL":
@@ -1574,6 +1608,8 @@ class Gateway():
                                     self.user_update = (None, None)
                                 self.guild_roles_changed = (guild_id, role["id"])
                                 break
+
+                self.execute_extensions_method_nochain("on_gateway_event", data, cache=True)
 
             elif opcode == 7:
                 logger.info("Host requested reconnect")
