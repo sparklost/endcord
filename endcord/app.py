@@ -6329,7 +6329,7 @@ class Endcord:
             else:
                 guild_name = None
                 channels = []
-            for guild in self.roles:
+            for guild in self.all_roles:
                 if guild["guild_id"] == guild_id:
                     guild_roles = guild["roles"]
                     break
