@@ -177,7 +177,7 @@ def search_usernames_roles(roles, query_results, guild_id, gateway, query, limit
     return sorted(results, key=lambda x: x[2], reverse=True)
 
 
-def search_emojis(all_emojis, premium, guild_id, query, limit=50, score_cutoff=15):
+def search_emojis(all_emojis, premium, guild_id, query, safe_emoji=False, limit=50, score_cutoff=15):
     """Search for emoji"""
     results = []
     worst_score = score_cutoff
@@ -211,7 +211,10 @@ def search_emojis(all_emojis, premium, guild_id, query, limit=50, score_cutoff=1
                 continue
             # emoji.EMOJI_DATA = {emoji: {"en": ":emoji_name:", "status": 2, "E": 3}...}
             # using only qualified emojis (status: 2)
-            formatted = f"{item["en"]} - {key}"
+            if safe_emoji:
+                formatted = item["en"]
+            else:
+                formatted = f"{item["en"]} - {key}"
             score = fuzzy_match_score(query, formatted)
             if score < worst_score:
                 continue

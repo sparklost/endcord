@@ -61,6 +61,29 @@ def normalize_int_str(input_int, digits_limit):
     return int_str
 
 
+def demojize(text):
+    """Safely demojize string"""
+    if not text:
+        return text
+    return emoji.demojize(text)
+
+
+def demojize_message(message):
+    """Safely demojize message"""
+    message["content"] = demojize(message["content"])
+    message["username"] = demojize(message["username"])
+    message["global_name"] = demojize(message.get("global_name"))
+    if message["referenced_message"]:
+        referenced = message["referenced_message"]
+        referenced["content"] = demojize(referenced["content"])
+        referenced["username"] = demojize(referenced["username"])
+        referenced["global_name"] = demojize(referenced.get("global_name"))
+    for embed in message["embeds"]:
+        if embed["type"] == "rich":
+            embed["url"] = demojize(embed["url"])
+    return message
+
+
 def generate_timestamp(discord_time, format_string, timezone=True):
     """Convert discord timestamp string to formatted string and optionally convert to current timezone"""
     try:
@@ -1026,7 +1049,9 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
         newline_index = max_length
         quote_nl = True
         if len_wch(message_line) > max_length:
-            newline_index = len(message_line[:max_length].rsplit(" ", 1)[0])   #  splits line on space
+            newline = message_line[:max_length].rsplit(" ", 1)[0]   # split line on space
+            newline_index = len(newline)
+            emoji_count = len_wch(newline) - newline_index
             # if there is \n on current line, use its position to split line
             if "\n" in message_line[:max_length]:
                 newline_index = message_line.index("\n")
@@ -1037,17 +1062,18 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
                 newline_text = lazy_replace(format_newline, "%timestamp", lambda: generate_timestamp(message["timestamp"], format_timestamp, convert_timezone))
                 newline_text = newline_text.replace("%content", "")
                 if newline_index <= len(newline_text):
-                    newline_index = max_length
+                    newline_index = max_length - (len_wch(message_line[:max_length]) - len(message_line[:max_length]))
+                    emoji_count = 0
                     quote_nl = False
                 else:
                     quote_nl = False
             if message_line[newline_index] in (" ", "\n"):   # remove space and \n
-                next_line = message_line[newline_index+1:]
+                next_line = message_line[newline_index - emoji_count + 1:]
                 split_on_space = 1
             else:
-                next_line = message_line[newline_index:]
+                next_line = message_line[newline_index - emoji_count:]
                 split_on_space = 0
-            message_line = message_line[:newline_index]
+            message_line = message_line[:newline_index - emoji_count]
         elif "\n" in message_line:
             newline_index = message_line.index("\n")
             next_line = message_line[newline_index+1:]
@@ -1145,23 +1171,26 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
             # limit new_line and split to next line
             newline_sign = False
             if len_wch(new_line) > max_length - bool(code_block_format):
-                newline_index = len(new_line[:max_length - bool(code_block_format)].rsplit(" ", 1)[0])
+                newline = new_line[:max_length - bool(code_block_format)].rsplit(" ", 1)[0]   # split line on space
+                newline_index = len(newline)
+                emoji_count = len_wch(newline) - newline_index
                 if "\n" in new_line[:max_length]:
                     newline_index = new_line.index("\n")
                     quote = False
                     newline_sign = True
                     split_on_space = 0
                 elif newline_index <= newline_len + 2*quote:
-                    newline_index = max_length - bool(code_block_format)
+                    newline_index = max_length - bool(code_block_format) - (len_wch(message_line[:max_length]) - len(message_line[:max_length]))
+                    emoji_count = 0
                 try:
                     if new_line[newline_index] in (" ", "\n"):   # remove space and \n
-                        next_line = new_line[newline_index+1:]
+                        next_line = new_line[newline_index - emoji_count + 1:]
                         split_on_space = 1
                     else:
-                        next_line = new_line[newline_index:]
+                        next_line = new_line[newline_index - emoji_count:]
                         split_on_space = 0
                 except IndexError:
-                    next_line = new_line[newline_index+1:]
+                    next_line = new_line[newline_index - emoji_count + 1:]
                     split_on_space = 1
                 new_line = new_line[:newline_index]
             elif "\n" in new_line:

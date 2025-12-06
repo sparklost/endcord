@@ -125,6 +125,7 @@ class Endcord:
         self.external_editor = config["external_editor"]
         self.limit_command_history = config["limit_command_history"]
         self.remove_prev_notif = ["remove_previous_notification"]
+        self.emoji_as_text = self.config["emoji_as_text"]
 
         if not self.external_editor or not shutil.which(self.external_editor):
             self.external_editor = os.environ.get("EDITOR", "nano")
@@ -603,7 +604,7 @@ class Endcord:
                     self.dms.remove(dm)
 
 
-    def switch_channel(self, channel_id, channel_name, guild_id, guild_name, parent_hint=None, preload=False):
+    def switch_channel(self, channel_id, channel_name, guild_id, guild_name, parent_hint=None, preload=False, delay=False):
         """
         All that should be done when switching channel.
         If it is DM, guild_id and guild_name should be None.
@@ -629,8 +630,10 @@ class Endcord:
             self.cache_deleted()
 
         # check if should open member list
-        open_member_list = self.member_list_auto_open and guild_id != self.active_channel["guild_id"]
-
+        open_member_list = (
+            self.member_list_auto_open and guild_id != self.active_channel["guild_id"] and
+            self.screen.getmaxyx()[1] - self.config["tree_width"] - self.member_list_width - 2 >= 32
+        )
 
         # clear member roles when switching guild so there are no issues with same members in both guilds
         if guild_id != self.active_channel["guild_id"]:
@@ -827,6 +830,8 @@ class Endcord:
             self.tui.remove_member_list()
         elif self.member_list_visible or open_member_list:
             self.member_list_visible = True
+            if delay:
+                time.sleep(0.01)   # needed when startup to fix issues with emojis and border lines
             self.update_member_list(reset=True)
         self.close_extra_window()
         if self.disable_sending:
@@ -3820,6 +3825,11 @@ class Endcord:
         if self.keep_deleted and messages:
             messages = self.restore_deleted(messages)
 
+        # emoji safe
+        if self.emoji_as_text:
+            for num_msg, message in enumerate(messages):
+                messages[num_msg] = formatter.demojize_message(message)
+
         current_guild = self.active_channel["guild_id"]
         if not current_guild:
             # skipping dms
@@ -3969,6 +3979,10 @@ class Endcord:
             messages = self.discord.get_messages(self.state["last_channel_id"], self.msg_num)
             if messages is None:   # network error
                 return
+            # emoji safe
+            if self.emoji_as_text:
+                for num, message in enumerate(messages):
+                    messages[num] = formatter.demojize_message(message)
             if self.need_preload and messages:
                 self.messages = messages
                 self.preloaded = True
@@ -4060,6 +4074,9 @@ class Endcord:
                     selected_presence = presence
                     break
         extra_title, extra_body = formatter.generate_extra_window_profile(user_data, roles, selected_presence, max_w)
+        if self.emoji_as_text:
+            extra_title = emoji.demojize(extra_title)
+            extra_body = [emoji.demojize(x) for x in extra_body]
         self.tui.draw_extra_window(extra_title, extra_body)
         self.extra_window_open = True
 
@@ -4487,6 +4504,7 @@ class Endcord:
                 self.premium,
                 self.active_channel["guild_id"],
                 assist_word,
+                safe_emoji=self.emoji_as_text,
                 limit=self.assist_limit,
                 score_cutoff=self.assist_score_cutoff,
             )
@@ -5204,7 +5222,7 @@ class Endcord:
             self.config["tree_drop_down_folder"],
             self.status_char,
             folder_names=self.state.get("folder_names", []),
-            safe_emoji=self.config["emoji_as_text"],
+            safe_emoji=self.emoji_as_text,
             show_folders=self.config["tree_show_folders"],
         )
         # debug_guilds_tree
@@ -5625,6 +5643,8 @@ class Endcord:
         my_message = data.get("user_id") == self.my_id
         channel_id = self.active_channel["channel_id"]
         if op == "MESSAGE_CREATE":
+            if self.emoji_as_text:
+                data = formatter.demojize_message(data)
             # if latest message is loaded - not viewing old message chunks
             if self.get_chat_last_message_id() == self.last_message_id:
                 self.messages.insert(0, data)
@@ -5659,6 +5679,8 @@ class Endcord:
             for num, loaded_message in enumerate(self.messages):
                 if data["id"] == loaded_message["id"]:
                     if op == "MESSAGE_UPDATE":
+                        if self.emoji_as_text:
+                            data = formatter.demojize_message(data)
                         for element in MESSAGE_UPDATE_ELEMENTS:
                             loaded_message[element] = data[element]
                             loaded_message["spoiled"] = []
@@ -5717,6 +5739,8 @@ class Endcord:
         data = new_message["d"]
         op = new_message["op"]
         if op == "MESSAGE_CREATE":
+            if self.emoji_as_text:
+                data = formatter.demojize_message(data)
             self.channel_cache[ch_num][1].insert(0, data)
             if len(self.channel_cache[ch_num][1]) > self.msg_num:
                 self.channel_cache[ch_num][1].pop(-1)
@@ -5725,6 +5749,8 @@ class Endcord:
             for num, loaded_message in enumerate(self.channel_cache[ch_num][1]):
                 if data["id"] == loaded_message["id"]:
                     if op == "MESSAGE_UPDATE":
+                        if self.emoji_as_text:
+                            data = formatter.demojize_message(data)
                         for element in MESSAGE_UPDATE_ELEMENTS:
                             loaded_message[element] = data[element]
                         loaded_message["edited"] = True
@@ -6521,7 +6547,7 @@ class Endcord:
                         channel_name = channel["name"]
                         break
             if channel_name:
-                self.switch_channel(channel_id, channel_name, guild_id, guild_name, preload=True)
+                self.switch_channel(channel_id, channel_name, guild_id, guild_name, preload=True, delay=True)
                 self.tui.tree_select_active()
             else:
                 self.chat.insert(0, "Select channel to load messages")
@@ -6540,15 +6566,6 @@ class Endcord:
 
         # open uncollapsed guilds, generate and draw tree
         self.open_guild(self.active_channel["guild_id"], restore=True)
-
-        # auto open member list if enough space
-        if (
-            self.member_list_auto_open and
-            self.active_channel["guild_id"] and
-            self.screen.getmaxyx()[1] - self.config["tree_width"] - self.member_list_width - 2 >= 32
-        ):
-            self.member_list_visible = True
-            self.update_member_list()
 
         # send new presence
         self.gateway.update_presence(

@@ -1465,10 +1465,13 @@ class TUI():
                     if y + 1 >= h:
                         break
                     if y >= 0:
-                        if num == self.extra_selected:
-                            self.win_extra_window.insstr(y + 1, 0, line + " " * (w - len(line)) + "\n", curses.color_pair(11) | self.attrib_map[11])
-                        else:
-                            self.win_extra_window.insstr(y + 1, 0, line + " " * (w - len(line)) + "\n", curses.color_pair(21) | self.attrib_map[21])
+                        try:
+                            if num == self.extra_selected:
+                                self.win_extra_window.insstr(y + 1, 0, line + " " * (w - len(line)) + "\n", curses.color_pair(11) | self.attrib_map[11])
+                            else:
+                                self.win_extra_window.insstr(y + 1, 0, line + " " * (w - len(line)) + "\n", curses.color_pair(21) | self.attrib_map[21])
+                        except curses.error:   # some error with emojis
+                            pass
 
                 y += 2
                 while y < h:
