@@ -1578,6 +1578,15 @@ class TUI():
     def remove_member_list(self):
         """Remove member list and resize chat"""
         if self.win_member_list:
+            # safely clean emojis
+            with self.lock:
+                h, w = self.win_member_list.getmaxyx()
+                for y in range(h):
+                    self.win_member_list.insstr(y, 0, " " * w, curses.color_pair(1))
+                self.win_member_list.noutrefresh()
+                self.need_update.set()
+            time.sleep(self.screen_update_delay/2)
+
             with self.lock:
                 del (self.win_member_list, self.win_chat)
                 self.member_list = []

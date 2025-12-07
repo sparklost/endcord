@@ -1,7 +1,10 @@
+import re
 from datetime import datetime
 
 PLATFORM_TYPES = ("Desktop", "Xbox", "Playstation", "IOS", "Android", "Nitendo", "Linux", "MacOS")
 CONTENT_TYPES = ("Played Game", "Watched Media", "Top Game", "Listened Media", "Listened Session", "Top Artist", "Custom Status", "Launched Activity", "Leaderboard")
+DISCORDAPP_CDN_ATTACHMENTS = "https://cdn.discordapp.com/attachments/"
+match_discord_attachment_url = re.compile(r"https:\/\/cdn\.discord(?:app)?\.com\/attachments\/\d+\/\d+\/([^\?\s)\]>]+)(?:\?.+)?")
 
 
 def get_newlined_value(embed, name):
@@ -59,6 +62,26 @@ def prepare_embeds(embeds, message_content):
     return ready_embeds
 
 
+def content_to_attachment(message):
+    """Convert attachment url in message content into real attachment"""
+    content = message["content"]
+    if DISCORDAPP_CDN_ATTACHMENTS in content:
+
+        matches = []
+        def collect(m):
+            matches.append((m.group(0), m.group(1)))
+            return ""
+        message["content"] = match_discord_attachment_url.sub(collect, content)
+
+        for attachment in matches:
+            message["attachments"].append({
+                "url": attachment[0],
+                "filename": attachment[1],
+            })
+
+    return message
+
+
 def prepare_message(message):
     """Prepare message dict"""
     # replied message
@@ -83,6 +106,7 @@ def prepare_message(message):
                 message["referenced_message"]["embeds"] = forwarded.get("embeds")
                 message["referenced_message"]["attachments"] = forwarded.get("attachments")
             reference_embeds = prepare_embeds(message["referenced_message"]["embeds"], "")
+            message["referenced_message"] = content_to_attachment(message["referenced_message"])
             for attachment in message["referenced_message"].get("attachments", []):
                 reference_embeds.append({
                     "type": attachment.get("content_type", "unknown"),
@@ -142,6 +166,7 @@ def prepare_message(message):
 
     # embeds and attachments
     embeds = prepare_embeds(message["embeds"], message["content"])
+    message = content_to_attachment(message)
     for attachment in message["attachments"]:
         embeds.append({
             "type": attachment.get("content_type", "unknown"),

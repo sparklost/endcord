@@ -33,7 +33,7 @@ match_md_spoiler = re.compile(r"(?<!\\)((?<=\|))?\|\|[^_]+?\|\|")
 match_md_code_snippet = re.compile(r"(?<!`|\\)`[^`]+`")
 match_md_code_block = re.compile(r"(?s)```.*?```")
 match_md_italic = re.compile(r"\b(?<!\\)(?<!\\_)(((?<=_))?_[^_]+_)\b|(((?<=\*))?\*[^\*]+\*)")
-match_url = re.compile(r"https?:\/\/\w+(\.\w+)+[^\r\n\t\f\v )\]>]*")
+match_url = re.compile(r"https?:\/\/\w+(\.\w+)+[^\s)\]>]*")
 match_discord_channel_url = re.compile(r"https:\/\/discord(?:app)?\.com\/channels\/(\d*)\/(\d*)(?:\/(\d*))?")
 match_discord_channel_combined = re.compile(r"<#(\d*?)>|https:\/\/discord(?:app)?\.com\/channels\/(\d*)\/(\d*)(?:\/(\d*))?")
 match_sticker_id = re.compile(r"<;\d*?;>")
@@ -703,10 +703,10 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
     format_message = config["format_message"]
     format_newline = config["format_newline"]
     format_reply = config["format_reply"]
+    format_interaction = config["format_interaction"]
     format_reactions = config["format_reactions"]
     format_one_reaction = config["format_one_reaction"]
     format_timestamp = config["format_timestamp"]
-    format_interaction = config["format_interaction"]
     edited_string = config["edited_string"]
     reactions_separator = config["reactions_separator"]
     limit_username = config["limit_username"]
@@ -931,7 +931,7 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
             interaction_line = (
                 format_interaction
                 .replace("%username", message["interaction"]["username"][:limit_username])
-                .replace("%global_name", get_global_name(message, use_nick)[:limit_username])
+                .replace("%global_name", normalize_string(get_global_name(message, use_nick)[:limit_username], limit_username, emoji_safe=True))
                 .replace("%command", message["interaction"]["command"])
             )
             interaction_line = normalize_string(interaction_line, max_length, emoji_safe=True, dots=True)
@@ -1269,7 +1269,7 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
                 )
             reactions_line = lazy_replace(format_reactions, "%timestamp", lambda: generate_timestamp(message["timestamp"], format_timestamp, convert_timezone))
             reactions_line = reactions_line.replace("%reactions", reactions_separator.join(reactions))
-            reactions_line = normalize_string(reactions_line, max_length-1, emoji_safe=True, dots=True, fill=False)
+            reactions_line = normalize_string(reactions_line, max_length-1, emoji_safe=True, dots=True, fill=True)
             temp_chat.append(reactions_line)
             if disable_formatting:
                 temp_format.append([color_base])
@@ -2143,7 +2143,7 @@ def generate_message_notification(data, channels, roles, guild_name, convert_tim
     return title, body
 
 
-def generate_tree(dms, guilds, threads, unseen, mentioned, guild_folders, activities, collapsed, uncollapsed_threads, active_channel_id, dd_vline, dd_hline, dd_intersect, dd_corner, dd_pointer, dd_thread, dd_forum, dd_folder, dm_status_char, folder_names=[], safe_emoji=False, show_folders=True):
+def generate_tree(dms, guilds, threads, unseen, mentioned, guild_folders, activities, collapsed, uncollapsed_threads, active_channel_id, config, folder_names=[], safe_emoji=False):
     """
     Generate channel tree according to provided formatting.
     tree_format keys:
@@ -2170,6 +2170,16 @@ def generate_tree(dms, guilds, threads, unseen, mentioned, guild_folders, activi
         1300 - end of third level drop down
     Voice channels are ignored.
     """
+    dd_vline = config["tree_drop_down_vline"]
+    dd_hline = config["tree_drop_down_hline"]
+    dd_intersect = config["tree_drop_down_intersect"]
+    dd_corner = config["tree_drop_down_corner"]
+    dd_pointer = config["tree_drop_down_pointer"]
+    dd_thread = config["tree_drop_down_thread"]
+    dd_forum = config["tree_drop_down_forum"]
+    dd_folder = config["tree_drop_down_folder"]
+    dm_status_char = config["tree_dm_status"]
+    show_folders = config["tree_show_folders"]
     intersection = f"{dd_intersect}{dd_hline*2}"   # default: "|--"
     pass_by = f"{dd_vline}  "   # default: "|  "
     intersection_end = f"{dd_corner}{dd_hline*2}"   # default: "\\--"

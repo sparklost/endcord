@@ -551,7 +551,7 @@ class Gateway():
         tag = None
         if data.get("primary_guild") and "tag" in data["primary_guild"]:   # spacebar_fix - get
             tag = data["primary_guild"]["tag"]
-        if data["bot"]:
+        if data.get("bot"):
             extra_data = None
         else:
             extra_data = {
@@ -571,7 +571,7 @@ class Gateway():
             "pronouns":  data.get("pronouns"),
             "joined_at": None,
             "tag": tag,
-            "bot": data["bot"],
+            "bot": data.get("bot"),
             "extra": extra_data,
             "roles": None,
         }
@@ -579,7 +579,7 @@ class Gateway():
 
     def receiver(self):
         """Receive and handle all traffic from gateway, should be run in a thread"""
-        logger.info("Receiver started")
+        logger.debug("Receiver started")
         self.resumable = False
         while self.run and not self.wait:
             try:
@@ -1625,7 +1625,7 @@ class Gateway():
                     break
 
         self.state = 0
-        logger.info("Receiver stopped")
+        logger.debug("Receiver stopped")
         self.reconnect_requested = True
         self.heartbeat_running = False
 

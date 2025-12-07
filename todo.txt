@@ -1,10 +1,5 @@
 Add %filler to message format strings
-    split format_message and format_newline on %filler
-    update limiting for messages
-        calculate post_content_len
-        include it in splitting content
-        after splitting append part to text before its added to chat
-    update limiting for format_reply, format_reactions, format_interaction
+Add s/old/new for regex replace
 
 Voice channels
     add voice channels to tree
@@ -21,7 +16,7 @@ Voice calls
     send speaking event?
 
 Add flatpack
-Optimize formatter by putting it in class
+Fix issues with spellchecker
 Downlaod 50 messages by default, but do incremental download, and draw on 25 then on 50
 Optimize self.guilds by using dicts, each guild/channel is keyed with its id; if its worth it
 Optimize main loop with queues and threading

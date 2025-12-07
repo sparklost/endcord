@@ -1863,7 +1863,7 @@ class Endcord:
                 else:
                     self.restore_input_text = (input_text, "command")
 
-            # mouse double-click on message
+            # mouse double click on message
             elif action == 40:
                 self.restore_input_text = (input_text, "standard")
                 clicked_chat, mouse_x = self.tui.get_clicked_chat()
@@ -1927,10 +1927,13 @@ class Endcord:
                             self.build_reaction(str(selected + 1), msg_index=msg_index)
                         elif clicked_type == 5:   # url
                             urls = self.get_msg_urls_chat(msg_index)
+                            content_urls = []
+                            for match in re.finditer(formatter.match_url, self.messages[msg_index]["content"]):
+                                content_urls.append(match.group())
                             url = urls[url_index]
                             embed_url = False
                             for embed in self.get_msg_embeds(msg_index, media_only=False):
-                                if embed == url:
+                                if embed == url and url not in content_urls:
                                     embed_url = True
                                     break
                             match = re.search(match_youtube, url)
@@ -2020,6 +2023,7 @@ class Endcord:
                     self.stop_extra_window(update=False)
                 elif self.replying["id"]:
                     self.reset_actions()
+                    self.restore_input_text = (input_text, "standard")
                 elif self.editing:
                     self.restore_input_text = (None, None)
                     self.reset_actions()
@@ -3545,6 +3549,7 @@ class Endcord:
             line_urls.append(url[2])
         return line_urls
 
+
     def get_msg_urls_chat(self, msg_index):
         """Get all urls from message, as visible in chat"""
         urls = self.get_msg_urls(msg_index, embeds=False)
@@ -4244,7 +4249,7 @@ class Endcord:
         self.chat, self.chat_format, self.chat_indexes, self.chat_map = formatter.generate_log(
             log,
             self.colors,
-             self.tui.get_dimensions()[2][1],
+            self.tui.get_dimensions()[2][1],
         )
         self.tui.set_selected(-1)
         self.tui.update_chat(self.chat, self.chat_format)
@@ -5212,18 +5217,9 @@ class Endcord:
             collapsed,
             self.uncollapsed_threads,
             self.active_channel["channel_id"],
-            self.config["tree_drop_down_vline"],
-            self.config["tree_drop_down_hline"],
-            self.config["tree_drop_down_intersect"],
-            self.config["tree_drop_down_corner"],
-            self.config["tree_drop_down_pointer"],
-            self.config["tree_drop_down_thread"],
-            self.config["tree_drop_down_forum"],
-            self.config["tree_drop_down_folder"],
-            self.status_char,
+            self.config,
             folder_names=self.state.get("folder_names", []),
             safe_emoji=self.emoji_as_text,
-            show_folders=self.config["tree_show_folders"],
         )
         # debug_guilds_tree
         # debug.save_json(self.tree, "tree.json", False)
@@ -5855,16 +5851,16 @@ class Endcord:
         """Check message events for deleted message and remove ghost pings"""
         if new_message["op"] == "MESSAGE_DELETE" and not self.keep_deleted:
             channel_id = new_message["d"]["channel_id"]
-            if channel_id in self.read_state and new_message["d"]["id"] in self.read_state[channel_id]:
-                     # if channel is from ready event - message is unknown
-                    self.read_state[channel_id]["mentions"].remove(new_message["d"]["id"])
-                    self.update_tree()
-                    if self.enable_notifications:
-                        for num_1, notification in enumerate(self.notifications):
-                            if notification["channel_id"] == channel_id:
-                                notification_id = self.notifications.pop(num_1)["id"]
-                                peripherals.notify_remove(notification_id)
-                                break
+            if channel_id in self.read_state and new_message["d"]["id"] in self.read_state.get(channel_id, {}).get("mentions"):
+                # if channel is from ready event - message is unknown
+                self.read_state[channel_id]["mentions"].remove(new_message["d"]["id"])
+                self.update_tree()
+                if self.enable_notifications:
+                    for num_1, notification in enumerate(self.notifications):
+                        if notification["channel_id"] == channel_id:
+                            notification_id = self.notifications.pop(num_1)["id"]
+                            peripherals.notify_remove(notification_id)
+                            break
 
 
     def process_new_user_data(self, new_user_data):
