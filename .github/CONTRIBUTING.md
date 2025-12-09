@@ -1,23 +1,24 @@
-## **Before trying to contribute**
-Just don't contribute. You'll save your mental health, and I will save time trying to understand your code. Open an issue, and I will get to it.  
+## **DO NOT CONTRIBUTE**
+You'll save your mental health, and I will save time trying to understand your code. Open an issue, and I will get to it.  
 The code is total mess that only I can efficiently navigate through, and if someone else adds any-quality code to it, it will only get harder for me.  
-Mostly any PR will be rejected, sorry.  
+Any PR will be rejected, sorry.  
 
 
 ## **LLM generated code is strongly prohibited**
-If PR is suspected to have more than 5% of AI generated code, it will be ASAP closed, and the features will be "really" implemented by someone else, without any association with that PR. No exceptions.  
-So, before even thinking about putting it through LLM, open an issue and save yourself of trouble, because others can do it for free and better.  
+If PR is suspected to have more than 5% of AI generated code, it will be closed ASAP, and the features will be "really" implemented by someone else, without any association with that PR. No exceptions.  
+So, before even thinking about putting it through a LLM, open an issue and save yourself the trouble, because others can do it for free and better.  
 
 
 ## Contributing rules
 - Don't use inheritance. It makes code even more unreadable.
 - Don't use dataclasses, it's too late now, use nested lists and dicts.
+- Don't write tests, this cant be tested.
 - NO typing!
-- Don't refactor, format (other than existing ruff config), clean, unnecessary optimize. I like the code the way it is.
+- Don't refactor, format (other than the existing ruff config), clean or unnecessarily optimize. I like the code the way it is.
 - Don't use `requests`, it uses 3MB more RAM than `http.client`.
 - Use `os.path` instead `pathlib`, its making things weird.
 - NO `asyncio`, this is pure `threading` project.
-- If you know how to do it, and it's not really hard, do it yourself, don't import large library for that.
+- If you know how to do it, and it's not really hard, do it yourself, don't import large libraries for that.
 
 
 ## Running from source
@@ -27,7 +28,7 @@ So, before even thinking about putting it through LLM, open an issue and save yo
 
 ## Useful debugging things
 
-### Debug points in code
+### Debug points in the code
 - `debug_events` - save all received events from gateway
 - `debug_guilds_tree` - print all tree data in jsons
 - `255_curses_bug` - this part of the code should be changed after [ncurses bug](https://github.com/python/cpython/issues/119138) is fixed. If there is no note, just remove the code
@@ -44,9 +45,7 @@ sudo socat -t100 -x -v UNIX-LISTEN:/run/user/1000/discord-ipc-0,mode=777,reusead
 
 ### Log discord events to console
 Open discord web or install discord-development  
-Or regular discord:  
-    in `.config/discord/config.json` put:  
-    `"DANGEROUS_ENABLE_DEVTOOLS_ONLY_ENABLE_IF_YOU_KNOW_WHAT_YOURE_DOING": true`  
+Or regular discord: in `.config/discord/config.json` put: `"DANGEROUS_ENABLE_DEVTOOLS_ONLY_ENABLE_IF_YOU_KNOW_WHAT_YOURE_DOING": true`  
 Open dev tools: `Ctrl+Shift+I`  
 Type: `allow pasting`  
 Paste code from [here](https://gist.github.com/MPThLee/3ccb554b9d882abc6313330e38e5dfaa?permalink_comment_id=5583182#gistcomment-5583182)  
@@ -58,26 +57,6 @@ https://github.com/discord-userdoccers/discord-userdoccers
 
 ### App command permissions chart
 https://discord.com/developers/docs/change-log#upcoming-application-command-permission-changes
-
-### Channel types
-- 0 - text
-- 1 - single person DM
-- 2 - voice
-- 3 - group DM (name is not None)
-- 4 - category
-- 5 - announcements
-- 11/12 - thread
-- 15 - forum (contains only threads)
-
-### Message notifications types
-- 0 - all messages
-- 1 - only mentions
-- 2 - nothing
-- 3 - category defaults
-
-### RPC activity types
-- 0 - playing
-- 2 - listening
 
 ### Layout
 Standard:
@@ -116,7 +95,6 @@ Compact:
 │         │[PROMPT]>                             │
 └────────────────────────────────────────────────┘
 ```
-
 
 ### Tree layout and formatting
 ```

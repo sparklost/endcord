@@ -1,21 +1,21 @@
 # cython: boundscheck=False, wraparound=False
 
-cdef inline int binary_search(int ucs, tuple ranges):
+cdef inline int binary_search(int codepoint, tuple ranges):
     cdef Py_ssize_t low = 0
     cdef Py_ssize_t high = len(ranges) - 1
     cdef Py_ssize_t mid
     cdef int start, end
 
-    if ucs < ranges[0][0] or ucs > ranges[high][1]:
+    if codepoint < ranges[0][0] or codepoint > ranges[high][1]:
         return 0
 
     while low <= high:
         mid = (low + high) >> 1
         start, end = ranges[mid]
 
-        if ucs > end:
+        if codepoint > end:
             low = mid + 1
-        elif ucs < start:
+        elif codepoint < start:
             high = mid - 1
         else:
             return 1

@@ -744,7 +744,7 @@ class TUI():
         return self.last_free_id
 
 
-    def set_selected(self, selected, change_amount=0, scroll=True):
+    def set_selected(self, selected, change_amount=0, scroll=True, draw=True):
         """Set selected line and text scrolling"""
         if self.chat_selected >= selected:
             up = True
@@ -764,7 +764,7 @@ class TUI():
                     self.chat_index = max(selected - 3, 0)
         elif change_amount and self.chat_index:
             self.chat_index += change_amount
-        if not self.disable_drawing:
+        if not self.disable_drawing and draw:
             self.draw_chat()
 
 

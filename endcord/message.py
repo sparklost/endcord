@@ -33,8 +33,10 @@ def prepare_embeds(embeds, message_content):
         content = ""
         main_url = None
         skip_main_url = False
+        embed_type = embed.get("type", "unknown")
         if "tenor.com/" not in embed.get("url", ""):
-            content += get_newlined_value(embed, "url")
+            if embed_type not in ("image", "video"):
+                content += get_newlined_value(embed, "url")
             main_url = embed.get("url")
             skip_main_url = True
         content += get_newlined_value(embed, "title")
@@ -52,9 +54,9 @@ def prepare_embeds(embeds, message_content):
         if "footer" in embed:
             content += get_newlined_value(embed["footer"], "text")
         content = content.strip("\n")
-        if content and content not in message_content:
+        if content and (content not in message_content or DISCORDAPP_CDN_ATTACHMENTS in content):
             ready_embeds.append({
-                "type": embed.get("type", "unknown"),   # spacebar_fix - get
+                "type": embed_type,   # spacebar_fix - get
                 "name": None,
                 "url": content,
                 "main_url": main_url,
@@ -62,7 +64,7 @@ def prepare_embeds(embeds, message_content):
     return ready_embeds
 
 
-def content_to_attachment(message):
+def content_to_attachment(message, embeds):
     """Convert attachment url in message content into real attachment"""
     content = message["content"]
     if DISCORDAPP_CDN_ATTACHMENTS in content:
@@ -74,12 +76,17 @@ def content_to_attachment(message):
         message["content"] = match_discord_attachment_url.sub(collect, content)
 
         for attachment in matches:
-            message["attachments"].append({
-                "url": attachment[0],
-                "filename": attachment[1],
-            })
+            for embed in embeds:
+                if embed["url"] == attachment[0]:
+                    break
+            else:
+                embeds.append({
+                    "type": "unknown",
+                    "url": attachment[0],
+                    "name": attachment[1],
+                })
 
-    return message
+    return message, embeds
 
 
 def prepare_message(message):
@@ -106,13 +113,13 @@ def prepare_message(message):
                 message["referenced_message"]["embeds"] = forwarded.get("embeds")
                 message["referenced_message"]["attachments"] = forwarded.get("attachments")
             reference_embeds = prepare_embeds(message["referenced_message"]["embeds"], "")
-            message["referenced_message"] = content_to_attachment(message["referenced_message"])
             for attachment in message["referenced_message"].get("attachments", []):
                 reference_embeds.append({
                     "type": attachment.get("content_type", "unknown"),
                     "name": attachment["filename"],
                     "url": attachment["url"],
                 })   # keep attachments in same place as embeds
+            message["referenced_message"], reference_embeds = content_to_attachment(message["referenced_message"], reference_embeds)
             reference = {
                 "id": message["referenced_message"]["id"],
                 "timestamp": message["referenced_message"]["timestamp"],
@@ -166,13 +173,13 @@ def prepare_message(message):
 
     # embeds and attachments
     embeds = prepare_embeds(message["embeds"], message["content"])
-    message = content_to_attachment(message)
     for attachment in message["attachments"]:
         embeds.append({
             "type": attachment.get("content_type", "unknown"),
             "name": attachment["filename"],
             "url": attachment["url"],
         })   # keep attachments in same place as embeds (attachments have no "main_url")
+    message, embeds = content_to_attachment(message, embeds)
     # mentions
     mentions = []
     if message["mentions"]:

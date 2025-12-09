@@ -1635,7 +1635,7 @@ class Endcord:
             # view summaries
             elif action == 28:
                 self.restore_input_text = (input_text, "standard extra")
-                self.show_summaries()
+                self.view_summaries()
 
             # search
             elif action == 29:
@@ -2257,6 +2257,10 @@ class Endcord:
                     # dont allow sending messagee until it expires
 
                 elif not self.disable_sending and not self.forum:
+                    # check for substituition
+                    if input_text.startswith("s/"):
+                        self.substitute_in_last_message(input_text)
+                        continue
                     # select attachment
                     this_attachments = None
                     active_channel = self.active_channel["channel_id"]
@@ -3509,6 +3513,7 @@ class Endcord:
             return self.messages[0]["id"]
         return 0
 
+
     def get_msg_urls(self, msg_index, embeds=True):
         """Get all urls from message"""
         urls = []
@@ -3626,6 +3631,30 @@ class Endcord:
                 spoiler_index = 0
             self.messages[msg_index]["spoiled"] = [spoiler_index]
         self.update_chat(keep_selected=True, scroll=False)
+
+
+    def substitute_in_last_message(self, input_text):
+        """Try to perform s/ substitutiion in last sent message of thi user, if the message is in current buffer"""
+        for message in self.messages:
+            if message["user_id"] == self.my_id:
+                message_id = message["id"]
+                content = message["content"]
+                break
+        else:
+            return
+        if not content:
+            return
+        new_content = formatter.substitute(content, input_text)
+        if new_content and content != new_content:
+            success = self.discord.send_update_message(
+                channel_id=self.active_channel["channel_id"],
+                message_id=message_id,
+                message_content=new_content,
+            )
+            if success is None:
+                self.gateway.set_offline()
+                self.update_extra_line("Network error.")
+                self.restore_input_text = (input_text, "standard")
 
 
     def download_file(self, url, move=True, open_media=False, open_move=False):
@@ -4881,12 +4910,12 @@ class Endcord:
             selected_msg = selected_msg + change_amount
             selected_line_new = self.msg_to_lines(selected_msg) - remainder
             change_amount_lines = selected_line_new - selected_line
-            self.tui.set_selected(selected_line_new, change_amount=change_amount_lines, scroll=scroll)
+            self.tui.set_selected(selected_line_new, change_amount=change_amount_lines, scroll=scroll, draw=False)
         elif select_message_index is not None:
             selected_line = self.msg_to_lines(select_message_index)
-            self.tui.set_selected(selected_line, scroll=scroll)
+            self.tui.set_selected(selected_line, scroll=scroll, draw=False)
         elif keep_selected is not None:
-            self.tui.set_selected(-1, scroll=scroll)   # return to bottom
+            self.tui.set_selected(-1, scroll=scroll, draw=False)   # return to bottom
 
         self.tui.update_chat(self.chat, self.chat_format)
 

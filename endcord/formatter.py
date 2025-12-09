@@ -57,7 +57,7 @@ def normalize_int_str(input_int, digits_limit):
     """Convert integer to string and limit its value to preferred number of digits"""
     int_str = str(min(input_int, 10**digits_limit - 1))
     while len(int_str) < digits_limit:
-        int_str = f" {int_str}"
+        int_str = " " + int_str
     return int_str
 
 
@@ -240,7 +240,8 @@ def limit_width_wch(text, max_width):
 def len_wch(text):
     """Return real display width for a string"""
     total_width = 0
-    for character in text:
+    for ch in text:
+        character = ord(ch)
         if 32 <= character < 0x7f:
             total_width += 1
         else:
@@ -268,18 +269,20 @@ def normalize_string(input_string, max_length, emoji_safe=False, dots=False, fil
     input_string = str(input_string)
     if not max_length:
         return input_string
+    if dots:
+        dots = len(input_string) > max_length
     if emoji_safe:
         input_string, length = limit_width_wch(input_string, max_length)
         if fill:
             input_string += " " * (max_length - length)
-        if max_length - length < 0:
+        if dots:
             return input_string[:-3] + "..."
         return input_string
     if fill:
         input_string += " " * (max_length - len(input_string))
     if len(input_string) > max_length:
         if dots:
-            return input_string[:max_length-3] + "..."
+            return input_string[:-3] + " " * (len_wch(input_string[-3:]) - 3) + "..."
         return input_string[:max_length]
     return input_string
 
@@ -630,6 +633,65 @@ def get_global_name(data, use_nick):
     return data["username"]
 
 
+def replace_backreferences(text):
+    """Repace sed like backreference with python re like brckreference """
+    def replacer(match):
+        num = match.group(1)
+        return f"\\g<{num}>"
+    return re.sub(r"\\(\d+)", replacer, text)
+
+
+def substitute(text, pattern):
+    """
+    Perform sed-like substitution with extended regex, with pattern: 's/old/new'.
+    Supported flags: /g - global, /i - case insensitive
+    Supports special character & to insert matched text.
+    """
+    if not pattern.startswith("s"):
+        return None
+    body = pattern[2:]
+
+    # split on / but handle escaped
+    parts = []
+    current = []
+    escaped = False
+    for ch in body:
+        if escaped:
+            current.append(ch)
+            escaped = False
+            continue
+        if ch == "\\":
+            current.append(ch)
+            escaped = True
+            continue
+        if ch == "/":
+            parts.append("".join(current))
+            current = []
+            continue
+        current.append(ch)
+    if current:
+        parts.append("".join(current))
+    if len(parts) < 2:
+        return None
+
+    old = parts[0].replace("\\/", "/")
+    new = parts[1].replace("\\/", "/")
+    flags = parts[2] if len(parts) >= 3 else ""
+    count = 0 if "g" in flags else 1
+    re_flags = 0
+    if "i" in flags.lower():
+        re_flags = re.IGNORECASE
+
+    # replace & with \g<0>
+    new = re.sub(r"(?<!\\)&", r"\\g<0>", new).replace(r"\&", "&")
+    new = replace_backreferences(new)
+
+    try:
+        return re.sub(old, new, text, count=count, flags=re_flags)
+    except re.PatternError:
+        return text
+
+
 def format_poll(poll):
     """Generate message text from poll data"""
     if poll["expires"] < time.time():
@@ -914,12 +976,12 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
             else:
                 reply_line = lazy_replace(format_reply, "%username", lambda: normalize_string("Unknown", limit_username))
                 reply_line = lazy_replace(reply_line, "%global_name", lambda: normalize_string("Unknown", limit_username))
-                reply_line = reply_line.replace("%timestamp", "")
+                reply_line = reply_line.replace("%timestamp", placeholder_timestamp)
                 reply_line = lazy_replace(reply_line, "%content", lambda: ref_message["content"].replace("\r", "").replace("\n", ""))
             reply_line = normalize_string(reply_line, max_length, emoji_safe=True, dots=True)
             temp_chat.append(reply_line)
             if disable_formatting or reply_color_format == color_blocked:
-                temp_format.append([reply_color_format])
+                temp_format.append([color_base])
             elif mentioned:
                 temp_format.append(color_mention_reply)
             else:
@@ -931,13 +993,13 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
             interaction_line = (
                 format_interaction
                 .replace("%username", message["interaction"]["username"][:limit_username])
-                .replace("%global_name", normalize_string(get_global_name(message, use_nick)[:limit_username], limit_username, emoji_safe=True))
+                .replace("%global_name", get_global_name(message["interaction"], use_nick)[:limit_username])
                 .replace("%command", message["interaction"]["command"])
             )
             interaction_line = normalize_string(interaction_line, max_length, emoji_safe=True, dots=True)
             temp_chat.append(interaction_line)
             if disable_formatting or reply_color_format == color_blocked:
-                temp_format.append([reply_color_format])
+                temp_format.append([color_base])
             elif mentioned:
                 temp_format.append(color_mention_reply)
             else:
@@ -1048,10 +1110,10 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
         newline_sign = False
         newline_index = max_length
         quote_nl = True
-        if len_wch(message_line) > max_length:
-            newline = message_line[:max_length].rsplit(" ", 1)[0]   # split line on space
-            newline_index = len(newline)
-            emoji_count = len_wch(newline) - newline_index
+        len_wch_message_line = len_wch(message_line)
+        wide = len_wch_message_line != len(message_line)   # whole message could be different
+        if len_wch_message_line > max_length:
+            newline_index = len(limit_width_wch(message_line, max_length)[0].rsplit(" ", 1)[0])   # split line on space
             # if there is \n on current line, use its position to split line
             if "\n" in message_line[:max_length]:
                 newline_index = message_line.index("\n")
@@ -1063,17 +1125,16 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
                 newline_text = newline_text.replace("%content", "")
                 if newline_index <= len(newline_text):
                     newline_index = max_length - (len_wch(message_line[:max_length]) - len(message_line[:max_length]))
-                    emoji_count = 0
                     quote_nl = False
                 else:
                     quote_nl = False
             if message_line[newline_index] in (" ", "\n"):   # remove space and \n
-                next_line = message_line[newline_index - emoji_count + 1:]
+                next_line = message_line[newline_index + 1:]
                 split_on_space = 1
             else:
-                next_line = message_line[newline_index - emoji_count:]
+                next_line = message_line[newline_index:]
                 split_on_space = 0
-            message_line = message_line[:newline_index - emoji_count]
+            message_line = message_line[:newline_index]
         elif "\n" in message_line:
             newline_index = message_line.index("\n")
             next_line = message_line[newline_index+1:]
@@ -1137,7 +1198,7 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
         # newline
         line_num = 1
         quote_nl = quote_nl and quote
-        while next_line:
+        while next_line and line_num < 200:   # safety against memory leaks
             this_quote = False
             if quote:
                 full_content = quote_character + " " + next_line
@@ -1146,7 +1207,9 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
             else:
                 full_content = next_line
                 extra_newline_len = 0
-            new_line = lazy_replace(format_newline, "%timestamp", lambda: generate_timestamp(message["timestamp"], format_timestamp, convert_timezone))
+            new_line = lazy_replace(format_newline, "%username", lambda: normalize_string(message["username"], limit_username, emoji_safe=True))
+            new_line = lazy_replace(new_line, "%global_name", lambda: normalize_string(global_name, limit_username, emoji_safe=True))
+            new_line = lazy_replace(new_line, "%timestamp", lambda: generate_timestamp(message["timestamp"], format_timestamp, convert_timezone))
             new_line = new_line.replace("%content", full_content)
 
             # correct index for each new line
@@ -1171,9 +1234,7 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
             # limit new_line and split to next line
             newline_sign = False
             if len_wch(new_line) > max_length - bool(code_block_format):
-                newline = new_line[:max_length - bool(code_block_format)].rsplit(" ", 1)[0]   # split line on space
-                newline_index = len(newline)
-                emoji_count = len_wch(newline) - newline_index
+                newline_index = len(limit_width_wch(new_line, max_length - bool(code_block_format))[0].rsplit(" ", 1)[0])   # split line on space
                 if "\n" in new_line[:max_length]:
                     newline_index = new_line.index("\n")
                     quote = False
@@ -1181,16 +1242,15 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
                     split_on_space = 0
                 elif newline_index <= newline_len + 2*quote:
                     newline_index = max_length - bool(code_block_format) - (len_wch(message_line[:max_length]) - len(message_line[:max_length]))
-                    emoji_count = 0
                 try:
                     if new_line[newline_index] in (" ", "\n"):   # remove space and \n
-                        next_line = new_line[newline_index - emoji_count + 1:]
+                        next_line = new_line[newline_index + 1:]
                         split_on_space = 1
                     else:
-                        next_line = new_line[newline_index - emoji_count:]
+                        next_line = new_line[newline_index:]
                         split_on_space = 0
                 except IndexError:
-                    next_line = new_line[newline_index - emoji_count + 1:]
+                    next_line = new_line[newline_index + 1:]
                     split_on_space = 1
                 new_line = new_line[:newline_index]
             elif "\n" in new_line:
