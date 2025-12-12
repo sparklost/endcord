@@ -1545,8 +1545,6 @@ class TUI():
 
     def draw_member_list(self, member_list, member_list_format, force=False, reset=False):
         """Draw member list and resize chat"""
-        import traceback
-        logger.info("".join(traceback.format_stack()))
         with self.lock:
             self.member_list = member_list
             self.member_list_format = member_list_format
