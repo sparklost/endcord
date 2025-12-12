@@ -7,8 +7,8 @@ import sys
 import uuid
 
 # default client properties
-CLIENT_BUILD_NUMBER = 476009   # should only affect experimental features availability
-CLIENT_VERSION = "0.0.117"
+CLIENT_BUILD_NUMBER = 478085   # should only affect experimental features availability
+CLIENT_VERSION = "0.0.118"
 USER_AGENT_WEB = "Mozilla/5.0 (%OS; rv:145.0) Gecko/20100101 Firefox/145.0"
 USER_AGENT_DESKTOP = f"Mozilla/5.0 (%OS) AppleWebKit/537.36 (KHTML, like Gecko) discord/{CLIENT_VERSION} Chrome/138.0.7204.251 Electron/37.6.0 Safari/537.36"
 LINUX_UA_STRING = "X11; Linux x86_64"

@@ -27,7 +27,7 @@ from discord_protos import PreloadedUserSettings
 from google.protobuf.json_format import MessageToDict
 
 from endcord import debug, perms
-from endcord.message import prepare_message, prepare_special_message_types
+from endcord.message import prepare_message
 
 DISCORD_HOST = "discord.com"
 LOCAL_MEMBER_COUNT = 50   # members per guild, CPU-RAM intensive
@@ -175,7 +175,6 @@ class Gateway():
             self.extension_cache.append((method_name, methods))
 
 
-
     def thread_guard(self):
         """Check if reconnect is requested and run reconnect thread if its not running"""
         while self.run:
@@ -277,7 +276,7 @@ class Gateway():
             self.reconnect_requested = True
 
 
-    def add_member_roles(self, guild_id, user_id, roles):
+    def add_member_roles(self, guild_id, user_id, roles, nonce=None):
         """Add member-role pair to corresponding guild, number of users per guild is limited"""
         num = -1
         for num, guild in enumerate(self.member_roles):
@@ -299,7 +298,7 @@ class Gateway():
         if len(self.member_roles[num]) > LOCAL_MEMBER_COUNT:
             self.member_roles[num].pop(-1)
         if not self.roles_changed:
-            self.roles_changed = True
+            self.roles_changed = nonce if nonce else True
 
 
     def process_hidden_channels(self):
@@ -973,49 +972,23 @@ class Gateway():
 
                 elif optext == "MESSAGE_CREATE" and "content" in response["d"]:
                     message = response["d"]
-                    if message["channel_id"] in self.subscribed_channels or True:
-                        message_done = prepare_message(message)
-                        # saving roles to cache
-                        if "member" in message and "roles" in message["member"]:
-                            self.add_member_roles(
-                                message.get("guild_id"),
-                                message["author"]["id"],
-                                message["member"]["roles"],
-                            )
-                        message_done.update({
-                            "channel_id": message["channel_id"],
-                            "guild_id": message.get("guild_id"),
-                        })
-                        self.messages_buffer.append({
-                            "op": "MESSAGE_CREATE",
-                            "d": message_done,
-                        })
-                    else:   # all other non-active channels
-                        mentions = []
-                        if message["mentions"]:
-                            for mention in message["mentions"]:
-                                mentions.append({
-                                    "username": mention.get("username"),   # spacebar_fix - get
-                                    "global_name": mention.get("global_name"),   # spacebar_fix - get
-                                    "id": mention["id"],
-                                })
-                        message = prepare_special_message_types(message)
-                        ready_data = {   # minimal message object so it uses less cpu and ram
-                            "id": message["id"],
-                            "channel_id": message["channel_id"],
-                            "guild_id": message.get("guild_id"),
-                            "content": message["content"],
-                            "mentions": mentions,
-                            "mention_roles": message["mention_roles"],
-                            "mention_everyone": message["mention_everyone"],
-                            "user_id": message["author"]["id"],
-                            "username": message["author"]["username"],
-                            "global_name": message["author"].get("global_name"),   # spacebar_fix - get
-                        }
-                        self.messages_buffer.append({
-                            "op": "MESSAGE_CREATE",
-                            "d": ready_data,
-                        })
+                    # saving roles to cache
+                    if  message["channel_id"] in self.subscribed_channels and "member" in message and "roles" in message["member"]:
+                        self.add_member_roles(
+                            message.get("guild_id"),
+                            message["author"]["id"],
+                            message["member"]["roles"],
+                            nonce=message["channel_id"],
+                        )
+                    message_done = prepare_message(message)
+                    message_done.update({
+                        "channel_id": message["channel_id"],
+                        "guild_id": message.get("guild_id"),
+                    })
+                    self.messages_buffer.append({
+                        "op": "MESSAGE_CREATE",
+                        "d": message_done,
+                    })
 
                 elif optext == "MESSAGE_UPDATE":
                     message = response["d"]
@@ -1143,7 +1116,6 @@ class Gateway():
                         guild_id = data["guild_id"]
                         for member in data["members"]:
                             if "roles" in member and "roles" in member:
-                                # for now, saving only first role, used for username color
                                 self.add_member_roles(
                                     guild_id,
                                     member["user"]["id"],

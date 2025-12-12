@@ -102,7 +102,8 @@ def prepare_message(message):
             if message["referenced_message"]["mentions"]:
                 for ref_mention in message["referenced_message"]["mentions"]:
                     ref_mentions.append({
-                        "username": ref_mention["username"],
+                        "username": ref_mention.get("username"),   # spacebar_fix - get
+                        "global_name": ref_mention.get("global_name"),   # spacebar_fix - get
                         "id": ref_mention["id"],
                     })
             if "message_snapshots" in message["referenced_message"]:

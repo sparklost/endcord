@@ -1,3 +1,11 @@
+Fix nick not being used in chat
+    keep nicknames in same structure as roles in gateway
+    when changed roles/nicknames update them in messages and regenerate chat
+Fix not removing ghost pings, unreads and notifications
+Fix viewing sticker
+Fix unreads line not removing and apearing after removed
+Optimize member roles by making them a dict
+
 Voice channels
     add voice channels to tree
     show voice channel activity
@@ -12,6 +20,7 @@ Voice calls
     send and receive RTCP?
     send speaking event?
 
+Detect launching outside terminal and start terminal
 Optimize main loop with queues and threading
 Fix member list not updating when switching between same-guild channels
 Vim-like bindings

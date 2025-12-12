@@ -58,7 +58,7 @@ GUILD_UPLOAD_LIMITS = (10*MB, 10*MB, 50*MB, 100*MB)   # premium tier 0, 1, 2, 3
 FORUM_COMMANDS = (1, 2, 7, 13, 14, 15, 17, 20, 22, 25, 27, 29, 30, 31, 32, 40, 42, 49, 50, 51, 52, 53, 55, 56, 57, 58, 66, 67)
 
 match_emoji = re.compile(r"<:(.*):(\d*)>")
-match_youtube = re.compile(r"(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)[a-zA-Z0-9_-]{11}")
+match_youtube = re.compile(r"(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)[a-zA-Z0-9_-]{11}")
 
 
 recorder = peripherals.Recorder()
@@ -497,7 +497,7 @@ class Endcord:
         self.guild_apps = []
         self.guild_commands_permitted = []
         self.pinned = []
-        self.missing_memmbers_nonce = None
+        self.missing_members_nonce = None
         self.forum = False
         self.disable_sending = False
         self.extra_line = None
@@ -1045,6 +1045,16 @@ class Endcord:
         for guild in self.member_roles:
             if guild["guild_id"] == self.active_channel["guild_id"]:
                 if self.username_role_colors:
+                    # add my roles if missing
+                    for member in guild["members"]:
+                        if member["user_id"] == self.my_id:
+                            break
+                    else:
+                        guild["members"].append({
+                            "user_id": self.my_id,
+                            "roles": self.current_my_roles,
+                        })
+                    # select colors
                     for member in guild["members"]:
                         if "primary_role_color" not in member:
                             member_roles = member["roles"]
@@ -1938,7 +1948,7 @@ class Endcord:
                                     break
                             match = re.search(match_youtube, url)
                             if match:
-                                if shutil.which(self.config["yt_dlp_path"]) and ((support_media and not self.config["native_media_player"]) or shutil.which(self.config["mpv_path"])):
+                                if support_media and shutil.which(self.config["yt_dlp_path"]) and shutil.which(self.config["mpv_path"]):
                                     self.download_threads.append(threading.Thread(target=self.download_file, daemon=True, args=(url, False, True)))
                                     self.download_threads[-1].start()
                                 else:
@@ -3548,7 +3558,7 @@ class Endcord:
         """Get selected url indexes in selected message from selected line in chat"""
         chat_line_map = self.chat_map[chat_sel]
         if not chat_line_map or not chat_line_map[5]:
-            return [0]
+            return []
         line_urls = []
         for url in chat_line_map[5]:
             line_urls.append(url[2])
@@ -3870,7 +3880,6 @@ class Endcord:
             return messages
 
         self.request_missing_members(current_guild, messages)
-
         return messages
 
 
@@ -3894,8 +3903,8 @@ class Endcord:
 
         # request missing members
         if missing_members:
-            self.missing_memmbers_nonce = discord.generate_nonce()
-            self.gateway.request_members(current_guild, missing_members, nonce=self.missing_memmbers_nonce)
+            self.missing_members_nonce = discord.generate_nonce()
+            self.gateway.request_members(current_guild, missing_members, nonce=self.missing_members_nonce)
 
 
     def get_chat_chunk(self, past=True, scroll=False):
@@ -6923,10 +6932,10 @@ class Endcord:
             new_member_roles, nonce = self.gateway.get_member_roles()
             if new_member_roles:
                 self.member_roles = new_member_roles
-                if nonce == self.missing_memmbers_nonce:
+                if nonce is not True and (nonce == self.missing_members_nonce or nonce == self.active_channel["channel_id"]):
                     self.select_current_member_roles()
                     self.update_chat(scroll=False)
-                    self.missing_memmbers_nonce = False
+                    self.missing_members_nonce = False
 
             # check for tree format changes
             self.check_tree_format()
