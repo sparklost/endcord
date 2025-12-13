@@ -128,7 +128,6 @@ class Endcord:
         self.limit_command_history = config["limit_command_history"]
         self.remove_prev_notif = ["remove_previous_notification"]
         self.emoji_as_text = config["emoji_as_text"]
-        send_x_super = config["send_x_super_properties"]
 
         if not self.external_editor or not shutil.which(self.external_editor):
             self.external_editor = os.environ.get("EDITOR", "nano")
@@ -205,7 +204,7 @@ class Endcord:
         self.chat.insert(0, f"Connecting to {self.config["custom_host"] if self.config["custom_host"] else "Discord"}")
         logger.info(f"Connecting to {self.config["custom_host"] if self.config["custom_host"] else "Discord"}")
 
-        if not send_x_super:
+        if not config["send_x_super_properties"]:
             client_prop = None
 
         # initialize stuff
@@ -849,7 +848,7 @@ class Endcord:
             self.update_chat(keep_selected=False, select_message_index=select_message_index)
         else:
             self.tui.update_chat(self.chat, self.chat_format)
-        self.set_channel_seen(channel_id, self.get_chat_last_message_id())   # right after update_chat so new_unreads is determined
+        self.set_channel_seen(channel_id, self.get_chat_last_message_id(), force_remove_notify=True)   # right after update_chat so new_unreads is determined
         if not guild_id:   # no member list in dms
             self.member_list_visible = False
             self.tui.remove_member_list()
@@ -1451,6 +1450,8 @@ class Endcord:
                     for num in self.get_url_from_selected_line(chat_sel):
                         if urls[num] in embeds:
                             selected_urls.append(urls[num])
+                else:
+                    selected_urls = embeds
                 if len(selected_urls) == 1:
                     self.restore_input_text = (input_text, "standard")
                     selected_url = self.refresh_attachment_url(selected_urls[0])
@@ -1967,7 +1968,7 @@ class Endcord:
                                 content_urls.append(match.group())
                             url = urls[url_index]
                             embed_url = False
-                            for embed in self.get_msg_embeds(msg_index, media_only=False):
+                            for embed in self.get_msg_embeds(msg_index, media_only=False, stickers=False):
                                 if embed == url and url not in content_urls:
                                     embed_url = True
                                     break
@@ -2561,20 +2562,22 @@ class Endcord:
                 for num in self.get_url_from_selected_line(chat_sel):
                     if urls[num] in embeds:
                         selected_urls.append(urls[num])
-                if len(selected_urls) == 1 or select_num:
-                    select_num = max(min(select_num-1, len(selected_urls)-1), 0)
-                    selected_url = self.refresh_attachment_url(selected_urls[select_num])
-                    self.download_threads.append(threading.Thread(target=self.download_file, daemon=True, args=(selected_url, False, True)))
-                    self.download_threads[-1].start()
-                else:
-                    self.ignore_typing = True
-                    self.downloading_file = {
-                        "urls": selected_urls,
-                        "web": False,
-                        "open": True,
-                    }
-                    self.restore_input_text = (None, "prompt")
-                    reset = False
+            else:
+                selected_urls = embeds
+            if len(selected_urls) == 1 or select_num:
+                select_num = max(min(select_num-1, len(selected_urls)-1), 0)
+                selected_url = self.refresh_attachment_url(selected_urls[select_num])
+                self.download_threads.append(threading.Thread(target=self.download_file, daemon=True, args=(selected_url, False, True)))
+                self.download_threads[-1].start()
+            else:
+                self.ignore_typing = True
+                self.downloading_file = {
+                    "urls": selected_urls,
+                    "web": False,
+                    "open": True,
+                }
+                self.restore_input_text = (None, "prompt")
+                reset = False
 
         elif cmd_type == 7:   # CANCEL
             reset = False
@@ -3633,7 +3636,7 @@ class Endcord:
         peripherals.copy_to_clipboard(url)
 
 
-    def get_msg_embeds(self, msg_index, media_only=True):
+    def get_msg_embeds(self, msg_index, media_only=True, stickers=True):
         """Get all palyable media embeds and stickers from message in chat"""
         urls = []
         for embed in self.messages[msg_index]["embeds"]:
@@ -3643,10 +3646,11 @@ class Endcord:
                     urls.append(embed["main_url"])
                 else:
                     urls.append(embed["url"])
-        for sticker in self.messages[msg_index]["stickers"]:
-            sticker_url = discord.get_sticker_url(sticker)
-            if sticker_url:
-                urls.append(sticker_url)
+        if stickers:
+            for sticker in self.messages[msg_index]["stickers"]:
+                sticker_url = discord.get_sticker_url(sticker)
+                if sticker_url:
+                    urls.append(sticker_url)
         return urls
 
 
@@ -5394,11 +5398,11 @@ class Endcord:
                 self.update_tree()
 
 
-    def set_channel_seen(self, channel_id, message_id=None, ack=True, force=False, update_tree=True):
+    def set_channel_seen(self, channel_id, message_id=None, ack=True, force=False, update_tree=True, force_remove_notify=False):
         """Set one channel as seen"""
         channel = self.read_state.get(channel_id)
         if channel:
-            remove_notification = False
+            remove_notification = force_remove_notify
             this_channel = channel_id == self.active_channel["channel_id"]
             last_message_id = channel["last_message_id"]
             unseen = not last_message_id or int(channel["last_acked_message_id"]) < int(last_message_id)

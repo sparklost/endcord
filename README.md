@@ -529,6 +529,9 @@ Locally hidden channels can be restored by removing them in `hidden_channels.jso
 ### Must send at least N messages in official client
 The client will refuse to send message in newly-created DM channels. This measure is to prevent triggering discords spam filter.
 
+### Messages wont send and in log it says error code 400
+In config, disable `send_x_super_properties`. These properties may be used in spam detection so disable them only if necessary, and report the issue.
+
 ### No notification sound
 Custom notification sound can be set in config: `custom_notification_sound = /path/to/file.mp3`.
 
