@@ -5917,10 +5917,10 @@ class Endcord:
 
 
     def process_msg_events_ghost_ping(self, new_message):
-        """Check message events for deleted message and remove ghost pings"""
+        """Check message events for deleted message and remove ghost pings/notifications"""
         if new_message["op"] == "MESSAGE_DELETE" and not self.keep_deleted:
             channel_id = new_message["d"]["channel_id"]
-            if channel_id in self.read_state and new_message["d"]["id"] in self.read_state.get(channel_id, {}).get("mentions"):
+            if channel_id in self.read_state and new_message["d"]["id"] in self.read_state.get(channel_id, {}).get("mentions", []):
                 # if channel is from ready event - message is unknown
                 self.read_state[channel_id]["mentions"].remove(new_message["d"]["id"])
                 self.update_tree()

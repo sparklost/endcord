@@ -1,4 +1,3 @@
-Fix not removing ghost pings, unreads and notifications
 Fix unreads line not removing and apearing after removed
 
 Voice channels

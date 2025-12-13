@@ -61,8 +61,10 @@ def get_user_processes_diff_linux():
         # read cmdline
         try:
             with open(f"/proc/{pid}/cmdline", "rb") as f:
-                # will decode only what is needed, not entire file
-                cmdline = f.read().split(b" -")[0].split(b"\x00-")[0]
+                # decode only what is needed, not entire file
+                cmdline = f.read().partition(b" -")[0].partition(b"\x00-")[0]
+                prefix, exe, _ = cmdline.partition(b".exe")
+                cmdline = prefix + exe
                 if not cmdline:
                     continue
                 cmdline = cmdline.decode("utf-8")
