@@ -33,6 +33,8 @@ DISCORD_HOST = "discord.com"
 LOCAL_MEMBER_COUNT = 50   # members per guild, CPU-RAM intensive
 ZLIB_SUFFIX = b"\x00\x00\xff\xff"
 VOICE_FLAGS = 3   # CLIPS_ENABLED and ALLOW_VOICE_RECORDING
+DEFAULT_CAPABILITIES = 30717
+DEFAULT_INTENTS = 50364033
 QOS_HEARTBEAT = True
 QOS_PAYLOAD = {"ver": 26, "active": True, "reason": "foregrounded"}
 inflator = zlib.decompressobj()
@@ -58,6 +60,13 @@ def reset_inflator():
     global inflator
     del inflator
     inflator = zlib.decompressobj()   # noqa
+
+
+def double_get(data, key1, key2, default=None):
+    """Get value from 2 nested dicts"""
+    if key1 in data:
+        return data[key1].get(key2, default)
+    return default
 
 
 class Gateway():
@@ -707,7 +716,7 @@ class Gateway():
                     # unread messages and pings
                     read_state = []
                     msg_ping = []
-                    for channel in data["read_state"]["entries"]:
+                    for channel in double_get(data, "read_state", "entries", default=[]):
                         # last_message_id in unread_state is actually last_ACKED_message_id
                         if "last_message_id" in channel and "mention_count" in channel:
                             read_state.append((channel["id"], channel["last_message_id"]))
@@ -731,7 +740,7 @@ class Gateway():
                     time_log_string += f"    read state ({len(self.read_state)} channels) - {round((time.time() - ready_time_mid) * 1000, 3)}ms\n"
                     ready_time_mid = time.time()
                     # guild and dm settings
-                    for guild in data["user_guild_settings"]["entries"]:
+                    for guild in double_get(data, "user_guild_settings", "entries", default=[]):
                         if guild["guild_id"]:
                             # find this guild in self.guilds
                             for guild_num, guild_g in enumerate(self.guilds):
@@ -1282,6 +1291,7 @@ class Gateway():
                     self.proto_changed = True
 
                 elif optext == "USER_GUILD_SETTINGS_UPDATE":
+
                     if data["guild_id"]:   # guild and channel
                         for guild_num_search, guild_g in enumerate(self.guilds):
                             if guild_g["guild_id"] == data["guild_id"]:
@@ -1681,7 +1691,7 @@ class Gateway():
             "op": 2,
             "d": {
                 "token": self.token,
-                "capabilities": 30717,
+                "capabilities": DEFAULT_CAPABILITIES,
                 "properties": self.client_prop,
                 "presence": {
                     "activities": [],
@@ -1691,6 +1701,9 @@ class Gateway():
                 },
             },
         }
+        if self.token.startswith("Bot"):
+            payload["d"].pop("capabilities")
+            payload["d"]["intents"] = DEFAULT_INTENTS
         self.send(payload)
 
 
@@ -1806,6 +1819,8 @@ class Gateway():
         Subscribe to the channel to receive "typing" events from gateway for specified channel,
         and threads updates, and member presence updates for this guild.
         """
+        if self.my_user_data["bot"]:
+            return
         if guild_id:
             # when subscribing, add channel to list of subscribed channels
             # then send whole list

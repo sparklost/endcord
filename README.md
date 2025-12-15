@@ -550,6 +550,9 @@ If there are no colors in Linux tty (but there should be), endcord can run insid
 Follow [fbterm setup instructions](https://wiki.archlinux.org/title/Fbterm#Installation), then set environment variable: `export TERM=fbterm` and run endcord.  
 Note: keybinding `Ctrl+Up/Down/Left/Right` does not work in tty.  
 
+### Adding desktop launcher on Linux
+Simply make launcher execute `endcord` or `endcord-lite`, endcord will deal with starting terminal. It will prefer `$TERMINAL` environment variable, then fallback to some most popular terminal emulators.
+
 ### Legacy theme
 Endcord default theme uses non-standard characters to display som TUI elements, and these characters may not work on some terminals, or look weird wih some fonts.  
 If that happens, use [legacy theme](themes/legacy.ini). It is used by default on windows.  

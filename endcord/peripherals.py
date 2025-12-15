@@ -138,6 +138,49 @@ def import_soundcard():
         return None
 
 
+def ensure_terminal():
+    """
+    Ensure that app is running inside a terminal emulator, launch inside terminal if not.
+    Prefer $TERMINAL env var, fallback to few common terminal emulators.
+    """
+    if sys.stdout.isatty():
+        return
+
+    terminals = []
+    if "TERMINAL" in os.environ:
+        terminals.append(os.environ["TERMINAL"])
+    terminals += [
+        "gnome-terminal",
+        "kgx",
+        "konsole",
+        "xfce4-terminal",
+        "lxterminal",
+        "alacritty",
+        "kitty",
+        "urxvt",
+        "x-terminal-emulator",
+        "xterm",
+    ]
+
+    for t in terminals:
+        if shutil.which(t):
+            terminal = t
+            break
+    else:
+        terminal = None
+
+    if not terminal:
+        print("No terminal emulator found.", file=sys.stderr)
+        sys.exit(1)
+
+    cmd = [sys.executable] + sys.argv
+    if terminal in ("gnome-terminal", "kgx"):
+        subprocess.Popen([terminal, "--"] + cmd)
+    else:
+        subprocess.Popen([terminal, "-e"] + cmd)
+    sys.exit(0)
+
+
 def save_config(path, data, section):
     """Save config section"""
     path = os.path.expanduser(path)

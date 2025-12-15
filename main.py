@@ -11,7 +11,7 @@ os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"   # fix for http
 from endcord import arg, defaults, peripherals
 
 APP_NAME = "endcord"
-VERSION = "1.1.2"
+VERSION = "1.1.3"
 default_config_path = peripherals.config_path
 log_path = peripherals.log_path
 uses_pgcurses = hasattr(curses, "PGCURSES")
@@ -44,6 +44,8 @@ def sigint_handler(_signum, _frame):
 
 def main(args):
     """Main function"""
+    if not uses_pgcurses:
+        peripherals.ensure_terminal()
     config_path = args.config
     theme_path = args.theme
     if config_path:

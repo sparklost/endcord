@@ -5428,14 +5428,14 @@ class Endcord:
                         break
 
 
-    def set_channel_unseen(self, channel_id, message_id, ping, skip_unread, last_acked_message_id=1, set_line=True):
+    def set_channel_unseen(self, channel_id, message_id, ping, skip_unread, last_acked_message_id=1, set_line=True, set_line_now=False):
         """Set one channel as unseen"""
         update_tree = False
         channel = self.read_state.get(channel_id)
         if channel:
             last_message_id = channel["last_message_id"]
             if last_message_id and int(channel["last_acked_message_id"]) >= int(last_message_id):
-                update_tree = True   # only  update tree if previous state is "read"
+                update_tree = True   # only update tree if previous state is "read"
             self.read_state[channel_id]["last_message_id"] = message_id
             if last_acked_message_id != 1 or not channel["last_acked_message_id"]:
                 self.read_state[channel_id]["last_acked_message_id"] = last_acked_message_id
@@ -5443,7 +5443,10 @@ class Endcord:
                 self.read_state[channel_id]["mentions"].append(message_id)
             if channel.get("last_acked_unreads_line") is None and set_line:
                 # last_acked_unreads_line is used to persist unreads line even after channel is acked
-                self.read_state[channel_id]["last_acked_unreads_line"] = self.read_state[channel_id]["last_acked_message_id"]
+                if set_line_now:
+                    self.read_state[channel_id]["last_acked_unreads_line"] = message_id
+                else:
+                    self.read_state[channel_id]["last_acked_unreads_line"] = self.read_state[channel_id]["last_acked_message_id"]
         else:
             self.read_state[channel_id] = {
                 "last_acked_message_id": last_acked_message_id,
@@ -5863,8 +5866,8 @@ class Endcord:
         """Process message events that should ping and send notification"""
         data = new_message["d"]
         op = new_message["op"]
-        this_channel = data["channel_id"] == self.active_channel["channel_id"]
         new_message_channel_id = data["channel_id"]
+        this_channel = self.active_channel["channel_id"] == new_message_channel_id
         if op == "MESSAGE_CREATE":
             if data["user_id"] == self.my_id:
                 self.set_channel_me_seen(new_message_channel_id, data["id"])
@@ -5874,11 +5877,16 @@ class Endcord:
                 for guild in self.guilds:
                     if guild["guild_id"] == data["guild_id"]:
                         if guild.get("muted"):
+                            muted = True
                             break
                         for channel in guild["channels"]:
                             if new_message_channel_id == channel["id"] and (channel.get("muted") or channel.get("hidden")):
                                 muted = True
                                 break
+                        break
+                for dm in self.dms:
+                    if dm["id"] == new_message_channel_id:
+                        muted = dm.get("muted")
                         break
                 if not muted:
                     # check if this message should ping
@@ -5911,6 +5919,7 @@ class Endcord:
                         this_channel and not self.new_unreads,
                         last_acked_message_id,
                         set_line=not(self.new_unreads and this_channel),
+                        set_line_now=this_channel and not self.new_unreads,
                     )
                     if this_channel and self.new_unreads:
                         self.update_chat(scroll=False)

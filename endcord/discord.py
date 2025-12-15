@@ -111,6 +111,9 @@ class Discord():
         }
         if client_prop:
             self.header["X-Super-Properties"] = client_prop
+        if self.header["Authorization"].startswith("Bot"):
+            self.header.pop("User-Agent", None)
+            self.header.pop("X-Super-Properties", None)
         self.user_agent = user_agent
         self.proxy = urllib.parse.urlsplit(proxy)
         self.my_id = self.get_my_id(exit_on_error=True)

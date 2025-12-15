@@ -8,7 +8,7 @@ import uuid
 
 # default client properties
 CLIENT_BUILD_NUMBER = None   # should only affect experimental features availability
-CLIENT_VERSION = "0.0.118"
+CLIENT_VERSION = "0.0.115"
 USER_AGENT_WEB = "Mozilla/5.0 (%OS; rv:145.0) Gecko/20100101 Firefox/145.0"
 USER_AGENT_DESKTOP = f"Mozilla/5.0 (%OS) AppleWebKit/537.36 (KHTML, like Gecko) discord/{CLIENT_VERSION} Chrome/138.0.7204.251 Electron/37.6.0 Safari/537.36"
 LINUX_UA_STRING = "X11; Linux x86_64"
@@ -87,7 +87,6 @@ def get_default_properties():
         "os": operating_system,
         "browser": "Discord Client",
         "release_channel": "stable",
-        "client_version": CLIENT_VERSION,
         "os_version": os_version,
         "os_arch": arch,
         "app_arch": arch,
@@ -107,6 +106,7 @@ def get_default_properties():
         data["window_manager"] = os.environ.get("XDG_CURRENT_DESKTOP", "unknown") + "," + os.environ.get("GDMSESSION", "unknown")
 
     user_agent = adjust_user_agent_os(USER_AGENT_DESKTOP, sys.platform, os_version)
+    data = add_client_version(data, user_agent)
 
     return add_user_agent(data, user_agent)
 
