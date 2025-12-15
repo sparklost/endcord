@@ -5,43 +5,7 @@ on:
     tags:
       - '[0-9]*.[0-9]*.[0-9]*'
 
-
-jobs:
-  detect_minor_bump:
-    runs-on: ubuntu-latest
-    outputs:
-      is_minor: ${{ steps.check.outputs.is_minor }}
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-          fetch-tags: true
-
-      - name: Get previous tag
-        id: prev
-        run: |
-          PREV=$(git tag --sort=-v:refname | sed -n '2p')
-          echo "prev=$PREV" >> $GITHUB_OUTPUT
-
-      - name: Compare versions
-        id: check
-        run: |
-          CUR="${{ github.ref_name }}"
-          PREV="${{ steps.prev.outputs.prev }}"
-
-          # Extract MINOR numbers
-          CUR_MINOR=$(echo "$CUR" | cut -d. -f2)
-          PREV_MINOR=$(echo "$PREV" | cut -d. -f2)
-
-          if [ "$CUR_MINOR" != "$PREV_MINOR" ]; then
-            echo "is_minor=true" >> $GITHUB_OUTPUT
-          else
-            echo "is_minor=false" >> $GITHUB_OUTPUT
-          fi
-
-
   build:
-    needs: detect_minor_bump
     name: build (${{ matrix.os }}, ${{ matrix.python-version }}${{ matrix.clang && format(', {0}', matrix.clang-version) || '' }})
     strategy:
       matrix:
@@ -62,13 +26,13 @@ jobs:
           - os: macos-15
             platform: macos
             python-version: 3.13
-            nuitka: true
+            nuitka: false
             clang: true
             clang-version: 20.1.4
           - os: macos-15-intel
             platform: macos
             python-version: 3.13
-            nuitka: true
+            nuitka: false
             clang: true
             clang-version: 20.1.3
     runs-on: ${{ matrix.os }}
@@ -78,10 +42,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
-
-      - name: Skip macOS unless minor bump
-        if: ${{ (matrix.os == 'macos-15' || matrix.os == 'macos-15-intel') && needs.detect_minor_bump.outputs.is_minor != 'true' }}
-        run: exit 0
 
       ## uncomment to enable caching with artifacts
       # - name: Set CCACHE_DIR environment variable
