@@ -410,7 +410,7 @@ class Endcord:
     def execute_extensions_method_first(self, method_name, *args, cache=False):
         """Execute specific method for each extension if extension has this method, and chain them, without chaining, stop on first run extension"""
         if not self.extensions:
-            return args
+            return None
 
         # try to load from cache (improves performance with many extensions)
         if cache:
