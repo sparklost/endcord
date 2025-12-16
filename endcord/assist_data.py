@@ -67,6 +67,7 @@ COMMAND_ASSISTS = (
     ("rename_folder [name] - Locally rename currently selected folder in tree", "rename_folder"),
     ("redraw - redraw UI if it ever gets messed up", "redraw"),
     ("show_log - show live log", "show_log"),
+    ("game_detection_blacklist [game] - toggle blacklist for games detected in past 7 days", "game_detection_blacklist"),
     ("set [key] = [value] - change settings and save them.", "set"),
     ("quit - quit endcord", "quit"),
 )

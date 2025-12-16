@@ -222,7 +222,7 @@ class Gateway():
                 self.ws.close(status=status)
                 logger.info(f"Disconnected with status code {status}")
             except Exception as e:
-                logger.warn("Error closing websocket:", e)
+                logger.warning("Error closing websocket:", e)
             finally:
                 self.ws = None
 

@@ -1,3 +1,5 @@
+Send messages through queue
+
 Voice channels
     add voice channels to tree
     show voice channel activity

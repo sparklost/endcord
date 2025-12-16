@@ -57,7 +57,7 @@ APP_COMMAND_AUTOCOMPLETE_DELAY = 0.3   # delay for requesting app command autoco
 MB = 1024 * 1024
 USER_UPLOAD_LIMITS = (10*MB, 50*MB, 500*MB, 50*MB)   # premium tier 0, 1, 2, 3 (none, classic, full, basic)
 GUILD_UPLOAD_LIMITS = (10*MB, 10*MB, 50*MB, 100*MB)   # premium tier 0, 1, 2, 3
-FORUM_COMMANDS = (1, 2, 7, 13, 14, 15, 17, 20, 22, 25, 27, 29, 30, 31, 32, 40, 42, 49, 50, 51, 52, 53, 55, 56, 57, 58, 66, 67)
+FORUM_COMMANDS = (1, 2, 7, 13, 14, 15, 17, 20, 22, 25, 27, 29, 30, 31, 32, 40, 42, 49, 50, 51, 52, 53, 55, 56, 57, 58, 61, 66, 67)
 
 match_emoji = re.compile(r"<:(.*):(\d*)>")
 match_youtube = re.compile(r"(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)[a-zA-Z0-9_-]{11}")
@@ -254,6 +254,7 @@ class Endcord:
             "muted": False,
             "collapsed": [],
             "folder_names": [],
+            "games_blacklist": [],
         }
         self.tree = []
         self.tree_format = []
@@ -345,7 +346,7 @@ class Endcord:
                     COMMAND_ASSISTS += ext_command_assist
                 instance = ext_class(self)
                 self.extensions.append(instance)
-                if ext_app_version != version:
+                if ext_app_version.split(".")[:2] != version.split(".")[:2]:
                     log_text.append(f"  {ext_name} {ext_version} - WARNING: This extension is built for different endcord version!")
                 else:
                     log_text.append(f"  {ext_name} {ext_version} - OK")
@@ -2119,7 +2120,6 @@ class Endcord:
                             self.restore_input_text = (None, None)
                     continue
 
-                # message will be received from gateway and then added to self.messages
                 if input_text.lower() != "y" and (self.deleting or self.cancel_download or self.hiding_ch["channel_id"]):
                     # anything not "y" when asking for "[Y/n]"
                     self.reset_actions()
@@ -3361,6 +3361,25 @@ class Endcord:
             guild_id, channel_id, _ = self.find_parents_from_id(self.active_channel)
             self.thread_toggle_join(guild_id, channel_id, thread_id)
             self.update_tree()
+
+        elif cmd_type == 61:   # GAME_DETECTION_BLACKLIST
+            if self.enable_game_detection and self.game_detection.run:
+                games = self.game_detection.get_detected()
+                name = cmd_args["name"].lower()
+                app_id = None
+                for game in games:
+                    if game[1].lower() == name:
+                        app_id = game[0]
+                        break
+                if app_id:
+                    if app_id in self.state["games_blacklist"]:
+                        self.state["games_blacklist"].remove(app_id)
+                    else:
+                        self.state["games_blacklist"].append(app_id)
+                    self.game_detection.set_blacklist(self.state["games_blacklist"])
+                    peripherals.save_json(self.state, f"state_{self.profiles["selected"]}.json")
+            else:
+                self.update_extra_line("Game detection service is disabled or not running.")
 
         elif cmd_type == 66 and self.fun:   # 666
             self.fun = 1 if self.fun == 2 else 2
@@ -4617,7 +4636,7 @@ class Endcord:
                 if "component_info" in message and message["component_info"]["buttons"]:
                     self.assist_found = search.search_string_selects(
                         message,
-                        assist_word,
+                        assist_word[14:],
                         limit=self.assist_limit,
                         score_cutoff=self.assist_score_cutoff,
                     )
@@ -4645,6 +4664,15 @@ class Endcord:
                     channel_id,
                     discord.PING_OPTIONS,
                     assist_word,
+                )
+
+            elif assist_word.lower().startswith("game_detection_blacklist ") and self.enable_game_detection and self.game_detection.run:
+                self.assist_found = search.search_games(
+                    self.game_detection.get_detected(),
+                    self.state["games_blacklist"],
+                    assist_word[25:],
+                    limit=self.assist_limit,
+                    score_cutoff=self.assist_score_cutoff,
                 )
 
             elif assist_word:
@@ -4741,6 +4769,7 @@ class Endcord:
         if update:
             self.update_status_line()
             self.stop_assist()
+        self.assist_word = None
 
 
     def insert_assist(self, input_text, index, start, end):
@@ -4761,7 +4790,7 @@ class Endcord:
             insert_string = f"<;{self.assist_found[index][1]};>"   # format: "<;ID;>"
         elif self.assist_type == 5:   # command
             if self.assist_found[index][1]:
-                if input_text.endswith(" ") and input_text not in ("set ", "string_select ", "set_notifications  "):
+                if input_text.endswith(" ") and input_text not in ("set ", "string_select ", "set_notifications ", "game_detection_blacklist "):
                     self.tui.instant_assist = False
                     command_type, command_args = parser.command_string(input_text)
                     self.close_extra_window()
@@ -6578,13 +6607,6 @@ class Endcord:
 
         # restore last state
         if self.config["remember_state"]:
-            self.state = {
-                "last_guild_id": None,
-                "last_channel_id": None,
-                "muted": False,
-                "collapsed": [],
-                "folder_names": [],
-            }
             self.state = peripherals.load_json(f"state_{self.profiles["selected"]}.json", self.state)
         if self.state["last_guild_id"] in self.state["collapsed"]:
             self.state["collapsed"].remove(self.state["last_guild_id"])
@@ -6659,7 +6681,7 @@ class Endcord:
 
         # start game detection service
         if self.enable_game_detection:
-            self.game_detection = game_detection.GameDetection(self, self.discord)
+            self.game_detection = game_detection.GameDetection(self, self.discord, self.state["games_blacklist"])
 
         # start extra line remover thread
         threading.Thread(target=self.extra_line_remover, daemon=True).start()
@@ -6797,7 +6819,7 @@ class Endcord:
             if self.enable_rpc:
                 new_activities = self.rpc.get_activities()
                 if new_activities is not None and self.gateway_state == 1:
-                    self.my_activities = new_activities + self.game_detection.get_activities(force=True)
+                    self.my_activities = new_activities + (self.game_detection.get_activities(force=True) if self.enable_game_detection else [])
                     self.gateway.update_presence(
                         self.my_status["status"],
                         custom_status=self.my_status["custom_status"],
@@ -6809,7 +6831,7 @@ class Endcord:
             if self.enable_game_detection:
                 new_activities = self.game_detection.get_activities()
                 if new_activities is not None and self.gateway_state == 1:
-                    self.my_activities = new_activities + self.rpc.get_activities(force=True)
+                    self.my_activities = new_activities + (self.rpc.get_activities(force=True) if self.enable_rpc else [])
                     self.gateway.update_presence(
                         self.my_status["status"],
                         custom_status=self.my_status["custom_status"],

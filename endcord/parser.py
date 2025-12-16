@@ -759,6 +759,15 @@ def command_string(text):
     elif text_lower.split(" ")[0] == "toggle_thread":
         cmd_type = 60
 
+    # 61 - GAME_DETECTION_BLACKLIST
+    elif text_lower.split(" ")[0] == "game_detection_blacklist":
+        cmd_type = 61
+        name = text[25:].strip(" ")
+        if name:
+            cmd_args = {"name": name}
+        else:
+            cmd_type = 0
+
 
     # 66 - 666
     elif text_lower == "666":

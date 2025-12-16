@@ -371,6 +371,27 @@ def search_client_commands(commands, query, limit=50, score_cutoff=15):
     return sorted(results, key=lambda x: x[2], reverse=True)
 
 
+def search_games(games, blacklist, query, limit=50, score_cutoff=15):
+    """Search for settings"""
+    results = []
+    worst_score = score_cutoff
+
+    for game_id, game_name in games:
+        if game_id in blacklist:
+            formatted = game_name + " (blacklisted)"
+        else:
+            formatted = game_name
+        score = fuzzy_match_score(query, formatted)
+        if score < worst_score and query:
+            continue
+        heapq.heappush(results, (formatted, f"game_detection_blacklist {game_name}", score))
+        if len(results) > limit:
+            heapq.heappop(results)
+            worst_score = results[0][2]
+
+    return sorted(results, key=lambda x: x[2], reverse=True)
+
+
 def search_app_commands(guild_apps, guild_commands, my_apps, my_commands, depth, guild_commands_permitted, dm, assist_skip_app_command, match_command_arguments, query, limit=50, score_cutoff=15):
     """Search for app commands"""
     results = []

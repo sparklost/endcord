@@ -67,9 +67,6 @@
     Paste image from clipboard as attachment.
 - `check_standing`  
     Check account standing. 0-100 value, anything non-100 is concerning.  
-- `set [key] = [value]` / `set [key]=[value]`  
-    Change settings and save them. Usually restart is required.  
-    External theme won't be changed, and it can override changed settings.  
 - `hide` / `hide <#[channel_id]>`  
     Prompt to hide selected channel in tree or specified channel.
 - `toggle_mute` / `toggle_mute <#[channel_id]>`  
@@ -127,3 +124,8 @@
     Redraw UI if it ever gets messed up.
 - `show_log`  
     Show live log.
+- `game_detection_blacklist [game_name]`  
+    Toggle blacklisted state for games detected in past 7 days, with assist.
+- `set [key] = [value]` / `set [key]=[value]`  
+    Change settings and save them. Usually restart is required.  
+    External theme won't be changed, and it can override changed settings.  

@@ -334,6 +334,7 @@ If this happens, more info about what is going on can be found in log, when endc
 ### Game detection
 Game detection service is ON by default and can be disabled in config.  
 Occasionally, it will download ~10MB json file, clean it up, and save it as ~1MB file. When this happens there will be small spike in CPU usage at startup.  
+Games can be blacklisted using `game_detection_blacklist` command.  
 
 ### Theming
 Custom theme path can be provided with `-c [PATH_TO_THEME]` flag or in `config.ini`.

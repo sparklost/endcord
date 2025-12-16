@@ -1673,14 +1673,14 @@ def generate_custom_prompt(text, format_prompt, limit_prompt=15):
     return prompt
 
 
-def generate_log(log, colors, max_w):
+def generate_log(log, colors, max_width):
     """Generate log lines shown in chat area"""
     chat = []
     chat_format = []
     indexes = []
     chat_map = []
     for message in log:
-        temp_chat = split_long_line(message, max_w, 4)
+        temp_chat = split_long_line(message, max_width, 4)
         chat.extend(temp_chat)
         chat_format.extend([[[colors[0]]]] * len(temp_chat))
         indexes.append(len(temp_chat))
