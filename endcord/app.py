@@ -5418,6 +5418,7 @@ class Endcord:
             self.config,
             folder_names=self.state.get("folder_names", []),
             safe_emoji=self.emoji_as_text,
+            max_w=self.tui.get_dimensions()[1][1],
         )
         # debug_guilds_tree
         # debug.save_json(self.tree, "tree.json", False)
