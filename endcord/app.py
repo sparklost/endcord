@@ -286,6 +286,7 @@ class Endcord:
         self.gateway.set_want_summaries(self.save_summaries)
         self.timed_extra_line = threading.Event()
         self.log_queue_manager = None
+        self.message_send_queue = queue.Queue()
         # threading.Thread(target=self.profiling_auto_exit, daemon=True).start()
         self.discord.get_voice_regions()
 
@@ -464,6 +465,7 @@ class Endcord:
             except Exception:
                 pass
 
+
     def put_to_message_sender(self, func, *args, **kwargs):
         """Put method to queue with its args and kwargs"""
         self.message_send_queue.put((func, args, kwargs))
@@ -504,7 +506,6 @@ class Endcord:
         if not self.preloaded:
             self.messages = []
         self.session_id = None
-        self.message_send_queue = queue.Queue()
         self.chat = []
         self.chat_format = []
         self.tab_string = ""
@@ -4058,6 +4059,8 @@ class Endcord:
 
     def get_chat_chunk(self, past=True, scroll=False):
         """Get chunk of chat in specified direction and add it to existing chat, trim chat to limited size and trigger update_chat"""
+        if self.my_status["client_state"] != "online":
+            return
         self.add_running_task("Downloading chat", 4)
         start_id = self.messages[-int(past)]["id"]
 

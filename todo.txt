@@ -1,8 +1,8 @@
 Add fine-grained notification settings
-    access "selected_notifications" in process_msg_other
-    handle all messages, only mentions and nothing
-    handle suppress_everyone and suppress_roles guild flags
-Optimize guilds and channels by making them dicts
+    access message_notification in process_msg_events_other_channels
+    handle "0 - all", "1 - mentions" and "2 - nothing" (if >=10: value -= 10)
+    handle "suppress_everyone" and "suppress_roles" guild flags
+Optimize accessing guilds and channels by making them dicts
 
 Voice channels
     add voice channels to tree
@@ -18,7 +18,6 @@ Voice calls
     send and receive RTCP?
     send speaking event?
 
-Optimize guilds by using dataclasses
 Optimize main loop with queues and threading
 Fix member list not updating when switching between same-guild channels
 Vim-like bindings

@@ -44,12 +44,10 @@ status_unpacker = struct.Struct("!H")
 
 def zlib_decompress(data):
     """Decompress zlib data, if it is not zlib compressed, return data instead"""
-    buffer = bytearray()
-    buffer.extend(data)
     if len(data) < 4 or data[-4:] != ZLIB_SUFFIX:
         return data
     try:
-        return inflator.decompress(buffer)
+        return inflator.decompress(data)
     except zlib.error as e:
         logger.error(f"zlib error: {e}")
         return None
@@ -672,6 +670,7 @@ class Gateway():
                     except ValueError:
                         response = None
                         opcode = None
+                    del data
                 else:
                     response = None
                     opcode = None
