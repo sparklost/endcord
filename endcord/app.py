@@ -6971,7 +6971,10 @@ class Endcord:
             if self.enable_game_detection:
                 new_activities = self.game_detection.get_activities()
                 if new_activities is not None and self.gateway_state == 1:
-                    self.my_activities = new_activities + (self.rpc.get_activities(force=True) if self.enable_rpc else [])
+                    # if new activities app_id not in rpc activities app_id
+                    rpc_activities = self.rpc.get_activities(force=True) if self.enable_rpc else []
+                    rpc_apps_ids = {d["application_id"] for d in rpc_activities}
+                    self.my_activities = rpc_activities + [d for d in self.my_activities if d["application_id"] not in rpc_apps_ids]
                     self.gateway.update_presence(
                         self.my_status["status"],
                         custom_status=self.my_status["custom_status"],

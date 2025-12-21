@@ -106,7 +106,7 @@ def prepare_message(message):
                         "global_name": ref_mention.get("global_name"),   # spacebar_fix - get
                         "id": ref_mention["id"],
                     })
-            if "message_snapshots" in message["referenced_message"]:
+            if message["referenced_message"].get("message_snapshots"):
                 forwarded = message["referenced_message"]["message_snapshots"][0]["message"]
                 # additional text with forwarded message is sent separately
                 message["referenced_message"]["content"] = f"[Forwarded]: {forwarded.get("content")}"
@@ -157,7 +157,7 @@ def prepare_message(message):
         nick = message["member"]["nick"]
 
     # forwarded messages
-    if "message_snapshots" in message:
+    if message.get("message_snapshots"):
         forwarded = message["message_snapshots"][0]["message"]
         # additional text with forwarded message is sent separately
         message["content"] = f"[Forwarded]: {forwarded.get("content")}"
