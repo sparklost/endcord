@@ -5901,6 +5901,11 @@ class Endcord:
                             loaded_message[element] = data[element]
                             loaded_message["spoiled"] = []
                         loaded_message["edited"] = True
+                        # check if this message has emoji and clear it before redraw
+                        msg_line_index = self.msg_to_lines(num)
+                        if msg_line_index in self.tui.wide_map:
+                            self.tui.wide_map = [msg_line_index]
+                            self.tui.clear_chat_wide()
                         self.update_chat(scroll=False)
                     elif op == "MESSAGE_DELETE":
                         if self.keep_deleted:
