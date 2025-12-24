@@ -51,9 +51,10 @@ cpdef list convert_role_colors(list all_roles, tuple colors, object guild_id, ob
                 continue
             color = role["color"]
             if color == 0:
-                color = default
-            rgb = int_to_rgb(color)
-            ansi = closest_color(colors, rgb)[0]
+                ansi = default
+            else:
+                rgb = int_to_rgb(color)
+                ansi = closest_color(colors, rgb)[0]
             role["color"] = ansi
             if role_id:
                 break

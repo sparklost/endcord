@@ -50,9 +50,10 @@ def convert_role_colors(all_roles, guild_id=None, role_id=None, default=-1):
                 continue
             color = role["color"]
             if color == 0:
-                color = default
-            rgb = int_to_rgb(color)
-            ansi = closest_color(rgb)[0]
+                ansi = default
+            else:
+                rgb = int_to_rgb(color)
+                ansi = closest_color(rgb)[0]
             role["color"] = ansi
             if role_id:
                 break

@@ -238,7 +238,6 @@ class Endcord:
             self.fun = 2 if (10, 25) <= today <= (11, 8) else self.fun
             self.fun = 3 if today >= (12, 25) or today <= (1, 8) else self.fun
             self.fun = 4 if today == (4, 1) else self.fun
-            self.tui.set_fun(self.fun)
         self.colors = self.tui.init_colors(self.colors)
         self.colors_formatted = self.tui.init_colors_formatted(self.colors_formatted, self.default_msg_alt_color)
         self.tui.update_chat(self.chat, [[[self.colors[0]]]] * len(self.chat))
@@ -3417,6 +3416,8 @@ class Endcord:
         elif cmd_type == 67 and self.fun:   # TOGGLE_SNOW
             self.fun = 1 if self.fun == 3 else 3
             self.tui.set_fun(self.fun)
+            self.state["snow"] = self.fun == 3
+            peripherals.save_json(self.state, f"state_{self.profiles["selected"]}.json")
 
         if success is None:
             self.gateway.set_offline()
@@ -6059,25 +6060,27 @@ class Endcord:
                         break
                 else:
                     is_dm = False
-                if not muted and message_notifications != 2:
-                    # check if this message should ping
+                if not muted:
                     ping = False
-                    mentions = data["mentions"]
-                    # select my roles from same guild as message
-                    my_roles = []
-                    for guild in self.my_roles:
-                        if guild["guild_id"] == data["guild_id"]:
-                            my_roles = guild["roles"]
-                    if (
-                        message_notifications == 0 or
-                        (data["mention_everyone"] and not suppress_everyone) or
-                        (bool([i for i in my_roles if i in data["mention_roles"]]) and not suppress_roles) or
-                        (self.my_id in [x["id"] for x in mentions]) or
-                        (is_dm and new_message_channel_id in self.dms_vis_id)
-                    ):
-                        if not this_channel or self.new_unreads:   # new_unreads already set in process events for active channel
-                            ping = True
-                        self.send_desktop_notification(new_message)
+                    
+                    if message_notifications != 2:
+                        # check if this message should ping
+                        mentions = data["mentions"]
+                        # select my roles from same guild as message
+                        my_roles = []
+                        for guild in self.my_roles:
+                            if guild["guild_id"] == data["guild_id"]:
+                                my_roles = guild["roles"]
+                        if (
+                            message_notifications == 0 or
+                            (data["mention_everyone"] and not suppress_everyone) or
+                            (bool([i for i in my_roles if i in data["mention_roles"]]) and not suppress_roles) or
+                            (self.my_id in [x["id"] for x in mentions]) or
+                            (is_dm and new_message_channel_id in self.dms_vis_id)
+                        ):
+                            if not this_channel or self.new_unreads:   # new_unreads already set in process events for active channel
+                                ping = True
+                            self.send_desktop_notification(new_message)
 
                     # set unseen
                     if this_channel and self.new_unreads:
@@ -6753,11 +6756,14 @@ class Endcord:
         # restore last state
         if self.config["remember_state"]:
             self.state = peripherals.load_json(f"state_{self.profiles["selected"]}.json", self.state)
+            if self.fun == 3 and "snow" in self.state and not self.state["snow"]:
+                self.fun = 1
         if self.state["last_guild_id"] in self.state["collapsed"]:
             self.state["collapsed"].remove(self.state["last_guild_id"])
         for folder in self.guild_folders:
             if folder["id"] and folder["id"] != "MISSING" and folder["id"] not in self.state["collapsed"]:
                 self.state["collapsed"].append(folder["id"])
+        self.tui.set_fun(self.fun)
 
         # load summaries
         if self.save_summaries:
