@@ -1538,9 +1538,13 @@ class Gateway():
                 elif optext in ("GUILD_CREATE", "GUILD_UPDATE", "GUILD_DELETE"):
                     guild_id = data["id"]
                     if optext == "GUILD_CREATE":
+                        have_it = False
                         for guild in self.guilds:
                             if guild["guild_id"] == guild_id:
-                                continue
+                                have_it = True
+                                break
+                        if have_it:
+                            continue
                         self.add_guild(data)
                         # add my roles
                         for member in data.get("members", []):

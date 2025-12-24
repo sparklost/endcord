@@ -6036,8 +6036,8 @@ class Endcord:
                 for guild in self.guilds:
                     if guild["guild_id"] == data["guild_id"]:
                         muted = guild.get("muted")
-                        suppress_everyone = guild["suppress_everyone"]
-                        suppress_roles = guild["suppress_roles"]
+                        suppress_everyone = guild.get("suppress_everyone")
+                        suppress_roles = guild.get("suppress_roles")
                         for channel in guild["channels"]:
                             if new_message_channel_id == channel["id"]:
                                 if channel.get("muted") or channel.get("hidden"):
