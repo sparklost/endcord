@@ -4,6 +4,7 @@ import logging
 import os
 import signal
 import sys
+import time
 import traceback
 
 os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"   # fix for https://github.com/Nuitka/Nuitka/issues/3442
@@ -116,7 +117,7 @@ def main(args):
     from endcord import profile_manager
     logger.info(f"Started endcord {VERSION}")
     if args.token:
-        profiles = {"selected": "default", "profiles": [{"name": "default", "token": args.token}]}
+        profiles = {"selected": "default", "plaintext": [{"name": "default", "token": args.token, "time": int(time.time())}], "keyring": []}
         proceed = True
     else:
         profiles_path = os.path.join(peripherals.config_path, "profiles.json")
@@ -126,7 +127,7 @@ def main(args):
             selected = None
         profiles, selected, proceed = profile_manager.manage(profiles_path, selected, force_open=args.manager)
         if not profiles:
-            sys.exit("Token not provided in token manager nor as argument")
+            sys.exit("Token not provided in profile manager nor as argument")
     if not proceed:
         sys.exit(0)
 

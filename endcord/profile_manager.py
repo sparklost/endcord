@@ -266,7 +266,7 @@ def draw_buttons(screen, selected, y, w):
 
 
 def main_tui(screen, profiles_enc, profiles_plain, selected, have_keyring):
-    """Main token manager tui"""
+    """Main profile manager tui"""
     curses.use_default_colors()
     curses.curs_set(0)
     curses.init_pair(1, -1, -1)
