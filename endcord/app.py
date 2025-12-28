@@ -291,7 +291,10 @@ class Endcord:
         self.discord.get_voice_regions()
 
         # init sigint handler - replaces handler from main.py
-        signal.signal(signal.SIGINT, self.sigint_handler)
+        try:
+            signal.signal(signal.SIGINT, self.sigint_handler)
+        except ValueError:
+            pass   # error when ran in pgcurses
 
         # init extensions
         if config["extensions"] and ENABLE_EXTENSIONS:
@@ -1512,6 +1515,9 @@ class Endcord:
 
             # upload attachment
             elif action == 13 and self.messages and not self.disable_sending:
+                if self.config["native_file_dialog"]:
+                    self.upload_native_dialog()
+                    continue
                 self.restore_input_text = (None, "autocomplete")
                 self.add_to_store(self.active_channel["channel_id"], input_text)
                 if self.current_channel.get("allow_attach", True):
@@ -2619,6 +2625,8 @@ class Endcord:
                 if path:
                     self.upload_threads.append(threading.Thread(target=self.upload, daemon=True, args=(path, )))
                     self.upload_threads[-1].start()
+                elif self.config["native_file_dialog"]:
+                    self.upload_native_dialog()
                 else:
                     self.restore_input_text = (None, "autocomplete")
                     if self.recording:   # stop recording voice message
@@ -3821,6 +3829,14 @@ class Endcord:
                 message_id=message_id,
                 message_content=new_content,
             )
+
+
+    def upload_native_dialog(self):
+        """Thread that waits for native dialog to return list of files to upload"""
+        files = peripherals.native_select_files()
+        for file in files:
+            self.upload_threads.append(threading.Thread(target=self.upload, daemon=True, args=(file, )))
+            self.upload_threads[-1].start()
 
 
     def download_file(self, url, move=True, open_media=False, open_move=False):

@@ -238,6 +238,7 @@ Downloads are parallel. `Ctrl+X` will cancel ALL downloads and attachments, with
 
 ### Uploading
 Uploading is initiated by pressing `Ctrl+U`. Previously typed content will be cached.  
+If `native_file_dialog` is set to `True` in config, it will open system native file dialog instead.  
 Type path to file that should be uploaded and press enter. Cached content will be restored.  
 Wait until file is uploaded and then send the message. Multiple files can be added this way.  
 Path can be absolute or relative, and has autocomplete on `tab` key.  
@@ -401,6 +402,7 @@ To prevent extension injection (malware can modify endcord config and inject ext
 Optional dependencies:
 - `xclip` - Clipboard support on X11
 - `wl-clipboard` - Clipboard support on Wayland
+- `zenity` / `kdialog` - Native file dialog when uploading
 - `aspell` - Spellchecking (and `aspell-en` dictionary)
 - `yt-dlp` - youtube support
 - `mpv` - Play youtube videos in native player (non-ascii)
@@ -491,15 +493,16 @@ Run main.py: `uv run --python 3.14t main.py`
 Endcord does its best to avoid causing any suspicious activity, so using it as-is is pretty much enough, but most important steps are:
 - Do not use endcord to perform any out-of-ordinary actions (i.e. self-bots). Third party clients can sometimes trip anti-spam heuristic algorithm for catching self-bots.
 - Do not use endcord at the same time with the client from which you coped token from, it might be it suspicios to have 2 clients using same token at the same time.
+- Do not use same token across different third party clients.
+- Do not use `--token` flag, endcord automatically refreshes token stored with profile manager, so there is no need to update it manually.
 - Increase `limit_channel_cache` in config - so REST API is not called on every channel switch. This will also slightly increase RAM and CPU usage.
 - `anonymous` mode in `client_properties` setting might be more risky than `default` mode.
+- If endcord hasnt been updated in a while, set `custom_user_agent` to the one found in API requests in official Discord client.
 - Do not set invalid `custom_user_agent` setting, and try to match it with your OS.
-- If endcord hasnt been updated in a while, set `custom_user_agent` to the one found in API requests in offiial Discord client.
-- Endcord automatically refreshes token stored in keyring or plaintext, so there is no need to update it manually unless token is revoked.
+- Do not use public proxy, like VPN or TOR.
 Less important steps is to decrease REST API calls, which might have little to no effect:
 - Discord REST API is called (most notably) each time client is started, when channel is changed, app command is sent and message is seen or sent. It would be best to not abuse these actions in order to reduce REST API calls.
 - Do not leave endcord on busy channels running in background.
-- Do not repeatedly view user profiles.
 - Sending ack (when channel is marked as seen) is throttled by endcord to 5s (configurable).
 - Disable `rpc_external` in config - it calls REST API for fetching external resources for Rich Presence, but it shouldn't be critical.
 - Disable `send_typing` in config - it calls REST API every 7s when typing, but it shouldn't be critical.

@@ -628,9 +628,8 @@ class TUI():
         self.disable_drawing = lock
         if lock:
             self.hibernate_cursor = 10
-        else:
-            self.screen.clear()
-            self.resize()
+        # else:   # seems to not be needed
+        #     self.resize(redraw_only=True)
 
 
     def is_window_open(self):

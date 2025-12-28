@@ -104,10 +104,20 @@ for app_path in (config_path, log_path, temp_path, downloads_path):
 # platform specific commands
 if sys.platform == "linux":
     runner = "xdg-open"
+    if shutil.which("zenity"):
+        filedialog = "zenity"
+    elif shutil.which("kdialog"):
+        filedialog = "kdialog"
+    else:
+        filedialog = None
 elif sys.platform == "win32":
     runner = "explorer"
+    import win32con
+    import win32gui
+    filedialog = "windows"
 elif sys.platform == "darwin":
     runner = "open"
+    filedialog = "mac"
 
 
 # check for audio systems
@@ -546,6 +556,85 @@ def copy_to_clipboard(text):
             stderr=subprocess.STDOUT,
         )
         proc.communicate(input=text.encode("utf-8"))
+
+
+def native_select_files(file_filter=None, multiple=True):
+    """Get one or more file paths with native dialog"""
+    if filedialog == "windows":
+        init_dir = os.path.join(os.environ["USERPROFILE"], "Desktop")
+    else:
+        init_dir = os.path.expanduser("~") + "/"
+
+    if filedialog == "zenity":
+        command = [
+            "zenity", "--file-selection",
+            "--title", "Import File",
+            "--filename", init_dir,
+        ]
+        if multiple:
+            command.append("--multiple")
+        if file_filter:
+            for one_filter in file_filter:
+                command.append("--file-filter")
+                command.append(one_filter)
+        data = subprocess.run(command, capture_output=True, text=True, check=False)
+        result = data.stdout.strip()
+        if not result:
+            return []
+        if multiple:
+            return result.split("|")
+        return [result]
+
+    if filedialog == "kdialog":
+        command = [
+            "kdialog", "--getopenfilename",
+            init_dir,
+            "--title", "Import File",
+        ]
+        if multiple:
+            command.append("--multiple")
+            command.append("--separate-output")
+        if file_filter:
+            command.append('"' + "|".join(file_filter) + '"')
+        data = subprocess.run(command, capture_output=True, text=True, check=False)
+        result = data.stdout.strip()
+        if not result:
+            return []
+        if multiple:
+            return result.splitlines()
+        return [result]
+
+    if filedialog == "windows":
+        flags = win32con.OFN_FILEMUSTEXIST | win32con.OFN_EXPLORER
+        if multiple:
+            flags |= win32con.OFN_ALLOWMULTISELECT
+        try:
+            foreground = win32gui.GetForegroundWindow()
+            result = win32gui.GetOpenFileNameW(
+                hwndOwner=foreground,
+                InitialDir=init_dir,
+                Title="Upload Files",
+                Flags=flags,
+            )[0].split("\x00")
+            if not result:
+                return []
+            if len(result) == 1:
+                return result
+            dir_path, *files = result   # first is directory rest are file names
+            return [f"{dir_path}\\{f}" for f in files]
+        except Exception:
+            return []
+
+    elif filedialog == "mac":
+        command += f'choose file default location "{init_dir}"  with prompt "Import File"'
+        data = subprocess.run(["osascript", "-"], input=command, text=True, capture_output=True, check=False)
+        data = data.stdout.strip().split(",")
+        return data[data.find(":"):].replace(":", "/")
+
+    else:
+        return "ERROR"
+
+    return []
 
 
 def get_file_size(path):

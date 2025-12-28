@@ -104,6 +104,8 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
     Will convert emoji characters to their names. Enable if emoji are not supported by terminal.
 - `native_media_player = False`  
     Use system native media player instead in-terminal ASCII art.
+- `native_file_dialog = False`  
+    Use system native file dialog when uploading files.
 - `save_sumamries = True`  
     Whether to save summaries to disk. Disable to save RAM and reduce disk writes.
 - `default_stickers = True`  
