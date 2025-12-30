@@ -1901,7 +1901,7 @@ class Endcord:
                 subprocess.run([self.external_editor, temp_message_path], check=True)
                 if os.path.exists(temp_message_path):
                     with open(temp_message_path, "r", encoding="utf-8") as f:
-                        new_text = f.read().strip("\n")
+                        new_text = f.read().strip("\n").replace("\t", " " * self.config["tab_spaces"])
                     os.remove(temp_message_path)
                     self.tui.set_input_index(len(new_text))
                     self.restore_input_text = (new_text, "standard")

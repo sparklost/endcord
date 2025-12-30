@@ -52,6 +52,8 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
     Time in seconds the cursor stays ON. Set to None or 0 to disable cursor blinking.
 - `cursor_off_time = 0.5`  
     Time in seconds the cursor stays OFF. Set to None or 0 to disable cursor blinking.
+- `tab_spaces = 4`  
+    How many spaces are inserted when pressing tab button or loading tab character from external editor.
 - `blocked_mode = 1`  
     What to do with blocked/ignored messages:  
     0 - No blocking  

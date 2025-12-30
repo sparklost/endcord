@@ -22,6 +22,7 @@ settings = {
     "show_pending_messages": True,
     "cursor_on_time": 0.7,
     "cursor_off_time": 0.5,
+    "tab_spaces": 4,
     "blocked_mode": 2,
     "hide_spam": True,
     "keep_deleted": False,

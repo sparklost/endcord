@@ -550,10 +550,11 @@ Its probably terminal emulator sending different key codes than those in default
 Then press key combination and see printed code. Put this code in settings to use it.  
 This mostly happens with `Ctrl+Arrow` and `Alt+Arrow` combinations, on some non-standard terminal emulators like kitty or cmder.
 
-### No colors in headless Linux tty
+### Running in tty
 If there are no colors in Linux tty (but there should be), endcord can run inside [fbterm](https://salsa.debian.org/debian/fbterm).  
 Follow [fbterm setup instructions](https://wiki.archlinux.org/title/Fbterm#Installation), then set environment variable: `export TERM=fbterm` and run endcord.  
-Note: keybinding `Ctrl+Up/Down/Left/Right` does not work in tty.  
+Some characters may fail to render so set `emoji_as_text = True` in config and `compact = True` in theme. Some theme characters should also be tweaked.  
+Note: keybinding `Ctrl+Up/Down/Left/Right` does not work in tty, either rebind them or add custom keymap, or in `/etc/vconsole.conf`.  
 
 ### Adding desktop launcher on Linux
 Simply make launcher execute `endcord` or `endcord-lite`, endcord will deal with starting terminal. It will prefer `$TERMINAL` environment variable, then fallback to some most popular terminal emulators.

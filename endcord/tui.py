@@ -256,6 +256,7 @@ class TUI():
         self.corner_ur = config["border_corners"][2]
         self.corner_dl = config["border_corners"][1]
         self.corner_dr = config["border_corners"][3]
+        self.tab_spaces = int(config["tab_spaces"])
 
         # select bordered method
         if self.bordered:
@@ -2513,17 +2514,29 @@ class TUI():
                     self.draw_input_line()
                 return self.return_input_code(20)
 
-            elif self.enable_autocomplete and key == 9:   # TAB - same as CTRL+I
-                if self.input_buffer and self.input_index == len(self.input_buffer):
-                    completions = peripherals.complete_path(self.input_buffer, separator=False)
-                    if completions:
-                        path = completions[selected_completion]
-                        self.input_buffer = path
-                        self.input_index = len(path)
-                        self.show_cursor()
-                        selected_completion += 1
-                        if selected_completion > len(completions) - 1:
-                            selected_completion = 0
+            elif key == 9:   # TAB - same as CTRL+I
+                if self.enable_autocomplete:
+                    if self.input_buffer and self.input_index == len(self.input_buffer):
+                        completions = peripherals.complete_path(self.input_buffer, separator=False)
+                        if completions:
+                            path = completions[selected_completion]
+                            self.input_buffer = path
+                            self.input_index = len(path)
+                            self.show_cursor()
+                            selected_completion += 1
+                            if selected_completion > len(completions) - 1:
+                                selected_completion = 0
+                else:   # regular text
+                    if self.input_select_start is not None:
+                        self.delete_selection()
+                        self.input_select_start = None
+                    tab_str = " " * self.tab_spaces
+                    self.input_buffer = self.input_buffer[:self.input_index] + tab_str + self.input_buffer[self.input_index:]
+                    self.input_index += self.tab_spaces
+                    self.typing = int(time.time())
+                    self.add_to_delta_store(tab_str)
+                    self.show_cursor()
+                    self.spellcheck()
 
             elif key in self.keybindings["tree_collapse_threads"]:
                 if (self.tree_format[self.tree_selected_abs] % 10):
