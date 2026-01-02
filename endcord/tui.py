@@ -2738,7 +2738,7 @@ class TUI():
 
         elif self.mouse_in_window(x, y, self.win_input_line):
             x, y = self.mouse_rel_pos(x, y, self.win_input_line)
-            input_index = min(self.input_line_index + x, len(self.input_buffer))
+            input_index = min(x + max(0, len(self.input_buffer) - self.input_hw[1] + 1 - self.input_line_index), len(self.input_buffer))
             self.set_input_index(input_index)
             self.draw_input_line()
 

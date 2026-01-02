@@ -26,6 +26,7 @@ from endcord.message import prepare_messages
 
 DISCORD_HOST = "discord.com"
 DISCORD_CDN_HOST = "cdn.discordapp.com"
+DYN_DISCORD_CDN_HOST = "media.discordapp.net"
 DISCORD_EPOCH = 1420070400
 SEARCH_PARAMS = ("content", "channel_id", "author_id", "mentions", "has", "max_id", "min_id", "pinned", "offset")
 SEARCH_HAS_OPTS = ("link", "embed", "poll", "file", "video", "image", "sound", "sticker", "forward")
@@ -133,8 +134,9 @@ class Discord():
     def check_expired_attachment_url(self, url):
         """Check if provided url is attachment and return its querys"""
         parsed_url = urllib.parse.urlsplit(url)
-        if self.cdn_host in parsed_url.netloc:
+        if self.cdn_host in parsed_url.netloc or (self.cdn_host == DISCORD_CDN_HOST and DYN_DISCORD_CDN_HOST in parsed_url.netloc):
             return dict(urllib.parse.parse_qsl(parsed_url.query))
+        return None
 
 
     def get_connection(self, host, port):

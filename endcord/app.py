@@ -1436,8 +1436,7 @@ class Endcord:
                         selected_urls.append(urls[num])
                 if len(selected_urls) == 1:
                     self.restore_input_text = (input_text, "standard")
-                    selected_url = self.refresh_attachment_url(selected_urls[0])
-                    self.download_threads.append(threading.Thread(target=self.download_file, daemon=True, args=(selected_url, )))
+                    self.download_threads.append(threading.Thread(target=self.download_file, daemon=True, args=(selected_urls[0], )))
                     self.download_threads[-1].start()
                 else:
                     self.ignore_typing = True
@@ -1488,8 +1487,7 @@ class Endcord:
                     selected_urls = embeds
                 if len(selected_urls) == 1:
                     self.restore_input_text = (input_text, "standard")
-                    selected_url = self.refresh_attachment_url(selected_urls[0])
-                    self.download_threads.append(threading.Thread(target=self.download_file, daemon=True, args=(selected_url, False, True)))
+                    self.download_threads.append(threading.Thread(target=self.download_file, daemon=True, args=(selected_urls[0], False, True)))
                     self.download_threads[-1].start()
                 elif selected_urls:
                     self.ignore_typing = True
@@ -2020,7 +2018,6 @@ class Endcord:
                                 else:
                                     webbrowser.open(url, new=0, autoraise=True)
                             elif embed_url:
-                                url = self.refresh_attachment_url(url)
                                 self.download_threads.append(threading.Thread(target=self.download_file, daemon=True, args=(url, False, False, True)))
                                 self.download_threads[-1].start()
                             else:
@@ -2194,8 +2191,7 @@ class Endcord:
                             logger.debug("Trying to play attachment from selection")
                             num = max(int(input_text) - 1, 0)
                             if num <= len(self.downloading_file["urls"]):
-                                url = self.refresh_attachment_url(urls[num])
-                                self.download_threads.append(threading.Thread(target=self.download_file, daemon=True, args=(url, False, True)))
+                                self.download_threads.append(threading.Thread(target=self.download_file, daemon=True, args=(urls[num], False, True)))
                                 self.download_threads[-1].start()
                         except ValueError:
                             pass
@@ -2203,8 +2199,7 @@ class Endcord:
                         try:
                             num = max(int(input_text) - 1, 0)
                             if num <= len(self.downloading_file["urls"]):
-                                url = self.refresh_attachment_url(urls[num])
-                                self.download_threads.append(threading.Thread(target=self.download_file, daemon=True, args=(url, )))
+                                self.download_threads.append(threading.Thread(target=self.download_file, daemon=True, args=(urls[num], )))
                                 self.download_threads[-1].start()
                         except ValueError:
                             pass
@@ -2555,8 +2550,7 @@ class Endcord:
                         selected_urls.append(urls[num])
                 if len(selected_urls) == 1 or select_num:
                     select_num = max(min(select_num-1, len(selected_urls)-1), 0)
-                    selected_url = self.refresh_attachment_url(selected_urls[select_num])
-                    self.download_threads.append(threading.Thread(target=self.download_file, daemon=True, args=(selected_url, )))
+                    self.download_threads.append(threading.Thread(target=self.download_file, daemon=True, args=(selected_urls[select_num], )))
                     self.download_threads[-1].start()
                 else:
                     self.ignore_typing = True
@@ -2604,8 +2598,7 @@ class Endcord:
                 selected_urls = embeds
             if len(selected_urls) == 1 or select_num:
                 select_num = max(min(select_num-1, len(selected_urls)-1), 0)
-                selected_url = self.refresh_attachment_url(selected_urls[select_num])
-                self.download_threads.append(threading.Thread(target=self.download_file, daemon=True, args=(selected_url, False, True)))
+                self.download_threads.append(threading.Thread(target=self.download_file, daemon=True, args=(selected_urls[select_num], False, True)))
                 self.download_threads[-1].start()
             else:
                 self.ignore_typing = True
@@ -3514,6 +3507,11 @@ class Endcord:
                         return url
                 except ValueError:
                     return url
+        elif queries == {}:
+            new_url = self.discord.refresh_attachment_url(url)
+            if new_url:
+                return new_url
+            return url
         return url
 
 
@@ -3876,9 +3874,15 @@ class Endcord:
             for file in self.cached_downloads:
                 if url == file[0] and os.path.exists(file[1]):
                     destination = file[1]
+                    from_cache = True
                     if open_move and peripherals.get_can_play(destination):
                         open_media = True
                     break
+
+        # refresh discord attachment url if needed
+        orig_url = url
+        if not open_media or not destination:
+            url = self.refresh_attachment_url(url)
 
         # download
         if not open_media or not destination:
@@ -3913,7 +3917,7 @@ class Endcord:
             self.media_thread = threading.Thread(target=self.open_media, daemon=True, args=(destination, ))
             self.media_thread.start()
             if not from_cache and destination:
-                self.cached_downloads.append([url, destination])
+                self.cached_downloads.append([orig_url, destination])
 
 
     def upload(self, path):
