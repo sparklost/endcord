@@ -1,5 +1,3 @@
-Fix emojis messing right edge
-
 Voice channels
     add voice channels to tree
     show voice channel activity

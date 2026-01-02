@@ -5070,6 +5070,13 @@ class Endcord:
             self.tui.lock_ui(True)
             self.curses_media.play(path)
             self.tui.restore_colors()   # 255_curses_bug
+            if self.active_channel["guild_id"]:   # 255_curses_bug
+                self.all_roles = self.tui.init_role_colors(   # restore role colors
+                    self.all_roles,
+                    self.default_msg_color[1],
+                    self.default_msg_alt_color[1],
+                    guild_id=self.active_channel["guild_id"],
+                )
             self.tui.lock_ui(False)
         else:
             if shutil.which(self.config["yt_dlp_path"]) and shutil.which(self.config["mpv_path"]):

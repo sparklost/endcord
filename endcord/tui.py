@@ -613,6 +613,12 @@ class TUI():
 
     def pause_curses(self):
         """Pause curses and disable drawing, releasing terminal"""
+        with self.lock:
+            h, w = self.win_member_list.getmaxyx()
+            for y in range(h):
+                self.win_member_list.insstr(y, 0, " " * w, curses.color_pair(1))
+            self.win_member_list.noutrefresh()
+            self.need_update.set()
         time.sleep(0.1)   # be sure everything is stopped before pausing
         with self.lock:
             self.lock_ui(True)
@@ -633,8 +639,8 @@ class TUI():
         self.disable_drawing = lock
         if lock:
             self.hibernate_cursor = 10
-        # else:   # seems to not be needed
-        #     self.resize(redraw_only=True)
+        else:
+            self.resize(redraw_only=True)
 
 
     def is_window_open(self):
@@ -1619,7 +1625,7 @@ class TUI():
                 self.need_update.set()
 
 
-    def remove_member_list(self):
+    def remove_member_list(self, pause=True):
         """Remove member list and resize chat"""
         if self.win_member_list:
             # safely clean emojis
@@ -1629,7 +1635,8 @@ class TUI():
                     self.win_member_list.insstr(y, 0, " " * w, curses.color_pair(1))
                 self.win_member_list.noutrefresh()
                 self.need_update.set()
-            time.sleep(self.screen_update_delay/2)
+            if pause:
+                time.sleep(self.screen_update_delay/2)
 
             # remove member list and redraw chat
             with self.lock:
@@ -1790,7 +1797,7 @@ class TUI():
             return 0
         if force_id > 0:
             curses.init_pair(force_id, fg, bg)
-            self.color_cache = set_list_item(self.color_cache, (fg, bg), force_id)   # 255_curses_bug
+            # self.color_cache = set_list_item(self.color_cache, (fg, bg), force_id)   # role colors are already saved in app.roles
             self.attrib_map = set_list_item(self.attrib_map, attribute, force_id)
             return force_id
         curses.init_pair(self.last_free_id, fg, bg)
@@ -2180,8 +2187,6 @@ class TUI():
                     return None, 0, 0, 103
                 elif key in self.keybindings["media_seek_backward"]:
                     return None, 0, 0, 104
-                elif key in self.keybindings["redraw"]:
-                    return None, 0, 0, 105
                 elif key == curses.KEY_RESIZE:
                     pass
                 continue   # disable all inputs from main UI
