@@ -112,6 +112,17 @@ Method names can be searched in `./endcord/app.py` code to see where they are ex
     - Return `True` only if binding is matched
 
 
+## Executing existing command
+Extensions can execute existing client-side commands with this code:
+```py
+command_text = "some_command argument_1 some text"
+command_type, command_args = self.app.parser.command_string(command_text)
+chat_sel = self.app.tui.get_chat_selected()[0]
+tree_sel = self.app.tui.get_tree_selected()
+self.app.execute_command(command_type, command_args, command_text, chat_sel, tree_sel)
+```
+
+
 ## Modifying existing code
 Existing code in endcord `app` class can be modified, by replacing `app` class methods with custom methods.  
 But be warned: replacing method like this will also replace any updates made to it in new endcord version, so extension muss be updated accordingly.  

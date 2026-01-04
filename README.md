@@ -149,7 +149,7 @@ Current log can be accessed with `show_log` command or in config directory.
 ### Keybindings
 Navigating messages - `Arrow-Up/Down`  
 Navigating channel tree - `Ctrl+Up/Down` *  
-Open command palette - `Ctrl+/`  
+Open command palette - `Ctrl+/` *  
 Insert newline - `Ctrl+N`  
 Scroll back to bottom - `Ctrl+H`  
 Expand selected categories and servers - `Ctrl+Space` *  
@@ -355,6 +355,7 @@ But there is also setting in config to open media in external app (cross-system,
 ### OS specific keybindings
 Some keybindings are used by terminals or OS itself, so they are by default rebound to something else.  
 #### Windows:  
+Open command palette - `Ctrl+'`
 Expand selected categories and servers - `Ctrl+A`  
 Copy message to clipboard - `Alt+L`  
 View attached media (image, gif, video, audio) - `Alt+Y`  
@@ -413,8 +414,8 @@ Optional dependencies:
 Install [windows terminal](https://github.com/microsoft/terminal) or [cmder](https://github.com/cmderdev/cmder), or any other modern terminal.  
 - Pre-built binaries (built with nuitka using clang) are available in releases
 - [Build](#building) endcord, standalone executable can be found in `./dist/endcord.exe`
-Run exe from wt or cmder. In cmder settings, under "Font" check "Treat font height as device units", so font is always monospace.  
-If built with experimental windowed mode, terminal is not required to use endcord.  
+Run exe from wt or cmder. If built with experimental windowed mode, terminal is not required to use endcord.  
+Cmder settings: "Mouse" > check "Send mouse events to console" and "Mark/Copy" > uncheck "Intelligent mode", and set "Main console font" and "Alternative font" to same monospace font.
 Optional dependency, for spellchecking: [aspell](https://github.com/adamyg/aspell-win32). It is expected to be installed in `C:\Program Files (x86)\`. If it is not, please open an issue and provide the actual install path. Alongside with base aspell, dictionary must be installed, even en_US.  
 Emoji and Ctrl+key support depends on terminal.  
 To enable youtube support, download [yt-dlp](https://github.com/yt-dlp/yt-dlp) and provide its executable path in config.  

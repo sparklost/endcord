@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 WINDOW_SIZE = (900, 600)
 MAXIMIZED = False
 FONT_SIZE = 12
-FONT_NAME = "Source Code Pro"
+FONT_NAME = None
 APP_NAME = "Endcord"
 REPEAT_DELAY = 400
 REPEAT_INTERVAL = 25
@@ -123,7 +123,10 @@ if config_path:
 # constants
 PGCURSES = True
 KEY_MOUSE = 409
-KEY_BACKSPACE = 263
+if sys.platform == "win32":
+    KEY_BACKSPACE = 8
+else:
+    KEY_BACKSPACE = 263
 KEY_DOWN = 258
 KEY_UP = 259
 KEY_LEFT = 260
@@ -168,6 +171,28 @@ elif sys.platform == "darwin":
     emoji_font_name = "Apple Color Emoji"
 else:
     emoji_font_name = "Noto Color Emoji"
+
+
+def find_mono():
+    """Find any monospace font"""
+    fonts = pygame.font.get_fonts()
+
+    mono_keywords = (
+        "code",
+        "mono",
+        "console",
+        "terminal",
+        "courier",
+        "consolas",
+        "menlo",
+        "fira",
+        "jetbrains",
+        "dejavusansmono",
+    )
+    for keyword in mono_keywords:
+        for font in fonts:
+            if keyword in font:
+                return font
 
 
 # tray stuff
@@ -222,7 +247,6 @@ def set_tray_icon(icon_index):
         icon.icon = tray_icons[icon_index]
     else:
         return
-    icon.update_icon()
 
 
 def tray_thread():
@@ -278,12 +302,20 @@ def map_key(event):
     key = event.key
     if event.mod & pygame.KMOD_CTRL:   # Ctrl+Key
         if key == pygame.K_DOWN:
+            if sys.platform == "win32":
+                return 481
             return 534
         if key == pygame.K_UP:
+            if sys.platform == "win32":
+                return 480
             return 575
         if key == pygame.K_LEFT:
+            if sys.platform == "win32":
+                return 443
             return 554
         if key == pygame.K_RIGHT:
+            if sys.platform == "win32":
+                return 444
             return 569
         if key == pygame.K_SPACE:
             return 0
@@ -451,7 +483,7 @@ class Window:
             self.ncols = ncols
             self.nlines = nlines
         else:
-            self.ncols = screen.get_width()  // self.char_width
+            self.ncols = screen.get_width() // self.char_width
             self.nlines = screen.get_height() // self.char_height
         self.pxy, self.pxx = self.begy * self.char_height, self.begx * self.char_width
 
@@ -631,7 +663,13 @@ class Window:
             if self.input_buffer:
                 return self.input_buffer.pop(0)
 
-            event = event_queue.get()
+            if self.nodelay_state:
+                try:
+                    event = event_queue.get_nowait()
+                except queue.Empty:
+                    event = None
+            else:
+                event = event_queue.get()
             if event is None:
                 return -1
 
@@ -693,11 +731,14 @@ def initscr():
     if MAXIMIZED:
         win = pg_Window.from_display_module()
         win.maximize()
+    font_name = FONT_NAME
+    if not font_name:
+        font_name = find_mono()
     emoji_font = pygame.font.SysFont(emoji_font_name, FONT_SIZE)
-    font_regular = pygame.freetype.SysFont(FONT_NAME, FONT_SIZE)
-    font_bold = pygame.freetype.SysFont(FONT_NAME, FONT_SIZE, bold=True)
-    font_italic = pygame.freetype.SysFont(FONT_NAME, FONT_SIZE, italic=True)
-    font_bold_italic = pygame.freetype.SysFont(FONT_NAME, FONT_SIZE, bold=True, italic=True)
+    font_regular = pygame.freetype.SysFont(font_name, FONT_SIZE)
+    font_bold = pygame.freetype.SysFont(font_name, FONT_SIZE, bold=True)
+    font_italic = pygame.freetype.SysFont(font_name, FONT_SIZE, italic=True)
+    font_bold_italic = pygame.freetype.SysFont(font_name, FONT_SIZE, bold=True, italic=True)
     font_regular.pad = font_bold.pad = font_italic.pad = font_bold_italic.pad = True
     return Window(0, 0, 0, 0, 0, 0)
 

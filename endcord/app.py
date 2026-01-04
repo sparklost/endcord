@@ -5214,7 +5214,7 @@ class Endcord:
         member_list, member_list_format = formatter.generate_member_list(
             self.member_list,
             self.current_roles,
-            self.member_list_width,
+            self.member_list_width + 1 - self.tui.bordered,
             self.use_nick,
             self.status_char,
         )

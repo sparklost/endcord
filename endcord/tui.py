@@ -842,7 +842,7 @@ class TUI():
             curses.init_pair(15, bkp_fg, bkp_bg)
             self.red_list = []
 
-        elif self.fun == 3:
+        elif self.fun == 3 and not uses_pgcurses:
             h, w = self.screen.getmaxyx()
             flakes = []
             while self.run and self.fun == 3:
@@ -1577,7 +1577,7 @@ class TUI():
                     member_list_hwyx = (
                         common_h,
                         self.member_list_width - self.bordered,
-                         self.bordered or self.have_title,
+                        self.bordered or self.have_title,
                         w - self.member_list_width,
                     )
                     self.win_member_list = self.screen.derwin(*member_list_hwyx)
@@ -1589,7 +1589,7 @@ class TUI():
                             self.title_hw = self.win_title_line.getmaxyx()
                             self.draw_title_line()
                     else:
-                        self.screen.vline(1, w - self.member_list_width-1, self.vert_line, common_h, curses.color_pair(self.default_color))
+                        self.screen.vline(self.have_title, w - self.member_list_width-1, self.vert_line, common_h, curses.color_pair(self.default_color))
 
                 # draw member list
                 h, w = self.win_member_list.getmaxyx()
@@ -1624,6 +1624,10 @@ class TUI():
                 self.win_member_list.noutrefresh()
                 self.need_update.set()
 
+        if uses_pgcurses:   # quick fix but not ideal, find why is tree cleared on derwin
+            self.draw_tree()
+            self.draw_title_tree()
+
 
     def remove_member_list(self, pause=True):
         """Remove member list and resize chat"""
@@ -1653,6 +1657,10 @@ class TUI():
                     self.title_hw = self.win_title_line.getmaxyx()
                     self.draw_title_line()
                 # self.draw_chat()   # chat will be regenerated and resized in app main loop
+
+        if uses_pgcurses:   # quick fix but not ideal, find why is tree cleared on derwin
+            self.draw_tree()
+            self.draw_title_tree()
 
 
     def set_cursor_color(self, color_id):

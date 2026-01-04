@@ -231,6 +231,7 @@ keybindings = {
 
 
 windows_override_keybindings = {
+    "command_palette": 28,   # Ctrl+\
     "tree_up": 480,   # Ctrl+Up
     "tree_down": 481,   # Ctrl+Down
     "tree_select": 1,   # Ctrl+A

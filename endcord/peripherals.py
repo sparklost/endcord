@@ -303,7 +303,12 @@ def convert_keybindings(keybindings):
     if sys.platform == "win32":   # windows has different codes for Alt+Key
         for key, value in keybindings.items():
             if isinstance(value, str):
-                keybindings[key] = re.sub(r"ALT\+(\d+)", lambda m: str(int(m.group(1)) + 320), value)
+                val = re.sub(r"ALT\+(\d+)", lambda m: str(int(m.group(1)) + 320), value)
+                try:
+                    val = int(val)
+                except ValueError:
+                    pass
+                keybindings[key] = val
     elif os.environ.get("TERM", "") == "xterm":   # xterm has different codes for Alt+Key
         # for ALT+Key it actually sends 195 then Key+64
         # but this is simpler since key should already be uniquely shifted
