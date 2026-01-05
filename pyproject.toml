@@ -11,7 +11,7 @@ dependencies = [
     "numpy>=2.4.0",
     "orjson>=3.11.5",
     "pexpect>=4.9.0",
-    "psutil>=7.1.3; sys_platform != 'linux'",
+    "psutil>=7.2.1; sys_platform != 'linux'",
     "pysocks>=1.7.1",
     "python-socks>=2.8.0",
     "pywin32>=311; sys_platform == 'win32'",
@@ -26,13 +26,13 @@ dependencies = [
 
 [dependency-groups]
 build = [
-    "cython>=3.2.3",
+    "cython>=3.2.4",
     "nuitka>=2.8.9",
     "pyinstaller>=6.17.0",
     "setuptools>=80.9.0",
 ]
 media = [
     "av>=16.0.1",
-    "pillow>=12.0.0",
-    "pynacl>=1.6.1",
+    "pillow>=12.1.0",
+    "pynacl>=1.6.2",
 ]

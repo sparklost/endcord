@@ -70,7 +70,7 @@ recorder = peripherals.Recorder()
 class Endcord:
     """Main app class"""
 
-    def __init__(self, screen, config, keybindings, profiles, version):
+    def __init__(self, screen, config, keybindings, command_bindings, profiles, version):
         self.screen = screen
         self.config = config
         self.init_time = time.time()
@@ -234,7 +234,7 @@ class Endcord:
         # this takes some time, so let other things init in parallel
         threading.Thread(target=self.gateway.connect, daemon=True).start()
         self.downloader = downloader.Downloader(config["proxy"])
-        self.tui = tui.TUI(self.screen, self.config, keybindings)
+        self.tui = tui.TUI(self.screen, self.config, keybindings, command_bindings)
         if self.fun:
             today = (time.localtime().tm_mon, time.localtime().tm_mday)
             self.fun = 2 if (10, 25) <= today <= (11, 8) else self.fun
@@ -2111,6 +2111,13 @@ class Endcord:
                     self.execute_extensions_methods("on_escape_key")
                 self.update_status_line()
                 self.stop_assist()
+
+            # command bindings
+            elif isinstance(action, tuple):
+                if action[0] == 50:
+                    self.restore_input_text = (input_text, "standard")
+                    command_type, command_args = parser.command_string(action[1])
+                    self.execute_command(command_type, command_args, action[1], chat_sel, tree_sel)
 
             # media controls
             elif action >= 100:

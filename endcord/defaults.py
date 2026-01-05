@@ -230,6 +230,10 @@ keybindings = {
 }
 
 
+command_bindings = {
+}
+
+
 windows_override_keybindings = {
     "command_palette": 28,   # Ctrl+\
     "tree_up": 480,   # Ctrl+Up

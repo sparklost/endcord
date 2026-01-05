@@ -1822,6 +1822,9 @@ class Gateway():
 
     def update_presence(self, status, custom_status=None, custom_status_emoji=None, activities=None):
         """Update client status. Statuses: 'online', 'idle', 'dnd', 'invisible', 'offline'"""
+        if self.legacy:
+            return   # spacebar_fix - gateway returns error if this event is sent
+
         all_activities = []
         if custom_status:
             all_activities.append({
@@ -1834,6 +1837,7 @@ class Gateway():
         if activities:
             for activity in activities:
                 all_activities.append(activity)
+
         payload = {
             "op": 3,
             "d": {

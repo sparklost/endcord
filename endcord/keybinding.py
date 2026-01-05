@@ -43,7 +43,7 @@ def get_key(screen):
         return first
 
 
-def picker_internal(screen, keybindings):
+def picker_internal(screen, keybindings, command_bindings):
     """Keybinding picker, prints last pressed key combination"""
     curses.use_default_colors()
     curses.curs_set(0)
@@ -51,6 +51,7 @@ def picker_internal(screen, keybindings):
     screen.bkgd(" ", curses.color_pair(1))
     screen.addstr(1, 0, message)
     keybindings = {key: (val,) if not isinstance(val, tuple) else val for key, val in keybindings.items()}
+    command_bindings = {val: (key,) for key, val in command_bindings.items()}
     while True:
         key_code = get_key(screen)
         if key_code == 27:   # escape sequence, when ALT+KEY is pressed
@@ -68,16 +69,20 @@ def picker_internal(screen, keybindings):
             if key_code in value:
                 warning = f'Warning: same keybinding as "{key}"'
                 break
+        for key, value in command_bindings.items():
+            if key_code in value and not warning:
+                warning = f'Warning: same keybinding as for command "{key}"'
+                break
         _, w = screen.getmaxyx()
         screen.addstr(7, 1, text + " " * (w - len(text)))
         screen.addstr(8, 1, warning + " " * (w - len(warning)))
         screen.refresh()
 
 
-def picker(keybindings):
+def picker(keybindings, command_bindings):
     """Keybinding picker, prints last pressed key combination"""
     try:
-        curses.wrapper(picker_internal, keybindings)
+        curses.wrapper(picker_internal, keybindings, command_bindings)
     except curses.error as e:
         if str(e) != "endwin() returned ERR":
             sys.exit("Curses error")

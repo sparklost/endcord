@@ -210,7 +210,7 @@ def save_config(path, data, section):
         config.write(f)
 
 
-def load_config(path, default, section="main", gen_config=False):
+def load_config(path, default, section="main", gen_config=False, merge=False):
     """
     Load settings and theme from config
     If some value is missing, it is replaced with default value
@@ -242,7 +242,7 @@ def load_config(path, default, section="main", gen_config=False):
             else:
                 config_data[key] = default[key]
         for key, value in config_data_raw.items():
-            if key.startswith("ext_"):
+            if key.startswith("ext_") or merge:
                 try:
                     eval_value = literal_eval(value.replace("\\", "\\\\"))
                     config_data[key] = eval_value
@@ -298,29 +298,58 @@ def merge_configs(custom_config_path, theme_path):
     return config, gen_config, error
 
 
+def alt_shift(value, shift):
+    """Try to change "ALT+Key into integer key value"""
+    val = re.sub(r"ALT\+(\d+)", lambda m: str(int(m.group(1)) + shift), value)
+    try:
+        return int(val)
+    except ValueError:
+        return val
+
+
+
 def convert_keybindings(keybindings):
     """Convert keybinding codes to os-specific codes"""
     if sys.platform == "win32":   # windows has different codes for Alt+Key
-        for key, value in keybindings.items():
-            if isinstance(value, str):
-                val = re.sub(r"ALT\+(\d+)", lambda m: str(int(m.group(1)) + 320), value)
-                try:
-                    val = int(val)
-                except ValueError:
-                    pass
-                keybindings[key] = val
+        shift = 320
     elif os.environ.get("TERM", "") == "xterm":   # xterm has different codes for Alt+Key
+        shift = 64
         # for ALT+Key it actually sends 195 then Key+64
         # but this is simpler since key should already be uniquely shifted
-        for key, value in keybindings.items():
-            if isinstance(value, str):
-                val = re.sub(r"ALT\+(\d+)", lambda m: str(int(m.group(1)) + 64), value)
-                try:
-                    val = int(val)
-                except ValueError:
-                    pass
-                keybindings[key] = val
+    else:
+        return keybindings
+
+    for key, value in keybindings.items():
+        if isinstance(value, str):
+            keybindings[key] = alt_shift(value, shift)
+
     return keybindings
+
+
+def convert_keybindings_cmd(keybindings):
+    """Convert keybinding codes to os-specific codes, for command bindings"""
+    if sys.platform == "win32":
+        shift = 320
+    elif os.environ.get("TERM", "") == "xterm":
+        shift = 64
+    else:
+        shift = 0
+
+    new_keybindings = {}
+    for key, value in keybindings.items():
+        new_key = key.replace('"', "")
+        if isinstance(new_key, str) and "alt" in new_key:
+            new_key = new_key.replace("alt", "ALT")
+        if isinstance(new_key, str) and shift:
+            new_key = alt_shift(new_key, shift)
+        else:
+            try:
+                new_key = int(new_key)
+            except ValueError:
+                pass
+        new_keybindings[new_key] = value
+
+    return new_keybindings
 
 
 def update_config(config, key, value):

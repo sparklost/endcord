@@ -194,7 +194,7 @@ if importlib.util.find_spec("endcord_cython") and importlib.util.find_spec("endc
 class TUI():
     """Methods used to draw terminal user interface"""
 
-    def __init__(self, screen, config, keybindings):
+    def __init__(self, screen, config, keybindings, command_bindings):
         self.spellchecker = peripherals.SpellCheck(config["aspell_mode"], config["aspell_lang"])
         acs_map = acs.get_map()
         curses.use_default_colors()
@@ -232,6 +232,7 @@ class TUI():
         self.role_color_start_id = self.last_free_id   # starting id for role colors
         self.keybindings = {key: (val,) if not isinstance(val, tuple) else val for key, val in keybindings.items()}
         self.switch_tab_modifier = self.keybindings["switch_tab_modifier"][0][:-4]
+        self.command_bindings = command_bindings
         self.screen = screen
         self.extensions = []
 
@@ -369,8 +370,16 @@ class TUI():
                     if len(split_binding) == 1:
                         continue
                     elif len(split_binding) > 2:
-                        sys.exit(f"Invalid keybinding: {binding}")
+                        logger.warn(f"Invalid keybinding: {binding}")
                     self.chainable.append(split_binding[0])
+        for binding in self.command_bindings:   # here read key instead value
+            if isinstance(binding, str):
+                split_binding = binding.split("-")
+                if len(split_binding) == 1:
+                    continue
+                elif len(split_binding) > 2:
+                    logger.warn(f"Invalid keybinding: {binding}")
+                self.chainable.append(split_binding[0])
 
 
     def load_extensions(self, extensions):
@@ -2688,6 +2697,9 @@ class TUI():
                 _, w = self.input_hw
 
             # terminal reserved keys: CTRL+ C, I, J, M, Q, S, Z
+
+            elif key in self.command_bindings:
+                return self.return_input_code((50, self.command_bindings.get(key)))
 
             # keep index inside screen
             self.cursor_pos = self.input_index - max(0, len(self.input_buffer) - w + 1 - self.input_line_index)

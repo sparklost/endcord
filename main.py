@@ -64,8 +64,16 @@ def main(args):
         section="keybindings",
         gen_config=gen_config,
     )
+    command_bindings = peripherals.load_config(
+        config_path,
+        defaults.command_bindings,
+        section="command_bindings",
+        gen_config=gen_config,
+        merge = True,
+    )
     if not uses_pgcurses:
         keybindings = peripherals.convert_keybindings(keybindings)
+        command_bindings = peripherals.convert_keybindings_cmd(command_bindings)
 
     os.environ["ESCDELAY"] = "25"   # 25ms
     if os.environ.get("TERM", "") in ("xterm", "linux"):
@@ -86,7 +94,7 @@ def main(args):
         from endcord import keybinding
         if uses_pgcurses:
             curses.enable_tray = False
-        keybinding.picker(keybindings)
+        keybinding.picker(keybindings, command_bindings)
         sys.exit(0)
     elif args.media:
         if not (
@@ -135,7 +143,7 @@ def main(args):
         logging.getLogger().setLevel(logging.DEBUG)
     try:
         from endcord import app
-        curses.wrapper(app.Endcord, config, keybindings, profiles, VERSION)
+        curses.wrapper(app.Endcord, config, keybindings, command_bindings, profiles, VERSION)
     except curses.error as e:
         if str(e) != "endwin() returned ERR":
             logger.error(traceback.format_exc())

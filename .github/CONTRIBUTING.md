@@ -193,3 +193,4 @@ user/flags - missing
 
 - Misc:
 Spacebar is still using old `user_settings` instead new protobuf settings.  
+Gateway returns error code 4000 if event "update presence" (opcode 3) is sent.  
