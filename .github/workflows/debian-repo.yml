@@ -123,8 +123,7 @@ jobs:
           if [ ! -d "gh-pages-repo/.git" ]; then
             mkdir -p gh-pages-repo
             cd gh-pages-repo
-            git init
-            git checkout -b gh-pages
+            git init -b gh-pages
             git config user.name "GitHub Actions"
             git config user.email "actions@github.com"
             git remote add origin "$REMOTE_URL"
