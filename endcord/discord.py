@@ -2084,10 +2084,10 @@ class Discord():
                         f.write(json.dumps(ready_app) + nl)
                 except Exception as e:
                     logger.error(f"Error decoding detectable apps json: {e}")
-                    return False, etag
-                return True, etag
+                    return None, etag
+                return save_path, etag
         elif response.status == 304:   # not modified
             save_path = os.path.expanduser(os.path.join(save_dir, f"detectable_apps_{etag}.ndjson"))
             return save_path, etag
         connection.close()
-        return False, etag
+        return None, etag

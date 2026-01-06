@@ -296,14 +296,16 @@ class GameDetection:
             return
 
         # download new detectable apps list if resource changed on the server
-        old_etag = find_detectable_apps_file(os.path.expanduser(peripherals.config_path))[1]
+        old_path, old_etag = find_detectable_apps_file(os.path.expanduser(peripherals.config_path))
         path, etag = self.discord.get_detectable_apps(peripherals.config_path, old_etag)
         if not path:
             logger.info("Cound not start game detection service: failed to download detectable applications list")
             return
         if old_etag != etag:
             logger.info(f'Downloaded new detectable applications list with ETag: W/"{etag}"')
-        del old_etag
+            if old_path:
+                os.remove(old_path)
+        del (old_path, old_etag)
 
         # load cached processes and remove outdated
         self.cache = peripherals.load_json("detected_apps_cache.json", {})   # {proc_path: [app_id, app_name, app_path, last_seen]...}
