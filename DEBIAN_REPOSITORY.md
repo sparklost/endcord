@@ -18,7 +18,7 @@ This fork of Endcord includes a sophisticated CI/CD pipeline that:
 The repository packages are signed with a GPG key to ensure authenticity. Add the public key to your system:
 
 ```bash
-wget -qO - https://raw.githubusercontent.com/Oichkatzelesfrettschen/endcord/gh-pages/public.key | sudo gpg --dearmor -o /etc/apt/keyrings/endcord-archive-keyring.gpg
+wget -qO - https://oichkatzelesfrettschen.github.io/endcord/public.key | sudo gpg --dearmor -o /etc/apt/keyrings/endcord-archive-keyring.gpg
 ```
 
 **Note:** The `public.key` file needs to be manually uploaded to the `gh-pages` branch after the first workflow run. See [Setup Instructions](#setup-instructions-for-repository-maintainer) below.
