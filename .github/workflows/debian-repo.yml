@@ -75,31 +75,31 @@ jobs:
           PKG_DIR="endcord_${{ env.VERSION }}_amd64"
           
           # 1. Control File
-          cat <<EOF > $PKG_DIR/DEBIAN/control
-          Package: endcord
-          Version: ${{ env.VERSION }}
-          Architecture: amd64
-          Maintainer: Endcord Fork Maintainer <no-reply@github.com>
-          Installed-Size: $(du -ks $PKG_DIR/usr | cut -f1)
-          Section: net
-          Priority: optional
-          Homepage: https://github.com/sparklost/endcord
-          Description: Feature rich Discord TUI client (Nightly Build)
-           This is an automated build of Endcord packaged for Debian.
-           It connects to Discord via the terminal.
-          EOF
+          {
+            echo "Package: endcord"
+            echo "Version: ${{ env.VERSION }}"
+            echo "Architecture: amd64"
+            echo "Maintainer: Endcord Fork Maintainer <no-reply@github.com>"
+            echo "Installed-Size: $(du -ks "$PKG_DIR/usr" | cut -f1)"
+            echo "Section: net"
+            echo "Priority: optional"
+            echo "Homepage: https://github.com/sparklost/endcord"
+            echo "Description: Feature rich Discord TUI client (Nightly Build)"
+            echo " This is an automated build of Endcord packaged for Debian."
+            echo " It connects to Discord via the terminal."
+          } > "$PKG_DIR/DEBIAN/control"
           
           # 2. Desktop Entry
-          cat <<EOF > $PKG_DIR/usr/share/applications/endcord.desktop
-          [Desktop Entry]
-          Name=Endcord
-          Exec=/usr/bin/endcord
-          Type=Application
-          Terminal=true
-          Categories=Network;Chat;
-          Keywords=discord;tui;
-          Comment=Discord TUI Client
-          EOF
+          {
+            echo "[Desktop Entry]"
+            echo "Name=Endcord"
+            echo "Exec=/usr/bin/endcord"
+            echo "Type=Application"
+            echo "Terminal=true"
+            echo "Categories=Network;Chat;"
+            echo "Keywords=discord;tui;"
+            echo "Comment=Discord TUI Client"
+          } > "$PKG_DIR/usr/share/applications/endcord.desktop"
 
       - name: Build .deb
         working-directory: ./deb-build
