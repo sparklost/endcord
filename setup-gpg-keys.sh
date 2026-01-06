@@ -17,6 +17,12 @@ if ! command -v gpg &> /dev/null; then
     exit 1
 fi
 
+# Verify that GPG is functional
+if ! gpg --version > /dev/null 2>&1; then
+    echo "Error: GPG appears to be installed but is not working correctly."
+    echo "Please verify your GPG installation (e.g., reinstall gnupg) and try again."
+    exit 1
+fi
 echo "This script will help you set up GPG keys for signing Debian packages."
 echo ""
 echo "Step 1: Generate a GPG key (if you don't have one)"
