@@ -1,5 +1,7 @@
 # Quick Start Guide - Debian Repository Setup
 
+**⚠️ Important:** This is an **unofficial community repack** of Endcord. This repository is not affiliated with or endorsed by the official Endcord team. We simply package upstream releases for easier Debian installation.
+
 This guide provides a quick walkthrough for setting up the automated Debian package repository.
 
 ## Prerequisites

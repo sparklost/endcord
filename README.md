@@ -14,6 +14,8 @@
 </div>
 
 > **📦 Debian/LMDE Users**: This fork provides automated nightly Debian packages via APT! See [DEBIAN_REPOSITORY.md](DEBIAN_REPOSITORY.md) for installation instructions. Automatic updates included!
+>
+> **⚠️ Note:** This is an **unofficial community repack** - not affiliated with the official Endcord team. We package upstream releases to make installation easier on Debian systems.
 
 Endcord is a third-party feature rich Discord client, running entirely in terminal.  
 It is built with python and ncurses library, to deliver lightweight yet feature rich experience.  

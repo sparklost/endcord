@@ -1,5 +1,7 @@
 # Implementation Summary
 
+**⚠️ Disclaimer:** This is an **unofficial community repack** of Endcord. This repository is not affiliated with, maintained by, or endorsed by the official Endcord development team at [sparklost/endcord](https://github.com/sparklost/endcord). We package upstream releases without modification to make installation easier on Debian-based systems.
+
 ## Overview
 
 This implementation provides a fully automated CI/CD pipeline for building, packaging, and distributing Endcord as Debian packages through a GitHub Pages-hosted APT repository.

@@ -84,9 +84,10 @@ jobs:
             echo "Section: net"
             echo "Priority: optional"
             echo "Homepage: https://github.com/sparklost/endcord"
-            echo "Description: Feature rich Discord TUI client (Nightly Build)"
-            echo " This is an automated build of Endcord packaged for Debian."
-            echo " It connects to Discord via the terminal."
+            echo "Description: Feature rich Discord TUI client (Unofficial Community Repack)"
+            echo " This is an unofficial community repack of Endcord for easier Debian installation."
+            echo " Packaged by fans - Not affiliated with or endorsed by the official Endcord team."
+            echo " Upstream project: https://github.com/sparklost/endcord"
           } > "$PKG_DIR/DEBIAN/control"
           
           # 2. Desktop Entry
@@ -143,16 +144,16 @@ jobs:
           cd ../../
           
           # Generate Release file
-          cat <<EOF > Release
-          Origin: Endcord-Unofficial
-          Label: Endcord
-          Suite: stable
-          Codename: stable
-          Architectures: amd64
-          Components: main
-          Description: Unofficial Endcord Repository
-          Date: $(date -R)
-          EOF
+          {
+            echo "Origin: Endcord-Unofficial"
+            echo "Label: Endcord Community Repack"
+            echo "Suite: stable"
+            echo "Codename: stable"
+            echo "Architectures: amd64"
+            echo "Components: main"
+            echo "Description: Unofficial community repack of Endcord - Not affiliated with the official Endcord team"
+            echo "Date: $(date -R)"
+          } > Release
           
           # Generate Hashes for Release
           apt-ftparchive release . >> Release

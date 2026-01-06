@@ -1,10 +1,14 @@
-# Endcord Debian Repository
+# Endcord Unofficial Debian Repository
+
+**⚠️ Important Notice:** This is an **unofficial community repack** of Endcord created by fans to make installation easier on Debian-based systems. This repository is **not affiliated with, maintained by, or endorsed by the official Endcord development team**. For the official project, please visit [sparklost/endcord](https://github.com/sparklost/endcord).
 
 This repository provides automated nightly builds of Endcord as Debian packages (`.deb`) for Debian 13 (Trixie) and LMDE 7 (Linux Mint Debian Edition).
 
 ## What is this?
 
-This fork of Endcord includes a sophisticated CI/CD pipeline that:
+This is a **community-maintained fork** that adds CI/CD infrastructure to create `.deb` packages. The actual Endcord application code comes directly from the official upstream repository with no modifications. We simply package it for easier installation on Debian systems.
+
+This fork includes a sophisticated CI/CD pipeline that:
 1. **Syncs daily** with the upstream [sparklost/endcord](https://github.com/sparklost/endcord) repository at 2:00 AM UTC
 2. **Builds** a single-file executable using PyInstaller
 3. **Packages** it into a signed `.deb` file with proper Debian metadata

@@ -430,12 +430,12 @@ gzip -9 -c Packages > Packages.gz
 cd ../../
 cat > Release <<-EOF
 	Origin: Endcord-Unofficial
-	Label: Endcord
+	Label: Endcord Community Repack
 	Suite: stable
 	Codename: stable
 	Architectures: amd64
 	Components: main
-	Description: Unofficial Endcord Repository
+	Description: Unofficial community repack of Endcord - Not affiliated with the official Endcord team
 	Date: $(date -R)
 	EOF
 apt-ftparchive release . >> Release
