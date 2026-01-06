@@ -168,8 +168,8 @@ jobs:
           gpg --default-key ${{ steps.setup-gpg.outputs.keyid }} -abs -o Release.gpg Release
           gpg --default-key ${{ steps.setup-gpg.outputs.keyid }} --clearsign -o InRelease Release
           
-          # Return to repo root
-          cd ../../..
+          # Return to gh-pages-repo root (we're in dists/stable)
+          cd ../..
           
           # Deploy
           git add .
