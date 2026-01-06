@@ -62,6 +62,19 @@ if [[ -z "$key_id" ]]; then
     exit 1
 fi
 
+# Validate that the key ID looks like a hexadecimal GPG key ID
+if ! [[ "$key_id" =~ ^[0-9A-Fa-f]{8,40}$ ]]; then
+    echo "Error: Invalid key ID format."
+    echo "Please enter the long hexadecimal ID shown after 'rsa4096/' in the output above."
+    exit 1
+fi
+
+# Verify that the key ID exists in your secret keyring
+if ! gpg --list-secret-keys --keyid-format LONG "$key_id" >/dev/null 2>&1; then
+    echo "Error: No secret key found for ID '$key_id'."
+    echo "Run 'gpg --list-secret-keys --keyid-format LONG' and copy the key ID exactly."
+    exit 1
+fi
 # Create a directory for exports
 mkdir -p gpg-exports
 cd gpg-exports
