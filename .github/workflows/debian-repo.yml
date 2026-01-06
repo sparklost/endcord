@@ -10,31 +10,55 @@ jobs:
     runs-on: ubuntu-24.04  # Closest match to Debian Trixie glibc
     permissions:
       contents: write
-    
-    steps:
-      - name: Checkout your repo (for scripts)
-        uses: actions/checkout@v4
-        with:
-          path: my-repo
 
-      - name: Checkout Upstream Endcord
+    steps:
+      - name: Checkout Fork
         uses: actions/checkout@v4
         with:
-          repository: sparklost/endcord
-          path: endcord-upstream
-          fetch-depth: 0
+          fetch-depth: 0  # Full history for merging
+          path: endcord
+
+      - name: Sync with Upstream
+        working-directory: ./endcord
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+
+          # Add upstream remote
+          git remote add upstream https://github.com/sparklost/endcord.git
+          git fetch upstream
+
+          # Check if we're behind upstream
+          BEHIND=$(git rev-list --count HEAD..upstream/main)
+          if [ "$BEHIND" -gt 0 ]; then
+            echo "Merging $BEHIND commit(s) from upstream..."
+            git merge upstream/main -m "Merge upstream/main: sync with sparklost/endcord"
+
+            # Restore fork README additions if overwritten
+            if [ -f "scripts/restore-fork-readme.sh" ]; then
+              chmod +x scripts/restore-fork-readme.sh
+              ./scripts/restore-fork-readme.sh || true
+              git add README.md 2>/dev/null || true
+              git diff --cached --quiet || git commit -m "Restore fork README additions after upstream merge"
+            fi
+
+            # Push merged changes back to fork
+            git push origin main
+          else
+            echo "Already up to date with upstream."
+          fi
 
       - name: Install Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y python3-dev build-essential dpkg-dev apt-utils clang libncurses-dev
-      
+
       - name: Install uv
         uses: astral-sh/setup-uv@v6
         with:
           version: "0.7.14"
           enable-cache: false
-      
+
       - name: Setup GPG
         id: setup-gpg
         uses: crazy-max/ghaction-import-gpg@v6
@@ -46,26 +70,26 @@ jobs:
         # We use PyInstaller here because Nuitka is very slow on free CI runners and may timeout.
         # If you have paid runners, change this to: uv run build.py --nuitka
         # Default is single-file build (no --onedir flag)
-        working-directory: ./endcord-upstream
+        working-directory: ./endcord
         run: |
           uv sync --group build
           uv run build.py
-          
+
       - name: Prepare Debian Package Structure
         id: prep
         run: |
           # Define version based on upstream version + date
-          cd endcord-upstream
+          cd endcord
           BASE_VER=$(grep 'version =' pyproject.toml | head -1 | cut -d '"' -f 2)
           DATE_TAG=$(date +%Y%m%d)
           FULL_VER="${BASE_VER}-nightly${DATE_TAG}"
           echo "VERSION=$FULL_VER" >> $GITHUB_ENV
-          
+
           # Create Staging Area
           mkdir -p ../deb-build/endcord_${FULL_VER}_amd64/usr/bin
           mkdir -p ../deb-build/endcord_${FULL_VER}_amd64/usr/share/applications
           mkdir -p ../deb-build/endcord_${FULL_VER}_amd64/DEBIAN
-          
+
           # Copy Binary
           cp dist/endcord ../deb-build/endcord_${FULL_VER}_amd64/usr/bin/endcord
           chmod +x ../deb-build/endcord_${FULL_VER}_amd64/usr/bin/endcord
@@ -74,7 +98,7 @@ jobs:
         working-directory: ./deb-build
         run: |
           PKG_DIR="endcord_${{ env.VERSION }}_amd64"
-          
+
           # 1. Control File
           {
             echo "Package: endcord"
@@ -90,7 +114,7 @@ jobs:
             echo " Packaged by fans - Not affiliated with or endorsed by the official Endcord team."
             echo " Upstream project: https://github.com/sparklost/endcord"
           } > "$PKG_DIR/DEBIAN/control"
-          
+
           # 2. Desktop Entry
           {
             echo "[Desktop Entry]"
@@ -163,12 +187,12 @@ jobs:
 
           # Move new deb file to pool
           cp ../deb-build/*.deb pool/main/
-          
+
           # Generate Packages file (run from repo root for correct paths)
           apt-ftparchive packages pool/main > dists/stable/main/binary-amd64/Packages
           gzip -9 -k -f dists/stable/main/binary-amd64/Packages
           cd dists/stable
-          
+
           # Generate Release file
           {
             echo "Origin: Endcord-Unofficial"
@@ -180,18 +204,18 @@ jobs:
             echo "Description: Unofficial community repack of Endcord - Not affiliated with the official Endcord team"
             echo "Date: $(date -R)"
           } > Release
-          
+
           # Generate Hashes for Release
           apt-ftparchive release . >> Release
-          
+
           # Sign the Release
           rm -f Release.gpg InRelease
           gpg --default-key ${{ steps.setup-gpg.outputs.keyid }} -abs -o Release.gpg Release
           gpg --default-key ${{ steps.setup-gpg.outputs.keyid }} --clearsign -o InRelease Release
-          
+
           # Return to gh-pages-repo root (we're in dists/stable)
           cd ../..
-          
+
           # Deploy
           git add .
           git commit -m "Update repo with version ${{ env.VERSION }}" || echo "No changes to commit"
