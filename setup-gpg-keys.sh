@@ -81,12 +81,12 @@ cd gpg-exports
 
 echo ""
 echo "Exporting private key for GitHub Actions..."
-gpg --export-secret-keys --armor "$key_id" > private.key
+gpg --export-secret-keys --armor "$key_id" > private.key || { echo "Error: Failed to export private key"; exit 1; }
 echo "✓ Private key saved to: gpg-exports/private.key"
 
 echo ""
 echo "Exporting public key for users..."
-gpg --export --armor "$key_id" > public.key
+gpg --export --armor "$key_id" > public.key || { echo "Error: Failed to export public key"; exit 1; }
 echo "✓ Public key saved to: gpg-exports/public.key"
 
 echo ""
