@@ -123,7 +123,7 @@ jobs:
           if [ ! -d "gh-pages-repo/.git" ]; then
             mkdir -p gh-pages-repo
             cd gh-pages-repo
-            git init -b gh-pages
+            git init
             git config user.name "GitHub Actions"
             git config user.email "actions@github.com"
             git remote add origin "$REMOTE_URL"
@@ -173,4 +173,5 @@ jobs:
           # Deploy
           git add .
           git commit -m "Update repo with version ${{ env.VERSION }}" || echo "No changes to commit"
-          git push --force origin gh-pages
+          # Push HEAD to remote gh-pages (works even if local branch has different name)
+          git push --force origin HEAD:gh-pages
