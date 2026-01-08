@@ -183,15 +183,16 @@ def search_emojis(all_emojis, premium, guild_id, query, safe_emoji=False, limit=
     worst_score = score_cutoff
 
     # guild emoji
-    if not premium:
+    if premium:
+        emojis = all_emojis
+    else:
         for guild in all_emojis:
             if guild["guild_id"] == guild_id:
                 emojis = [guild]
                 break
         else:
             emojis = []
-    else:
-        emojis = all_emojis
+
     for guild in emojis:
         guild_name = guild["guild_name"]
         for guild_emoji in guild["emojis"]:
@@ -231,15 +232,16 @@ def search_stickers(all_stickers, default_stickers, premium, guild_id, query, li
     results = []
     worst_score = score_cutoff
 
-    if not premium:
+    if premium:
+        stickers = all_stickers
+    else:
         for pack in all_stickers:
             if pack["pack_id"] == guild_id:
                 stickers = [pack]
                 break
         else:
             stickers = []
-    else:
-        stickers = all_stickers
+        
     for pack in stickers + default_stickers:
         pack_name = pack["pack_name"]
         for sticker in pack["stickers"]:

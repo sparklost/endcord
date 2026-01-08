@@ -891,7 +891,7 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
         temp_wide_map = []
         mentioned = False
         edited = message.get("edited")   # failsafe
-        user_id = message["user_id"]
+        user_id = message.get("user_id")
         selected_color_spoiler = color_spoiler
         disable_formatting = False
 
@@ -991,9 +991,9 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
                     ref_message["content"] = "Blocked message"
                     reply_color_format = color_blocked
                 for member in member_roles:
-                    if member["user_id"] == user_id:
+                    if member["user_id"] == ref_message["user_id"]:
                         if not ref_message["nick"]:
-                            ref_message["nick"] = nick
+                            ref_message["nick"] = member.get("nick")
                         break
                 global_name = get_global_name(ref_message, use_nick)
                 reply_embeds = ref_message["embeds"].copy()

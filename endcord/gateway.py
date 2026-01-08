@@ -2262,7 +2262,7 @@ class Gateway():
 
     def get_messages(self):
         """
-        Get message CREATE, EDIT, DELETE and ACK events for every guild and channel.
+        Get message CREATE, UPDATE, DELETE and ACK events for every guild and channel.
         Returns 1 by 1 event as an update for list of messages.
         """
         if len(self.messages_buffer) == 0:
