@@ -838,6 +838,16 @@ def command_string(text):
             "attachments": attachments,
         }
 
+    # 64 - COPY_LINK
+    elif text_lower.startswith("copy_link"):
+        cmd_type = 64
+        try:
+            num = int(text.split(" ")[1])
+            cmd_args = {"num": num}
+        except (IndexError, ValueError):
+            pass
+
+
     # 66 - 666
     elif text_lower == "666":
         cmd_type = 66

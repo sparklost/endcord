@@ -98,7 +98,7 @@ def content_to_attachment(message, embeds):
 
         for attachment in matches:
             for embed in embeds:
-                if embed["url"] == attachment[0]:
+                if embed["url"].split("?")[0] == attachment[0].split("?")[0]:   # query url part usually changes
                     break
             else:
                 embeds.append({

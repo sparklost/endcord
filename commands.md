@@ -7,6 +7,8 @@
     Download selected attachment.
 - `open_link` / `open_link [num]`  
     Open selected url in browser, prompt if there are multiple on same line.
+- `copy_link` / `copy_link [num]`  
+    Copy selected url to clipboard, prompt if there are multiple on same line.
 - `play` / `play [num]`  
     Play selected attachment.
 - `search` / `search [query]`  
@@ -113,7 +115,7 @@
     Silence incoming call or cancel outgoing call.
 - `voice_list_call`  
     Show all call participants and their states in an updated list. Must be in the call to use this.
-- `toggle_mute`  
+- `voice_toggle_mute`  
     Toggle mute state before joining a call. Persisted across sessions.
 - `generate_invite *duration *limit`  
     Generate invite to current server with custom expiration `duration` and uses `limit`. Set to 0 for infinite. Invite URL will be copied to clipboard.

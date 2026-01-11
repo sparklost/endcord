@@ -962,7 +962,7 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
                 filler_r = filler - filler_l
                 temp_chat.append(f"{date_separator * filler_l}{date}{date_separator * filler_r}")
                 temp_format.append([color_separator])
-                temp_chat_map.append(None)
+                temp_chat_map.append((num, None, None, None, None, None, None))
         except IndexError:
             pass
 
@@ -1526,7 +1526,7 @@ def generate_status_line(my_user_data, my_status, unseen, typing, active_channel
     elif action["type"] == 3:   # confirm deleting
         action_string = "Really delete the message? [Y/n]"
     elif action["type"] == 4:   # select from multiple links
-        action_string = "Select link to open in browser (type a number)"
+        action_string = "Select link (type a number)"
     elif action["type"] == 5:   # select from multiple attachments
         action_string = "Select attachment link to download (type a number)"
     elif action["type"] == 6:   # select attachment media to play

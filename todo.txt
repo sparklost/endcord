@@ -1,3 +1,6 @@
+Show media with box characters
+Show inline media in chat
+
 Voice channels
     add voice channels to tree
     show voice channel activity
