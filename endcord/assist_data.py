@@ -46,7 +46,7 @@ COMMAND_ASSISTS = (
     ("toggle_tab - toggle tabbed (pinned) state of current channel", "toggle_tab"),
     ("switch_tab [num] - switch to specified tab by its number", "switch_tab"),
     ("vote [num] - vote for specified answer index on active poll message", "vote"),
-    ("paste_clipboard_image - upload image from clipboard as attachment", "paste_clipboard_image"),
+    ("paste - paste image or file as attachment or text from clipboard", "paste"),
     ("insert_timestamp YYYY-MM-DD-HH-mm / YYYY-MM-DD / HH:mm / HH:mm:SS - insert discord timestamp", "insert_timestamp"),
     ("set_notifications *<#[channel_id]> ... - show and modify server/channel notification settings", "set_notifications"),
     ("check_standing - check account standing, anything non-100 is concerning", "check_standing"),

@@ -299,7 +299,7 @@ class GameDetection:
         old_path, old_etag = find_detectable_apps_file(os.path.expanduser(peripherals.config_path))
         path, etag = self.discord.get_detectable_apps(peripherals.config_path, old_etag)
         if not path:
-            logger.info("Cound not start game detection service: failed to download detectable applications list")
+            logger.info("Could not start game detection service: failed to download detectable applications list")
             return
         if old_etag != etag:
             logger.info(f'Downloaded new detectable applications list with ETag: W/"{etag}"')

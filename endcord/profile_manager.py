@@ -47,6 +47,25 @@ TOKEN_PROMPT_TEXT = """ Token is required to access Discord through your account
 
  Enter to confirm, Esc to go back.
  """
+AUTH_METHOD_PROMPT_TEXT = (
+    "Select authentication method:",
+    "",
+    "QR Code - Scan with Discord mobile app (Recommended)",
+    "Manual Token - Copy token from browser DevTools",
+    "", "", "",
+    "Enter to confirm, Esc to go back, Up/Down to select",
+)
+QR_AUTH_TEXT = """ Scan this QR code with the Discord mobile app to log in.
+
+ 1. Open Discord on your phone
+ 2. Go to Settings > Scan QR Code
+ 3. Point your camera at the code below
+ 4. Tap 'Yes, log me in' when prompted
+
+ The QR code expires in 2 minutes. Press Esc to cancel.
+"""
+QR_WAITING_TEXT = " Waiting for confirmation on your phone..."
+QR_SCANNED_TEXT = " QR code scanned by: {username}"
 SOURCE_PROMPT_TEXT = (
     "Select where to save token:",
     "Keyring is secure encrypted storage provided by the OS - recommended,",
@@ -399,7 +418,7 @@ def main_tui(screen, profiles_enc, profiles_plain, selected, have_keyring):
 
 
 def manage_profile(screen, have_keyring, editing_profile=None):
-    """Wrapper around 3 steps for adding/editing profile"""
+    """Wrapper around steps for adding/editing profile with QR code or manual token"""
     profile = {
         "name": None,
         "time": None,
@@ -410,6 +429,7 @@ def manage_profile(screen, have_keyring, editing_profile=None):
         profile = editing_profile
 
     step = 0
+    use_qr_auth = False
     run = True
     while run:
         if step == 0:   # name
@@ -421,17 +441,42 @@ def manage_profile(screen, have_keyring, editing_profile=None):
                 step += 1
             else:
                 return profile, False
-        elif step == 1:   # token
-            token, proceed = text_prompt(screen, TOKEN_PROMPT_TEXT, "TOKEN: ", mask=True)
+        elif step == 1:   # auth method selection (skip if editing)
+            if editing_profile:
+                # When editing, go straight to manual token entry
+                step = 2
+                use_qr_auth = False
+                continue
+            auth_method, proceed = auth_method_prompt(screen)
             if proceed:
-                if token:
-                    profile["token"] = token
-                    if not have_keyring or editing_profile:   # skip asking for source
-                        return profile, True
-                    step += 1
+                use_qr_auth = (auth_method == 0)
+                step += 1
             else:
                 step -= 1
-        elif step == 2:   # source
+        elif step == 2:   # token (QR or manual)
+            if use_qr_auth:
+                token, proceed = qr_auth_prompt(screen)
+                if proceed and token:
+                    profile["token"] = token
+                    if not have_keyring:   # skip asking for source
+                        return profile, True
+                    step += 1
+                elif not proceed:
+                    step -= 1
+                else:
+                    # QR auth failed but not cancelled, stay on same step to retry or go back
+                    step -= 1
+            else:
+                token, proceed = text_prompt(screen, TOKEN_PROMPT_TEXT, "TOKEN: ", mask=True)
+                if proceed:
+                    if token:
+                        profile["token"] = token
+                        if not have_keyring or editing_profile:   # skip asking for source
+                            return profile, True
+                        step += 1
+                else:
+                    step -= 1
+        elif step == 3:   # source
             source, proceed = source_prompt(screen)
             if source:
                 profile["source"] = "plaintext"
@@ -580,6 +625,218 @@ def source_prompt(screen):
     screen.refresh()
 
     return selected_num, proceed
+
+
+def auth_method_prompt(screen):
+    """Prompt to select authentication method (QR code or manual token)"""
+    screen.clear()
+    screen.bkgd(" ", curses.color_pair(1))
+    h, w = screen.getmaxyx()
+    for num, line in enumerate(AUTH_METHOD_PROMPT_TEXT):
+        screen.addstr(num+1, 0, line.center(w), curses.color_pair(1))
+    run = True
+    proceed = False
+    selected_num = 0  # 0 = QR Code (recommended), 1 = Manual Token
+    while run:
+        y = len(AUTH_METHOD_PROMPT_TEXT) - 4
+        h, w = screen.getmaxyx()
+        for num, option in enumerate(("QR Code (Recommended)", "Manual Token")):
+            text = option.center(25)
+            x_gap = (w - 25) // 2
+            if num == selected_num:
+                screen.addstr(y, x_gap, text, curses.color_pair(1) | curses.A_STANDOUT)
+            else:
+                screen.addstr(y, x_gap, text, curses.color_pair(1))
+            y += 1
+
+        key = screen.getch()
+
+        if key == 27:   # ESCAPE
+            break
+        elif key == 10:   # ENTER
+            proceed = True
+            break
+        elif key == curses.KEY_UP:
+            if selected_num > 0:
+                selected_num -= 1
+        elif key == curses.KEY_DOWN:
+            if selected_num < 1:
+                selected_num += 1
+
+        screen.refresh()
+
+    screen.clear()
+    screen.refresh()
+
+    return selected_num, proceed  # 0 = QR Code, 1 = Manual
+
+
+def qr_auth_prompt(screen):
+    """Display QR code for authentication and wait for user to scan"""
+    try:
+        from . import qr_auth
+    except ImportError:
+        logger.warning("QR auth module not available")
+        return None, False
+
+    if not qr_auth.HAVE_CRYPTO:
+        screen.clear()
+        screen.bkgd(" ", curses.color_pair(1))
+        h, w = screen.getmaxyx()
+        error_msg = "QR Code login requires 'cryptography' package."
+        install_msg = "Install with: pip install cryptography"
+        screen.addstr(h//2 - 1, max(0, (w - len(error_msg))//2), error_msg, curses.color_pair(1))
+        screen.addstr(h//2 + 1, max(0, (w - len(install_msg))//2), install_msg, curses.color_pair(1))
+        screen.addstr(h//2 + 3, max(0, (w - 20)//2), "Press any key...", curses.color_pair(1))
+        screen.refresh()
+        screen.getch()
+        return None, False
+
+    screen.clear()
+    screen.bkgd(" ", curses.color_pair(1))
+    screen.nodelay(False)
+
+    token = None
+    cancelled = False
+    qr_displayed = False
+    user_scanned = None
+    error_msg = None
+
+    # State variables for the auth thread
+    state = {"qr_ascii": None, "qr_url": None, "username": None, "token": None, "error": None, "done": False}
+
+    def on_qr_ready(url, ascii_art):
+        state["qr_url"] = url
+        state["qr_ascii"] = ascii_art
+
+    def on_user_scanned(user_data):
+        state["username"] = user_data.get_display_name()
+
+    def on_token_received(tok):
+        state["token"] = tok
+        state["done"] = True
+
+    def on_error(e):
+        state["error"] = str(e)
+        state["done"] = True
+
+    # Start auth in a thread
+    import threading
+    auth_thread = None
+    client = qr_auth.RemoteAuthClient()
+    client.on_qr_code = on_qr_ready
+    client.on_user_data = on_user_scanned
+    client.on_token = on_token_received
+    client.on_error = on_error
+
+    def run_auth():
+        try:
+            client.connect_and_wait(timeout=120)
+        except qr_auth.QRAuthCancelled:
+            pass
+        except qr_auth.QRAuthTimeout:
+            state["error"] = "QR code expired. Please try again."
+        except Exception as e:
+            state["error"] = str(e)
+        finally:
+            state["done"] = True
+
+    auth_thread = threading.Thread(target=run_auth, daemon=True)
+    auth_thread.start()
+
+    # Display loop
+    screen.nodelay(True)
+    run = True
+    last_draw = 0
+
+    while run:
+        h, w = screen.getmaxyx()
+
+        # Check for escape key
+        try:
+            key = screen.getch()
+            if key == 27:
+                cancelled = True
+                client.close()
+                break
+        except Exception:
+            pass
+
+        # Redraw periodically
+        current_time = time.time()
+        if current_time - last_draw > 0.1:  # 10 FPS
+            last_draw = current_time
+            screen.clear()
+
+            # Draw header text
+            lines = QR_AUTH_TEXT.strip().split("\n")
+            for num, line in enumerate(lines):
+                if num < h - 2:
+                    screen.addstr(num + 1, 0, line[:w-1], curses.color_pair(1))
+
+            qr_start_y = len(lines) + 2
+
+            # Draw QR code if available
+            if state["qr_ascii"]:
+                qr_lines = state["qr_ascii"].split("\n")
+                for num, line in enumerate(qr_lines):
+                    y = qr_start_y + num
+                    if y < h - 3:
+                        x = max(0, (w - len(line)) // 2)
+                        try:
+                            screen.addstr(y, x, line[:w-1], curses.color_pair(1))
+                        except curses.error:
+                            pass
+
+                # Show URL below QR
+                url_y = qr_start_y + len(qr_lines) + 1
+                if url_y < h - 2 and state["qr_url"]:
+                    url_text = f"URL: {state['qr_url']}"
+                    x = max(0, (w - len(url_text)) // 2)
+                    try:
+                        screen.addstr(url_y, x, url_text[:w-1], curses.color_pair(1))
+                    except curses.error:
+                        pass
+
+            elif not state["done"]:
+                # Loading message
+                loading_msg = "Generating QR code..."
+                screen.addstr(qr_start_y, max(0, (w - len(loading_msg))//2), loading_msg, curses.color_pair(1))
+
+            # Show scanned user
+            if state["username"]:
+                scanned_msg = QR_SCANNED_TEXT.format(username=state["username"])
+                try:
+                    screen.addstr(h - 3, 0, scanned_msg[:w-1], curses.color_pair(1) | curses.A_BOLD)
+                    screen.addstr(h - 2, 0, QR_WAITING_TEXT[:w-1], curses.color_pair(1))
+                except curses.error:
+                    pass
+
+            # Show error
+            if state["error"]:
+                try:
+                    screen.addstr(h - 2, 0, f" Error: {state['error']}"[:w-1], curses.color_pair(1))
+                except curses.error:
+                    pass
+
+            screen.refresh()
+
+        # Check if auth completed
+        if state["done"]:
+            if state["token"]:
+                token = state["token"]
+            break
+
+        time.sleep(0.05)
+
+    screen.nodelay(False)
+    screen.clear()
+    screen.refresh()
+
+    if cancelled:
+        return None, False
+
+    return token, token is not None
 
 
 

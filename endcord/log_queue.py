@@ -80,7 +80,7 @@ def read_log_file(path, limit=100):
         output_line = ""
         for num, subline in enumerate(sublines):
             if subline.startswith("  ["):
-                output_line += subline[2:]
+                output_line += " " + subline[2:]
             else:
                 output_line += "\n" + subline
         if output_line.strip():
