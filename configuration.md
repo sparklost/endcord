@@ -155,7 +155,7 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
 - `custom_user_agent = None`  
     Custom [user agent string](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/User-Agent) for `client_properties`.  
     Default user agent is Firefox for `"anonymous"` and discord desktop client for `default` client properties.  
-    User agent should not be changed unless the [default ones](https://github.com/sparklost/endcord/blob/main/endcord/app.py) are very outdated.  
+    User agent should not be changed unless the [default ones](https://github.com/sparklost/endcord/blob/main/endcord/client_properties.py) are very outdated.  
     Setting wrong user agent can make you more suspicious to discord spam filter! Make sure user agent string matches your OS.  
 - `send_x_super_properties = True`  
     Enable sending X-Super-Properties header containing system information. May reduce risk suspicion of client. Disabling this may solve message sending issues ("reurned error code 400" in log).  
@@ -271,7 +271,7 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
 - `media_ascii_palette = "  ..',;:c*loexk#O0XNW"`  
     Characters used to draw in terminal. From darkest to brightest. Same character can be repeated. Number of characters is not fixed.
 - `media_saturation = 1.2`  
-    Saturation correction applied to image in order to make colors more visible. Adjust if changing `ascii_palette` or color_media_bg.
+    Saturation correction applied to image in order to make colors more visible. Adjust if changing `ascii_palette` or media_color_bg.
 - `media_font_scale = 2.25`  
     Font height/width ratio. Change only if picture dimensions ratio is wrong in terminal.
 

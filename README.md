@@ -60,8 +60,82 @@ We package [upstream releases](https://github.com/sparklost/endcord) for easier 
 
 Endcord is a third-party feature rich Discord client, running entirely in terminal.
 It is built with python and ncurses library, to deliver lightweight yet feature rich experience.
-Discord token is required in order to run endcord! see [Token](#token).
 [More screenshots](https://github.com/sparklost/endcord/blob/main/.github/screenshots.md).
+
+---
+
+## Quick Start - Sign In
+
+Getting started with Endcord takes less than a minute. Choose your preferred login method:
+
+### Option 1: QR Code Login (Recommended)
+
+The easiest way to sign in - just scan a QR code with your phone!
+
+```bash
+# Install QR auth dependencies (one-time)
+pip install cryptography qrcode
+
+# Or with uv:
+uv sync --group qrauth
+```
+
+1. **Run Endcord** - `endcord` or `uv run main.py`
+2. **Click "Add"** in the Profile Manager
+3. **Enter a profile name** (anything you want, e.g., "main")
+4. **Select "QR Code (Recommended)"**
+5. **Scan the QR code** with your Discord mobile app:
+   - Open Discord on your phone
+   - Go to **Settings** (gear icon) → **Scan QR Code**
+   - Point camera at the terminal
+   - Tap **"Yes, log me in"**
+6. **Done!** You're now logged in.
+
+<details>
+<summary><b>Screenshot: QR Code Login Flow</b></summary>
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Scan this QR code with the Discord mobile app to log in.  │
+│                                                             │
+│  1. Open Discord on your phone                              │
+│  2. Go to Settings > Scan QR Code                           │
+│  3. Point your camera at the code below                     │
+│  4. Tap 'Yes, log me in' when prompted                      │
+│                                                             │
+│              ██████████████    ██  ████████████             │
+│              ██          ██  ████  ██        ██             │
+│              ██  ██████  ██    ██  ██  ████  ██             │
+│              ██  ██████  ██  ██    ██  ████  ██             │
+│              ██  ██████  ██  ██    ██  ████  ██             │
+│              ██          ██        ██        ██             │
+│              ██████████████  ██  ████████████              │
+│                                                             │
+│              URL: https://discord.com/ra/abc123...          │
+│                                                             │
+│  QR code scanned by: YourUsername#1234                      │
+│  Waiting for confirmation on your phone...                  │
+└─────────────────────────────────────────────────────────────┘
+```
+</details>
+
+### Option 2: Manual Token Entry
+
+If you prefer or can't use QR code login:
+
+1. **Run Endcord** and select **"Add"** → enter profile name → select **"Manual Token"**
+2. **Get your token** from Discord:
+   - Open [Discord Web](https://discord.com/app) in your browser
+   - Press `F12` (or `Ctrl+Shift+I`) to open Developer Tools
+   - Go to **Network** tab → refresh the page (`F5`)
+   - In the filter box, type `discord.com/api`
+   - Click any request → **Headers** tab → find `Authorization`
+   - Copy the token value (right-click → Copy Value)
+3. **Paste the token** in Endcord and press Enter
+
+> **Security Note:** Your token is like a password. Never share it with anyone.
+
+---
 
 
 ## Features
@@ -159,15 +233,21 @@ Profile manager will always automatically load last used profile.
 Unless other profile is selected in manager TUI, or profile name is provided with `--profile` flag.
 Manager can be re-opened using `--manager` flag.
 
-### Token
-Token is used to access Discord through your account without logging-in.
-It is required to use endcord.
-See [FAQ](#FAQ) for more info on obtaining your Discord token.
-After obtaining token, you can either:
-- Provide token in profile manager - recommended,
-- Pass token to endcord as command argument: `endcord -t [YOUR_TOKEN]`.
-Note that if you use it as argument, it might get saved in your terminal history file.
-**Do not share your token!** Remove it form config before sharing it.
+### Token / Authentication
+A Discord token is required to use Endcord. You have two options:
+
+**Option 1: QR Code Login (Recommended)**
+Scan a QR code with your Discord mobile app - no manual token extraction needed!
+See [Quick Start](#quick-start---sign-in) for step-by-step instructions.
+
+**Option 2: Manual Token**
+Extract token from browser DevTools. See [FAQ](#faq) for instructions.
+
+After obtaining your token, you can either:
+- Use the profile manager (recommended) - stores token securely in system keyring
+- Pass token as command argument: `endcord -t [YOUR_TOKEN]` (not recommended - saved in shell history)
+
+**Do not share your token!** It provides full access to your Discord account.
 
 ### Keybinding
 Keybindings are configured in separate sections in `config.ini`.  Main keybindings section is `[keybindings]`.
@@ -223,7 +303,7 @@ Preview selected file in upload assist or when searching gif - `Alt+V`
 Cancel all downloads/uploads - `Ctrl+X`
 Cancel selected attachment - `Ctrl+K`
 Reveal one spoiler in selected messages - `Alt+T`
-Paste text - terminal paste, usually `Ctrl+Shift+V`
+Paste text - terminal paste, usually `Ctrl+Shift+V`, or better: `paste` command
 Undo input line - `Alt+Z`
 Redo input line - `Alt+Shift+Z`
 Show pinned messages in current channel - `Alt+N`
@@ -528,7 +608,20 @@ Run main.py: `uv run --python 3.14t main.py`
 
 
 ## FAQ
-### Obtaining your Discord token
+### How do I sign in / get my Discord token?
+
+**Recommended: Use QR Code Login** - See [Quick Start](#quick-start---sign-in) above.
+
+Simply scan a QR code with your Discord mobile app. No dev tools needed!
+
+```bash
+# Enable QR login (one-time)
+pip install cryptography qrcode
+```
+
+**Alternative: Manual Token Entry**
+
+If you can't use QR login, extract your token manually:
 1. Open Discord in browser.
 2. Open developer tools (`F12` or `Ctrl+Shift+I` on Chrome and Firefox).
 3. Go to the `Network` tab then refresh the page.

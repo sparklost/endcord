@@ -12,5 +12,5 @@ def save_image():
     if isinstance(img, Image.Image):
         save_path = os.path.join(peripherals.temp_path, f"clipboard_image_{int(time.time())}.png")
         img.save(save_path)
-        return save_path
-    return None
+        return [save_path]
+    return []

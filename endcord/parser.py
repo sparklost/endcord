@@ -541,8 +541,8 @@ def command_string(text):
     elif text_lower.startswith("check_standing"):
         cmd_type = 27
 
-    # 28 - PASTE_CLIPBOARD_IMAGE
-    elif text_lower.startswith("paste_clipboard_image"):
+    # 28 - PASTE
+    elif text_lower.startswith("paste"):
         cmd_type = 28
 
     # 29 - TOGGLE_MUTE
