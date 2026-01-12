@@ -618,7 +618,7 @@ def paste_clipboard_files(save_path=None):
             if types_list[0].startswith("image/"):
                 if not save_path:
                     return []
-                file_path = os.path.join(save_path, f"clipboard_image_{int(time.time())}" + types_list[0][6:])
+                file_path = os.path.join(save_path, f"clipboard_image_{int(time.time())}." + types_list[0][6:])
                 with open(file_path, "wb") as f:
                     proc = subprocess.run(
                         query_command[:] + [types_list[0]] + ([suffix] if suffix else []),
