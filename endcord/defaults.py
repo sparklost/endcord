@@ -43,7 +43,7 @@ settings = {
     "rpc_external": True,
     "emoji_as_text": False,
     "native_media_player": False,
-    "native_file_dialog": "Auto",
+    "native_file_dialog": "auto",
     "save_summaries": True,
     "default_stickers": True,
     "only_one_open_server": False,

@@ -559,18 +559,18 @@ def copy_to_clipboard(text):
                     ["wl-copy"],
                     stdin=subprocess.PIPE,
                     stdout=subprocess.DEVNULL,
-                    stderr=subprocess.STDOUT,
+                    stderr=subprocess.DEVNULL,
                 )
                 proc.communicate(input=text.encode("utf-8"))
             except FileNotFoundError:
-                logger.warning("Cant copy: wl-copy not found on system")
+                logger.warning("Cant copy: wl-clipboard not found on system")
         else:
             try:
                 proc = subprocess.Popen(
                     ["xclip"],
                     stdin=subprocess.PIPE,
                     stdout=subprocess.DEVNULL,
-                    stderr=subprocess.STDOUT,
+                    stderr=subprocess.DEVNULL,
                 )
                 proc.communicate(input=text.encode("utf-8"))
             except FileNotFoundError:
@@ -585,9 +585,71 @@ def copy_to_clipboard(text):
             ["pbcopy", "w"],
             stdin=subprocess.PIPE,
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.STDOUT,
+            stderr=subprocess.DEVNULL,
         )
         proc.communicate(input=text.encode("utf-8"))
+
+
+def paste_clipboard_files(save_path=None):
+    """Get files paths from clipboard, linux only, needs xclip or wl-clipboard"""
+    if sys.platform == "linux":
+
+        if os.getenv("WAYLAND_DISPLAY"):
+            list_command = ["wl-paste", "-l"]
+            query_command = ["wl-paste", "-t"]
+            list_types = ""
+            suffix = ""
+        else:
+            list_command = ["xclip", "-selection", "clipboard", "-t"]
+            query_command = list_command
+            list_types = "TARGETS"
+            suffix = "-o"
+
+        try:
+            # get types
+            proc = subprocess.Popen(
+                list_command[:] + ([list_types, suffix] if suffix else []),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+            )
+            types_list = proc.communicate()[0].decode().split("\n")
+
+            # binary image
+            if types_list[0].startswith("image/"):
+                if not save_path:
+                    return []
+                file_path = os.path.join(save_path, f"clipboard_image_{int(time.time())}" + types_list[0][6:])
+                with open(file_path, "wb") as f:
+                    proc = subprocess.run(
+                        query_command[:] + [types_list[0]] + ([suffix] if suffix else []),
+                        stdout=f,
+                        stderr=subprocess.DEVNULL,
+                        check=False,
+                    )
+                return [file_path]
+
+            # file path
+            if "text/uri-list" in types_list:
+                proc = subprocess.Popen(
+                    query_command[:] + ["text/uri-list"] + ([suffix] if suffix else []),
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.DEVNULL,
+                )
+                data = proc.communicate()[0].decode().strip("\n")
+                return [line[7:] for line in data.splitlines() if line.startswith("file://")]
+
+            # plain text or nothing
+            if "text/plain" in types_list:
+                proc = subprocess.Popen(
+                    query_command[:] + ["text/plain"] + ([suffix] if suffix else []),
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.DEVNULL,
+                )
+                return proc.communicate()[0].decode().strip("\n")
+
+        except FileNotFoundError:
+            logger.warning("Cant paste: wl-clipboard or xclip not found on system")
+    return []
 
 
 def native_select_files(file_filter=None, multiple=True, auto=False):

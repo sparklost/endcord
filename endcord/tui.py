@@ -622,12 +622,13 @@ class TUI():
 
     def pause_curses(self):
         """Pause curses and disable drawing, releasing terminal"""
-        with self.lock:
-            h, w = self.win_member_list.getmaxyx()
-            for y in range(h):
-                self.win_member_list.insstr(y, 0, " " * w, curses.color_pair(1))
-            self.win_member_list.noutrefresh()
-            self.need_update.set()
+        if self.win_member_list:
+            with self.lock:
+                h, w = self.win_member_list.getmaxyx()
+                for y in range(h):
+                    self.win_member_list.insstr(y, 0, " " * w, curses.color_pair(1))
+                self.win_member_list.noutrefresh()
+                self.need_update.set()
         time.sleep(0.1)   # be sure everything is stopped before pausing
         with self.lock:
             self.lock_ui(True)
@@ -806,6 +807,21 @@ class TUI():
         self.cursor_pos = min(w - 1, self.cursor_pos)
         self.input_select_start = None
         self.show_cursor()
+
+
+    def paste_text(self, text):
+        """Paste text at current index in input line"""
+        if self.input_select_start is not None:
+            self.delete_selection()
+            self.input_select_start = None
+        self.input_buffer = self.input_buffer[:self.input_index] + text + self.input_buffer[self.input_index:]
+        self.input_index += len(text)
+        self.typing = int(time.time())
+        for key in text:
+            self.add_to_delta_store(key)
+        self.show_cursor()
+        self.spellcheck()
+        self.draw_input_line()
 
 
     def set_tray_icon(self, icon=0):

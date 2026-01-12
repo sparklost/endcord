@@ -65,8 +65,8 @@
     Go to specified channel/category/server from anywhere. If server or category is specified, they will be selected in tree.  
 - `view_pfp` / `view_pfp <@[user_id]>`  
     View profile picture of user from currently selected message or specified user.
-- `paste_clipboard_image`  
-    Paste image from clipboard as attachment.
+- `paste`  
+    Try to paste image or file as attachemnt, or text to input line. Requires either media suport (all platforms, no text) or `xclip`/`wl-clipboard` (linux only).  
 - `check_standing`  
     Check account standing. 0-100 value, anything non-100 is concerning.  
 - `hide` / `hide <#[channel_id]>`  

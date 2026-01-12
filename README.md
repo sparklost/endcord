@@ -178,7 +178,7 @@ Preview selected file in upload assist or when searching gif - `Alt+V`
 Cancel all downloads/uploads - `Ctrl+X`  
 Cancel selected attachment - `Ctrl+K`  
 Reveal one spoiler in selected messages - `Alt+T`  
-Paste text - terminal paste, usually `Ctrl+Shift+V`  
+Paste text - terminal paste, usually `Ctrl+Shift+V`, or better: `paste` command  
 Undo input line - `Alt+Z`  
 Redo input line - `Alt+Shift+Z`  
 Show pinned messages in current channel - `Alt+N`  

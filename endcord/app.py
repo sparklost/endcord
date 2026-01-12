@@ -1540,9 +1540,9 @@ class Endcord:
             # upload file
             elif action == 13 and self.messages and not self.disable_sending:
                 if self.config["native_file_dialog"]:
-                    self.upload_native_dialog()
-                    self.restore_input_text = (input_text, "standard")
-                    continue
+                    if self.upload_native_dialog():
+                        self.restore_input_text = (input_text, "standard")
+                        continue
                 self.restore_input_text = (None, "autocomplete")
                 self.add_to_store(self.active_channel["channel_id"], input_text)
                 if self.current_channel.get("allow_attach", True):
@@ -1687,7 +1687,7 @@ class Endcord:
                         self.restore_input_text = (gif, "standard")
                         continue
                     elif self.assist_found:
-                        new_input_text, new_index = self.insert_assist(
+                        new_input_text, new_input_index = self.insert_assist(
                             input_text,
                             self.tui.get_extra_selected(),
                             self.tui.assist_start,
@@ -1705,7 +1705,7 @@ class Endcord:
                                 self.tui.instant_assist = True
                             else:
                                 self.restore_input_text = (new_input_text, "standard")
-                            self.tui.set_input_index(new_index)
+                            self.tui.set_input_index(new_input_index)
                 elif self.member_list_visible:   # controls for member list when no extra window
                     mlist_selected = self.tui.get_mlist_selected()
                     if mlist_selected >= len(self.member_list):
@@ -2161,16 +2161,16 @@ class Endcord:
             elif (action == 0 and input_text and input_text != "\n" and self.active_channel["channel_id"]) or self.command:
                 if self.assist_word is not None and self.assist_found:
                     self.restore_input_text = (input_text, "standard")
-                    new_input_text, new_index = self.insert_assist(
+                    new_input_text, new_input_index = self.insert_assist(
                         input_text,
                         self.tui.get_extra_selected(),
                         self.tui.assist_start,
                         self.tui.input_index,
                     )
-                    self.reset_states(reacting=False)
+                    # self.reset_states(reacting=False)
                     self.update_status_line()
                     # 1000000 means its command execution and should restore text from store
-                    if new_input_text is not None and new_index != 1000000:
+                    if new_input_text is not None and new_input_index != 1000000:
                         if (self.search or self.search_gif) and self.extra_bkp:
                             self.restore_input_text = (new_input_text, "search")
                             self.ignore_typing = True
@@ -2185,11 +2185,11 @@ class Endcord:
                             self.ignore_typing = True
                         else:
                             self.restore_input_text = (new_input_text, "standard")
-                        self.tui.set_input_index(new_index)
+                        self.tui.set_input_index(new_input_index)
                     else:
                         self.assist_word = None
                         self.assist_found = []
-                        if new_index != 1000000:
+                        if new_input_index != 1000000:
                             self.restore_input_text = (None, None)
                     continue
 
@@ -2671,12 +2671,13 @@ class Endcord:
         elif cmd_type == 9:   # UPLOAD
             if self.current_channel.get("allow_attach", True):
                 path = cmd_args.get("path", None)
+                success = False
                 if path:
                     self.upload_threads.append(threading.Thread(target=self.upload, daemon=True, args=(path, )))
                     self.upload_threads[-1].start()
                 elif self.config["native_file_dialog"]:
-                    self.upload_native_dialog()
-                else:
+                    success = self.upload_native_dialog()
+                if not success:
                     self.restore_input_text = (None, "autocomplete")
                     if self.recording:   # stop recording voice message
                         self.recording = False
@@ -2941,16 +2942,29 @@ class Endcord:
             standing = self.discord.get_my_standing()
             self.update_extra_line(f"Account standing: {standing}/100")
 
-        elif cmd_type == 28:   # PASTE_CLIPBOARD_IMAGE
-            if support_media:
-                path = clipboard.save_image()
-                if path:
-                    self.upload_threads.append(threading.Thread(target=self.upload, daemon=True, args=(path, )))
-                    self.upload_threads[-1].start()
-                else:
-                    self.update_extra_line("Image not found in clipboard.")
+        elif cmd_type == 28:   # PASTE
+            paths = []
+            if shutil.which("xclip") or shutil.which("wl-paste"):
+                paths = peripherals.paste_clipboard_files(peripherals.temp_path)
+            elif support_media:
+                paths = clipboard.save_image()
             else:
                 self.update_extra_line("No media support.")
+            if isinstance(paths, str):
+                active_channel = self.active_channel["channel_id"]
+                for num, channel in enumerate(self.input_store):
+                    if channel["id"] == active_channel:
+                        input_text = self.input_store[num]["content"]
+                        input_index = self.input_store[num]["index"]
+                        self.input_store[num]["content"] = input_text[:input_index] + paths + input_text[input_index:]
+                        self.input_store[num]["index"] = input_index + len(paths)
+                        break
+            else:
+                for path in paths:
+                    self.upload_threads.append(threading.Thread(target=self.upload, daemon=True, args=(path, )))
+                    self.upload_threads[-1].start()
+                if not paths:
+                    self.update_extra_line("Image not found in clipboard.")
 
         elif cmd_type == 29:   # TOGGLE_MUTE
             channel_id = cmd_args.get("channel_id")
@@ -3928,15 +3942,21 @@ class Endcord:
 
     def upload_native_dialog(self):
         """Thread that waits for native dialog to return list of files to upload"""
-        if self.config["native_file_dialog"] == "Auto" and shutil.which("yazi"):
+        native_file_dialog = self.config["native_file_dialog"]
+        if isinstance(native_file_dialog, str):
+            native_file_dialog = native_file_dialog.lower()
+        if native_file_dialog == "auto" and shutil.which("yazi"):
             self.tui.pause_curses()
             files = peripherals.native_select_files(auto=True)
             self.tui.resume_curses()
         else:
             files = peripherals.native_select_files()
+        if files == "ERROR":
+            return False
         for file in files:
             self.upload_threads.append(threading.Thread(target=self.upload, daemon=True, args=(file, )))
             self.upload_threads[-1].start()
+        return True
 
 
     def download_file(self, url, move=True, open_media=False, open_move=False):

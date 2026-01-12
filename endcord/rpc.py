@@ -170,6 +170,7 @@ class RPC:
     def client_thread(self, connection):
         """Thread that handles receiving and sending data from one client"""
         app_id = None
+        rpc_data = None
 
         try:   # lets keep server running even if there is error in one thread
             op, init_data = receive_data(connection)
@@ -319,7 +320,7 @@ class RPC:
             win32file.CloseHandle(connection)
         else:
             connection.close()
-        logger.info("RPC client disconnected")
+        logger.info(f"RPC client disconnected: {rpc_data["name"] if rpc_data else "Unknown"}")
 
 
     def server_thread_win(self):
