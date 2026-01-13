@@ -23,16 +23,16 @@ References:
 - https://docs.discord.food/remote-authentication/desktop
 """
 
-import asyncio
 import base64
 import hashlib
+import http.client
 import json
 import logging
-import os
 import ssl
 import threading
 import time
 from typing import Callable, Optional
+from urllib.parse import urlparse
 
 try:
     from cryptography.hazmat.primitives import hashes, serialization
@@ -155,6 +155,114 @@ def _compute_fingerprint(public_key_b64: str) -> str:
     public_key_der = base64.b64decode(public_key_b64)
     fingerprint_hash = hashlib.sha256(public_key_der).digest()
     return base64.urlsafe_b64encode(fingerprint_hash).decode().rstrip("=")
+
+
+def _parse_proxy(proxy: str) -> tuple:
+    """
+    Parse proxy URL robustly, supporting multiple formats.
+
+    Supported formats:
+    - host:port
+    - http://host:port
+    - http://user:pass@host:port
+
+    Returns:
+        tuple: (host, port, auth) where auth is (user, pass) or None
+    """
+    if not proxy:
+        return None, None, None
+
+    try:
+        # Add scheme if missing for urlparse to work correctly
+        if "://" not in proxy:
+            proxy = f"http://{proxy}"
+
+        parsed = urlparse(proxy)
+        host = parsed.hostname
+        port = parsed.port or 8080
+        auth = None
+
+        if parsed.username:
+            auth = (parsed.username, parsed.password or "")
+
+        if host:
+            return host, port, auth
+    except Exception as e:
+        logger.warning(f"Failed to parse proxy URL '{proxy}': {e}")
+
+    # Fallback: basic host:port parsing
+    try:
+        if ":" in proxy and "://" not in proxy:
+            parts = proxy.rsplit(":", 1)
+            return parts[0], int(parts[1]), None
+        return proxy, 8080, None
+    except (ValueError, IndexError):
+        return proxy, 8080, None
+
+
+def _exchange_ticket_for_token(ticket: str, proxy: Optional[str] = None) -> str:
+    """
+    Exchange the decrypted ticket for an authentication token via Discord API.
+
+    Args:
+        ticket: Decrypted ticket from PENDING_LOGIN
+        proxy: Optional proxy URL
+
+    Returns:
+        Authentication token
+
+    Raises:
+        QRAuthError: If the exchange fails
+    """
+    host, port, auth = _parse_proxy(proxy)
+
+    try:
+        if host:
+            # Use proxy with CONNECT tunnel
+            connection = http.client.HTTPSConnection(host, port, timeout=10)
+            connection.set_tunnel("discord.com", 443)
+        else:
+            connection = http.client.HTTPSConnection("discord.com", 443, timeout=10)
+
+        body = json.dumps({"ticket": ticket})
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "*/*",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        }
+
+        connection.request("POST", "/api/v9/users/@me/remote-auth/login", body, headers)
+        response = connection.getresponse()
+        response_data = response.read()
+
+        if response.status != 200:
+            error_msg = f"Token exchange failed (status {response.status})"
+            try:
+                error_data = json.loads(response_data.decode('utf-8'))
+                error_msg += f": {error_data}"
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                preview = response_data.decode('utf-8', errors='replace')[:200]
+                error_msg += f": {preview}"
+            raise QRAuthError(error_msg)
+
+        result = json.loads(response_data.decode('utf-8'))
+        token = result.get("encrypted_token") or result.get("token")
+
+        if not token:
+            raise QRAuthError("No token in exchange response")
+
+        logger.info("Successfully exchanged ticket for authentication token")
+        return token
+
+    except QRAuthError:
+        raise
+    except Exception as e:
+        raise QRAuthError(f"Token exchange failed: {e}")
+    finally:
+        try:
+            connection.close()
+        except Exception:
+            pass
 
 
 def generate_qr_code_ascii(data: str, border: int = 2) -> str:
@@ -367,12 +475,17 @@ class RemoteAuthClient:
             self.on_waiting()
 
     def _handle_pending_login(self, data: dict):
-        """Handle PENDING_LOGIN - auth complete, extract token"""
-        encrypted_token = data.get("ticket")
-        if not encrypted_token:
+        """Handle PENDING_LOGIN - auth complete, exchange ticket for token"""
+        encrypted_ticket = data.get("ticket")
+        if not encrypted_ticket:
             raise QRAuthError("No ticket in pending_login")
 
-        self.token = _decrypt_payload(encrypted_token, self.private_key)
+        # Decrypt the ticket
+        decrypted_ticket = _decrypt_payload(encrypted_ticket, self.private_key)
+        logger.debug("Ticket decrypted, exchanging for authentication token")
+
+        # Exchange ticket for actual token via API
+        self.token = _exchange_ticket_for_token(decrypted_ticket, self.proxy)
         logger.info("Remote auth successful, token received")
 
         if self.on_token:
@@ -396,12 +509,15 @@ class RemoteAuthClient:
             raise QRAuthError("cryptography library required. Run: pip install cryptography")
 
         try:
-            # Connect to gateway
+            # Connect to gateway with robust proxy parsing
             ws_opts = {}
             if self.proxy:
-                # Parse proxy URL
-                ws_opts["http_proxy_host"] = self.proxy.split(":")[0]
-                ws_opts["http_proxy_port"] = int(self.proxy.split(":")[1]) if ":" in self.proxy else 8080
+                host, port, auth = _parse_proxy(self.proxy)
+                if host:
+                    ws_opts["http_proxy_host"] = host
+                    ws_opts["http_proxy_port"] = port
+                    if auth:
+                        ws_opts["http_proxy_auth"] = auth
 
             self.ws = websocket.create_connection(
                 REMOTE_AUTH_GATEWAY,
@@ -418,7 +534,14 @@ class RemoteAuthClient:
                     raise QRAuthTimeout("Authentication timed out")
 
                 try:
-                    self.ws.settimeout(1.0)  # Check every second
+                    # Adaptive timeout: longer when waiting, respects remaining time
+                    if effective_timeout:
+                        elapsed = time.time() - start_time
+                        remaining = effective_timeout - elapsed
+                        ws_timeout = min(5.0, max(0.5, remaining))
+                    else:
+                        ws_timeout = 5.0
+                    self.ws.settimeout(ws_timeout)
                     data = self._recv()
                 except websocket.WebSocketTimeoutException:
                     continue
