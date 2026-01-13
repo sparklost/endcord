@@ -2,7 +2,7 @@ import heapq
 import importlib.util
 import re
 
-import emoji
+from endcord import emoji_compat as emoji
 
 COMMAND_OPT_TYPE = ("subcommand", "group", "string", "integer", "True/False", "user ID", "channel ID", "role ID", "mentionable ID", "number", "attachment")
 

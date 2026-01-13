@@ -13,7 +13,7 @@ import time
 import webbrowser
 from datetime import datetime
 
-import emoji
+from endcord import emoji_compat as emoji
 
 from endcord import (
     client_properties,

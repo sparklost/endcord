@@ -6,7 +6,7 @@ import sys
 import threading
 import time
 
-from endcord import acs, peripherals
+from endcord import acs, peripherals, termcap
 
 logger = logging.getLogger(__name__)
 uses_pgcurses = hasattr(curses, "PGCURSES")
@@ -197,11 +197,26 @@ class TUI():
     def __init__(self, screen, config, keybindings, command_bindings):
         self.spellchecker = peripherals.SpellCheck(config["aspell_mode"], config["aspell_lang"])
         acs_map = acs.get_map()
-        curses.use_default_colors()
-        curses.curs_set(0)   # using custom cursor
-        curses.mousemask(curses.ALL_MOUSE_EVENTS)
-        curses.mouseinterval(0)
-        print("\x1b[?2004h")   # enable bracketed paste mode
+        # Initialize curses with capability-aware settings
+        termcap.safe_start_color()
+        termcap.safe_curs_set(0)  # using custom cursor
+
+        # Detect capabilities if not already done
+        self.term_caps = termcap.detect_capabilities()
+
+        # Enable mouse only if supported and configured
+        if config.get("mouse", True) and self.term_caps.has_mouse:
+            termcap.safe_mousemask(curses.ALL_MOUSE_EVENTS, self.term_caps)
+            curses.mouseinterval(0)
+        else:
+            if not self.term_caps.has_mouse:
+                logger.info("Mouse disabled: terminal does not support mouse input")
+
+        # Enable bracketed paste only if supported
+        if self.term_caps.has_bracketed_paste:
+            termcap.enable_bracketed_paste(self.term_caps)
+        else:
+            logger.debug("Bracketed paste disabled: terminal does not support it")
         self.last_free_id = 1   # last free color pair id
         self.color_cache = []   # for restoring colors   # 255_curses_bug
         self.attrib_map = [0]   # has 0 so its index starts from 1 to be matched with color pairs
