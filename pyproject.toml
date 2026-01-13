@@ -27,10 +27,12 @@ dependencies = [
 [project.optional-dependencies]
 qrauth = [
     "cryptography>=41.0.0",
-    "qrcode>=7.4",
+    "segno>=1.6.0",  # Best terminal QR output
+    "qrcode>=7.4",   # Fallback
 ]
 full = [
     "cryptography>=41.0.0",
+    "segno>=1.6.0",
     "qrcode>=7.4",
     "av>=14.0.0",
     "pillow>=10.0.0",
@@ -51,5 +53,6 @@ media = [
 ]
 qrauth = [
     "cryptography>=41.0.0",
+    "segno>=1.6.0",
     "qrcode>=7.4",
 ]
