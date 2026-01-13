@@ -817,6 +817,7 @@ def qr_auth_prompt(screen):
                 try:
                     screen.addstr(h - 2, 0, f" Error: {state['error']}"[:w-1], curses.color_pair(1))
                 except curses.error:
+                    # Ignore drawing errors (e.g., when the terminal is too small); not critical to flow.
                     pass
 
             screen.refresh()
