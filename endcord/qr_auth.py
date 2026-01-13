@@ -214,16 +214,17 @@ def _parse_proxy(proxy: str) -> tuple:
         return proxy, 8080, None
 
 
-def _exchange_ticket_for_token(ticket: str, proxy: Optional[str] = None) -> str:
+def _exchange_ticket_for_token(ticket: str, private_key, proxy: Optional[str] = None) -> str:
     """
-    Exchange the decrypted ticket for an authentication token via Discord API.
+    Exchange the ticket for an authentication token via Discord API.
 
     Args:
-        ticket: Decrypted ticket from PENDING_LOGIN
+        ticket: Ticket from PENDING_LOGIN
+        private_key: RSA private key to decrypt the encrypted token
         proxy: Optional proxy URL
 
     Returns:
-        Authentication token
+        Decrypted authentication token
 
     Raises:
         QRAuthError: If the exchange fails
@@ -261,12 +262,19 @@ def _exchange_ticket_for_token(ticket: str, proxy: Optional[str] = None) -> str:
             raise QRAuthError(error_msg)
 
         result = json.loads(response_data.decode('utf-8'))
-        token = result.get("encrypted_token") or result.get("token")
+        encrypted_token = result.get("encrypted_token")
 
-        if not token:
-            raise QRAuthError("No token in exchange response")
+        if not encrypted_token:
+            # Fallback to plain token if not encrypted
+            token = result.get("token")
+            if not token:
+                raise QRAuthError("No token in exchange response")
+            logger.info("Successfully exchanged ticket for authentication token (plain)")
+            return token
 
-        logger.info("Successfully exchanged ticket for authentication token")
+        # Decrypt the encrypted token with our private key
+        token = _decrypt_payload(encrypted_token, private_key)
+        logger.info("Successfully exchanged ticket for authentication token (decrypted)")
         return token
 
     except QRAuthError:
@@ -486,8 +494,8 @@ class RemoteAuthClient:
         # The ticket is NOT encrypted - pass directly to API
         logger.debug("Received ticket, exchanging for authentication token")
 
-        # Exchange ticket for actual token via API
-        self.token = _exchange_ticket_for_token(ticket, self.proxy)
+        # Exchange ticket for actual token via API (response is encrypted)
+        self.token = _exchange_ticket_for_token(ticket, self.private_key, self.proxy)
         logger.info("Remote auth successful, token received")
 
         if self.on_token:
