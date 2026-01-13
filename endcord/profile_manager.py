@@ -50,9 +50,7 @@ TOKEN_PROMPT_TEXT = """ Token is required to access Discord through your account
 AUTH_METHOD_PROMPT_TEXT = (
     "Select authentication method:",
     "",
-    "QR Code - Scan with Discord mobile app (Recommended)",
-    "Manual Token - Copy token from browser DevTools",
-    "", "", "",
+    "", "", "", "", "",
     "Enter to confirm, Esc to go back, Up/Down to select",
 )
 QR_AUTH_TEXT = """ Scan this QR code with the Discord mobile app to log in.
@@ -650,12 +648,17 @@ def auth_method_prompt(screen):
     run = True
     proceed = False
     selected_num = 0  # 0 = QR Code (recommended), 1 = Manual Token
+    options = (
+        "QR Code - Scan with Discord app (Recommended)",
+        "Manual Token - Copy from browser DevTools",
+    )
+    opt_width = max(len(o) for o in options) + 4
     while run:
-        y = len(AUTH_METHOD_PROMPT_TEXT) - 4
+        y = len(AUTH_METHOD_PROMPT_TEXT) - 5
         h, w = screen.getmaxyx()
-        for num, option in enumerate(("QR Code (Recommended)", "Manual Token")):
-            text = option.center(25)
-            x_gap = (w - 25) // 2
+        for num, option in enumerate(options):
+            text = option.center(opt_width)
+            x_gap = max(0, (w - opt_width) // 2)
             if num == selected_num:
                 screen.addstr(y, x_gap, text, curses.color_pair(1) | curses.A_STANDOUT)
             else:

@@ -133,8 +133,8 @@ def _generate_keypair():
     return private_key, public_key_b64
 
 
-def _decrypt_payload(encrypted_b64: str, private_key) -> str:
-    """Decrypt OAEP-encrypted payload from Discord"""
+def _decrypt_payload_raw(encrypted_b64: str, private_key) -> bytes:
+    """Decrypt OAEP-encrypted payload from Discord (returns raw bytes)"""
     encrypted = base64.b64decode(encrypted_b64)
     decrypted = private_key.decrypt(
         encrypted,
@@ -144,15 +144,21 @@ def _decrypt_payload(encrypted_b64: str, private_key) -> str:
             label=None
         )
     )
-    return decrypted.decode()
+    return decrypted
+
+
+def _decrypt_payload(encrypted_b64: str, private_key) -> str:
+    """Decrypt OAEP-encrypted payload from Discord (returns string)"""
+    return _decrypt_payload_raw(encrypted_b64, private_key).decode()
 
 
 def _compute_nonce_proof(nonce_b64: str, private_key) -> str:
     """Decrypt nonce and compute SHA256 proof"""
-    decrypted_nonce = _decrypt_payload(nonce_b64, private_key)
+    # Nonce is raw binary data, not text
+    decrypted_nonce = _decrypt_payload_raw(nonce_b64, private_key)
     if not decrypted_nonce:
         raise QRAuthError("Failed to decrypt nonce: empty payload")
-    nonce_hash = hashlib.sha256(decrypted_nonce.encode()).digest()
+    nonce_hash = hashlib.sha256(decrypted_nonce).digest()
     # URL-safe base64 without padding
     proof = base64.urlsafe_b64encode(nonce_hash).decode().rstrip("=")
     return proof
@@ -401,6 +407,9 @@ class RemoteAuthClient:
         """Receive JSON message from WebSocket"""
         if self.ws:
             data = self.ws.recv()
+            # Handle both string and bytes data
+            if isinstance(data, bytes):
+                data = data.decode("utf-8")
             return json.loads(data)
         return {}
 
@@ -513,9 +522,18 @@ class RemoteAuthClient:
                     if auth:
                         ws_opts["http_proxy_auth"] = auth
 
+            # Add browser-like headers to avoid Cloudflare blocks
+            headers = [
+                "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept-Language: en-US,en;q=0.9",
+            ]
+
             self.ws = websocket.create_connection(
                 REMOTE_AUTH_GATEWAY,
                 sslopt={"cert_reqs": ssl.CERT_REQUIRED},
+                header=headers,
+                origin="https://discord.com",
+                host="remote-auth-gateway.discord.gg",
                 **ws_opts
             )
 

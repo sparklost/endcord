@@ -560,10 +560,13 @@ def generate_qr_code_ascii(data: str, border: int = 2) -> str:
     """
     Generate ASCII art QR code for terminal display.
     Backwards-compatible wrapper around QRDisplay.
+
+    Uses UNICODE_HALF_BLOCK mode (not ANSI) for curses compatibility.
     """
     config = QRConfig(border=border)
     display = QRDisplay(config)
-    return display.render(data)
+    # Use Unicode half-blocks WITHOUT ANSI escapes for curses compatibility
+    return display.render(data, mode=RenderMode.UNICODE_HALF_BLOCK)
 
 
 def generate_qr_code_simple(data: str) -> str:
