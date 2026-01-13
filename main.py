@@ -160,7 +160,7 @@ def main(args):
         logging.getLogger().setLevel(logging.DEBUG)
     try:
         from endcord import app
-        curses.wrapper(app.Endcord, config, keybindings, command_bindings, profiles, VERSION)
+        curses.wrapper(app.Endcord, config, keybindings, command_bindings, profiles, VERSION, terminal_caps)
     except curses.error as e:
         if str(e) != "endwin() returned ERR":
             logger.error(traceback.format_exc())

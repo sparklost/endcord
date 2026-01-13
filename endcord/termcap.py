@@ -207,8 +207,14 @@ def detect_unicode_support() -> tuple:
     """
     term = get_term()
 
-    # Check locale
-    lang = os.environ.get("LANG", "") + os.environ.get("LC_ALL", "")
+    # Check locale with standard precedence:
+    # LC_ALL > LC_CTYPE > LANG
+    lang = (
+        os.environ.get("LC_ALL")
+        or os.environ.get("LC_CTYPE")
+        or os.environ.get("LANG")
+        or ""
+    )
     has_utf8_locale = "utf-8" in lang.lower() or "utf8" in lang.lower()
 
     # TTY has limited unicode
@@ -359,16 +365,20 @@ def apply_environment_fixes(caps: Optional[TerminalCapabilities] = None) -> Term
     Apply environment variable fixes based on detected capabilities.
 
     This modifies os.environ to optimize terminal behavior.
-    Returns the capabilities used (detected if not provided).
+    Returns updated capabilities that reflect any environment changes made.
     """
     if caps is None:
         caps = detect_capabilities()
+
+    # Track if we need to re-detect capabilities
+    term_changed = False
 
     # Set optimal TERM
     optimal_term = get_optimal_term()
     if optimal_term != caps.term:
         os.environ["TERM"] = optimal_term
         logger.info(f"Upgraded TERM: {caps.term} -> {optimal_term}")
+        term_changed = True
 
     # Set ESCDELAY
     os.environ["ESCDELAY"] = str(caps.recommended_escdelay)
@@ -376,6 +386,10 @@ def apply_environment_fixes(caps: Optional[TerminalCapabilities] = None) -> Term
     # Ensure UTF-8 locale for unicode support
     if caps.has_unicode and not os.environ.get("LANG"):
         os.environ["LANG"] = "en_US.UTF-8"
+
+    # Re-detect capabilities if TERM was changed to keep caps consistent
+    if term_changed:
+        caps = detect_capabilities()
 
     return caps
 

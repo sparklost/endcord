@@ -70,11 +70,12 @@ recorder = peripherals.Recorder()
 class Endcord:
     """Main app class"""
 
-    def __init__(self, screen, config, keybindings, command_bindings, profiles, version):
+    def __init__(self, screen, config, keybindings, command_bindings, profiles, version, terminal_caps=None):
         self.screen = screen
         self.config = config
         self.init_time = time.time()
         self.profiles = profiles
+        self.terminal_caps = terminal_caps
 
         # select profile
         for profile in profiles["keyring"] + profiles["plaintext"]:
@@ -234,7 +235,7 @@ class Endcord:
         # this takes some time, so let other things init in parallel
         threading.Thread(target=self.gateway.connect, daemon=True).start()
         self.downloader = downloader.Downloader(config["proxy"])
-        self.tui = tui.TUI(self.screen, self.config, keybindings, command_bindings)
+        self.tui = tui.TUI(self.screen, self.config, keybindings, command_bindings, self.terminal_caps)
         if self.fun:
             today = (time.localtime().tm_mon, time.localtime().tm_mday)
             self.fun = 2 if (10, 25) <= today <= (11, 8) else self.fun
