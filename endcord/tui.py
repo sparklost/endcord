@@ -194,15 +194,15 @@ if importlib.util.find_spec("endcord_cython") and importlib.util.find_spec("endc
 class TUI():
     """Methods used to draw terminal user interface"""
 
-    def __init__(self, screen, config, keybindings, command_bindings):
+    def __init__(self, screen, config, keybindings, command_bindings, terminal_caps=None):
         self.spellchecker = peripherals.SpellCheck(config["aspell_mode"], config["aspell_lang"])
         acs_map = acs.get_map()
         # Initialize curses with capability-aware settings
         termcap.safe_start_color()
         termcap.safe_curs_set(0)  # using custom cursor
 
-        # Detect capabilities if not already done
-        self.term_caps = termcap.detect_capabilities()
+        # Use provided capabilities or detect if not provided
+        self.term_caps = terminal_caps if terminal_caps is not None else termcap.detect_capabilities()
 
         # Enable mouse only if supported and configured
         if config.get("mouse", True) and self.term_caps.has_mouse:

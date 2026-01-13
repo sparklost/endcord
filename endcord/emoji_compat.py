@@ -59,8 +59,22 @@ def demojize(text: str, delimiters: tuple = (":", ":")) -> str:
         if EMOJI_V2_PLUS:
             return _emoji.demojize(text, delimiters=delimiters)
         else:
-            # Older API
-            return _emoji.demojize(text)
+            # Older API: normalize delimiters to match our API
+            result = _emoji.demojize(text)
+
+            # emoji<2.0 uses ":" as the default delimiter pair; if the caller
+            # requested different delimiters, rewrite the codes so the public
+            # API behaves consistently across emoji versions.
+            default_delimiters = (":", ":")
+            if delimiters != default_delimiters:
+                start, end = delimiters
+                # Replace patterns like :smile: with the requested delimiters
+                result = re.sub(
+                    r":([a-zA-Z0-9_+\-]+):",
+                    lambda m: f"{start}{m.group(1)}{end}",
+                    result,
+                )
+            return result
     except Exception as e:
         logger.debug(f"demojize failed: {e}")
         return text
