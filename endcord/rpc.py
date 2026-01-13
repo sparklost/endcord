@@ -320,7 +320,7 @@ class RPC:
             win32file.CloseHandle(connection)
         else:
             connection.close()
-        logger.info(f"RPC client disconnected: {rpc_data["name"] if rpc_data else "Unknown"}")
+        logger.info(f'RPC client disconnected: {rpc_data.get("name", "Unknown") if rpc_data else "Unknown"}')
 
 
     def server_thread_win(self):
