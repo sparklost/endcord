@@ -362,17 +362,23 @@ def main_tui(screen, profiles_enc, profiles_plain, selected, have_keyring):
                 regenerate = True
             elif selected_button == 2 and profiles:   # EDIT
                 enc_source = profiles[selected_num]["source"] == "keyring"
-                for num, profile in enumerate(profiles_enc if enc_source else profiles_plain):
-                    if profile["name"] ==  profiles[selected_num]["name"]:
+                profile_index = None
+                for num, profile_data in enumerate(profiles_enc if enc_source else profiles_plain):
+                    if profile_data.get("name") == profiles[selected_num]["name"]:
+                        profile_index = num
                         break
+                if profile_index is None:
+                    logger.warning("Profile not found during edit")
+                    regenerate = True
+                    continue
                 profile, edit = manage_profile(screen, have_keyring, editing_profile=profiles[selected_num])
                 screen.clear()
                 if edit:
-                    profile.pop("source")
+                    profile.pop("source", None)
                     if enc_source:
-                        profiles_enc[num] = profile
+                        profiles_enc[profile_index] = profile
                     else:
-                        profiles_plain[num] = profile
+                        profiles_plain[profile_index] = profile
                 regenerate = True
             elif selected_button == 3 and profiles:   # DELETE
                 profiles_enc, profiles_plain, deleted = delete_profile(screen, profiles_enc, profiles_plain, profiles[selected_num])
@@ -490,16 +496,23 @@ def manage_profile(screen, have_keyring, editing_profile=None):
 def delete_profile(screen, profiles_enc, profiles_plain, selected_profile):
     """Yes/No window asking to delete specified profile"""
     screen.clear()
-    selected_name = selected_profile["name"]
-    enc_source = selected_profile["source"] == "keyring"
-    for num, profile in enumerate(profiles_enc if enc_source else profiles_plain):
-        if profile["name"] == selected_name:
+    selected_name = selected_profile.get("name", "Unknown")
+    enc_source = selected_profile.get("source") == "keyring"
+
+    profile_index = None
+    for num, profile_data in enumerate(profiles_enc if enc_source else profiles_plain):
+        if profile_data.get("name") == selected_name:
+            profile_index = num
             break
+
+    if profile_index is None:
+        logger.warning(f"Profile '{selected_name}' not found for deletion")
+        return profiles_enc, profiles_plain, False
 
     run = True
     while run:
         h, w = screen.getmaxyx()
-        text = f"Are you sure you want to delete {profile["name"]} profile? Enter/Y / Esc/N"
+        text = f"Are you sure you want to delete {selected_name} profile? Enter/Y / Esc/N"
         text = text.center(w)
         screen.addstr(int(h/2), 0, text, curses.color_pair(1) | curses.A_STANDOUT)
 
@@ -508,9 +521,9 @@ def delete_profile(screen, profiles_enc, profiles_plain, selected_profile):
             return profiles_enc, profiles_plain, False
         if key == 10 or key == 121:   # ENTER / Y
             if enc_source:
-                profiles_enc.pop(num)
+                profiles_enc.pop(profile_index)
             else:
-                profiles_plain.pop(num)
+                profiles_plain.pop(profile_index)
             return profiles_enc, profiles_plain, True
 
 
@@ -830,7 +843,15 @@ def qr_auth_prompt(screen):
 
         time.sleep(0.05)
 
+    # Cleanup
     screen.nodelay(False)
+
+    # Wait for auth thread to complete with timeout
+    if auth_thread and auth_thread.is_alive():
+        auth_thread.join(timeout=2.0)
+        if auth_thread.is_alive():
+            logger.warning("Auth thread did not complete in time")
+
     screen.clear()
     screen.refresh()
 
@@ -844,11 +865,11 @@ def qr_auth_prompt(screen):
 def update_time(profiles_enc, profiles_plain, profile_name):
     """Update time for selected profile"""
     for profile in profiles_enc:
-        if profile["name"] == profile_name:
+        if profile.get("name") == profile_name:
             profile["time"] = int(time.time())
             return
     for profile in profiles_plain:
-        if profile["name"] == profile_name:
+        if profile.get("name") == profile_name:
             profile["time"] = int(time.time())
             return
 
@@ -871,15 +892,23 @@ def manage(profiles_path, external_selected, force_open=False):
         if not profiles_enc:
             profiles_enc = []
         else:
-            selected = profiles_enc["selected"]
-            profiles_enc = profiles_enc["profiles"]
+            # Safely extract with validation
+            if isinstance(profiles_enc, dict):
+                selected = profiles_enc.get("selected")
+                profiles_enc = profiles_enc.get("profiles", [])
+            else:
+                profiles_enc = []
     else:
         profiles_enc = []
     profiles_plain = load_plain(profiles_path)
     if profiles_plain:
-        if not selected:
-            selected = profiles_plain["selected"]
-        profiles_plain = profiles_plain["profiles"]
+        # Safely extract with validation
+        if isinstance(profiles_plain, dict):
+            if not selected:
+                selected = profiles_plain.get("selected")
+            profiles_plain = profiles_plain.get("profiles", [])
+        else:
+            profiles_plain = []
 
     if external_selected:
         selected = external_selected

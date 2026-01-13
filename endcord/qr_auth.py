@@ -87,7 +87,13 @@ class UserData:
     """Parsed user data from remote auth"""
     def __init__(self, encrypted_data: str, private_key):
         decrypted = _decrypt_payload(encrypted_data, private_key)
+        if not decrypted:
+            raise QRAuthError("Failed to decrypt user data: empty payload")
+
         parts = decrypted.split(":")
+        if len(parts) < 3:
+            raise QRAuthError(f"Invalid user data format: expected at least 3 fields, got {len(parts)}")
+
         self.id = parts[0]
         self.discriminator = parts[1]
         self.avatar_hash = parts[2]
@@ -144,6 +150,8 @@ def _decrypt_payload(encrypted_b64: str, private_key) -> str:
 def _compute_nonce_proof(nonce_b64: str, private_key) -> str:
     """Decrypt nonce and compute SHA256 proof"""
     decrypted_nonce = _decrypt_payload(nonce_b64, private_key)
+    if not decrypted_nonce:
+        raise QRAuthError("Failed to decrypt nonce: empty payload")
     nonce_hash = hashlib.sha256(decrypted_nonce.encode()).digest()
     # URL-safe base64 without padding
     proof = base64.urlsafe_b64encode(nonce_hash).decode().rstrip("=")
@@ -215,6 +223,7 @@ def _exchange_ticket_for_token(ticket: str, proxy: Optional[str] = None) -> str:
         QRAuthError: If the exchange fails
     """
     host, port, auth = _parse_proxy(proxy)
+    connection = None  # Initialize before try block to avoid UnboundLocalError
 
     try:
         if host:
@@ -259,10 +268,11 @@ def _exchange_ticket_for_token(ticket: str, proxy: Optional[str] = None) -> str:
     except Exception as e:
         raise QRAuthError(f"Token exchange failed: {e}")
     finally:
-        try:
-            connection.close()
-        except Exception:
-            pass
+        if connection:
+            try:
+                connection.close()
+            except Exception:
+                pass
 
 
 def generate_qr_code_ascii(data: str, border: int = 2) -> str:
@@ -366,6 +376,7 @@ class RemoteAuthClient:
         self._heartbeat_thread: Optional[threading.Thread] = None
         self._stop_heartbeat = threading.Event()
         self._last_heartbeat_ack = True
+        self._heartbeat_lock = threading.Lock()  # Thread-safe heartbeat state
 
         # Callbacks
         self.on_qr_code: Optional[Callable[[str, str], None]] = None  # (url, ascii_qr)
@@ -383,14 +394,15 @@ class RemoteAuthClient:
     def _heartbeat_loop(self):
         """Send heartbeats at the specified interval"""
         while not self._stop_heartbeat.wait(self.heartbeat_interval / 1000):
-            if not self._last_heartbeat_ack:
-                logger.warning("Missed heartbeat ACK")
-            try:
-                self._send({"op": OP_HEARTBEAT})
-                self._last_heartbeat_ack = False
-            except Exception as e:
-                logger.debug(f"Heartbeat error: {e}")
-                break
+            with self._heartbeat_lock:
+                if not self._last_heartbeat_ack:
+                    logger.warning("Missed heartbeat ACK")
+                try:
+                    self._send({"op": OP_HEARTBEAT})
+                    self._last_heartbeat_ack = False
+                except Exception as e:
+                    logger.debug(f"Heartbeat error: {e}")
+                    break
 
     def _stop_heartbeat_thread(self):
         """Stop the heartbeat thread"""
@@ -574,7 +586,8 @@ class RemoteAuthClient:
                     raise QRAuthCancelled("Authentication cancelled by user")
 
                 elif op == OP_HEARTBEAT_ACK:
-                    self._last_heartbeat_ack = True
+                    with self._heartbeat_lock:
+                        self._last_heartbeat_ack = True
 
                 elif op == "captcha":
                     # Captcha required (rare)
