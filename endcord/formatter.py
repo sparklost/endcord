@@ -5,7 +5,7 @@ import re
 import time
 from datetime import UTC, datetime
 
-import emoji
+from endcord import emoji_compat as emoji
 
 from endcord.wide_ranges import WIDE_RANGES
 

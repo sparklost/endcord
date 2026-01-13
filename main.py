@@ -9,10 +9,13 @@ import traceback
 
 os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"   # fix for https://github.com/Nuitka/Nuitka/issues/3442
 
-from endcord import arg, defaults, peripherals
+from endcord import arg, defaults, peripherals, termcap
 
 APP_NAME = "endcord"
 VERSION = "1.1.8"
+
+# Global terminal capabilities (set during startup)
+terminal_caps = None
 default_config_path = peripherals.config_path
 log_path = peripherals.log_path
 uses_pgcurses = hasattr(curses, "PGCURSES")
@@ -75,9 +78,23 @@ def main(args):
         keybindings = peripherals.convert_keybindings(keybindings)
         command_bindings = peripherals.convert_keybindings_cmd(command_bindings)
 
-    os.environ["ESCDELAY"] = "25"   # 25ms
-    if os.environ.get("TERM", "") in ("xterm", "linux"):
-        os.environ["TERM"] = "xterm-256color"
+    # Detect terminal capabilities and apply environment fixes
+    global terminal_caps
+    terminal_caps = termcap.detect_capabilities()
+    termcap.apply_environment_fixes(terminal_caps)
+
+    # Check minimum requirements
+    ok, warnings = termcap.check_minimum_requirements(terminal_caps)
+    for warning in warnings:
+        logger.warning(warning)
+
+    # Apply safe config overrides based on terminal capabilities
+    safe_overrides = termcap.get_safe_config_overrides(terminal_caps)
+    for key, value in safe_overrides.items():
+        if key not in config or config[key] is None:
+            config[key] = value
+            logger.info(f"Auto-configured {key}={value} for terminal compatibility")
+
     if sys.platform == "linux":
         cert_path = "/etc/ssl/certs/ca-certificates.crt"
         if os.path.exists(cert_path):
