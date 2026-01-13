@@ -479,16 +479,15 @@ class RemoteAuthClient:
 
     def _handle_pending_login(self, data: dict):
         """Handle PENDING_LOGIN - auth complete, exchange ticket for token"""
-        encrypted_ticket = data.get("ticket")
-        if not encrypted_ticket:
+        ticket = data.get("ticket")
+        if not ticket:
             raise QRAuthError("No ticket in pending_login")
 
-        # Decrypt the ticket
-        decrypted_ticket = _decrypt_payload(encrypted_ticket, self.private_key)
-        logger.debug("Ticket decrypted, exchanging for authentication token")
+        # The ticket is NOT encrypted - pass directly to API
+        logger.debug("Received ticket, exchanging for authentication token")
 
         # Exchange ticket for actual token via API
-        self.token = _exchange_ticket_for_token(decrypted_ticket, self.proxy)
+        self.token = _exchange_ticket_for_token(ticket, self.proxy)
         logger.info("Remote auth successful, token received")
 
         if self.on_token:
