@@ -2951,14 +2951,9 @@ class Endcord:
             else:
                 self.update_extra_line("No media support.")
             if isinstance(paths, str):
-                active_channel = self.active_channel["channel_id"]
-                for num, channel in enumerate(self.input_store):
-                    if channel["id"] == active_channel:
-                        input_text = self.input_store[num]["content"]
-                        input_index = self.input_store[num]["index"]
-                        self.input_store[num]["content"] = input_text[:input_index] + paths + input_text[input_index:]
-                        self.input_store[num]["index"] = input_index + len(paths)
-                        break
+                # Delegate text pasting to the TUI so that both the input buffer
+                # and cursor position are updated correctly in the UI.
+                self.tui.paste_text(paths)
             else:
                 for path in paths:
                     self.upload_threads.append(threading.Thread(target=self.upload, daemon=True, args=(path, )))
