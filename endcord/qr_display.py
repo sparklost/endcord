@@ -35,17 +35,19 @@ logger = logging.getLogger(__name__)
 
 class RenderMode(Enum):
     """QR code rendering modes in order of preference."""
-    ANSI_HALF_BLOCK = auto()   # Best: ANSI colors + Unicode half-blocks (segno)
-    UNICODE_HALF_BLOCK = auto() # Good: Unicode half-blocks without ANSI
-    UNICODE_FULL_BLOCK = auto() # OK: Full blocks, double height
-    ASCII_BLOCK = auto()        # Fallback: ## for black, spaces for white
-    ASCII_CHAR = auto()         # Legacy: X for black, space for white
-    TEXT_ONLY = auto()          # Last resort: just the URL
+
+    ANSI_HALF_BLOCK = auto()  # Best: ANSI colors + Unicode half-blocks (segno)
+    UNICODE_HALF_BLOCK = auto()  # Good: Unicode half-blocks without ANSI
+    UNICODE_FULL_BLOCK = auto()  # OK: Full blocks, double height
+    ASCII_BLOCK = auto()  # Fallback: ## for black, spaces for white
+    ASCII_CHAR = auto()  # Legacy: X for black, space for white
+    TEXT_ONLY = auto()  # Last resort: just the URL
 
 
 @dataclass
 class QRConfig:
     """Configuration for QR code rendering."""
+
     border: int = 2
     error_correction: str = "L"  # L, M, Q, H
     min_version: int = 1
@@ -56,6 +58,7 @@ class QRConfig:
 
 class QRLibrary(Enum):
     """Available QR code libraries."""
+
     SEGNO = "segno"
     QRCODE = "qrcode"
     PYQRCODE = "pyqrcode"
@@ -68,6 +71,7 @@ def detect_available_libraries() -> dict:
 
     try:
         import segno
+
         available[QRLibrary.SEGNO] = segno
         logger.debug("segno library available")
     except ImportError:
@@ -75,6 +79,7 @@ def detect_available_libraries() -> dict:
 
     try:
         import qrcode
+
         available[QRLibrary.QRCODE] = qrcode
         logger.debug("qrcode library available")
     except ImportError:
@@ -82,6 +87,7 @@ def detect_available_libraries() -> dict:
 
     try:
         import pyqrcode
+
         available[QRLibrary.PYQRCODE] = pyqrcode
         logger.debug("pyqrcode library available")
     except ImportError:
@@ -122,6 +128,7 @@ class QRDisplay:
         if self._term_caps is None:
             try:
                 from endcord import termcap
+
                 self._term_caps = termcap.detect_capabilities()
             except ImportError:
                 self._term_caps = None
@@ -134,12 +141,8 @@ class QRDisplay:
             return self.term_caps.has_unicode
         # Fallback: check locale
         import os
-        lang = (
-            os.environ.get("LC_ALL")
-            or os.environ.get("LC_CTYPE")
-            or os.environ.get("LANG")
-            or ""
-        )
+
+        lang = os.environ.get("LC_ALL") or os.environ.get("LC_CTYPE") or os.environ.get("LANG") or ""
         return "utf-8" in lang.lower() or "utf8" in lang.lower()
 
     @property
@@ -149,6 +152,7 @@ class QRDisplay:
             return self.term_caps.colors >= 8
         # Fallback: check TERM
         import os
+
         term = os.environ.get("TERM", "").lower()
         return "color" in term or term in ("xterm", "screen", "tmux")
 
@@ -158,6 +162,7 @@ class QRDisplay:
         if self.term_caps:
             return self.term_caps.is_tty
         import os
+
         return os.environ.get("TERM", "").lower() == "linux"
 
     def detect_best_mode(self) -> RenderMode:
@@ -184,18 +189,16 @@ class QRDisplay:
             if self.has_unicode:
                 self._cached_mode = RenderMode.UNICODE_HALF_BLOCK
                 return self._cached_mode
-            else:
-                self._cached_mode = RenderMode.ASCII_BLOCK
-                return self._cached_mode
+            self._cached_mode = RenderMode.ASCII_BLOCK
+            return self._cached_mode
 
         # Check for pyqrcode
         if QRLibrary.PYQRCODE in self._libraries:
             if self.has_colors:
                 self._cached_mode = RenderMode.ANSI_HALF_BLOCK
                 return self._cached_mode
-            else:
-                self._cached_mode = RenderMode.ASCII_CHAR
-                return self._cached_mode
+            self._cached_mode = RenderMode.ASCII_CHAR
+            return self._cached_mode
 
         # No libraries available
         self._cached_mode = RenderMode.TEXT_ONLY
@@ -429,8 +432,9 @@ class QRDisplay:
         qr_width, qr_height = self.get_dimensions(data)
         return qr_width <= term_width - margin and qr_height <= term_height - margin
 
-    def draw_curses(self, screen, data: str, start_y: int = 0, center: bool = True,
-                    color_pair: int = 0, max_height: int = 0) -> int:
+    def draw_curses(
+        self, screen, data: str, start_y: int = 0, center: bool = True, color_pair: int = 0, max_height: int = 0
+    ) -> int:
         """
         Draw QR code directly to a curses screen.
 
@@ -455,9 +459,7 @@ class QRDisplay:
         if max_height <= 0:
             max_height = h - start_y - 2
 
-        lines, qr_width, qr_height = self.render_for_curses(
-            data, max_width=w - 2, max_height=max_height
-        )
+        lines, _, _ = self.render_for_curses(data, max_width=w - 2, max_height=max_height)
 
         drawn = 0
         for num, line in enumerate(lines):
@@ -472,7 +474,7 @@ class QRDisplay:
 
             try:
                 attr = curses.color_pair(color_pair) if color_pair else 0
-                screen.addstr(y, x, line[:w-1], attr)
+                screen.addstr(y, x, line[: w - 1], attr)
                 drawn += 1
             except curses.error:
                 pass
@@ -483,6 +485,7 @@ class QRDisplay:
 # Convenience functions
 
 _default_display: Optional[QRDisplay] = None
+
 
 def get_display() -> QRDisplay:
     """Get the default QRDisplay instance."""
@@ -516,8 +519,9 @@ def render_qr_for_curses(data: str, max_width: int = 0, max_height: int = 0) -> 
     return get_display().render_for_curses(data, max_width, max_height)
 
 
-def draw_qr_curses(screen, data: str, start_y: int = 0, center: bool = True,
-                   color_pair: int = 0, max_height: int = 0) -> int:
+def draw_qr_curses(
+    screen, data: str, start_y: int = 0, center: bool = True, color_pair: int = 0, max_height: int = 0
+) -> int:
     """
     Draw QR code directly to a curses screen.
 
@@ -546,7 +550,7 @@ def check_qr_support() -> dict:
     libs = detect_available_libraries()
 
     return {
-        "libraries": [lib.value for lib in libs.keys()],
+        "libraries": [lib.value for lib in libs],
         "best_mode": display.detect_best_mode().name,
         "has_unicode": display.has_unicode,
         "has_colors": display.has_colors,

@@ -35,9 +35,10 @@ from typing import Callable, Optional
 from urllib.parse import urlparse
 
 try:
-    from cryptography.hazmat.primitives import hashes, serialization
-    from cryptography.hazmat.primitives.asymmetric import rsa, padding
     from cryptography.hazmat.backends import default_backend
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import padding, rsa
+
     HAVE_CRYPTO = True
 except ImportError:
     HAVE_CRYPTO = False
@@ -63,21 +64,25 @@ OP_HEARTBEAT_ACK = "heartbeat_ack"
 
 class QRAuthError(Exception):
     """Base exception for QR auth errors"""
+
     pass
 
 
 class QRAuthTimeout(QRAuthError):
     """QR code expired or auth timed out"""
+
     pass
 
 
 class QRAuthCancelled(QRAuthError):
     """User cancelled the auth on mobile"""
+
     pass
 
 
 class QRAuthCaptcha(QRAuthError):
     """Captcha required (rare, usually on suspicious IPs)"""
+
     def __init__(self, captcha_data: dict):
         self.captcha_data = captcha_data
         super().__init__("Captcha required for authentication")
@@ -85,6 +90,7 @@ class QRAuthCaptcha(QRAuthError):
 
 class UserData:
     """Parsed user data from remote auth"""
+
     def __init__(self, encrypted_data: str, private_key):
         decrypted = _decrypt_payload(encrypted_data, private_key)
         if not decrypted:
@@ -117,16 +123,11 @@ def _generate_keypair():
     if not HAVE_CRYPTO:
         raise QRAuthError("cryptography library not installed. Run: pip install cryptography")
 
-    private_key = rsa.generate_private_key(
-        public_exponent=65537,
-        key_size=2048,
-        backend=default_backend()
-    )
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048, backend=default_backend())
 
     public_key = private_key.public_key()
     public_key_spki = public_key.public_bytes(
-        encoding=serialization.Encoding.DER,
-        format=serialization.PublicFormat.SubjectPublicKeyInfo
+        encoding=serialization.Encoding.DER, format=serialization.PublicFormat.SubjectPublicKeyInfo
     )
     public_key_b64 = base64.b64encode(public_key_spki).decode()
 
@@ -137,12 +138,7 @@ def _decrypt_payload_raw(encrypted_b64: str, private_key) -> bytes:
     """Decrypt OAEP-encrypted payload from Discord (returns raw bytes)"""
     encrypted = base64.b64decode(encrypted_b64)
     decrypted = private_key.decrypt(
-        encrypted,
-        padding.OAEP(
-            mgf=padding.MGF1(algorithm=hashes.SHA256()),
-            algorithm=hashes.SHA256(),
-            label=None
-        )
+        encrypted, padding.OAEP(mgf=padding.MGF1(algorithm=hashes.SHA256()), algorithm=hashes.SHA256(), label=None)
     )
     return decrypted
 
@@ -244,7 +240,7 @@ def _exchange_ticket_for_token(ticket: str, private_key, proxy: Optional[str] = 
         headers = {
             "Content-Type": "application/json",
             "Accept": "*/*",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         }
 
         connection.request("POST", "/api/v9/users/@me/remote-auth/login", body, headers)
@@ -254,14 +250,14 @@ def _exchange_ticket_for_token(ticket: str, private_key, proxy: Optional[str] = 
         if response.status != 200:
             error_msg = f"Token exchange failed (status {response.status})"
             try:
-                error_data = json.loads(response_data.decode('utf-8'))
+                error_data = json.loads(response_data.decode("utf-8"))
                 error_msg += f": {error_data}"
             except (json.JSONDecodeError, UnicodeDecodeError):
-                preview = response_data.decode('utf-8', errors='replace')[:200]
+                preview = response_data.decode("utf-8", errors="replace")[:200]
                 error_msg += f": {preview}"
             raise QRAuthError(error_msg)
 
-        result = json.loads(response_data.decode('utf-8'))
+        result = json.loads(response_data.decode("utf-8"))
         encrypted_token = result.get("encrypted_token")
 
         if not encrypted_token:
@@ -293,20 +289,16 @@ def _exchange_ticket_for_token(ticket: str, private_key, proxy: Optional[str] = 
 # This module provides terminal-aware QR code rendering with automatic
 # capability detection and fallback strategies
 try:
-    from endcord.qr_display import (
-        generate_qr_code_ascii,
-        generate_qr_code_simple,
-        QRDisplay,
-        RenderMode,
-        check_qr_support,
-    )
+    from endcord.qr_display import generate_qr_code_ascii
 except ImportError:
     # Minimal fallback if qr_display module not available
     def generate_qr_code_ascii(data: str, border: int = 2) -> str:
         """Fallback QR generation when qr_display module unavailable."""
         try:
-            import segno
             import io
+
+            import segno
+
             qr = segno.make(data)
             f = io.StringIO()
             qr.terminal(out=f, compact=True, border=border)
@@ -317,6 +309,7 @@ except ImportError:
 
         try:
             import qrcode
+
             qr = qrcode.QRCode(version=1, border=border)
             qr.add_data(data)
             qr.make(fit=True)
@@ -434,10 +427,7 @@ class RemoteAuthClient:
         self._start_heartbeat()
 
         # Send INIT
-        self._send({
-            "op": OP_INIT,
-            "encoded_public_key": self.public_key_b64
-        })
+        self._send({"op": OP_INIT, "encoded_public_key": self.public_key_b64})
 
     def _handle_nonce_proof(self, data: dict):
         """Handle NONCE_PROOF opcode"""
@@ -446,10 +436,7 @@ class RemoteAuthClient:
             raise QRAuthError("No nonce in nonce_proof")
 
         proof = _compute_nonce_proof(encrypted_nonce, self.private_key)
-        self._send({
-            "op": OP_NONCE_PROOF,
-            "proof": proof
-        })
+        self._send({"op": OP_NONCE_PROOF, "proof": proof})
 
     def _handle_pending_remote_init(self, data: dict):
         """Handle PENDING_REMOTE_INIT - QR code is ready"""
@@ -541,7 +528,7 @@ class RemoteAuthClient:
                 header=headers,
                 origin="https://discord.com",
                 host="remote-auth-gateway.discord.gg",
-                **ws_opts
+                **ws_opts,
             )
 
             start_time = time.time()
@@ -598,12 +585,14 @@ class RemoteAuthClient:
 
                 elif op == "captcha":
                     # Captcha required (rare)
-                    raise QRAuthCaptcha({
-                        "captcha_sitekey": data.get("captcha_sitekey"),
-                        "captcha_service": data.get("captcha_service", "hcaptcha"),
-                        "captcha_rqdata": data.get("captcha_rqdata"),
-                        "captcha_rqtoken": data.get("captcha_rqtoken"),
-                    })
+                    raise QRAuthCaptcha(
+                        {
+                            "captcha_sitekey": data.get("captcha_sitekey"),
+                            "captcha_service": data.get("captcha_service", "hcaptcha"),
+                            "captcha_rqdata": data.get("captcha_rqdata"),
+                            "captcha_rqtoken": data.get("captcha_rqtoken"),
+                        }
+                    )
 
                 else:
                     logger.debug(f"Unknown opcode: {op}")
@@ -638,7 +627,7 @@ def authenticate_with_qr(
     on_user_scanned: Optional[Callable[[UserData], None]] = None,
     on_waiting: Optional[Callable[[], None]] = None,
     proxy: Optional[str] = None,
-    timeout: Optional[float] = None
+    timeout: Optional[float] = None,
 ) -> Optional[str]:
     """
     Convenience function for QR code authentication.

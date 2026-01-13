@@ -11,6 +11,7 @@ from datetime import datetime
 if sys.platform == "win32":
     import pywintypes
     import win32cred
+
     BACKSPACE = 8
 else:
     BACKSPACE = curses.KEY_BACKSPACE
@@ -50,7 +51,11 @@ TOKEN_PROMPT_TEXT = """ Token is required to access Discord through your account
 AUTH_METHOD_PROMPT_TEXT = (
     "Select authentication method:",
     "",
-    "", "", "", "", "",
+    "",
+    "",
+    "",
+    "",
+    "",
     "Enter to confirm, Esc to go back, Up/Down to select",
 )
 QR_AUTH_TEXT = """ Scan this QR code with the Discord mobile app to log in.
@@ -68,7 +73,10 @@ SOURCE_PROMPT_TEXT = (
     "Select where to save token:",
     "Keyring is secure encrypted storage provided by the OS - recommended,",
     "Plaintext means it will be saved as 'profiles.json' file in endcord config directory",
-    "", "", "", "",
+    "",
+    "",
+    "",
+    "",
     "Enter to confirm, Esc to go back, Up/Down to select",
 )
 
@@ -112,10 +120,16 @@ def load_secret():
     """Try to load profiles from system keyring"""
     if sys.platform == "linux":
         try:
-            result = subprocess.run([
-                "secret-tool", "lookup",
-                "service", APP_NAME,
-                ], capture_output=True, text=True, check=True,
+            result = subprocess.run(
+                [
+                    "secret-tool",
+                    "lookup",
+                    "service",
+                    APP_NAME,
+                ],
+                capture_output=True,
+                text=True,
+                check=True,
             )
             return result.stdout.strip()
         except subprocess.CalledProcessError:
@@ -133,11 +147,17 @@ def load_secret():
 
     if sys.platform == "darwin":
         try:
-            result = subprocess.run([
-                "security", "find-generic-password",
-                "-s", APP_NAME,
-                "-w",
-                ], capture_output=True, text=True, check=True,
+            result = subprocess.run(
+                [
+                    "security",
+                    "find-generic-password",
+                    "-s",
+                    APP_NAME,
+                    "-w",
+                ],
+                capture_output=True,
+                text=True,
+                check=True,
             )
             return result.stdout.strip()
         except subprocess.CalledProcessError:
@@ -148,35 +168,48 @@ def save_secret(profiles):
     """Save profiles to system keyring"""
     if sys.platform == "linux":
         try:
-            subprocess.run([
-                "secret-tool", "store",
-                "--label=" + f"{APP_NAME} profiles",
-                "service", APP_NAME,
-                ], input=profiles.encode(), check=True,
+            subprocess.run(
+                [
+                    "secret-tool",
+                    "store",
+                    "--label=" + f"{APP_NAME} profiles",
+                    "service",
+                    APP_NAME,
+                ],
+                input=profiles.encode(),
+                check=True,
             )
         except subprocess.CalledProcessError as e:
             logger.error(f"secret-tool error: {e}")
 
     elif sys.platform == "win32":
         try:
-            win32cred.CredWrite({
-                "Type": win32cred.CRED_TYPE_GENERIC,
-                "TargetName": f"{APP_NAME} profiles",
-                "CredentialBlob": profiles,
-                "Persist": win32cred.CRED_PERSIST_LOCAL_MACHINE,
-            }, 0)
+            win32cred.CredWrite(
+                {
+                    "Type": win32cred.CRED_TYPE_GENERIC,
+                    "TargetName": f"{APP_NAME} profiles",
+                    "CredentialBlob": profiles,
+                    "Persist": win32cred.CRED_PERSIST_LOCAL_MACHINE,
+                },
+                0,
+            )
         except pywintypes.error as e:
             sys.exit(e)
 
-
     elif sys.platform == "darwin":
-        subprocess.run([
-            "security", "add-generic-password",
-            "-s", APP_NAME,
-            "-a", "profiles",
-            "-w", profiles,
-            "-U",
-            ], check=True,
+        subprocess.run(
+            [
+                "security",
+                "add-generic-password",
+                "-s",
+                APP_NAME,
+                "-a",
+                "profiles",
+                "-w",
+                profiles,
+                "-U",
+            ],
+            check=True,
         )
 
 
@@ -184,10 +217,14 @@ def remove_secret():
     """Remove profiles from system keyring"""
     if sys.platform == "linux":
         try:
-            subprocess.run([
-                "secret-tool", "clear",
-                "service", APP_NAME,
-                ], check=True,
+            subprocess.run(
+                [
+                    "secret-tool",
+                    "clear",
+                    "service",
+                    APP_NAME,
+                ],
+                check=True,
             )
         except subprocess.CalledProcessError:
             pass
@@ -203,10 +240,14 @@ def remove_secret():
             pass
 
     elif sys.platform == "darwin":
-        subprocess.run([
-            "security", "delete-generic-password",
-            "-s", APP_NAME,
-            ], check=True,
+        subprocess.run(
+            [
+                "security",
+                "delete-generic-password",
+                "-s",
+                APP_NAME,
+            ],
+            check=True,
         )
 
 
@@ -298,9 +339,7 @@ def main_tui(screen, profiles_enc, profiles_plain, selected, have_keyring):
     if not have_keyring:
         screen.addstr(3, 0, NO_KEYRING_TEXT, curses.color_pair(1))
 
-    profiles = [
-        {**p, "source": "keyring"} for p in profiles_enc
-    ] + [
+    profiles = [{**p, "source": "keyring"} for p in profiles_enc] + [
         {**p, "source": "plaintext"} for p in profiles_plain
     ]
     profiles = sorted(profiles, key=lambda x: x["name"])
@@ -330,17 +369,17 @@ def main_tui(screen, profiles_enc, profiles_plain, selected, have_keyring):
             else:
                 screen.addstr(y, 0, text, curses.color_pair(1))
             y += 1
-        draw_buttons(screen, selected_button, h-1, w)
+        draw_buttons(screen, selected_button, h - 1, w)
 
         key = screen.getch()
-        if key == 27:   # ecape key
+        if key == 27:  # ecape key
             break
-        if key == 10:   # ENTER
-            if selected_button == 0 and profiles:   # LOAD
+        if key == 10:  # ENTER
+            if selected_button == 0 and profiles:  # LOAD
                 proceed = True
                 selected = profiles[selected_num]["name"]
                 break
-            elif selected_button == 1:   # ADD
+            elif selected_button == 1:  # ADD
                 profile, add = manage_profile(screen, have_keyring)
                 screen.clear()
                 if add:
@@ -358,7 +397,7 @@ def main_tui(screen, profiles_enc, profiles_plain, selected, have_keyring):
                         else:
                             profiles_plain.append(profile)
                 regenerate = True
-            elif selected_button == 2 and profiles:   # EDIT
+            elif selected_button == 2 and profiles:  # EDIT
                 enc_source = profiles[selected_num]["source"] == "keyring"
                 profile_index = None
                 for num, profile_data in enumerate(profiles_enc if enc_source else profiles_plain):
@@ -378,13 +417,15 @@ def main_tui(screen, profiles_enc, profiles_plain, selected, have_keyring):
                     else:
                         profiles_plain[profile_index] = profile
                 regenerate = True
-            elif selected_button == 3 and profiles:   # DELETE
-                profiles_enc, profiles_plain, deleted = delete_profile(screen, profiles_enc, profiles_plain, profiles[selected_num])
+            elif selected_button == 3 and profiles:  # DELETE
+                profiles_enc, profiles_plain, deleted = delete_profile(
+                    screen, profiles_enc, profiles_plain, profiles[selected_num]
+                )
                 screen.clear()
                 if deleted and selected_num > 0:
-                    selected_num -=1
+                    selected_num -= 1
                 regenerate = True
-            elif selected_button == 4:   # QUIT
+            elif selected_button == 4:  # QUIT
                 break
         elif key == curses.KEY_UP:
             if selected_num > 0:
@@ -406,9 +447,7 @@ def main_tui(screen, profiles_enc, profiles_plain, selected, have_keyring):
             screen.addstr(1, 0, MANAGER_TEXT, curses.color_pair(1))
             if not have_keyring:
                 screen.addstr(3, 0, NO_KEYRING_TEXT, curses.color_pair(1))
-            profiles = [
-                {**p, "source": "keyring"} for p in profiles_enc
-            ] + [
+            profiles = [{**p, "source": "keyring"} for p in profiles_enc] + [
                 {**p, "source": "plaintext"} for p in profiles_plain
             ]
             profiles = sorted(profiles, key=lambda x: x["name"])
@@ -436,7 +475,7 @@ def manage_profile(screen, have_keyring, editing_profile=None):
     use_qr_auth = False
     run = True
     while run:
-        if step == 0:   # name
+        if step == 0:  # name
             name, proceed = text_prompt(screen, NAME_PROMPT_TEXT, "PROFILE NAME: ", init=profile["name"])
             if proceed:
                 if not name:
@@ -445,7 +484,7 @@ def manage_profile(screen, have_keyring, editing_profile=None):
                 step += 1
             else:
                 return profile, False
-        elif step == 1:   # auth method selection (skip if editing)
+        elif step == 1:  # auth method selection (skip if editing)
             if editing_profile:
                 # When editing, go straight to manual token entry
                 step = 2
@@ -453,16 +492,16 @@ def manage_profile(screen, have_keyring, editing_profile=None):
                 continue
             auth_method, proceed = auth_method_prompt(screen)
             if proceed:
-                use_qr_auth = (auth_method == 0)
+                use_qr_auth = auth_method == 0
                 step += 1
             else:
                 step -= 1
-        elif step == 2:   # token (QR or manual)
+        elif step == 2:  # token (QR or manual)
             if use_qr_auth:
                 token, proceed = qr_auth_prompt(screen)
                 if proceed and token:
                     profile["token"] = token
-                    if not have_keyring:   # skip asking for source
+                    if not have_keyring:  # skip asking for source
                         return profile, True
                     step += 1
                 elif not proceed:
@@ -475,12 +514,12 @@ def manage_profile(screen, have_keyring, editing_profile=None):
                 if proceed:
                     if token:
                         profile["token"] = token
-                        if not have_keyring or editing_profile:   # skip asking for source
+                        if not have_keyring or editing_profile:  # skip asking for source
                             return profile, True
                         step += 1
                 else:
                     step -= 1
-        elif step == 3:   # source
+        elif step == 3:  # source
             source, proceed = source_prompt(screen)
             if source:
                 profile["source"] = "plaintext"
@@ -512,12 +551,12 @@ def delete_profile(screen, profiles_enc, profiles_plain, selected_profile):
         h, w = screen.getmaxyx()
         text = f"Are you sure you want to delete {selected_name} profile? Enter/Y / Esc/N"
         text = text.center(w)
-        screen.addstr(int(h/2), 0, text, curses.color_pair(1) | curses.A_STANDOUT)
+        screen.addstr(int(h / 2), 0, text, curses.color_pair(1) | curses.A_STANDOUT)
 
         key = screen.getch()
-        if key == 27 or key == 110:   # ESCAPE / N
+        if key == 27 or key == 110:  # ESCAPE / N
             return profiles_enc, profiles_plain, False
-        if key == 10 or key == 121:   # ENTER / Y
+        if key == 10 or key == 121:  # ENTER / Y
             if enc_source:
                 profiles_enc.pop(profile_index)
             else:
@@ -538,10 +577,10 @@ def text_prompt(screen, description_text, prompt, init=None, mask=False):
         text = ""
     prompt_len = len(prompt) + 2
     if mask:
-        dots = "•" * len(text[:w-prompt_len])
-        screen_text = prompt + dots + " " * (w - len(text)-prompt_len)
+        dots = "•" * len(text[: w - prompt_len])
+        screen_text = prompt + dots + " " * (w - len(text) - prompt_len)
     else:
-        screen_text = prompt + text[:w-prompt_len] + " " * (w - len(text)-prompt_len)
+        screen_text = prompt + text[: w - prompt_len] + " " * (w - len(text) - prompt_len)
     screen.addstr(prompt_y, 1, screen_text, curses.color_pair(1) | curses.A_STANDOUT)
     run = True
     proceed = False
@@ -561,14 +600,14 @@ def text_prompt(screen, description_text, prompt, init=None, mask=False):
                 sequence.append(key)
                 if key == 126:
                     break
-                if key == 27:   # holding escape key
+                if key == 27:  # holding escape key
                     sequence.append(-1)
                     break
             screen.nodelay(False)
             if sequence[-1] == -1 and sequence[-2] == 27:
                 break
 
-        if key == 10:   # ENTER
+        if key == 10:  # ENTER
             proceed = True
             break
 
@@ -580,10 +619,10 @@ def text_prompt(screen, description_text, prompt, init=None, mask=False):
 
         _, w = screen.getmaxyx()
         if mask:
-            dots = "•" * len(text[:w-prompt_len])
-            screen_text = prompt + dots + " " * (w - len(text)-prompt_len)
+            dots = "•" * len(text[: w - prompt_len])
+            screen_text = prompt + dots + " " * (w - len(text) - prompt_len)
         else:
-            screen_text = prompt + text[:w-prompt_len] + " " * (w - len(text)-prompt_len)
+            screen_text = prompt + text[: w - prompt_len] + " " * (w - len(text) - prompt_len)
         screen.addstr(prompt_y, 1, screen_text, curses.color_pair(1) | curses.A_STANDOUT)
         screen.refresh()
 
@@ -599,7 +638,7 @@ def source_prompt(screen):
     screen.bkgd(" ", curses.color_pair(1))
     h, w = screen.getmaxyx()
     for num, line in enumerate(SOURCE_PROMPT_TEXT):
-        screen.addstr(num+1, 0, line.center(w), curses.color_pair(1))
+        screen.addstr(num + 1, 0, line.center(w), curses.color_pair(1))
     run = True
     proceed = False
     selected_num = 0
@@ -617,9 +656,9 @@ def source_prompt(screen):
 
         key = screen.getch()
 
-        if key == 27:   # ESCAPE
+        if key == 27:  # ESCAPE
             break
-        elif key == 10:   # ENTER
+        elif key == 10:  # ENTER
             proceed = True
             break
         elif key == curses.KEY_UP:
@@ -644,7 +683,7 @@ def auth_method_prompt(screen):
     screen.bkgd(" ", curses.color_pair(1))
     h, w = screen.getmaxyx()
     for num, line in enumerate(AUTH_METHOD_PROMPT_TEXT):
-        screen.addstr(num+1, 0, line.center(w), curses.color_pair(1))
+        screen.addstr(num + 1, 0, line.center(w), curses.color_pair(1))
     run = True
     proceed = False
     selected_num = 0  # 0 = QR Code (recommended), 1 = Manual Token
@@ -667,9 +706,9 @@ def auth_method_prompt(screen):
 
         key = screen.getch()
 
-        if key == 27:   # ESCAPE
+        if key == 27:  # ESCAPE
             break
-        elif key == 10:   # ENTER
+        elif key == 10:  # ENTER
             proceed = True
             break
         elif key == curses.KEY_UP:
@@ -701,9 +740,9 @@ def qr_auth_prompt(screen):
         h, w = screen.getmaxyx()
         error_msg = "QR Code login requires 'cryptography' package."
         install_msg = "Install with: pip install cryptography"
-        screen.addstr(h//2 - 1, max(0, (w - len(error_msg))//2), error_msg, curses.color_pair(1))
-        screen.addstr(h//2 + 1, max(0, (w - len(install_msg))//2), install_msg, curses.color_pair(1))
-        screen.addstr(h//2 + 3, max(0, (w - 20)//2), "Press any key...", curses.color_pair(1))
+        screen.addstr(h // 2 - 1, max(0, (w - len(error_msg)) // 2), error_msg, curses.color_pair(1))
+        screen.addstr(h // 2 + 1, max(0, (w - len(install_msg)) // 2), install_msg, curses.color_pair(1))
+        screen.addstr(h // 2 + 3, max(0, (w - 20) // 2), "Press any key...", curses.color_pair(1))
         screen.refresh()
         screen.getch()
         return None, False
@@ -738,6 +777,7 @@ def qr_auth_prompt(screen):
 
     # Start auth in a thread
     import threading
+
     auth_thread = None
     client = qr_auth.RemoteAuthClient()
     client.on_qr_code = on_qr_ready
@@ -788,7 +828,7 @@ def qr_auth_prompt(screen):
             lines = QR_AUTH_TEXT.strip().split("\n")
             for num, line in enumerate(lines):
                 if num < h - 2:
-                    screen.addstr(num + 1, 0, line[:w-1], curses.color_pair(1))
+                    screen.addstr(num + 1, 0, line[: w - 1], curses.color_pair(1))
 
             qr_start_y = len(lines) + 2
 
@@ -800,7 +840,7 @@ def qr_auth_prompt(screen):
                     if y < h - 3:
                         x = max(0, (w - len(line)) // 2)
                         try:
-                            screen.addstr(y, x, line[:w-1], curses.color_pair(1))
+                            screen.addstr(y, x, line[: w - 1], curses.color_pair(1))
                         except curses.error:
                             pass
 
@@ -810,28 +850,28 @@ def qr_auth_prompt(screen):
                     url_text = f"URL: {state['qr_url']}"
                     x = max(0, (w - len(url_text)) // 2)
                     try:
-                        screen.addstr(url_y, x, url_text[:w-1], curses.color_pair(1))
+                        screen.addstr(url_y, x, url_text[: w - 1], curses.color_pair(1))
                     except curses.error:
                         pass
 
             elif not state["done"]:
                 # Loading message
                 loading_msg = "Generating QR code..."
-                screen.addstr(qr_start_y, max(0, (w - len(loading_msg))//2), loading_msg, curses.color_pair(1))
+                screen.addstr(qr_start_y, max(0, (w - len(loading_msg)) // 2), loading_msg, curses.color_pair(1))
 
             # Show scanned user
             if state["username"]:
                 scanned_msg = QR_SCANNED_TEXT.format(username=state["username"])
                 try:
-                    screen.addstr(h - 3, 0, scanned_msg[:w-1], curses.color_pair(1) | curses.A_BOLD)
-                    screen.addstr(h - 2, 0, QR_WAITING_TEXT[:w-1], curses.color_pair(1))
+                    screen.addstr(h - 3, 0, scanned_msg[: w - 1], curses.color_pair(1) | curses.A_BOLD)
+                    screen.addstr(h - 2, 0, QR_WAITING_TEXT[: w - 1], curses.color_pair(1))
                 except curses.error:
                     pass
 
             # Show error
             if state["error"]:
                 try:
-                    screen.addstr(h - 2, 0, f" Error: {state['error']}"[:w-1], curses.color_pair(1))
+                    screen.addstr(h - 2, 0, f" Error: {state['error']}"[: w - 1], curses.color_pair(1))
                 except curses.error:
                     # Ignore drawing errors (e.g., when the terminal is too small); not critical to flow.
                     pass
@@ -864,7 +904,6 @@ def qr_auth_prompt(screen):
     return token, token is not None
 
 
-
 def update_time(profiles_enc, profiles_plain, profile_name):
     """Update time for selected profile"""
     for profile in profiles_enc:
@@ -890,7 +929,7 @@ def manage(profiles_path, external_selected, force_open=False):
         try:
             profiles_enc = json.loads(profiles_enc)
         except json.JSONDecodeError:
-            remove_secret()   # failsafe for remnants of old save method
+            remove_secret()  # failsafe for remnants of old save method
             profiles_enc = None
         if not profiles_enc:
             profiles_enc = []
@@ -928,7 +967,6 @@ def manage(profiles_path, external_selected, force_open=False):
         }
         return profiles, selected, True
 
-
     # if no profiles and have working keyring
     if sys.platform == "linux" and not (bool(profiles_enc) or bool(profiles_plain)) and have_keyring:
         have_keyring = setup_secret_service()
@@ -945,7 +983,7 @@ def manage(profiles_path, external_selected, force_open=False):
             sys.exit("Curses error, see log for more info")
         proceed = False
 
-    if (bool(profiles_enc) or bool(profiles_plain)):
+    if bool(profiles_enc) or bool(profiles_plain):
         if proceed:
             update_time(profiles_enc, profiles_plain, selected)
         if have_keyring:

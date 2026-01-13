@@ -14,8 +14,9 @@ logger = logging.getLogger(__name__)
 # Try to import the emoji library
 try:
     import emoji as _emoji
+
     HAVE_EMOJI = True
-    EMOJI_VERSION = getattr(_emoji, '__version__', 'unknown')
+    EMOJI_VERSION = getattr(_emoji, "__version__", "unknown")
 except ImportError:
     HAVE_EMOJI = False
     EMOJI_VERSION = None
@@ -31,7 +32,7 @@ except Exception as e:
 EMOJI_V2_PLUS = False
 if HAVE_EMOJI and EMOJI_VERSION:
     try:
-        major = int(EMOJI_VERSION.split('.')[0])
+        major = int(EMOJI_VERSION.split(".")[0])
         EMOJI_V2_PLUS = major >= 2
     except (ValueError, IndexError):
         pass
@@ -78,7 +79,7 @@ def demojize(text: str, delimiters: tuple = (":", ":")) -> str:
                     # EMOJI_ALIAS_UNICODE_ENGLISH keys are colon-wrapped shortcodes,
                     # e.g. ":smile:". Replace exactly those with the requested
                     # delimiters, preserving the inner shortcode text.
-                    for shortcode in alias_map.keys():
+                    for shortcode in alias_map:
                         if not (shortcode.startswith(":") and shortcode.endswith(":")):
                             continue
                         inner = shortcode[1:-1]
@@ -150,11 +151,11 @@ def is_emoji(char: str) -> bool:
         # Fallback: basic Unicode range check for common emoji
         code = ord(char[0]) if char else 0
         return (
-            0x1F300 <= code <= 0x1F9FF or  # Misc Symbols, Emoticons, etc.
-            0x2600 <= code <= 0x26FF or    # Misc Symbols
-            0x2700 <= code <= 0x27BF or    # Dingbats
-            0x1F600 <= code <= 0x1F64F or  # Emoticons
-            0x1F680 <= code <= 0x1F6FF     # Transport/Map
+            0x1F300 <= code <= 0x1F9FF  # Misc Symbols, Emoticons, etc.
+            or 0x2600 <= code <= 0x26FF  # Misc Symbols
+            or 0x2700 <= code <= 0x27BF  # Dingbats
+            or 0x1F600 <= code <= 0x1F64F  # Emoticons
+            or 0x1F680 <= code <= 0x1F6FF  # Transport/Map
         )
 
     try:
@@ -163,7 +164,7 @@ def is_emoji(char: str) -> bool:
         else:
             # Older API fallback
             demojized = _emoji.demojize(char)
-            return demojized != char and demojized.startswith(':')
+            return demojized != char and demojized.startswith(":")
     except Exception:
         return False
 
@@ -195,7 +196,7 @@ def emoji_count(text: str) -> int:
         else:
             # Older API fallback
             demojized = _emoji.demojize(text)
-            return len(re.findall(r':[a-zA-Z0-9_]+:', demojized))
+            return len(re.findall(r":[a-zA-Z0-9_]+:", demojized))
     except Exception:
         return 0
 
@@ -222,7 +223,7 @@ def replace_emoji(text: str, replace: str = "") -> str:
                 result.append(char)
             elif replace:
                 result.append(replace)
-        return ''.join(result)
+        return "".join(result)
 
     try:
         if EMOJI_V2_PLUS:
@@ -231,9 +232,9 @@ def replace_emoji(text: str, replace: str = "") -> str:
             # Older API fallback: use demojize then strip codes
             demojized = _emoji.demojize(text)
             if replace:
-                return re.sub(r':[a-zA-Z0-9_]+:', replace, demojized)
+                return re.sub(r":[a-zA-Z0-9_]+:", replace, demojized)
             else:
-                return re.sub(r':[a-zA-Z0-9_]+:', '', demojized)
+                return re.sub(r":[a-zA-Z0-9_]+:", "", demojized)
     except Exception:
         return text
 
@@ -249,7 +250,7 @@ def get_emoji_regexp():
         return None
 
     try:
-        if EMOJI_V2_PLUS and hasattr(_emoji, 'get_emoji_regexp'):
+        if EMOJI_V2_PLUS and hasattr(_emoji, "get_emoji_regexp"):
             return _emoji.get_emoji_regexp()
         return None
     except Exception:
@@ -261,7 +262,7 @@ emoji = _emoji
 
 # Re-export EMOJI_DATA for search functionality
 # This is a dict mapping emoji characters to their metadata
-if HAVE_EMOJI and hasattr(_emoji, 'EMOJI_DATA'):
+if HAVE_EMOJI and hasattr(_emoji, "EMOJI_DATA"):
     EMOJI_DATA = _emoji.EMOJI_DATA
 else:
     # Empty fallback - search won't find emoji but won't crash
