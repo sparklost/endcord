@@ -370,26 +370,21 @@ def apply_environment_fixes(caps: Optional[TerminalCapabilities] = None) -> Term
     if caps is None:
         caps = detect_capabilities()
 
-    # Track if we need to re-detect capabilities
-    term_changed = False
-
-    # Set optimal TERM
+    # Set optimal TERM first - this may change capabilities
     optimal_term = get_optimal_term()
     if optimal_term != caps.term:
         os.environ["TERM"] = optimal_term
         logger.info(f"Upgraded TERM: {caps.term} -> {optimal_term}")
-        term_changed = True
+        # Re-detect capabilities immediately after TERM change
+        # so subsequent env fixes use the updated capabilities
+        caps = detect_capabilities()
 
-    # Set ESCDELAY
+    # Set ESCDELAY based on (potentially updated) capabilities
     os.environ["ESCDELAY"] = str(caps.recommended_escdelay)
 
-    # Ensure UTF-8 locale for unicode support
+    # Ensure UTF-8 locale for unicode support based on (potentially updated) capabilities
     if caps.has_unicode and not os.environ.get("LANG"):
         os.environ["LANG"] = "en_US.UTF-8"
-
-    # Re-detect capabilities if TERM was changed to keep caps consistent
-    if term_changed:
-        caps = detect_capabilities()
 
     return caps
 
@@ -449,8 +444,14 @@ def get_safe_config_overrides(caps: TerminalCapabilities) -> dict:
 
 # Curses initialization helpers
 
-def safe_curs_set(visibility: int) -> bool:
-    """Safely set cursor visibility, returns True if successful"""
+def safe_curs_set(visibility: int, caps: Optional[TerminalCapabilities] = None) -> bool:
+    """
+    Safely set cursor visibility, returns True if successful.
+
+    Args:
+        visibility: 0=invisible, 1=normal, 2=very visible
+        caps: Optional pre-detected capabilities (for consistency, not currently used)
+    """
     try:
         curses.curs_set(visibility)
         return True
@@ -461,6 +462,10 @@ def safe_curs_set(visibility: int) -> bool:
 def safe_mousemask(mask: int, caps: Optional[TerminalCapabilities] = None) -> int:
     """
     Safely enable mouse with capability checking.
+
+    Args:
+        mask: Mouse event mask (e.g. curses.ALL_MOUSE_EVENTS)
+        caps: Optional pre-detected capabilities to check mouse support
 
     Returns the actual mask that was set.
     """
@@ -474,8 +479,19 @@ def safe_mousemask(mask: int, caps: Optional[TerminalCapabilities] = None) -> in
         return 0
 
 
-def safe_start_color() -> bool:
-    """Safely initialize color support"""
+def safe_start_color(caps: Optional[TerminalCapabilities] = None) -> bool:
+    """
+    Safely initialize color support.
+
+    Args:
+        caps: Optional pre-detected capabilities to check color support
+
+    Returns True if color was initialized successfully.
+    """
+    # Skip if capabilities indicate no color support
+    if caps and caps.colors <= 0:
+        return False
+
     try:
         curses.start_color()
         curses.use_default_colors()

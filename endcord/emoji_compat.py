@@ -68,12 +68,32 @@ def demojize(text: str, delimiters: tuple = (":", ":")) -> str:
             default_delimiters = (":", ":")
             if delimiters != default_delimiters:
                 start, end = delimiters
-                # Replace patterns like :smile: with the requested delimiters
-                result = re.sub(
-                    r":([a-zA-Z0-9_+\-]+):",
-                    lambda m: f"{start}{m.group(1)}{end}",
-                    result,
-                )
+
+                # Prefer restricting replacements to known emoji shortcodes so that
+                # we don't rewrite arbitrary :word: sequences that weren't produced
+                # by emoji.demojize.
+                alias_map = getattr(_emoji, "EMOJI_ALIAS_UNICODE_ENGLISH", None)
+
+                if alias_map:
+                    # EMOJI_ALIAS_UNICODE_ENGLISH keys are colon-wrapped shortcodes,
+                    # e.g. ":smile:". Replace exactly those with the requested
+                    # delimiters, preserving the inner shortcode text.
+                    for shortcode in alias_map.keys():
+                        if not (shortcode.startswith(":") and shortcode.endswith(":")):
+                            continue
+                        inner = shortcode[1:-1]
+                        replacement = f"{start}{inner}{end}"
+                        result = result.replace(shortcode, replacement)
+                else:
+                    # Fallback: we don't have the alias map, so broaden the allowed
+                    # characters but still avoid matching nested colons/spaces.
+                    # This will match any :...: without whitespace/colons inside.
+                    result = re.sub(
+                        r":([^:\s]+):",
+                        lambda m: f"{start}{m.group(1)}{end}",
+                        result,
+                    )
+
             return result
     except Exception as e:
         logger.debug(f"demojize failed: {e}")

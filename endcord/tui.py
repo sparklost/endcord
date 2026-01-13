@@ -197,12 +197,13 @@ class TUI():
     def __init__(self, screen, config, keybindings, command_bindings, terminal_caps=None):
         self.spellchecker = peripherals.SpellCheck(config["aspell_mode"], config["aspell_lang"])
         acs_map = acs.get_map()
-        # Initialize curses with capability-aware settings
-        termcap.safe_start_color()
-        termcap.safe_curs_set(0)  # using custom cursor
 
         # Use provided capabilities or detect if not provided
         self.term_caps = terminal_caps if terminal_caps is not None else termcap.detect_capabilities()
+
+        # Initialize curses with capability-aware settings
+        termcap.safe_start_color(self.term_caps)
+        termcap.safe_curs_set(0, self.term_caps)  # using custom cursor
 
         # Enable mouse only if supported and configured
         if config.get("mouse", True) and self.term_caps.has_mouse:

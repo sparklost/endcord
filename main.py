@@ -79,9 +79,10 @@ def main(args):
         command_bindings = peripherals.convert_keybindings_cmd(command_bindings)
 
     # Detect terminal capabilities and apply environment fixes
+    # apply_environment_fixes may upgrade TERM and return updated capabilities
     global terminal_caps
     terminal_caps = termcap.detect_capabilities()
-    termcap.apply_environment_fixes(terminal_caps)
+    terminal_caps = termcap.apply_environment_fixes(terminal_caps)
 
     # Check minimum requirements
     ok, warnings = termcap.check_minimum_requirements(terminal_caps)
