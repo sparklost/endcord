@@ -275,135 +275,66 @@ def _exchange_ticket_for_token(ticket: str, proxy: Optional[str] = None) -> str:
                 pass
 
 
-def _generate_qr_segno(data: str, compact: bool = True) -> str:
-    """
-    Generate QR code using segno (best terminal output).
-    Uses native ANSI/Unicode support for optimal display.
-    """
-    import io
-    import segno
-    qr = segno.make(data)
-    # Capture output to StringIO since out=None prints to stdout
-    f = io.StringIO()
-    qr.terminal(out=f, compact=compact)
-    f.seek(0)
-    return f.read()
-
-
-def _generate_qr_qrcode(data: str, border: int = 2) -> str:
-    """
-    Generate QR code using qrcode library with Unicode half-blocks.
-    Fallback when segno is not available.
-    """
-    import qrcode
-    qr = qrcode.QRCode(
-        version=1,
-        error_correction=qrcode.constants.ERROR_CORRECT_L,
-        box_size=1,
-        border=border,
+# Import QR display functions from dedicated module
+# This module provides terminal-aware QR code rendering with automatic
+# capability detection and fallback strategies
+try:
+    from endcord.qr_display import (
+        generate_qr_code_ascii,
+        generate_qr_code_simple,
+        QRDisplay,
+        RenderMode,
+        check_qr_support,
     )
-    qr.add_data(data)
-    qr.make(fit=True)
+except ImportError:
+    # Minimal fallback if qr_display module not available
+    def generate_qr_code_ascii(data: str, border: int = 2) -> str:
+        """Fallback QR generation when qr_display module unavailable."""
+        try:
+            import segno
+            import io
+            qr = segno.make(data)
+            f = io.StringIO()
+            qr.terminal(out=f, compact=True, border=border)
+            f.seek(0)
+            return f.read()
+        except ImportError:
+            pass
 
-    matrix = qr.get_matrix()
-    lines = []
+        try:
+            import qrcode
+            qr = qrcode.QRCode(version=1, border=border)
+            qr.add_data(data)
+            qr.make(fit=True)
+            matrix = qr.get_matrix()
+            lines = []
+            for y in range(0, len(matrix), 2):
+                line = ""
+                for x in range(len(matrix[y])):
+                    top = matrix[y][x]
+                    bottom = matrix[y + 1][x] if y + 1 < len(matrix) else False
+                    if top and bottom:
+                        line += "\u2588"
+                    elif top:
+                        line += "\u2580"
+                    elif bottom:
+                        line += "\u2584"
+                    else:
+                        line += " "
+                lines.append(line)
+            return "\n".join(lines)
+        except ImportError:
+            pass
 
-    # Process two rows at a time using Unicode half blocks
-    for y in range(0, len(matrix), 2):
-        line = ""
-        for x in range(len(matrix[y])):
-            top = matrix[y][x]
-            bottom = matrix[y + 1][x] if y + 1 < len(matrix) else False
+        return f"[QR Code - scan this URL with Discord mobile app]\n{data}"
 
-            if top and bottom:
-                line += "\u2588"  # Full block (both black)
-            elif top and not bottom:
-                line += "\u2580"  # Upper half block
-            elif not top and bottom:
-                line += "\u2584"  # Lower half block
-            else:
-                line += " "  # Both white
-        lines.append(line)
+    def generate_qr_code_simple(data: str) -> str:
+        """Fallback simple QR generation."""
+        return f"[Install 'segno' or 'qrcode' for QR display]\nURL: {data}"
 
-    return "\n".join(lines)
-
-
-def _generate_qr_pyqrcode(data: str, quiet_zone: int = 1) -> str:
-    """
-    Generate QR code using pyqrcode (legacy fallback).
-    Uses ANSI terminal output.
-    """
-    import pyqrcode
-    qr = pyqrcode.create(data)
-    return qr.terminal(quiet_zone=quiet_zone)
-
-
-def generate_qr_code_ascii(data: str, border: int = 2) -> str:
-    """
-    Generate ASCII art QR code for terminal display.
-
-    Uses a fallback chain for best compatibility:
-    1. segno - Best output, native Unicode/ANSI support
-    2. qrcode - Good fallback with custom half-block rendering
-    3. pyqrcode - Legacy fallback with ANSI output
-    4. Plain text URL - Final fallback when no library available
-    """
-    # Try segno first (best terminal output)
-    try:
-        return _generate_qr_segno(data, compact=True)
-    except ImportError:
-        pass
-    except Exception as e:
-        logger.debug(f"segno failed: {e}")
-
-    # Try qrcode with custom half-block rendering
-    try:
-        return _generate_qr_qrcode(data, border=border)
-    except ImportError:
-        pass
-    except Exception as e:
-        logger.debug(f"qrcode failed: {e}")
-
-    # Try pyqrcode as legacy fallback
-    try:
-        return _generate_qr_pyqrcode(data)
-    except ImportError:
-        pass
-    except Exception as e:
-        logger.debug(f"pyqrcode failed: {e}")
-
-    # Final fallback: just return the URL
-    return f"[QR Code - scan this URL with Discord mobile app]\n{data}"
-
-
-def generate_qr_code_simple(data: str) -> str:
-    """
-    Generate simple ASCII QR code using basic characters.
-    More compatible with limited terminal fonts (TTY, no Unicode).
-    """
-    try:
-        import qrcode
-        qr = qrcode.QRCode(
-            version=1,
-            error_correction=qrcode.constants.ERROR_CORRECT_L,
-            box_size=1,
-            border=2,
-        )
-        qr.add_data(data)
-        qr.make(fit=True)
-
-        matrix = qr.get_matrix()
-        lines = []
-        for row in matrix:
-            line = ""
-            for cell in row:
-                line += "##" if cell else "  "  # Double-width ASCII for square pixels
-            lines.append(line)
-
-        return "\n".join(lines)
-
-    except ImportError:
-        return f"[Install 'qrcode' or 'segno' package for QR display]\nURL: {data}"
+    QRDisplay = None
+    RenderMode = None
+    check_qr_support = None
 
 
 class RemoteAuthClient:
