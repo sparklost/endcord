@@ -1,5 +1,5 @@
 """
-QR Code Terminal Display Module
+QR Code Terminal Display Module.
 
 Provides robust, terminal-aware QR code rendering with automatic
 capability detection and fallback strategies.
@@ -268,6 +268,7 @@ class QRDisplay:
     def _render_unicode_halfblock(self, matrix: list) -> str:
         """
         Render QR using Unicode half-block characters.
+
         Combines two vertical pixels into one character for compact display.
 
         Characters used:
@@ -497,7 +498,7 @@ def get_display() -> QRDisplay:
 
 def render_qr_code(data: str, mode: Optional[RenderMode] = None) -> str:
     """
-    Convenience function to render a QR code.
+    Render a QR code for terminal display.
 
     Args:
         data: Data to encode
@@ -511,7 +512,7 @@ def render_qr_code(data: str, mode: Optional[RenderMode] = None) -> str:
 
 def render_qr_for_curses(data: str, max_width: int = 0, max_height: int = 0) -> Tuple[list, int, int]:
     """
-    Convenience function to render QR code for curses.
+    Render QR code for curses display.
 
     Returns:
         Tuple of (lines, width, height)
@@ -563,6 +564,7 @@ def check_qr_support() -> dict:
 def generate_qr_code_ascii(data: str, border: int = 2) -> str:
     """
     Generate ASCII art QR code for terminal display.
+
     Backwards-compatible wrapper around QRDisplay.
 
     Uses UNICODE_HALF_BLOCK mode (not ANSI) for curses compatibility.
@@ -576,6 +578,7 @@ def generate_qr_code_ascii(data: str, border: int = 2) -> str:
 def generate_qr_code_simple(data: str) -> str:
     """
     Generate simple ASCII QR code for limited terminals.
+
     Backwards-compatible wrapper.
     """
     config = QRConfig(border=2, compact=False)

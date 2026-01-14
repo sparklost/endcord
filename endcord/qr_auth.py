@@ -1,5 +1,5 @@
 """
-Discord QR Code Remote Authentication
+Discord QR Code Remote Authentication.
 
 This module implements Discord's Remote Auth protocol, allowing users to log in
 by scanning a QR code with their Discord mobile app instead of manually extracting tokens.
@@ -63,25 +63,25 @@ OP_HEARTBEAT_ACK = "heartbeat_ack"
 
 
 class QRAuthError(Exception):
-    """Base exception for QR auth errors"""
+    """Base exception for QR auth errors."""
 
     pass
 
 
 class QRAuthTimeout(QRAuthError):
-    """QR code expired or auth timed out"""
+    """QR code expired or auth timed out."""
 
     pass
 
 
 class QRAuthCancelled(QRAuthError):
-    """User cancelled the auth on mobile"""
+    """User cancelled the auth on mobile."""
 
     pass
 
 
 class QRAuthCaptcha(QRAuthError):
-    """Captcha required (rare, usually on suspicious IPs)"""
+    """Captcha required (rare, usually on suspicious IPs)."""
 
     def __init__(self, captcha_data: dict):
         self.captcha_data = captcha_data
@@ -89,7 +89,7 @@ class QRAuthCaptcha(QRAuthError):
 
 
 class UserData:
-    """Parsed user data from remote auth"""
+    """Parsed user data from remote auth."""
 
     def __init__(self, encrypted_data: str, private_key):
         decrypted = _decrypt_payload(encrypted_data, private_key)
@@ -106,11 +106,13 @@ class UserData:
         self.username = parts[3] if len(parts) > 3 else "Unknown"
 
     def get_display_name(self) -> str:
+        """Return the user's display name with discriminator if applicable."""
         if self.discriminator and self.discriminator != "0":
             return f"{self.username}#{self.discriminator}"
         return self.username
 
     def get_avatar_url(self) -> str:
+        """Return the URL to the user's avatar image."""
         if self.avatar_hash:
             return f"https://cdn.discordapp.com/avatars/{self.id}/{self.avatar_hash}.png"
         # Default avatar based on discriminator or user id
@@ -119,7 +121,7 @@ class UserData:
 
 
 def _generate_keypair():
-    """Generate RSA 2048-bit keypair for remote auth"""
+    """Generate RSA 2048-bit keypair for remote auth."""
     if not HAVE_CRYPTO:
         raise QRAuthError("cryptography library not installed. Run: pip install cryptography")
 
@@ -135,7 +137,7 @@ def _generate_keypair():
 
 
 def _decrypt_payload_raw(encrypted_b64: str, private_key) -> bytes:
-    """Decrypt OAEP-encrypted payload from Discord (returns raw bytes)"""
+    """Decrypt OAEP-encrypted payload from Discord (returns raw bytes)."""
     encrypted = base64.b64decode(encrypted_b64)
     decrypted = private_key.decrypt(
         encrypted, padding.OAEP(mgf=padding.MGF1(algorithm=hashes.SHA256()), algorithm=hashes.SHA256(), label=None)
@@ -144,12 +146,12 @@ def _decrypt_payload_raw(encrypted_b64: str, private_key) -> bytes:
 
 
 def _decrypt_payload(encrypted_b64: str, private_key) -> str:
-    """Decrypt OAEP-encrypted payload from Discord (returns string)"""
+    """Decrypt OAEP-encrypted payload from Discord (returns string)."""
     return _decrypt_payload_raw(encrypted_b64, private_key).decode()
 
 
 def _compute_nonce_proof(nonce_b64: str, private_key) -> str:
-    """Decrypt nonce and compute SHA256 proof"""
+    """Decrypt nonce and compute SHA256 proof."""
     # Nonce is raw binary data, not text
     decrypted_nonce = _decrypt_payload_raw(nonce_b64, private_key)
     if not decrypted_nonce:
@@ -161,7 +163,7 @@ def _compute_nonce_proof(nonce_b64: str, private_key) -> str:
 
 
 def _compute_fingerprint(public_key_b64: str) -> str:
-    """Compute fingerprint from public key for verification"""
+    """Compute fingerprint from public key for verification."""
     public_key_der = base64.b64decode(public_key_b64)
     fingerprint_hash = hashlib.sha256(public_key_der).digest()
     return base64.urlsafe_b64encode(fingerprint_hash).decode().rstrip("=")
@@ -375,13 +377,13 @@ class RemoteAuthClient:
         self.on_waiting: Optional[Callable[[], None]] = None
 
     def _start_heartbeat(self):
-        """Start heartbeat thread"""
+        """Start heartbeat thread."""
         self._stop_heartbeat.clear()
         self._heartbeat_thread = threading.Thread(target=self._heartbeat_loop, daemon=True)
         self._heartbeat_thread.start()
 
     def _heartbeat_loop(self):
-        """Send heartbeats at the specified interval"""
+        """Send heartbeats at the specified interval."""
         while not self._stop_heartbeat.wait(self.heartbeat_interval / 1000):
             with self._heartbeat_lock:
                 if not self._last_heartbeat_ack:
@@ -394,18 +396,18 @@ class RemoteAuthClient:
                     break
 
     def _stop_heartbeat_thread(self):
-        """Stop the heartbeat thread"""
+        """Stop the heartbeat thread."""
         self._stop_heartbeat.set()
         if self._heartbeat_thread:
             self._heartbeat_thread.join(timeout=2)
 
     def _send(self, data: dict):
-        """Send JSON message to WebSocket"""
+        """Send JSON message to WebSocket."""
         if self.ws:
             self.ws.send(json.dumps(data))
 
     def _recv(self) -> dict:
-        """Receive JSON message from WebSocket"""
+        """Receive JSON message from WebSocket."""
         if self.ws:
             data = self.ws.recv()
             # Handle both string and bytes data
@@ -415,7 +417,7 @@ class RemoteAuthClient:
         return {}
 
     def _handle_hello(self, data: dict):
-        """Handle HELLO opcode"""
+        """Handle HELLO opcode."""
         self.timeout_ms = data.get("timeout_ms", 120000)
         self.heartbeat_interval = data.get("heartbeat_interval", 41250)
         logger.debug(f"Remote auth hello: timeout={self.timeout_ms}ms, heartbeat={self.heartbeat_interval}ms")
@@ -430,7 +432,7 @@ class RemoteAuthClient:
         self._send({"op": OP_INIT, "encoded_public_key": self.public_key_b64})
 
     def _handle_nonce_proof(self, data: dict):
-        """Handle NONCE_PROOF opcode"""
+        """Handle NONCE_PROOF opcode."""
         encrypted_nonce = data.get("encrypted_nonce")
         if not encrypted_nonce:
             raise QRAuthError("No nonce in nonce_proof")
@@ -439,7 +441,7 @@ class RemoteAuthClient:
         self._send({"op": OP_NONCE_PROOF, "proof": proof})
 
     def _handle_pending_remote_init(self, data: dict):
-        """Handle PENDING_REMOTE_INIT - QR code is ready"""
+        """Handle PENDING_REMOTE_INIT - QR code is ready."""
         self.fingerprint = data.get("fingerprint")
         if not self.fingerprint:
             raise QRAuthError("No fingerprint in pending_remote_init")
@@ -460,7 +462,7 @@ class RemoteAuthClient:
             self.on_qr_code(qr_url, qr_ascii)
 
     def _handle_pending_ticket(self, data: dict):
-        """Handle PENDING_TICKET - user scanned QR, waiting for confirmation"""
+        """Handle PENDING_TICKET - user scanned QR, waiting for confirmation."""
         encrypted_user = data.get("encrypted_user_payload")
         if encrypted_user:
             self.user_data = UserData(encrypted_user, self.private_key)
@@ -473,7 +475,7 @@ class RemoteAuthClient:
             self.on_waiting()
 
     def _handle_pending_login(self, data: dict):
-        """Handle PENDING_LOGIN - auth complete, exchange ticket for token"""
+        """Handle PENDING_LOGIN - auth complete, exchange ticket for token."""
         ticket = data.get("ticket")
         if not ticket:
             raise QRAuthError("No ticket in pending_login")
@@ -612,7 +614,7 @@ class RemoteAuthClient:
                 self.ws = None
 
     def close(self):
-        """Close the connection"""
+        """Close the connection."""
         self._stop_heartbeat_thread()
         if self.ws:
             try:
@@ -630,7 +632,7 @@ def authenticate_with_qr(
     timeout: Optional[float] = None,
 ) -> Optional[str]:
     """
-    Convenience function for QR code authentication.
+    Authenticate via QR code scan with Discord mobile app.
 
     Args:
         on_qr_ready: Callback when QR code is ready. Receives (url, ascii_art).

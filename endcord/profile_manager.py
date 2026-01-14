@@ -330,6 +330,9 @@ def draw_buttons(screen, selected, y, w):
 
 def main_tui(screen, profiles_enc, profiles_plain, selected, have_keyring):
     """Main profile manager tui"""
+    # Ensure lists are never None for iteration
+    profiles_enc = profiles_enc or []
+    profiles_plain = profiles_plain or []
     curses.use_default_colors()
     curses.curs_set(0)
     curses.init_pair(1, -1, -1)
@@ -529,6 +532,9 @@ def manage_profile(screen, have_keyring, editing_profile=None):
                 return profile, True
             step -= 1
 
+    # Should never reach here but satisfies type checker
+    return profile, False
+
 
 def delete_profile(screen, profiles_enc, profiles_plain, selected_profile):
     """Yes/No window asking to delete specified profile"""
@@ -562,6 +568,9 @@ def delete_profile(screen, profiles_enc, profiles_plain, selected_profile):
             else:
                 profiles_plain.pop(profile_index)
             return profiles_enc, profiles_plain, True
+
+    # Should never reach here but satisfies type checker
+    return profiles_enc, profiles_plain, False
 
 
 def text_prompt(screen, description_text, prompt, init=None, mask=False):
@@ -1011,8 +1020,8 @@ def refresh_token(new_token, profile_name, profiles_path):
         profiles_enc = []
 
     profiles_plain = load_plain(profiles_path)
-    if profiles_plain:
-        profiles_plain = profiles_plain["profiles"]
+    if profiles_plain and isinstance(profiles_plain, dict):
+        profiles_plain = profiles_plain.get("profiles", [])
 
     for profile in profiles_enc:
         if profile["name"] == profile_name:
