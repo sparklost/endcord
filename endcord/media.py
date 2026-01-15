@@ -199,6 +199,8 @@ class TerminalMedia():
     def sigint_handler(self, _signum, _frame):
         """Handling Ctrl-C event"""
         self.stop_playback()
+        time.sleep(1)
+        sys.exit()   # failsafe
 
 
     def pil_img_to_term(self, img, remove_alpha=True):
@@ -436,17 +438,17 @@ class TerminalMedia():
                     time.sleep(0.1)
 
 
-    def video_player(self, video_queue, audio_queue, frame_duration):
+    def video_player(self, video_queue, audio_queue, frame_duration, no_audio=False):
         """Play video frames from the queue"""
         while True:
             frame = video_queue.get()
             if frame is None:
                 break
-            if audio_queue.qsize() >= 1:
+            if audio_queue.qsize() >= 1 or no_audio:
                 start_time = time.time()
                 img = frame.to_image()
                 self.pil_img_to_term(img, remove_alpha=False)
-            if audio_queue.qsize() >= 3:
+            if audio_queue.qsize() >= 3 or no_audio:
                 time.sleep(max(frame_duration - (time.time() - start_time), 0))
             while self.pause:
                 time.sleep(0.1)
@@ -489,7 +491,7 @@ class TerminalMedia():
 
         # prepare video
         video_queue = Queue(maxsize=10)
-        video_thread = threading.Thread(target=self.video_player, args=(video_queue, audio_queue, frame_duration), daemon=True)
+        video_thread = threading.Thread(target=self.video_player, args=(video_queue, audio_queue, frame_duration, not(have_audio)), daemon=True)
         video_thread.start()
 
         num = 0

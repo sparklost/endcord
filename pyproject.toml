@@ -1,6 +1,6 @@
 [project]
 name = "endcord"
-version = "1.1.8"
+version = "1.2.0"
 description = "Feature rich Discord TUI client."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -28,11 +28,11 @@ dependencies = [
 build = [
     "cython>=3.2.4",
     "nuitka>=2.8.9",
-    "pyinstaller>=6.17.0",
+    "pyinstaller>=6.18.0",
     "setuptools>=80.9.0",
 ]
 media = [
-    "av>=16.0.1",
+    "av>=16.1.0",
     "pillow>=12.1.0",
     "pynacl>=1.6.2",
 ]

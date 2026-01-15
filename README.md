@@ -481,8 +481,9 @@ Endcord does work with free-threaded python, and it significantly improves media
 But currently building does not work in this mode, nuitka [doesn't support free-threaded mode](<https://github.com/Nuitka/Nuitka/issues/3062>) yet.  
 Anyway, to run it from source:  
 First install python with uv: `uv python install 3.14t`, it must be >= 3.14t (because some libraries dont have free-threaded support for < 3.14).  
-Install dependencies: `uv sync --python 3.14t --group media`  
-Run main.py: `uv run --python 3.14t main.py`  
+Install dependencies: `uv sync --python 3.14t --group media`.  
+Remove orjson (doesn't support freethreaded python): `uv remove orjson`. (ujson also doesn't support freethreaded).  
+Run main.py: `uv run --python 3.14t main.py`.  
 
 
 ## FAQ

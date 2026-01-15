@@ -1,7 +1,5 @@
-Fix video player skips to end
 Add option to login with email ?
 Add option to login with QR code ?
-Show inline media in chat
 
 Vim-like bindings
     have input mode that types in input line
@@ -22,6 +20,7 @@ Voice calls
     send and receive RTCP?
     send speaking event?
 
+Show inline media in chat - after fixing https://github.com/python/cpython/issues/119138
 Fix per-channel member list
 Video calls
 Localization
