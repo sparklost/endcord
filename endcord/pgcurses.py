@@ -61,11 +61,11 @@ SYSTEM_COLORS = (
 if sys.platform == "linux":
     path = os.environ.get("XDG_DATA_HOME", "")
     if path.strip():
-        config_path = os.path.join(path, f"{APP_NAME.lower()}/pgcurses.json")
+        config_path = os.path.join(path, APP_NAME.lower(), "pgcurses.json")
     else:
         config_path = f"~/.config/{APP_NAME.lower()}/pgcurses.json"
 elif sys.platform == "win32":
-    config_path = os.path.join(os.path.normpath(f"{os.environ["USERPROFILE"]}/AppData/Local/{APP_NAME.lower()}/"), "pgcurses.json")
+    config_path = os.path.join(os.environ["LOCALAPPDATA"], APP_NAME, "pgcurses.json")
 elif sys.platform == "darwin":
     config_path = f"~/Library/Application Support/{APP_NAME.lower()}/pgcurses.json"
 #config_path = os.environ.get("PGCURSES_CONFIG")

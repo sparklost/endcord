@@ -157,6 +157,7 @@ Scroll back to bottom - `Ctrl+H`
 Expand selected categories and servers - `Ctrl+Space` *  
 Enter selected channel - `Ctrl+Space`  
 Reply to selected message - `Ctrl+R`  
+Add reaction to selected message - `Alt+R`  
 Edit selected message - `Ctrl+E`  
 Delete selected message - `Ctrl+D`  
 Toggle reply ping when replying - `Ctrl+P`  
@@ -583,6 +584,6 @@ Go to [TODO](todo.txt).
 
 ### Features that will not be added
 Following features have significant risk of triggering discords spam filter, and may cause account to be limited or even banned:  
-Sending friend request, opening new DM, creating new thread, scriptable command macros, anything payment related.  
+Sending friend request, opening new DM, creating new thread, anything payment related.  
 
 Therefore, they will NOT be implemented in endcord.  

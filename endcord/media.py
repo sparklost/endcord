@@ -1,9 +1,9 @@
-import curses
 import importlib.util
 import logging
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import threading
@@ -22,7 +22,10 @@ try:
 except (AssertionError, RuntimeError):
     have_soundcard = False
 
-from endcord import xterm256
+from endcord import terminal_utils, xterm256
+
+ESC = "\x1b"
+RESET = f"{ESC}[0m"
 
 logger = logging.getLogger(__name__)
 match_youtube = re.compile(r"(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)[a-zA-Z0-9_-]{11}")
@@ -36,50 +39,109 @@ def get_mime(path):
     return "unknown/unknown"
 
 
-def img_to_curses(screen, img, img_gray, start_color_id, ascii_palette, ascii_palette_len, screen_width, screen_height, width, height):
-    """Draw image using curses with padding"""
+def img_to_term(img, img_gray, bg_color, ascii_palette, ascii_palette_len, screen_width, screen_height, img_width, img_height):
+    """Convert image to ANSI-colored string made of ascii_palette, ready be printed in terminal"""
     pixels = img.load()
     pixels_gray = img_gray.load()
 
-    padding_h = (screen_height - height) // 2
-    padding_w = (screen_width - width) // 2
-    bg_color = curses.color_pair(start_color_id + 1)
+    padding_h = (screen_height - img_height) // 2
+    padding_w = (screen_width - img_width) // 2
+
+    bg = f"{ESC}[48;5;{bg_color}m"
+    out_lines = []
 
     # top padding
-    for y_fill in range(padding_h):
-        screen.insstr(y_fill, 0, " " * screen_width, bg_color)
+    for _ in range(padding_h):
+        out_lines.append(bg + (" " * screen_width) + RESET)
 
     # image rows
-    for y in range(height):
-        row_y = y + padding_h
+    for y in range(img_height):
+        line_parts = []
+        current_fg = None
 
         # left padding
         if padding_w > 0:
-            screen.insstr(row_y, 0, " " * padding_w, bg_color)
+            line_parts.append(bg + (" " * padding_w))
 
-        for x in range(width):
+        # image columns
+        for x in range(img_width):
             gray_val = pixels_gray[x, y]
-            character = ascii_palette[(gray_val * ascii_palette_len) // 255]
-            color = start_color_id + pixels[x, y] + 16
-            screen.insch(row_y, x + padding_w, character, curses.color_pair(color))
+            color = pixels[x, y] + 16
+            if color != current_fg:
+                line_parts.append(f"{ESC}[38;5;{color}m")
+                current_fg = color
+            line_parts.append(ascii_palette[(gray_val * ascii_palette_len) // 255])
 
         # right padding
-        if x + padding_w + 1 < screen_width:
-            screen.insstr(row_y, x + padding_w + 1, " " * (screen_width - (x + padding_w + 1)), bg_color)
+        visible_len = padding_w + img_width
+        if visible_len < screen_width:
+            line_parts.append(bg + (" " * (screen_width - visible_len)))
+
+        line_parts.append(RESET)
+        out_lines.append("".join(line_parts))
 
     # bottom padding
-    if screen_height != height:
-        for y_fill in range(padding_h + 1):
-            try:
-                screen.insstr(screen_height - 1 - y_fill, 0, " " * screen_width, bg_color)
-            except curses.error:
-                pass
+    while len(out_lines) < screen_height:
+        out_lines.append(bg + (" " * screen_width) + RESET)
 
-    screen.noutrefresh()
+    return "\n".join(out_lines)
 
-# use cython if available, ~1.15 times faster
+
+def img_to_term_block(img, bg_color, screen_width, screen_height, img_width, img_height):
+    """Convert image to ANSI-colored string made of half-blocks, ready to be printed in terminal"""
+    pixels = img.load()
+
+    padding_h = (screen_height - img_height // 2) // 2
+    padding_w = (screen_width - img_width) // 2
+
+    bg = f"{ESC}[48;5;{bg_color}m"
+    out_lines = []
+
+    # top padding
+    for _ in range(padding_h):
+        out_lines.append(bg + (" " * screen_width) + RESET)
+
+    # image rows
+    for y in range(0, img_height - 1, 2):
+        line_parts = []
+        current_fg = None
+        current_bg = None
+
+        # left padding
+        if padding_w > 0:
+            line_parts.append(bg + (" " * padding_w))
+
+        # image columns
+        for x in range(img_width):
+            top_color = pixels[x, y] + 16
+            bot_color = pixels[x, y + 1] + 16
+            if top_color != current_fg:
+                line_parts.append(f"{ESC}[38;5;{top_color}m")
+                current_fg = top_color
+            if bot_color != current_bg:
+                line_parts.append(f"{ESC}[48;5;{bot_color}m")
+                current_bg = bot_color
+            line_parts.append("▀")
+
+        # right padding
+        visible_len = padding_w + img_width
+        if visible_len < screen_width:
+            line_parts.append(bg + (" " * (screen_width - visible_len)))
+
+        line_parts.append(RESET)
+        out_lines.append("".join(line_parts))
+
+    # bottom padding
+    while len(out_lines) < screen_height:
+        out_lines.append(bg + (" " * screen_width) + RESET)
+
+    return "\n".join(out_lines)
+
+
+
+# use cython if available, ~1.7 times faster
 if importlib.util.find_spec("endcord_cython") and importlib.util.find_spec("endcord_cython.media"):
-    from endcord_cython.media import img_to_curses
+    from endcord_cython.media import img_to_term, img_to_term_block
 
 # get speaker
 if have_soundcard:
@@ -91,25 +153,28 @@ if have_soundcard:
 else:
     have_sound = False
 
-class CursesMedia():
-    """Methods for showing and playing media in terminal with curses"""
+class TerminalMedia():
+    """Methods for showing and playing media in terminal"""
 
-    def __init__(self, screen, config, start_color_id, ui=True):
+    def __init__(self, config, keybindings, ui=True, external=False):
         logging.getLogger("libav").setLevel(logging.ERROR)
-        self.screen = screen
-        self.font_scale = config["media_font_scale"]   # 2.25
+        media_block = config["media_use_blocks"]
+        self.font_ratio = config["media_font_aspect_ratio"]   # 2.25
+        self.font_ratio_block = self.font_ratio / 2
         self.ascii_palette = list(config["media_ascii_palette"])   # "  ..',;:c*loexk#O0XNW"
         self.saturation = config["media_saturation"]   # 1.2
         self.cap_fps = config["media_cap_fps"]   # 30
-        self.color_media_bg = config["media_color_bg"]   # -1
+        self.bg_color = config["media_color_bg"]   # -1
         self.mute_video = config["media_mute"]   # false
         self.bar_ch = config["media_bar_ch"]
         self.default_color = config["color_default"][0]   # all 255 colors already init in order
         self.yt_dlp_path = config["yt_dlp_path"]
         self.yt_dlp_format = config["yt_dlp_format"]
+        self.keybindings = {key: (val,) if not isinstance(val, tuple) else val for key, val in keybindings.items()}
         if self.default_color == -1:
             self.default_color = 0
-        self.start_color_id = start_color_id
+        if external:
+            signal.signal(signal.SIGINT, self.sigint_handler)
         self.ascii_palette_len = len(self.ascii_palette) - 1
         self.xterm_256_palette = xterm256.palette_short
         self.run = False
@@ -120,45 +185,33 @@ class CursesMedia():
         self.path = None
         self.media_type = None
         self.seek = None
-
-        self.lock = threading.RLock()
-        self.need_update = threading.Event()
-
+        self.screen_size = terminal_utils.get_size()
         self.ui = ui
+        self.ui_line = None
         if ui:
-            self.show_ui()
-        # self.init_colors()   # 255_curses_bug - enable this
-        self.start_color_id = 0   # 255_curses_bug
+            self.ui_timer = 0
+        else:
+            self.ui_timer = 30
+        if media_block:
+            self.pil_img_to_term = self.pil_img_to_term_block
 
 
-    def init_colors(self):
-        """Initialize 255 colors for drawing picture, from starting color ID"""
-        for i in range(1, 255):
-            curses.init_pair(self.start_color_id + i, i, self.color_media_bg)
+    def sigint_handler(self, _signum, _frame):
+        """Handling Ctrl-C event"""
+        self.stop_playback()
 
 
-    def screen_update(self):
-        """Thread that updates drawn content on physical screen"""
-        while self.run:
-            self.need_update.wait()
-            # here must be delay, otherwise output gets messed up
-            with self.lock:
-                time.sleep(0.005)   # lower delay so video is not late
-                curses.doupdate()
-                self.need_update.clear()
+    def pil_img_to_term(self, img, remove_alpha=True):
+        """Convert pillow image to ascii art and display it in terminal with media controls of needed"""
+        screen_height, screen_width = terminal_utils.get_size()
+        height, width = terminal_utils.get_size()
 
-
-    def pil_img_to_curses(self, img, remove_alpha=True):
-        """Convert pillow image to ascii art and display it with curses"""
-        screen_height, screen_width = self.media_screen.getmaxyx()
-        height, width = self.media_screen.getmaxyx()
-
-        # scale image
-        wpercent = (width / (float(img.size[0] * self.font_scale)))
-        hsize = int((float(img.size[1]) * float(wpercent)))
+        # scale image preserving aspect ratio
+        wpercent = width / (img.size[0] * self.font_ratio)
+        hsize = int(img.size[1] * wpercent)
         if hsize > height:
-            hpercent = (height / float(img.size[1]))
-            wsize = int((float(img.size[0] * self.font_scale) * float(hpercent)))
+            hpercent = height / img.size[1]
+            wsize = int(img.size[0] * hpercent * self.font_ratio)
             width = wsize
         else:
             height = hsize
@@ -170,6 +223,7 @@ class CursesMedia():
             sat = ImageEnhance.Color(img)
             img = sat.enhance(self.saturation)
 
+        # remove alpha
         if remove_alpha and img.mode != "RGB" and img.mode != "L":
             background = Image.new("RGB", img.size, (0, 0, 0))
             background.paste(img, mask=img.split()[3])
@@ -180,25 +234,79 @@ class CursesMedia():
         img_palette.putpalette(self.xterm_256_palette)
         img = img.quantize(palette=img_palette, dither=0)
 
-        # draw with curses
-        img_to_curses(
-            self.media_screen,
+        # draw
+        string = img_to_term(
             img,
             img_gray,
-            self.start_color_id,
+            self.bg_color,
             self.ascii_palette,
             self.ascii_palette_len,
             screen_width,
-            screen_height,
+            screen_height - bool(self.ui_line),
             width,
             height,
         )
-        self.need_update.set()
+        if self.ui_line:
+            string += f"\n{ESC}[48;5;{self.bg_color}m{self.ui_line}{RESET}"
+        terminal_utils.draw(string)
+
+    def pil_img_to_term_block(self, img, remove_alpha=True):
+        """Convert pillow image to half-block terminal output"""
+        screen_height, screen_width = terminal_utils.get_size()
+        height = screen_height * 2
+        width = screen_width
+
+        # scale image preserving aspect ratio
+        wpercent = width / float(img.size[0] * self.font_ratio_block)
+        hsize = int(img.size[1] * wpercent)
+        if hsize > height:
+            hpercent = height / float(img.size[1])
+            wsize = int(img.size[0] * hpercent * self.font_ratio_block)
+            width = wsize
+        else:
+            height = hsize
+        height &= ~1   # must be even height
+        img = img.resize((width, height), Image.Resampling.LANCZOS)
+
+        # remove alpha
+        if remove_alpha and img.mode not in ("RGB", "L"):
+            background = Image.new("RGB", img.size, (0, 0, 0))
+            background.paste(img, mask=img.split()[3])
+            img = background
+
+        # apply xterm256 palette
+        img_palette = Image.new("P", (16, 16))
+        img_palette.putpalette(self.xterm_256_palette)
+        img = img.quantize(palette=img_palette, dither=0)
+
+        # draw
+        string = img_to_term_block(
+            img,
+            self.bg_color,
+            screen_width,
+            screen_height - bool(self.ui_line),
+            width,
+            height,
+        )
+        if self.ui_line:
+            string += f"\n{ESC}[48;5;{self.bg_color}m{self.ui_line}{RESET}"
+        terminal_utils.draw(string)
+
+
+    def draw_blank(self):
+        """Fill screen with bg_color"""
+        screen_size = terminal_utils.get_size()
+        bg = f"{ESC}[48;5;{self.bg_color}m"
+        line = bg + (" " * screen_size[1]) + RESET
+        string = "\n".join(line for _ in range(screen_size[0]))
+        if self.ui_line:
+            string += f"\n{bg}{self.ui_line}{RESET}"
+        terminal_utils.draw(string)
 
 
     def play_img(self, img_path):
         """
-        Convert image to colored ascii art and draw it with curses.
+        Convert image to colored ascii art and draw it on terminal.
         If image is animated (eg apng) send it to play_anim instead.
         """
         img = Image.open(img_path)
@@ -206,22 +314,19 @@ class CursesMedia():
             self.media_type = "gif"
             self.play_anim(img_path)
             return
-        self.init_colors()   # 255_curses_bug
         self.hide_ui()
-        self.pil_img_to_curses(img)
-        while self.playing:
-            self.media_screen.noutrefresh()
-            self.need_update.set()
-            screen_size = self.media_screen.getmaxyx()
-            if self.media_screen_size != screen_size:
-                self.pil_img_to_curses(img)
-                self.media_screen_size = screen_size
+        self.pil_img_to_term(img)
+        while self.run:
+            screen_size = terminal_utils.get_size()
+            if self.screen_size != screen_size:
+                self.screen_size = screen_size
+                self.pil_img_to_term(img)
             time.sleep(0.1)
+        self.stop_playback()
 
 
     def play_anim(self, gif_path):
-        """Convert animated image to colored ascii art and draw it with curses"""
-        self.init_colors()   # 255_curses_bug
+        """Convert animated image to colored ascii art and draw it in terminal"""
         self.hide_ui()
         gif = Image.open(gif_path)
         frame = 0
@@ -233,7 +338,7 @@ class CursesMedia():
                 gif.seek(frame)
                 img = Image.new("RGB", gif.size)
                 img.paste(gif)
-                self.pil_img_to_curses(img, remove_alpha=False)
+                self.pil_img_to_term(img, remove_alpha=False)
                 frame += 1
                 time.sleep(max(frame_duration - (time.time() - start_time), 0))
             except EOFError:
@@ -245,7 +350,6 @@ class CursesMedia():
     def play_audio(self, path, loop=False, loop_delay=0.7, loop_max=60):
         """Play only audio"""
         if self.ui:
-            self.init_colors()   # 255_curses_bug
             self.show_ui()
 
         self.seek = None
@@ -253,18 +357,11 @@ class CursesMedia():
             self.ended = True
             return
 
+        self.draw_blank()
+
         container = av.open(path)
         self.ended = False
         self.video_time = 0   # using video_time to simplify controls
-
-        # fill screen
-        if self.ui:
-            self.media_screen.clear()
-            h, w = self.media_screen.getmaxyx()
-            for y in range(h):
-                self.media_screen.insstr(y, 0, " " * w, curses.color_pair(self.start_color_id+1))
-            self.media_screen.noutrefresh()
-            self.need_update.set()
 
         all_audio_streams = container.streams.audio
         if not all_audio_streams:   # no audio?
@@ -297,8 +394,6 @@ class CursesMedia():
                     stream.play(frame.to_ndarray().astype("float32").T)
                     self.video_time += frame.samples * frame_duration
                     if self.pause:
-                        if self.ui:
-                            self.draw_ui()
                         while self.pause:
                             time.sleep(0.1)
                 if loop:
@@ -350,8 +445,7 @@ class CursesMedia():
             if audio_queue.qsize() >= 1:
                 start_time = time.time()
                 img = frame.to_image()
-                with self.lock:
-                    self.pil_img_to_curses(img, remove_alpha=False)
+                self.pil_img_to_term(img, remove_alpha=False)
             if audio_queue.qsize() >= 3:
                 time.sleep(max(frame_duration - (time.time() - start_time), 0))
             while self.pause:
@@ -360,8 +454,8 @@ class CursesMedia():
 
     def play_video(self, path):
         """Decode video and audio frames and manage queues"""
-        self.init_colors()   # 255_curses_bug
-        self.show_ui()
+        if self.ui:
+            self.show_ui()
         self.seek = None
 
         container = av.open(path)
@@ -420,7 +514,6 @@ class CursesMedia():
                 num += 1
                 self.video_time += frame_duration
             if self.pause:
-                self.draw_ui()
                 while self.pause:
                     time.sleep(0.1)
 
@@ -432,6 +525,25 @@ class CursesMedia():
         self.ended = True
 
 
+    def play_youtube(self, url):
+        """Get youtube video stream and play video"""
+        if shutil.which(self.yt_dlp_path):
+            command = [self.yt_dlp_path, "-f", str(self.yt_dlp_format), "-g", url]
+            proc = subprocess.Popen(
+                command,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+            )
+            stream_url = proc.communicate()[0].decode().strip("\n")
+            self.path = stream_url
+            self.media_type = "video"
+            self.start_ui_thread()
+            self.play_video(stream_url)
+        else:
+            logger.warning("Cant play youtube link, yt-dlp path is invalid")
+
+
     def play(self, path):
         """Select runner based on file type"""
         if not path:
@@ -440,12 +552,15 @@ class CursesMedia():
             return
         if os.path.isdir(path):
             return
+
         self.path = path
         self.ui = True
         self.run = True
-        self.screen_update_thread = threading.Thread(target=self.screen_update, daemon=True)
-        self.screen_update_thread.start()
         self.playing = True
+
+        terminal_utils.enter_tui()
+        input_thread = threading.Thread(target=self.wait_input, daemon=True)
+        input_thread.start()
         try:
             yt_match = re.search(match_youtube, path)
             if yt_match:
@@ -478,37 +593,17 @@ class CursesMedia():
                 time.sleep(0.2)
         except Exception as e:
             logger.error("".join(traceback.format_exception(e)))
+        finally:
+            terminal_utils.leave_tui()
+
         self.run = False
         self.playing = False
-        self.need_update.set()
-        self.screen_update_thread.join()
-
-
-    def play_youtube(self, url):
-        """Get youtube video stream and play video"""
-        if shutil.which(self.yt_dlp_path):
-            command = [self.yt_dlp_path, "-f", str(self.yt_dlp_format), "-g", url]
-            proc = subprocess.Popen(
-                command,
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
-            )
-            stream_url = proc.communicate()[0].decode().strip("\n")
-            self.path = stream_url
-            self.media_type = "video"
-            self.start_ui_thread()
-            self.play_video(stream_url)
-        else:
-            logger.warning("Cant play youtube link, yt-dlp path is invalid")
 
 
     def control_codes(self, code):
         """Handle controls from TUI"""
         if code == 100:   # quit media player
-            self.pause = False
-            self.run = False
-            self.playing = False
+            self.stop_playback()
         elif code == 101 and self.media_type in ("audio", "video"):   # pause
             self.show_ui()
             self.pause = not self.pause
@@ -547,22 +642,12 @@ class CursesMedia():
 
     def show_ui(self):
         """Show UI after its been hidden"""
-        with self.lock:
-            self.ui_timer = 0
-            h, w = self.screen.getmaxyx()
-            media_screen_hwyx = (h - 1, w, 0, 0)
-            self.media_screen = self.screen.derwin(*media_screen_hwyx)
-            ui_line_hwyx = (1, w, h - 1, 0)
-            self.ui_line = self.screen.derwin(*ui_line_hwyx)
-            self.media_screen_size = self.media_screen.getmaxyx()
+        self.ui_timer = 0
 
 
     def hide_ui(self):
         """Hide UI"""
-        with self.lock:
-            h, w = self.screen.getmaxyx()
-            self.media_screen = self.screen
-            self.ui_line = None
+        self.ui_timer = 30
 
 
     def draw_ui_loop(self):
@@ -573,9 +658,9 @@ class CursesMedia():
             self.ui_timer = 0
             while self.run:
                 if self.ui_timer <= 25:
-                    self.draw_ui()
+                    self.ui_line = self.build_ui_string()
                     if self.ui_timer == 25:
-                        self.hide_ui()
+                        self.ui_line = ""
                     if not (self.pause or self.ended):
                         self.ui_timer += 1
                 time.sleep(0.2)
@@ -584,66 +669,49 @@ class CursesMedia():
             self.video_time = 0
             self.ui_timer = 0
             while self.run:
-                self.draw_ui()
+                self.ui_line = self.build_ui_string()
+                self.draw_blank()
                 time.sleep(0.2)
 
 
-    def draw_ui(self):
+    def build_ui_string(self):
         """Draw UI line at bottom of the screen"""
-        if self.ui_line:
-            total_time = f"{int(self.video_duration) // 60:02d}:{int(self.video_duration) % 60:02d}"
-            current_time = f"{int(self.video_time) // 60:02d}:{int(self.video_time) % 60:02d}"
-            bar_len = self.screen.getmaxyx()[1] - 20   # minus len of all other elements and spaces
-            filled = int(bar_len * min(self.video_time / self.video_duration, 1))
-            bar = self.bar_ch * filled + " " * (bar_len - filled)
-            if self.pause:
-                pause = "|"
-            else:
-                pause = ">"
-            with self.lock:
-                ui_line = f"   {pause} {current_time} {bar} {total_time}  "
-                self.ui_line.addstr(0, 0, ui_line, curses.color_pair(self.default_color))
-                self.ui_line.noutrefresh()
-                self.need_update.set()
+        total_time = f"{int(self.video_duration) // 60:02d}:{int(self.video_duration) % 60:02d}"
+        current_time = f"{int(self.video_time) // 60:02d}:{int(self.video_time) % 60:02d}"
+        bar_len = terminal_utils.get_size()[1] - 20   # minus len of all other elements and spaces
+        filled = int(bar_len * min(self.video_time / self.video_duration, 1))
+        bar = self.bar_ch * filled + " " * (bar_len - filled)
+        if self.pause:
+            pause = "|"
+        else:
+            pause = ">"
+        return f"   {pause} {current_time} {bar} {total_time}   "
 
 
-def wait_input(screen, keybindings, curses_media):
-    """Handle input from user"""
-    keybindings = {key: (val,) if not isinstance(val, tuple) else val for key, val in keybindings.items()}
-    run = True
-    while run:
-        key = screen.getch()
-        if key == 27:   # ESCAPE
-            screen.nodelay(True)
-            key = screen.getch()
-            if key in (-1, 27):
-                screen.nodelay(False)
-                curses_media.control_codes(100)
-            screen.nodelay(False)
-            run = False
-        elif key in keybindings["media_pause"]:
-            curses_media.control_codes(101)
-        elif key in keybindings["media_replay"]:
-            curses_media.control_codes(102)
-        elif key in keybindings["media_seek_forward"]:
-            curses_media.control_codes(103)
-        elif key in keybindings["media_seek_backward"]:
-            curses_media.control_codes(104)
-        elif key == curses.KEY_RESIZE:
-            pass
+    def wait_input(self):
+        """Handle input from user"""
+        run = True
+        while run:
+            key = terminal_utils.read_key()
+            if key == 27:   # ESCAPE
+                self.control_codes(100)
+                run = False
+            elif key in self.keybindings["media_pause"]:
+                self.control_codes(101)
+            elif key in self.keybindings["media_replay"]:
+                self.control_codes(102)
+            elif key in self.keybindings["media_seek_forward"]:
+                self.control_codes(103)
+            elif key in self.keybindings["media_seek_backward"]:
+                self.control_codes(104)
 
 
-def ascii_runner(screen, path, config, keybindings):
+def ascii_runner(path, config, keybindings):
     """Main function"""
     path = os.path.expanduser(path)
     if not os.path.exists(path):
         sys.exit("Cant play media: File not found.")
     if os.path.isdir(path):
         sys.exit("Cant play media: Specified path is a directory.")
-    curses.curs_set(0)
-    curses.start_color()
-    curses.use_default_colors()
-    curses_media = CursesMedia(screen, config, 0)
-    input_thread = threading.Thread(target=wait_input, args=(screen, keybindings, curses_media), daemon=True)
-    input_thread.start()
-    curses_media.play(path)
+    terminal_media = TerminalMedia(config, keybindings, external=True)
+    terminal_media.play(path)

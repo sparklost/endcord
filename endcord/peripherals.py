@@ -58,17 +58,17 @@ elif sys.platform == "linux":
 if sys.platform == "linux":
     path = os.environ.get("XDG_DATA_HOME", "")
     if path.strip():
-        config_path = os.path.join(path, f"{APP_NAME}/")
-        log_path = os.path.join(path, f"{APP_NAME}/")
+        config_path = os.path.join(path, f"{APP_NAME}")
+        log_path = os.path.join(path, f"{APP_NAME}")
     else:
-        config_path = f"~/.config/{APP_NAME}/"
-        log_path = f"~/.config/{APP_NAME}/"
+        config_path = f"~/.config/{APP_NAME}"
+        log_path = f"~/.config/{APP_NAME}"
     path = os.environ.get("XDG_RUNTIME_DIR", "")
     if path.strip():
-        temp_path = os.path.join(path, f"{APP_NAME}/")
+        temp_path = os.path.join(path, f"{APP_NAME}")
     else:
         # per-user temp dir
-        temp_path = f"/run/user/{os.getuid()}/{APP_NAME}/"
+        temp_path = f"/run/user/{os.getuid()}/{APP_NAME}"
         # fallback to .cache
         if not os.access(f"/run/user/{os.getuid()}", os.W_OK):
             temp_path = f"~/.cache/{APP_NAME}"
@@ -76,19 +76,19 @@ if sys.platform == "linux":
 
     path = os.environ.get("XDG_DOWNLOAD_DIR", "")
     if path.strip():
-        downloads_path = os.path.join(path, f"{APP_NAME}/")
+        downloads_path = os.path.join(path, f"{APP_NAME}")
     else:
-        downloads_path = "~/Downloads/"
+        downloads_path = "~/Downloads"
 elif sys.platform == "win32":
-    config_path = os.path.join(os.path.normpath(f"{os.environ["USERPROFILE"]}/AppData/Local/{APP_NAME}/"), "")
-    log_path = os.path.join(os.path.normpath(f"{os.environ["USERPROFILE"]}/AppData/Local/{APP_NAME}/"), "")
-    temp_path = os.path.join(os.path.normpath(f"{os.environ["USERPROFILE"]}/AppData/Local/Temp/{APP_NAME}/"), "")
-    downloads_path = os.path.join(os.path.normpath(f"{os.environ["USERPROFILE"]}/Downloads/"), "")
+    config_path = os.path.join(os.environ["LOCALAPPDATA"], APP_NAME)
+    log_path = os.path.join(os.environ["LOCALAPPDATA"], APP_NAME)
+    temp_path = os.path.join(os.environ["LOCALAPPDATA"], "Temp", APP_NAME)
+    downloads_path = os.path.join(os.environ["USERPROFILE"], "Downloads")
 elif sys.platform == "darwin":
-    config_path = f"~/Library/Application Support/{APP_NAME}/"
-    log_path = f"~/Library/Application Support/{APP_NAME}/"
-    temp_path = f"~/Library/Caches/TemporaryItems{APP_NAME}/"
-    downloads_path = "~/Downloads/"
+    config_path = f"~/Library/Application Support/{APP_NAME}"
+    log_path = f"~/Library/Application Support/{APP_NAME}"
+    temp_path = f"~/Library/Caches/TemporaryItems{APP_NAME}"
+    downloads_path = "~/Downloads"
 else:
     sys.exit(f"Unsupported platform: {sys.platform}")
 
@@ -214,7 +214,7 @@ def load_config(path, default, section="main", gen_config=False, merge=False):
     If some value is missing, it is replaced with default value
     """
     if not path:
-        path = config_path + "config.ini"
+        path = os.path.join(config_path, "config.ini")
     path = os.path.expanduser(path)
 
     if not os.path.exists(path) or gen_config:
@@ -266,10 +266,11 @@ def merge_configs(custom_config_path, theme_path):
     gen_config = False
     error = None
     if not custom_config_path:
-        if not os.path.exists(os.path.expanduser(config_path) + "config.ini"):
+        default_config_path = os.path.expanduser(os.path.join(config_path, "config.ini"))
+        if not os.path.exists(default_config_path):
             logger.info("Using default config")
             gen_config = True
-        custom_config_path = config_path + "config.ini"
+        custom_config_path = default_config_path
     elif not os.path.exists(os.path.expanduser(custom_config_path)):
         gen_config = True
     config = load_config(custom_config_path, defaults.settings)
@@ -363,7 +364,7 @@ def update_config(config, key, value):
     config_path = config["config_path"]
     saved_config = ConfigParser(interpolation=None)
     if os.path.exists(config_path):
-        with open(config_path, "r", encoding="utf-8") as f:
+        with open(os.path.expanduser(config_path), "r", encoding="utf-8") as f:
             saved_config.read_file(f)
     new_config = {}
     new_theme = {}
@@ -446,7 +447,7 @@ def get_extensions(path):
 def install_extension(url):
     """Install extension from specified git repo url"""
     if shutil.which("git"):
-        ext_path = os.path.expanduser(os.path.join(config_path + "Extensions"))
+        ext_path = os.path.expanduser(os.path.join(config_path, "Extensions"))
         if not os.path.exists(ext_path):
             os.makedirs(os.path.expanduser(path), exist_ok=True)
         print("Installing extension to: {ext_path}")

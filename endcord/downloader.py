@@ -37,7 +37,7 @@ class Downloader:
     def download(self, url, file_id=None):
         """Thread that downloads file and stores it in temp folder"""
         if not os.path.exists(os.path.expanduser(peripherals.temp_path)):
-            os.makedirs(os.path.expanduser(os.path.dirname(os.path.expanduser(peripherals.temp_path))), exist_ok=True)
+            os.makedirs(os.path.dirname(os.path.expanduser(peripherals.temp_path)), exist_ok=True)
         url_object = urllib.parse.urlsplit(url)
         filename = os.path.basename(url_object.path)
         proxy = urllib.parse.urlsplit(self.proxy)

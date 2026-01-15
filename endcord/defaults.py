@@ -151,9 +151,10 @@ theme = {
     "color_chat_url": [153, -1, "u"],
     "color_chat_spoiler": [245, -1],
     "color_chat_code": [250, 233],
+    "media_use_blocks": True,
     "media_ascii_palette": "  ..',;:c*loexk#O0XNW",
     "media_saturation": 1.2,
-    "media_font_scale": 2.25,
+    "media_font_aspect_ratio": 2.25,
     "media_color_bg": 16,
     "media_bar_ch": "━",
 }
@@ -199,9 +200,8 @@ keybindings = {
     "show_summaries": "ALT+115",   # Alt+S
     "copy_message_link": "ALT+117",   # Alt+U
     "go_channel": "ALT+103",   # Alt+G
-    "add_reaction": 12,   # Ctrl+L
+    "add_reaction": "ALT+114",   # Alt+R
     "search_gif": "ALT+102",   # Alt+F
-    "record_audio": "ALT+114",   # Alt+R
     "show_reactions": "ALT+119",   # Alt+W
     "show_pinned": "ALT+110",   # Alt+N
     # extra line

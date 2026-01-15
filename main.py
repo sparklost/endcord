@@ -17,12 +17,10 @@ default_config_path = peripherals.config_path
 log_path = peripherals.log_path
 uses_pgcurses = hasattr(curses, "PGCURSES")
 
-if not os.path.exists(log_path):
-    os.makedirs(os.path.expanduser(os.path.dirname(log_path)), exist_ok=True)
 logger = logging
 logging.basicConfig(
     level="INFO",
-    filename=os.path.expanduser(f"{log_path}{APP_NAME}.log"),
+    filename=os.path.expanduser(os.path.join(log_path, APP_NAME + ".log")),
     encoding="utf-8",
     filemode="w",
     format="{asctime} - {levelname}\n  [{module}]: {message}\n",
@@ -107,7 +105,7 @@ def main(args):
         if uses_pgcurses:
             curses.enable_tray = False
         try:
-            curses.wrapper(media.ascii_runner, args.media, config, keybindings)
+            media.ascii_runner(args.media, config, keybindings)
         except curses.error as e:
             if str(e) != "endwin() returned ERR":
                 logger.error(traceback.format_exc())

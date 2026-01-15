@@ -40,7 +40,7 @@ support_media = (
     importlib.util.find_spec("nacl") is not None
 )
 if support_media:
-    from endcord import clipboard, media
+    from endcord import clipboard
 cythonized = importlib.util.find_spec("endcord_cython") and importlib.util.find_spec("endcord_cython.search")
 uses_pgcurses = tui.uses_pgcurses
 
@@ -73,6 +73,7 @@ class Endcord:
     def __init__(self, screen, config, keybindings, command_bindings, profiles, version):
         self.screen = screen
         self.config = config
+        self.keybindings = keybindings
         self.init_time = time.time()
         self.profiles = profiles
 
@@ -289,6 +290,7 @@ class Endcord:
         self.timed_extra_line = threading.Event()
         self.log_queue_manager = None
         self.message_send_queue = queue.Queue()
+        self.terminal_media = None
         # threading.Thread(target=self.profiling_auto_exit, daemon=True).start()
         self.discord.get_voice_regions()
 
@@ -308,6 +310,8 @@ class Endcord:
 
     def sigint_handler(self, _signum, _frame):
         """Handling Ctrl-C event"""
+        if self.terminal_media:
+            self.terminal_media.stop_playback()
         self.gateway.disconnect_ws()
         self.run = False
         try:
@@ -535,7 +539,7 @@ class Endcord:
         self.downloader.cancel()
         self.download_threads = []
         self.upload_threads = []
-        self.ready_attachments = []
+        self.ready_attachments = {}
         self.selected_attachment = 0
         self.current_my_roles = []
         self.member_roles = []
@@ -1566,10 +1570,9 @@ class Endcord:
             elif action == 15:
                 self.restore_input_text = (input_text, "standard")
                 num_attachments = 0
-                for attachments in self.ready_attachments:
-                    if attachments["channel_id"] == self.active_channel["channel_id"]:
-                        num_attachments = len(attachments["attachments"])
-                        break
+                attachments = self.ready_attachments.get(self.active_channel["channel_id"])
+                if attachments:
+                    num_attachments = len(attachments)
                 if self.selected_attachment + 1 < num_attachments:
                     self.selected_attachment += 1
                     self.update_extra_line()
@@ -1628,14 +1631,12 @@ class Endcord:
                     self.download_threads[-1].start()
                 else:
                     active_channel = self.active_channel["channel_id"]
-                    for attachments in self.ready_attachments:
-                        if attachments["channel_id"] == active_channel:
-                            if attachments["attachments"] and len(attachments["attachments"]) >= self.selected_attachment - 1:
-                                file_path = attachments["attachments"][self.selected_attachment]["path"]
-                                if isinstance(file_path, str):
-                                    self.media_thread = threading.Thread(target=self.open_media, daemon=True, args=(file_path, ))
-                                    self.media_thread.start()
-                            break
+                    attachments = self.ready_attachments.get(active_channel)
+                    if attachments and len(attachments) >= self.selected_attachment - 1:
+                        file_path = attachments[self.selected_attachment]["path"]
+                        if isinstance(file_path, str):
+                            self.media_thread = threading.Thread(target=self.open_media, daemon=True, args=(file_path, ))
+                            self.media_thread.start()
 
             # view profile info
             elif action == 24:
@@ -1815,13 +1816,11 @@ class Endcord:
                             break
                     self.set_status(new_status)
 
-            # record audio message
-            elif action == 34 and self.messages and not self.disable_sending and not self.uploading:
-                self.restore_input_text = (input_text, "standard")
-                if self.recording:
-                    self.stop_recording()
-                else:
-                    self.start_recording()
+            # quit
+            elif action == 34:
+                self.run = False
+                time.sleep(0.5)
+                sys.exit()
 
             # toggle member list
             elif self.get_members and action == 35:
@@ -2098,10 +2097,6 @@ class Endcord:
                     )))
                     self.download_threads[-1].start()
 
-            elif action == 49:
-                self.run = False
-                time.sleep(0.5)
-                sys.exit()
 
             # escape in main UI
             elif action == 5:
@@ -2151,9 +2146,9 @@ class Endcord:
                     command_type, command_args = parser.command_string(action[1])
                     self.execute_command(command_type, command_args, action[1], chat_sel, tree_sel)
 
-            # media controls
-            elif action >= 100:
-                self.curses_media.control_codes(action)
+            # media controls   # handled externally in media.py as curses is fully paused
+            # elif action >= 100:
+            #     self.terminal_media.control_codes(action)
 
             # execute extensions bindings
             elif self.execute_extensions_method_first("on_wait_input", action, input_text, chat_sel, tree_sel, cache=True):
@@ -2368,11 +2363,14 @@ class Endcord:
                     # select attachment
                     this_attachments = None
                     active_channel = self.active_channel["channel_id"]
-                    for num, attachments in enumerate(self.ready_attachments):
-                        if attachments["channel_id"] == active_channel:
-                            this_attachments = self.ready_attachments.pop(num)["attachments"]
+                    attachments = self.ready_attachments.get(active_channel)
+                    if attachments:
+                        if all(attachment.get("state", 0) >= 1 for attachment in attachments):
+                            this_attachments = self.ready_attachments.pop(active_channel)
                             self.update_extra_line()
-                            break
+                        else:
+                            self.restore_input_text = (input_text, "standard")
+                            self.update_extra_line("Attachments are still uploading.")
                     # if this thread is not joined, join it (locally only)
                     if self.current_channel.get("type") in (11, 12) and not self.current_channel.get("joined"):
                         channel_id, _, guild_id, _, parent_id = self.find_parents_from_tree(active_channel)
@@ -2447,11 +2445,14 @@ class Endcord:
                 elif self.ready_attachments and not self.disable_sending and not self.forum:
                     this_attachments = None
                     active_channel = self.active_channel["channel_id"]
-                    for num, attachments in enumerate(self.ready_attachments):
-                        if attachments["channel_id"] == active_channel:
-                            this_attachments = self.ready_attachments.pop(num)["attachments"]
+                    attachments = self.ready_attachments.get(active_channel)
+                    if attachments:
+                        if all(attachment.get("state", 0) >= 1 for attachment in attachments):
+                            this_attachments = self.ready_attachments.pop(active_channel)
                             self.update_extra_line()
-                            break
+                        else:
+                            self.update_extra_line("Attachments are still uploading.")
+                            continue
                     nonce = discord.generate_nonce()
                     self.put_to_message_sender(self.discord.send_message,
                         active_channel,
@@ -3546,11 +3547,10 @@ class Endcord:
         # select attachment
         this_attachments = None
         if need_attachment and not autocomplete:
-            for num, attachments in enumerate(self.ready_attachments):
-                if attachments["channel_id"] == self.active_channel["channel_id"]:
-                    this_attachments = self.ready_attachments.pop(num)["attachments"]
-                    self.update_extra_line()
-                    break
+            attachments = self.ready_attachments.get(self.active_channel["channel_id"])
+            if attachments:
+                this_attachments = self.ready_attachments.pop(self.active_channel["channel_id"])
+                self.update_extra_line()
             if not this_attachments:
                 self.update_extra_line("Attachment not provided.")
                 self.stop_assist()
@@ -3588,11 +3588,13 @@ class Endcord:
         for attachment in attachments_paths:
             self.upload(attachment, channel_id=channel_id)
         this_attachments = []
-        for num, attachments in enumerate(self.ready_attachments):
-            if attachments["channel_id"] == channel_id:
-                this_attachments = self.ready_attachments.pop(num)["attachments"]
+        attachments = self.ready_attachments.get(channel_id)
+        if attachments:
+            if all(attachment.get("state", 0) >= 1 for attachment in attachments):
+                this_attachments = self.ready_attachments.pop(channel_id)
                 self.update_extra_line()
-                break
+            else:
+                self.update_extra_line("Attachments are still uploading.")
         self.discord.send_message(
             channel_id,
             content,
@@ -4053,6 +4055,9 @@ class Endcord:
             self.update_extra_line("Cant upload directory")
             return
 
+        if not channel_id:
+            channel_id = self.active_channel["channel_id"]
+
         size = peripherals.get_file_size(path)
         limit = max(USER_UPLOAD_LIMITS[self.premium], GUILD_UPLOAD_LIMITS[self.premium])
         if size > limit:
@@ -4063,47 +4068,48 @@ class Endcord:
             return
 
         # add attachment to list
-        for ch_index, channel in enumerate(self.ready_attachments):
-            if channel["channel_id"] == self.active_channel["channel_id"]:
-                break
-        else:
-            self.ready_attachments.append({
-                "channel_id": channel_id or self.active_channel["channel_id"],
-                "attachments": [],
-            })
-            ch_index = len(self.ready_attachments) - 1
-        self.ready_attachments[ch_index]["attachments"].append({
+        if channel_id not in self.ready_attachments:
+            self.ready_attachments[channel_id] = []
+        self.ready_attachments[channel_id].append({
             "path": path,
             "name": os.path.basename(path),
             "upload_url": None,
             "upload_filename": None,
-            "state": 0,
+            "state": 0,   # 0 - uploading, 1 - done, 2 - too large, 3 - restricted, 4 - failed
         })
-        at_index = len(self.ready_attachments[ch_index]["attachments"]) - 1
+        at_index = len(self.ready_attachments[channel_id]) - 1
 
         self.add_running_task("Uploading file", 2)
         time.sleep(0.01)   # time for tui to clear extra window before drawing extra line
         self.update_extra_line()
-        upload_data, code = self.discord.request_attachment_url(self.active_channel["channel_id"], path)
+        upload_data, code = self.discord.request_attachment_url(channel_id, path)
         if code == 3:
             self.gateway.set_offline()
             self.update_extra_line("Network error.")
+        if channel_id not in self.ready_attachments:
+            self.update_extra_line()
+            self.remove_running_task("Uploading file", 2)
+            return
         try:
             if upload_data:
                 uploaded = self.discord.upload_attachment(upload_data["upload_url"], path)
+                if uploaded is None:
+                    self.update_extra_line()
+                    self.remove_running_task("Uploading file", 2)
+                    return
                 if uploaded:
-                    self.ready_attachments[ch_index]["attachments"][at_index]["upload_url"] = upload_data["upload_url"]
-                    self.ready_attachments[ch_index]["attachments"][at_index]["upload_filename"] = upload_data["upload_filename"]
-                    self.ready_attachments[ch_index]["attachments"][at_index]["state"] = 1
+                    self.ready_attachments[channel_id][at_index]["upload_url"] = upload_data["upload_url"]
+                    self.ready_attachments[channel_id][at_index]["upload_filename"] = upload_data["upload_filename"]
+                    self.ready_attachments[channel_id][at_index]["state"] = 1
                 else:
-                    self.ready_attachments[ch_index]["attachments"][at_index]["path"] = None
-                    self.ready_attachments[ch_index]["attachments"][at_index]["state"] = 4
+                    self.ready_attachments[channel_id][at_index]["path"] = None
+                    self.ready_attachments[channel_id][at_index]["state"] = 4
             else:
-                self.ready_attachments[ch_index]["attachments"][at_index]["path"] = None
+                self.ready_attachments[channel_id][at_index]["path"] = None
                 if code == 1:
-                    self.ready_attachments[ch_index]["attachments"][at_index]["state"] = 4
+                    self.ready_attachments[channel_id][at_index]["state"] = 4
                 elif code == 2:
-                    self.ready_attachments[ch_index]["attachments"][at_index]["state"] = 2
+                    self.ready_attachments[channel_id][at_index]["state"] = 2
         except IndexError:
             self.update_extra_line("Failed uploading attachment.")
         self.update_extra_line()
@@ -4111,34 +4117,30 @@ class Endcord:
 
 
     def cancel_upload(self):
-        """Cancels and removes all uploaded attachments from list"""
-        for num, attachments_ch in enumerate(self.ready_attachments):
-            if attachments_ch["channel_id"] == self.active_channel["channel_id"]:
-                attachments = self.ready_attachments.pop(num)["attachments"]
-                if not attachments:
-                    break
-                for attachment in attachments:
-                    self.discord.cancel_uploading(url=attachment["upload_url"])
+        """Cancel and remove all uploaded attachments for current channel"""
+        attachments = self.ready_attachments.get(self.active_channel["channel_id"])
+        if attachments:
+            for attachment in attachments:
+                self.discord.cancel_uploading(url=attachment["upload_url"])
+                if attachment["upload_filename"]:
                     self.discord.cancel_attachment(attachment["upload_filename"])
-                    self.selected_attachment = 0
-                self.update_extra_line()
-                break
+                self.selected_attachment = 0
+            self.ready_attachments.pop(self.active_channel["channel_id"])
+            self.update_extra_line()
 
 
     def cancel_attachment(self):
         """Cancel currently selected attachment"""
-        for num, attachments_ch in enumerate(self.ready_attachments):
-            if attachments_ch["channel_id"] == self.active_channel["channel_id"]:
-                attachments = self.ready_attachments[num]["attachments"]
-                if attachments:
-                    attachment = attachments.pop(self.selected_attachment)["upload_filename"]
-                    if not len(attachments):
-                        self.ready_attachments.pop(num)
-                    self.discord.cancel_attachment(attachment)
-                    if self.selected_attachment >= 1:
-                        self.selected_attachment -= 1
-                    self.update_extra_line()
-                break
+        attachments = self.ready_attachments.get(self.active_channel["channel_id"])
+        if attachments:
+            attachment = attachments.pop(self.selected_attachment)["upload_filename"]
+            if not len(attachments):
+                self.ready_attachments.pop(self.active_channel["channel_id"])
+            if attachment:
+                self.discord.cancel_attachment(attachment)
+            if self.selected_attachment >= 1:
+                self.selected_attachment -= 1
+            self.update_extra_line()
 
 
     def start_recording(self):
@@ -4619,7 +4621,7 @@ class Endcord:
         """Show live log in chat area"""
         time.sleep(0.1)   # time to finish self.update_chat in main loop when resize
         self.messages = []
-        log = log_queue.read_log_file(os.path.expanduser(f"{peripherals.log_path}{peripherals.APP_NAME}.log"))
+        log = log_queue.read_log_file(os.path.expanduser(os.path.join(peripherals.log_path, peripherals.APP_NAME) + ".log"))
         self.chat, self.chat_format, self.chat_indexes, self.chat_map = formatter.generate_log(
             log,
             self.colors,
@@ -5217,18 +5219,16 @@ class Endcord:
         If TUI mode: prevent other UI updates, draw media and wait for input, after quitting - update UI
         If native mode: just open the file/url
         """
-        if support_media and not self.config["native_media_player"]:
-            self.tui.lock_ui(True)
-            self.curses_media.play(path)
-            self.tui.restore_colors()   # 255_curses_bug
-            if self.active_channel["guild_id"]:   # 255_curses_bug
-                self.all_roles = self.tui.init_role_colors(   # restore role colors
-                    self.all_roles,
-                    self.default_msg_color[1],
-                    self.default_msg_alt_color[1],
-                    guild_id=self.active_channel["guild_id"],
-                )
-            self.tui.lock_ui(False)
+        if support_media and not self.config["native_media_player"] and not uses_pgcurses:
+            if not self.terminal_media:
+                from endcord import media
+                if support_media:
+                    self.terminal_media = media.TerminalMedia(self.config, self.keybindings)
+            self.update_extra_line()
+            self.tui.pause_curses()
+            self.terminal_media.play(path)
+            time.sleep(0.1)
+            self.tui.resume_curses()
         else:
             if shutil.which(self.config["yt_dlp_path"]) and shutil.which(self.config["mpv_path"]):
                 mpv_path = self.config["mpv_path"]
@@ -5590,14 +5590,10 @@ class Endcord:
             if timed:
                 self.timed_extra_line.set()
         else:
-            for attachments in self.ready_attachments:
-                if attachments["channel_id"] == self.active_channel["channel_id"]:
-                    break
-            else:
-                attachments = None
+            attachments = self.ready_attachments.get(self.active_channel["channel_id"])
             if attachments:
                 self.extra_line = formatter.generate_extra_line(
-                    attachments["attachments"],
+                    attachments,
                     self.selected_attachment,
                     self.tui.get_dimensions()[2][1],
                 )
@@ -6564,7 +6560,9 @@ class Endcord:
     def start_ringing(self, path, loop_delay=1, loop_max=60):
         """Start ringing with specified audio file"""
         if support_media:
-            self.ringer = media.CursesMedia(None, self.config, 0, ui=False)
+            if not self.terminal_media:
+                from endcord import media
+            self.ringer = media.TerminalMedia(self.config, self.keybindings, ui=False)
             self.ringer.play_audio_noui(path, loop=True, loop_delay=loop_delay, loop_max=loop_max)
         else:
             self.ringer = peripherals.Player()
@@ -6934,7 +6932,6 @@ class Endcord:
             self.guilds = guilds
         self.all_roles = self.gateway.get_roles()
         self.all_roles = color.convert_role_colors(self.all_roles, default=self.config["color_default"][0])
-        last_free_color_id = self.tui.get_last_free_color_id()
 
         # get my roles and compute perms
         self.my_roles = self.gateway.get_my_roles()
@@ -6947,15 +6944,8 @@ class Endcord:
         for hidden in self.hidden_channels:
             self.hide_channel(hidden["channel_id"], hidden["guild_id"])
 
-        # initialize media
-        if support_media:
-            # must be run after all colors are initialized in endcord.tui
-            self.curses_media = media.CursesMedia(self.screen, self.config, last_free_color_id)
-        else:
-            self.curses_media = None
-
         # some checks
-        if "~/.cache/" in peripherals.temp_path:
+        if "~/.cache" in peripherals.temp_path:
             logger.warning(f"Temp files will be stored in {peripherals.temp_path}")
         if self.config["proxy"]:
             logger.info(f"Using proxy: {self.config["proxy"]}")

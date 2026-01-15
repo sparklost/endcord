@@ -24,6 +24,9 @@
 <b>Viewing user profile:<b><br>
 <img src="./screenshots/05.png" alt="Viewing user profile" width="800">
 <br><br>
-<b>Video in built-in ASCII art media player:<b><br>
+<b>Video in built-in media player using "block" characters:<b><br>
 <img src="./screenshots/06.png" alt="Media with ASCII art" width="800">
+<br><br>
+<b>Video in built-in media player using ASCII art:<b><br>
+<img src="./screenshots/07.png" alt="Media with ASCII art" width="800">
 </div>

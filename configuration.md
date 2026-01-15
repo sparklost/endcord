@@ -268,11 +268,15 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
     Characters used to draw corners in bordered mode.
 - `username_role_colors = True`  
     Allow `%username` and `%global_name` to have color of primary role.
+- `media_use_blocks = False`  
+    Wether to use "block" characters (`▀`) for drawing media instead traditional characters from media_ascii_palette.  
+    This will result in clearer picture with pixel-like characters, vertical resolution will be doubled.  
+    media_ascii_palette and media_saturation have no effect when this is ON.  
 - `media_ascii_palette = "  ..',;:c*loexk#O0XNW"`  
     Characters used to draw in terminal. From darkest to brightest. Same character can be repeated. Number of characters is not fixed.
 - `media_saturation = 1.2`  
     Saturation correction applied to image in order to make colors more visible. Adjust if changing `ascii_palette` or media_color_bg.
-- `media_font_scale = 2.25`  
+- `media_font_aspect_ratio = 2.25`  
     Font height/width ratio. Change only if picture dimensions ratio is wrong in terminal.
 
 ### Colors and attributes

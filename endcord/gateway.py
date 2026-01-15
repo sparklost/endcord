@@ -814,6 +814,8 @@ class Gateway():
                                 for dm_num, dm_g in enumerate(self.dms):
                                     if dm_g["id"] == dm["channel_id"]:
                                         break
+                                else:
+                                    continue
                                 self.dms[dm_num].update({
                                     "message_notifications": dm["message_notifications"],
                                     "muted": dm["muted"],

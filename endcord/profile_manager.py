@@ -211,8 +211,13 @@ def save_plain(profiles, profiles_path):
     path = os.path.expanduser(profiles_path)
     if not os.path.exists(path):
         os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w") as f:
-        json.dump(profiles, f, indent=2)
+    if sys.platform == "linux":
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w") as f:
+            json.dump(profiles, f, indent=2)
+    else:
+        with open(path, "w") as f:
+            json.dump(profiles, f, indent=2)
 
 
 def remove_plain(profiles_path):

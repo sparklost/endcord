@@ -149,7 +149,7 @@ class Discord():
         return None
 
 
-    def get_connection(self, host, port):
+    def get_connection(self, host, port, timeout=10):
         """Get connection object and handle proxying"""
         if self.proxy.scheme:
             if self.proxy.scheme.lower() == "http":
@@ -164,12 +164,12 @@ class Discord():
                 ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
                 proxy_sock = ssl_context.wrap_socket(proxy_sock, server_hostname=host)
                 # proxy_sock.do_handshake()   # seems like its not needed
-                connection = http.client.HTTPSConnection(host, port, timeout=10)
+                connection = http.client.HTTPSConnection(host, port, timeout=timeout + 5)
                 connection.sock = proxy_sock
             else:
                 connection = http.client.HTTPSConnection(host, port)
         else:
-            connection = http.client.HTTPSConnection(host, port, timeout=5)
+            connection = http.client.HTTPSConnection(host, port, timeout=timeout)
         return connection
 
 
@@ -1646,13 +1646,16 @@ class Discord():
         upload_url_path = f"{url.path}?{url.query}"
         with open(path, "rb") as f:
             try:
-                connection = self.get_connection(url.netloc, 443)
+                connection = self.get_connection(url.netloc, 443, timeout=120)
                 self.uploading.append((upload_url, connection))
                 connection.request("PUT", upload_url_path, f, header)
                 response = connection.getresponse()
-                self.uploading.remove((upload_url, connection))
+                if (upload_url, connection) in self.uploading:
+                    self.uploading.remove((upload_url, connection))
             except (socket.gaierror, TimeoutError):
                 connection.close()
+                return False
+            except OSError:   # canceled upload
                 return None
             if response.status == 200:
                 connection.close()
@@ -1674,7 +1677,7 @@ class Discord():
             for upload in self.uploading:
                 upload_url, connection = upload
                 try:
-                    connection.sock.shutdown()
+                    connection.sock.shutdown(socket.SHUT_RDWR)
                     connection.sock.close()
                 except Exception:
                     logger.debug("Cancel upload: upload socket already closed.")

@@ -203,7 +203,6 @@ class TUI():
         curses.mouseinterval(0)
         print("\x1b[?2004h")   # enable bracketed paste mode
         self.last_free_id = 1   # last free color pair id
-        self.color_cache = []   # for restoring colors   # 255_curses_bug
         self.attrib_map = [0]   # has 0 so its index starts from 1 to be matched with color pairs
         tree_bg = config["color_tree_default"][1]
         self.init_pair((255, -1))   # white on default
@@ -441,6 +440,9 @@ class TUI():
 
     def resize(self, redraw_only=False):
         """Resize screen area and redraw ui"""
+        if self.disable_drawing:
+            return
+
         # re-init areas
         if not redraw_only:
             h, w = self.screen.getmaxyx()
@@ -512,6 +514,9 @@ class TUI():
 
     def resize_bordered(self, redraw_only=False):
         """Resize screen area and redraw ui in bordered mode"""
+        if self.disable_drawing:
+            return
+
         h, w = self.screen.getmaxyx()
         chat_hwyx = (
             h - 4 - self.have_title,
@@ -629,9 +634,10 @@ class TUI():
                     self.win_member_list.insstr(y, 0, " " * w, curses.color_pair(1))
                 self.win_member_list.noutrefresh()
                 self.need_update.set()
-        time.sleep(0.1)   # be sure everything is stopped before pausing
+        self.disable_drawing = True
+        self.hibernate_cursor = 10
+        time.sleep(0.2)   # be sure everything is stopped before pausing
         with self.lock:
-            self.lock_ui(True)
             curses.def_prog_mode()
             curses.endwin()
 
@@ -640,16 +646,10 @@ class TUI():
         """Resume curses and enable drawing, capturing terminal"""
         with self.lock:
             curses.reset_prog_mode()
+            curses.curs_set(0)
+            curses.flushinp()
             self.screen.refresh()
-            self.lock_ui(False)
-
-
-    def lock_ui(self, lock):
-        """Turn ON/OFF main TUI drawing"""
-        self.disable_drawing = lock
-        if lock:
-            self.hibernate_cursor = 10
-        else:
+            self.disable_drawing = False
             self.resize(redraw_only=True)
 
 
@@ -811,6 +811,8 @@ class TUI():
 
     def paste_text(self, text):
         """Paste text at current index in input line"""
+        if self.disable_drawing:
+            return
         if self.input_select_start is not None:
             self.delete_selection()
             self.input_select_start = None
@@ -856,6 +858,9 @@ class TUI():
             bkp_fg, bkp_bg = curses.pair_content(15)
             curses.init_pair(15, -1, 196)
             while self.run and self.fun == 2:
+                if self.disable_drawing:
+                    time.sleep(0.5)
+                    continue
                 if self.red_list:
                     with self.fun_lock:
                         self.red_list.pop(random.randrange(len(self.red_list)))
@@ -1020,7 +1025,8 @@ class TUI():
                 self.tree_selected = num - skipped
                 self.tree_index = max(self.tree_selected - self.tree_hw[0] + 3, 0)
                 break
-        self.draw_tree()
+        if not self.disable_drawing:
+            self.draw_tree()
 
 
     def toggle_category(self, tree_pos, only_open=False):
@@ -1031,7 +1037,8 @@ class TUI():
                     self.tree_format[tree_pos] -= 1
             else:
                 self.tree_format[tree_pos] += 1
-            self.draw_tree()
+            if not self.disable_drawing:
+                self.draw_tree()
             self.tree_format_changed = True
 
 
@@ -1274,8 +1281,7 @@ class TUI():
                     self.need_update.set()
             except curses.error:
                 # exception will happen when window is resized to smaller w dimensions
-                if not self.disable_drawing:
-                    self.resize()
+                self.resize()
 
 
     def set_wide_map(self, wide_map):
@@ -1285,6 +1291,8 @@ class TUI():
 
     def clear_chat_wide(self):
         """Clear specific chat lines that are containing emoji"""
+        if self.disable_drawing:
+            return
         h, w = self.win_chat.getmaxyx()
         for y in self.wide_map:
             chat_y = y - self.chat_index
@@ -1422,6 +1430,8 @@ class TUI():
         Draw extra line above status line and resize chat.
         If toggle and same text is repeated then remove extra line.
         """
+        if self.disable_drawing:
+            return
         with self.lock:
             if toggle and text == self.extra_line_text:
                 self.remove_extra_line()
@@ -1461,6 +1471,8 @@ class TUI():
 
     def remove_extra_line(self):
         """Disable drawing of extra line above status line, and resize chat"""
+        if self.disable_drawing:
+            return
         if self.win_extra_line:
             with self.lock:
                 del self.win_chat
@@ -1489,6 +1501,8 @@ class TUI():
         Draw extra window above status line and resize chat.
         title_txt is string, body_text is list.
         """
+        if self.disable_drawing:
+            return
         with self.lock:
             self.extra_select = select
             self.extra_window_title = title_txt
@@ -1552,6 +1566,8 @@ class TUI():
 
     def remove_extra_window(self):
         """Disable drawing of extra window above status line, and resize chat"""
+        if self.disable_drawing:
+            return
         if self.win_extra_window:
             with self.lock:
                 del (self.win_extra_window, self.win_chat)
@@ -1581,6 +1597,8 @@ class TUI():
 
     def draw_member_list(self, member_list, member_list_format, force=False, reset=False, clean=True):
         """Draw member list and resize chat"""
+        if self.disable_drawing:
+            return
         with self.lock:
             self.member_list = member_list
             self.member_list_format = member_list_format
@@ -1656,6 +1674,8 @@ class TUI():
 
     def remove_member_list(self, pause=True):
         """Remove member list and resize chat"""
+        if self.disable_drawing:
+            return
         if self.win_member_list:
             # safely clean emojis
             with self.lock:
@@ -1727,7 +1747,7 @@ class TUI():
 
     def show_cursor(self):
         """Force cursor to be shown on screen and reset blinking"""
-        if self.enable_blink_cursor:
+        if self.enable_blink_cursor and not self.disable_drawing:
             self.set_cursor_color(15)
             self.cursor_on = True
             self.hibernate_cursor = 0
@@ -1830,11 +1850,9 @@ class TUI():
             return 0
         if force_id > 0:
             curses.init_pair(force_id, fg, bg)
-            # self.color_cache = set_list_item(self.color_cache, (fg, bg), force_id)   # role colors are already saved in app.roles
             self.attrib_map = set_list_item(self.attrib_map, attribute, force_id)
             return force_id
         curses.init_pair(self.last_free_id, fg, bg)
-        self.color_cache.append((fg, bg))   # 255_curses_bug
         self.attrib_map.append(attribute)
         self.last_free_id += 1
         return self.last_free_id - 1
@@ -1917,12 +1935,6 @@ class TUI():
             if guild_id:
                 break
         return all_roles
-
-
-    def restore_colors(self):   # 255_curses_bug
-        """Re-initialize cached colors"""
-        for num, color in enumerate(self.color_cache):
-            curses.init_pair(num + 1, *color)
 
 
     def spellcheck(self):
@@ -2142,7 +2154,7 @@ class TUI():
                     self.draw_member_list(self.member_list, self.member_list_format)
 
         elif key in self.keybindings["quit"]:
-            return 49
+            return 34
 
         # check extensions bindings
         else:
@@ -2193,36 +2205,42 @@ class TUI():
         selected_completion = 0
         self.keybinding_chain = None
         key = -1
+        self.screen.timeout(200)
         while self.run:
+            while self.disable_drawing:
+                time.sleep(0.2)
             key = get_key(self.screen)
+            if key == -1:
+                continue
 
             if self.mouse and key == curses.KEY_MOUSE:
                 code = self.mouse_events(key)
                 if code:
                     return self.return_input_code(code)
                 continue
-
             w = self.input_hw[1]
-            if self.disable_drawing:
-                if key == 27:   # ESCAPE
-                    self.screen.nodelay(True)
-                    key = get_key(self.screen)
-                    if key in (-1, 27):
-                        self.input_buffer = ""
-                        self.screen.nodelay(False)
-                        return None, 0, 0, 100
-                    self.screen.nodelay(False)
-                elif key in self.keybindings["media_pause"]:
-                    return None, 0, 0, 101
-                elif key in self.keybindings["media_replay"]:
-                    return None, 0, 0, 102
-                elif key in self.keybindings["media_seek_forward"]:
-                    return None, 0, 0, 103
-                elif key in self.keybindings["media_seek_backward"]:
-                    return None, 0, 0, 104
-                elif key == curses.KEY_RESIZE:
-                    pass
-                continue   # disable all inputs from main UI
+
+            # media controls   # handled externally in media.py because curses is fully paused
+            # if self.disable_drawing:
+            #     if key == 27:   # ESCAPE
+            #         self.screen.nodelay(True)
+            #         key = get_key(self.screen)
+            #         if key in (-1, 27):
+            #             self.input_buffer = ""
+            #             self.screen.nodelay(False)
+            #             return None, 0, 0, 100
+            #         self.screen.nodelay(False)
+            #     elif key in self.keybindings["media_pause"]:
+            #         return None, 0, 0, 101
+            #     elif key in self.keybindings["media_replay"]:
+            #         return None, 0, 0, 102
+            #     elif key in self.keybindings["media_seek_forward"]:
+            #         return None, 0, 0, 103
+            #     elif key in self.keybindings["media_seek_backward"]:
+            #         return None, 0, 0, 104
+            #     elif key == curses.KEY_RESIZE:
+            #         pass
+            #     continue   # disable all inputs from main UI
 
             if key == 27:   # ESCAPE
                 # terminal waits when Esc is pressed, but not when sending escape sequence
@@ -2551,8 +2569,7 @@ class TUI():
                 self.cursor_pos = self.input_index - max(0, len(self.input_buffer) - w + 1 - self.input_line_index)
                 self.cursor_pos = max(self.cursor_pos, 0)
                 self.cursor_pos = min(w - 1, self.cursor_pos)
-                if not self.disable_drawing:
-                    self.draw_input_line()
+                self.draw_input_line()
                 return self.return_input_code(20)
 
             elif key == 9:   # TAB - same as CTRL+I
@@ -2684,9 +2701,6 @@ class TUI():
             elif key in self.keybindings["cycle_status"]:
                 return self.return_input_code(33)
 
-            elif key in self.keybindings["record_audio"] and not forum:
-                return self.return_input_code(34)
-
             elif key in self.keybindings["toggle_member_list"]:
                 return self.return_input_code(35)
 
@@ -2724,8 +2738,7 @@ class TUI():
             self.cursor_pos = self.input_index - max(0, len(self.input_buffer) - w + 1 - self.input_line_index)
             self.cursor_pos = max(self.cursor_pos, 0)
             self.cursor_pos = min(w - 1, self.cursor_pos)
-            if not self.disable_drawing:
-                self.draw_input_line()
+            self.draw_input_line()
         return None, None, None, None
 
 

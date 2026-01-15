@@ -1,5 +1,12 @@
-Show media with box characters
+Fix video player skips to end
+Add option to login with email ?
+Add option to login with QR code ?
 Show inline media in chat
+
+Vim-like bindings
+    have input mode that types in input line
+    have normal mode - single keys can be used as bindings and execute commands
+    show current mode in bars and prompt
 
 Voice channels
     add voice channels to tree
@@ -16,6 +23,5 @@ Voice calls
     send speaking event?
 
 Fix per-channel member list
-Vim-like bindings
 Video calls
 Localization

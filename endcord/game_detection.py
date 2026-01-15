@@ -219,7 +219,7 @@ else:
 
 def find_detectable_apps_file(directory):
     """Find detectable_apps_[etag].ndjson path and extract etag"""
-    pattern = os.path.join(directory, "detectable_apps_*.ndjson")
+    pattern = os.path.expanduser(os.path.join(directory, "detectable_apps_*.ndjson"))
     matches = glob.glob(pattern)
     if not matches:
         return None, None
@@ -296,7 +296,7 @@ class GameDetection:
             return
 
         # download new detectable apps list if resource changed on the server
-        old_path, old_etag = find_detectable_apps_file(os.path.expanduser(peripherals.config_path))
+        old_path, old_etag = find_detectable_apps_file(peripherals.config_path)
         path, etag = self.discord.get_detectable_apps(peripherals.config_path, old_etag)
         if not path:
             logger.info("Could not start game detection service: failed to download detectable applications list")
