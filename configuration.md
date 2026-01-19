@@ -170,7 +170,7 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
     DO NOT CHANGE, unless you know what youre doing. This might cause some features to not work or client to get unstable.  
     If bot token is used, then this will be used as `intents` parameter instead. See [discord bot documentation](https://discord.com/developers/docs/events/gateway#gateway-intents).  
     Default capabilities: `30717`, default intents: `50364033`.  
-- `"easter_eggs = True`  
+- `easter_eggs = True`  
     In case some easter egg is annoying.
 - `debug = False`  
     Enable debug mode.

@@ -39,8 +39,8 @@ Discord token is required in order to run endcord! see [Token](#token).
     - Don't show hidden channels
     - Show muted channels as gray
     - Show unread channels as bold
-    - Show channels with mention as red
-    - Expand categories and servers
+    - Show channels with mention as red with number of mentions
+    - Collapse categories and servers
     - DMs in separate drop-down, show DM status
     - Forums, channel threads
     - Folders with custom naming

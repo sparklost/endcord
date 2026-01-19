@@ -75,7 +75,8 @@ def main(args):
 
     os.environ["ESCDELAY"] = "25"   # 25ms
     if os.environ.get("TERM", "") in ("xterm", "linux"):
-        os.environ["TERM"] = "xterm-256color"
+        os.environ["REALTERM"] = os.environ["TERM"]
+        os.environ["TERM"] = "xterm-256color"   # try to force 256-color mode
     peripherals.ensure_ssl_certificates()
 
     if args.colors:

@@ -271,6 +271,7 @@ class Endcord:
         self.extra_indexes = []
         self.extra_body = []
         self.viewing_user_data = {"id": None, "guild_id": None}
+        self.read_state = {}
         self.hidden_channels = []
         self.current_subscribed_members = []
         self.recording = False
@@ -526,7 +527,6 @@ class Endcord:
         if self.my_user_data:
             self.update_prompt()
         self.typing = []
-        self.read_state = {}
         self.notifications = []
         self.typing_sent = int(time.time())
         self.sent_ack_time = time.time() - self.ack_throttling

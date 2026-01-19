@@ -2316,6 +2316,8 @@ def generate_message_notification(data, channels, roles, guild_name, convert_tim
             body = f"Sent {embed_type}"
         else:
             body = f"Sent {num} attachments"
+    elif data.get("stickers"):
+        body = "Sent a sticker"
     else:
         body = "Unknown content"
 

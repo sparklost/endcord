@@ -1,6 +1,7 @@
 import curses
 import importlib.util
 import logging
+import os
 import re
 import sys
 import threading
@@ -15,7 +16,7 @@ MAX_DELTA_STORE = 50   # limit undo size
 MIN_ASSIST_LETTERS = 2
 ASSIST_TRIGGERS = ("#", "@", ":", ";")
 APP_COMMAND_ASSIST_TRIEGGER = "/"
-if sys.platform == "win32":
+if sys.platform == "win32" or os.environ.get("REALTERM", "") == "xterm":
     BACKSPACE = 8   # i cant believe this
 else:
     BACKSPACE = curses.KEY_BACKSPACE
@@ -1049,7 +1050,7 @@ class TUI():
         w += 2
         y -= 1
         x -= 1
-        
+
         try:
             # lines
             if top and w > 0:
