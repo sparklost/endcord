@@ -241,7 +241,7 @@ def search_stickers(all_stickers, default_stickers, premium, guild_id, query, li
                 break
         else:
             stickers = []
-        
+
     for pack in stickers + default_stickers:
         pack_name = pack["pack_name"]
         for sticker in pack["stickers"]:
@@ -422,7 +422,7 @@ def search_tabs(tabs, query, limit=50, score_cutoff=15):
         score = fuzzy_match_score(query, formatted)
         if score < worst_score and query:
             continue
-        heapq.heappush(results, (formatted, f"switch_tab {num}", score))
+        heapq.heappush(results, (formatted, f"switch_tab {num + 1}", score))
         if len(results) > limit:
             heapq.heappop(results)
             worst_score = results[0][2]

@@ -5110,7 +5110,7 @@ class Endcord:
 
 
     def insert_assist(self, input_text, index, start, end):
-        """Insert assist from specified at specified position in the text"""
+        """Insert specified assist to specified position in the text"""
         if index >= len(self.assist_found) or index < 0:
             return None, None
         if self.assist_type == 1:   # channel

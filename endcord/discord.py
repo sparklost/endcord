@@ -637,18 +637,20 @@ class Discord():
             response = connection.getresponse()
         except (socket.gaierror, TimeoutError):
             connection.close()
-            return None
+            return 1, None
         if response.status == 200:
             data = json.loads(response.read())
             connection.close()
-            return {
+            return 0, {
                 "id": data["id"],
                 "name": data["name"],
                 "description": data["description"],
             }
+        if response.status == 404:
+            return 2, None
         log_api_error(response, "get_rpc_app")
         connection.close()
-        return False
+        return 3, None
 
 
     def get_rpc_app_assets(self, app_id):

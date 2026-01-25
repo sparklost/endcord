@@ -100,6 +100,7 @@ class RPC:
         self.changed = False
         self.external = config["rpc_external"]
         self.activities = []
+        self.not_exist = []
         if user["bot"]:
             logger.warning("RPC server cannot be started for bot accounts")
             return
@@ -184,11 +185,19 @@ class RPC:
                     connection.close()
                 return
             app_id = init_data["client_id"]
+
+            if app_id in self.not_exist:
+                if sys.platform == "win32":
+                    win32file.CloseHandle(connection)
+                else:
+                    connection.close()
+                return
+
             logger.debug(f"RPC app id: {app_id}")
-            rpc_data = self.discord.get_rpc_app(app_id)
+            status, rpc_data = self.discord.get_rpc_app(app_id)
             rpc_assets = self.discord.get_rpc_app_assets(app_id)
-            logger.info(f"RPC client connected: {rpc_data["name"]}")
             if rpc_data and rpc_assets:
+                logger.info(f"RPC client connected: {rpc_data["name"]}")
                 send_data(connection, 1, self.dispatch)
                 sent_time = time.time() - (GATEWAY_RATE_LIMIT + 1)
                 prev_activity = None
@@ -300,6 +309,8 @@ class RPC:
                         send_data(connection, op, response)
 
             else:
+                if status == 2:   # not found
+                    self.not_exist.append(app_id)
                 logger.warning("Failed retrieving RPC app data from discord")
         except Exception as e:
             logger.error(e)
