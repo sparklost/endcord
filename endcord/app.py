@@ -893,7 +893,7 @@ class Endcord:
 
         # update UI
         if not forum:
-            self.update_chat(keep_selected=False, select_message_index=select_message_index)
+            self.update_chat(keep_selected=False, select_message_index=select_message_index, select_unread=True)
         else:
             self.tui.update_chat(self.chat, self.chat_format)
         self.set_channel_seen(channel_id, self.get_chat_last_message_id(), force_remove_notify=True)   # right after update_chat so new_unreads is determined
@@ -2038,7 +2038,7 @@ class Endcord:
                         # decode
                         if chat_line_map[1] and chat_line_map[1][0] < mouse_x < chat_line_map[1][1]:
                             clicked_type = 2   # username
-                        elif chat_line_map[2]:
+                        elif chat_line_map[2] == 1:
                             clicked_type = 3   # replied line
                         elif chat_line_map[3]:
                             for num, reaction in enumerate(chat_line_map[3]):
@@ -4341,7 +4341,8 @@ class Endcord:
                 return
             if new_chunk and self.get_chat_last_message_id() == self.last_message_id and new_chunk[0]["id"] != self.last_message_id:
                 self.add_to_channel_cache(self.active_channel["channel_id"], self.messages, self.active_channel.get("pinned", False))
-            selected_id = self.messages[self.lines_to_msg(self.tui.get_chat_selected()[0], space=True)]["id"]
+            selected_msg, remainder = self.lines_to_msg_with_remainder(self.tui.get_chat_selected()[0], space=True)
+            selected_id = self.messages[selected_msg]["id"]
             self.messages = self.messages + new_chunk
             all_msg = len(self.messages)
             old_chat_len = len(self.chat)
@@ -4353,7 +4354,7 @@ class Endcord:
                 # when messages are trimmed, keep same selected position
                 if len(self.messages) != all_msg:
                     selected_msg_new = selected_msg - (all_msg - len(self.messages))
-                    selected_line = self.msg_to_lines(selected_msg_new)
+                    selected_line = self.msg_to_lines(selected_msg_new) - remainder
                 self.tui.allow_chat_selected_hide(self.get_chat_last_message_id() == self.last_message_id)
                 if scroll:
                     scroll_diff = old_chat_len - 1 - selected_line
@@ -4363,7 +4364,7 @@ class Endcord:
                     elif len(self.messages) != all_msg:
                         for num, message in enumerate(self.messages):
                             if message["id"] == selected_id:
-                                selected_msg_index = self.msg_to_lines(num, smart=True)
+                                selected_msg_index = self.msg_to_lines(num, smart=True) - remainder
                                 break
                         else:
                             selected_msg_index = 3
@@ -4382,17 +4383,18 @@ class Endcord:
                 return
             selected_line = 0
             old_chat_len = len(self.chat)
+            selected_msg, remainder = self.lines_to_msg_with_remainder(self.tui.get_chat_selected()[0], space=True)
+            selected_id = self.messages[selected_msg]["id"]
             selected_msg = self.lines_to_msg(selected_line, space=True)
             if new_chunk and self.get_chat_last_message_id() == self.last_message_id and new_chunk[0]["id"] != self.last_message_id:
                 self.add_to_channel_cache(self.active_channel["channel_id"], self.messages, self.active_channel.get("pinned", False))
-            selected_id = self.messages[self.lines_to_msg(self.tui.get_chat_selected()[0], space=True)]["id"]
             self.messages = new_chunk + self.messages
             all_msg = len(self.messages)
             self.messages = self.messages[:self.limit_chat_buffer]
             self.update_chat(keep_selected=True)
             # keep same selected position
             selected_msg_new = selected_msg + len(new_chunk)
-            selected_line = self.msg_to_lines(selected_msg_new)
+            selected_line = self.msg_to_lines(selected_msg_new) - remainder
             self.tui.allow_chat_selected_hide(self.get_chat_last_message_id() == self.last_message_id)
             if scroll:
                 scroll_diff = len(self.chat) - old_chat_len
@@ -4405,7 +4407,7 @@ class Endcord:
                 elif len(self.messages) != all_msg:
                     for num, message in enumerate(self.messages):
                         if message["id"] == selected_id:
-                            selected_msg_index = self.msg_to_lines(num, smart=True)
+                            selected_msg_index = self.msg_to_lines(num, smart=True) - remainder
                             break
                     else:
                         selected_msg_index = len(self.chat) - 3
@@ -5342,7 +5344,7 @@ class Endcord:
             peripherals.native_open(path, mpv_path, yt_in_mpv=self.config["yt_in_mpv"])
 
 
-    def update_chat(self, keep_selected=True, change_amount=0, select_message_index=None, scroll=True):
+    def update_chat(self, keep_selected=True, change_amount=0, select_message_index=None, scroll=True, select_unread=False):
         """Generate chat and update it in TUI"""
         if self.messages is None:
             return
@@ -5351,7 +5353,7 @@ class Endcord:
             selected_line, text_index = self.tui.get_chat_selected()
             if selected_line == -1:
                 keep_selected = False
-            selected_msg, remainder = self.lines_to_msg_with_remainder(selected_line)
+            selected_msg, remainder = self.lines_to_msg_with_remainder(selected_line, space=True)
 
         # spacebar_fix - message/referenced_message is always null, instead only for deleted message
         if self.gateway.legacy:
@@ -5392,7 +5394,8 @@ class Endcord:
             change_amount_lines = selected_line_new - selected_line
             self.tui.set_selected(selected_line_new, change_amount=change_amount_lines, scroll=scroll, draw=False)
         elif select_message_index is not None:
-            selected_line = self.msg_to_lines(select_message_index)
+            full_message = (self.config["message_spacing"] and select_unread)
+            selected_line = self.msg_to_lines(select_message_index, full=full_message) + 2 * full_message
             self.tui.set_selected(selected_line, scroll=scroll, draw=False)
         elif keep_selected is not None:
             self.tui.set_selected(-1, scroll=scroll, draw=False)   # return to bottom
@@ -5770,26 +5773,28 @@ class Endcord:
         return None
 
 
-    def lines_to_msg_with_remainder(self, line_index):
+    def lines_to_msg_with_remainder(self, line_index, space=False):
         """Convert line index from formatted chat to message index and remainder"""
         i = 0
         while i < 5:
             line_map = self.chat_map[line_index - i]
             if line_map and line_map[0] is not None:
-                if line_map[4]:
-                    return line_map[0], 0
+                if line_map[4]:   # when it reaches message base line
+                    return line_map[0], 0 - (i * space)
                 remainder = 0
                 while remainder < len(self.chat_map) - (line_index + remainder + 1):
                     remainder_line_map = self.chat_map[line_index + remainder + 1]
-                    if remainder_line_map and(remainder_line_map[0] is None or remainder_line_map[0] != line_map[0]):
+                    if not remainder_line_map or (remainder_line_map[0] is None or remainder_line_map[0] != line_map[0] or remainder_line_map[2]):
                         break
                     remainder += 1
-                return line_map[0], remainder
+                if line_map[2]:   # when selected reply line
+                    i += 1
+                return line_map[0], remainder - (i * space)
             i += 1
         return 0, 0
 
 
-    def msg_to_lines(self, msg_index, smart=False):
+    def msg_to_lines(self, msg_index, smart=False, full=False):
         """Convert message index to line index from formatted chat"""
         in_msg_start_index = 0
         if smart:
@@ -5802,6 +5807,10 @@ class Endcord:
                 in_msg_start_index = 0
         for line_index, line_map in enumerate(self.chat_map):
             if line_map and line_map[0] == msg_index and line_map[4]:      # message root has timestamp range
+                if full:
+                    next_line_map = self.chat_map[line_index + 1]
+                    if next_line_map and next_line_map[0] == line_map[0] and next_line_map[2]:
+                        return line_index - in_msg_start_index - 1
                 return line_index - in_msg_start_index
 
 

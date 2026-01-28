@@ -321,6 +321,8 @@ def map_key(event):
             return 0
         if key == pygame.K_SLASH:
             return 31
+        if key == pygame.K_BACKSPACE:
+            return 8
     elif event.mod & pygame.KMOD_SHIFT:   # Shift+Key
         if key == pygame.K_DOWN:
             return 336

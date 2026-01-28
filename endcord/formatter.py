@@ -1132,7 +1132,7 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
                 temp_format.append(color_mention_reply)
             else:
                 temp_format.append(color_reply)
-            temp_chat_map.append((num, None, False, None, None, None, None))
+            temp_chat_map.append((num, None, 2, None, None, None, None))
 
         # main message
         quote = False

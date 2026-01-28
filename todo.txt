@@ -1,7 +1,6 @@
 Fix unreads line appearing in current chat
 Add ability to open custom emoji with media player
 Investigate read state reverting after reconnect
-Add option to select individual message
 
 Vim-like bindings
     have input mode - type in input line
@@ -30,6 +29,7 @@ after fixing https://github.com/python/cpython/issues/119138
     Show inline media in chat
     Add bg color for mentions and channels in chat
 
+Add option to select individual message
 Add scrollbar to chat
 Fix per-channel member list
 Video calls

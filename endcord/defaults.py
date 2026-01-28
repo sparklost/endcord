@@ -43,7 +43,7 @@ settings = {
     "media_cap_fps": 30,
     "rpc_external": True,
     "emoji_as_text": False,
-    "message_spacing": False,
+    "message_spacing": True,
     "native_media_player": False,
     "native_file_dialog": "auto",
     "save_summaries": True,
@@ -185,6 +185,7 @@ keybindings = {
     "select_all": "ALT+97",   # Alt+A
     "copy_sel": "ALT+99",   # Alt+C
     "cut_sel": "ALT+120",   # Alt+X
+    "delete_word": 8, # Ctrl+Backspace/Ctrl+H
     # chat
     "reply": 18,   # Ctrl+R
     "edit": 5,   # Ctrl+E
@@ -195,7 +196,7 @@ keybindings = {
     "download": 23,   # Ctrl+W
     "upload": 21,   # Ctrl+U
     "browser": 15,   # Ctrl+O
-    "copy_msg": 8,   # Ctrl+H
+    "copy_msg": 10,   # Ctrl+M
     "view_media": 22,   # Ctrl+V
     "spoil": "ALT+116",   # Alt+T
     "search": 6,   # Ctrl+F
@@ -244,7 +245,6 @@ windows_override_keybindings = {
     "tree_select": 1,   # Ctrl+A
     "word_left": 443,   # Ctrl+Left
     "word_right": 444,   # Ctrl+Right
-    "copy_msg": "ALT+108",   # Alt+L
     "view_media": "ALT+121",   # Alt+Y
 }
 

@@ -106,7 +106,7 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
     Whether to use external resources for Rich Presence (like custom pictures).
 - `emoji_as_text = False`  
     Will convert emoji characters to their names. Enable if emoji are not supported by terminal.
-- `message_spacing = False`  
+- `message_spacing = True`  
     Will add one line space between messages not belonging to same user.
 - `native_media_player = False`  
     Use system native media player instead in-terminal ASCII art.

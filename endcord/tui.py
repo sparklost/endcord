@@ -16,8 +16,9 @@ MAX_DELTA_STORE = 50   # limit undo size
 MIN_ASSIST_LETTERS = 2
 ASSIST_TRIGGERS = ("#", "@", ":", ";")
 APP_COMMAND_ASSIST_TRIEGGER = "/"
-if sys.platform == "win32" or os.environ.get("REALTERM", "") == "xterm":
+if sys.platform == "win32" or os.environ.get("REALTERM", "") == "xterm":   # envvar set in main.py
     BACKSPACE = 8   # i cant believe this
+    # ctrl+backspace is 263 (curses.KEY_BACKSPACE)
 else:
     BACKSPACE = curses.KEY_BACKSPACE
 BUTTON4_PRESSED = getattr(curses, "BUTTON4_PRESSED", 0)
@@ -2042,7 +2043,7 @@ class TUI():
 
 
     def common_keybindings(self, key, mouse=False, switch=False, command=False, forum=False):
-        """Handle keybinding events that are common for all buffers"""
+        """Handle keybinding events that can be executed by mouse events"""
         if key == curses.KEY_UP:   # UP
             if command:
                 return 46
@@ -2422,6 +2423,29 @@ class TUI():
                 self.input_index = len(self.input_buffer)
                 self.input_select_start = None
                 self.spellcheck()
+
+            elif key in self.keybindings["delete_word"]:
+                word = ""
+                for word_part in self.input_buffer[:self.input_index].split(" ")[::-1]:
+                    if word_part == "":
+                        word += " "
+                    else:
+                        word += word_part
+                        break
+                if word:
+                    self.input_buffer = self.input_buffer[:self.input_index-len(word)] + self.input_buffer[self.input_index:]
+                    self.input_index -= len(word)
+                    self.input_index = max(self.input_index, 0)
+                    input_line_index_diff = self.input_index - max(0, len(self.input_buffer) - w + 1 - self.input_line_index)
+                    if input_line_index_diff <= 0:
+                        self.input_line_index -= input_line_index_diff - 4   # diff is negative
+                        self.input_line_index = min(max(0, self.input_line_index), max(0, len(self.input_buffer) - w))
+                    self.input_select_start = None
+                    if self.enable_autocomplete:
+                        selected_completion = 0
+                    for char in word:
+                        self.add_to_delta_store("BACKSPACE", char)
+                    self.spellcheck()
 
             elif key in self.keybindings["word_left"]:
                 left_len = 0

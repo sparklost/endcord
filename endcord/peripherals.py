@@ -327,8 +327,10 @@ def convert_keybindings(keybindings):
     """Convert keybinding codes to os-specific codes"""
     if sys.platform == "win32":   # windows has different codes for Alt+Key
         shift = 320
+        swap_backspace = True   # config - 8 (ctrl+backspace) with real - 263 (backspace)
     elif os.environ.get("TERM", "") == "xterm":   # xterm has different codes for Alt+Key
         shift = 64
+        swap_backspace = True
         # for ALT+Key it actually sends 195 then Key+64
         # but this is simpler since key should already be uniquely shifted
     else:
@@ -337,6 +339,8 @@ def convert_keybindings(keybindings):
     for key, value in keybindings.items():
         if isinstance(value, str):
             keybindings[key] = alt_shift(value, shift)
+        elif swap_backspace and value == 8:
+            keybindings[key] = 263
 
     return keybindings
 
@@ -632,14 +636,14 @@ def paste_clipboard_files(save_path=None):
             types_list = proc.communicate()[0].decode().split("\n")
 
             # binary image
-            for data_type in types_list:
+            for num, data_type in enumerate(types_list):
                 if data_type.startswith("image/"):
                     if not save_path:
                         return []
-                    file_path = os.path.join(save_path, f"clipboard_image_{int(time.time())}." + types_list[0][6:])
+                    file_path = os.path.join(save_path, f"clipboard_image_{int(time.time())}." + types_list[num].split("/")[1])
                     with open(file_path, "wb") as f:
                         proc = subprocess.run(
-                            query_command[:] + [types_list[0]] + ([suffix] if suffix else []),
+                            query_command[:] + [types_list[num]] + ([suffix] if suffix else []),
                             stdout=f,
                             stderr=subprocess.DEVNULL,
                             check=False,

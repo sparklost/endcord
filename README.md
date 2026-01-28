@@ -152,7 +152,7 @@ Navigating messages - `Arrow-Up/Down`
 Navigating channel tree - `Ctrl+Up/Down` *  
 Open command palette - `Ctrl+/` *  
 Insert newline - `Ctrl+N`  
-Scroll back to bottom - `Ctrl+H`  
+Scroll back to bottom - `Ctrl+B`  
 Expand selected categories and servers - `Ctrl+Space` *  
 Enter selected channel - `Ctrl+Space`  
 Reply to selected message - `Ctrl+R`  
@@ -169,7 +169,7 @@ View channel info (selected in tree) - `Alt+I`
 Show summaries for current channel - `Alt+S`  
 Search messages in current channel - `Ctrl+F`  
 Search gifs - `Alt+F`  
-Copy message to clipboard - `Ctrl+B` *  
+Copy message to clipboard - `Ctrl+M`  
 Open selected link in browser - `Ctrl+O` *  
 Download selected attachment - `Ctrl+W`  
 View selected attached media (image, gif, video, audio) - `Ctrl+V` *  
@@ -201,7 +201,7 @@ Scroll up/down in all windows
 Single click to select in all windows, in tree also: un/collapse  
 Double click in:  
 Tree - or enter channel  
-Extra window - select item  
+Extra window - select item  ctrl+m
 Member list - view member profile  
 Input line - select a word  
 Double click in chat:  
@@ -359,9 +359,8 @@ But there is also setting in config to open media in external app (cross-system,
 ### OS specific keybindings
 Some keybindings are used by terminals or OS itself, so they are by default rebound to something else.  
 #### Windows:  
-Open command palette - `Ctrl+'`
+Open command palette - `Ctrl+\`
 Expand selected categories and servers - `Ctrl+A`  
-Copy message to clipboard - `Alt+L`  
 View attached media (image, gif, video, audio) - `Alt+Y`  
 #### macOS:
 Navigating channel tree - `Shift+Up/Down`  
