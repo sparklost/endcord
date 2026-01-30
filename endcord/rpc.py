@@ -373,6 +373,7 @@ class RPC:
     def get_activities(self):
         """Get activities for all connected apps, and if they changed."""
         cache = self.changed
-        self.changed = False
-        logger.debug(f"Sending: {json.dumps(self.activities, indent=2)}")
+        if self.changed:
+            self.changed = False
+            logger.debug(f"Sending: {json.dumps(self.activities, indent=2)}")
         return self.activities, cache

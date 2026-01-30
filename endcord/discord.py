@@ -203,10 +203,10 @@ class Discord():
             connection = self.get_connection(self.host, 443)
             connection.request("GET", "/api/v9/users/@me", message_data, self.header)
             response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
+        except (socket.gaierror, TimeoutError) as e:
             if exit_on_error:
-                logger.warning("No internet connection. Exiting...")
-                raise SystemExit("No internet connection. Exiting...")
+                logger.warning(f"Network error: {e}")
+                raise SystemExit(f"Network error: {e}")
             connection.close()
             return None
         if response.status == 200:
@@ -218,7 +218,7 @@ class Discord():
             raise SystemExit("unauthorized access. Probably invalid token. Exiting...")
         log_api_error(response, "get_my_id")
         connection.close()
-        return False
+        raise SystemExit(f"Network error: {"See log for more info"}")
 
 
     def get_user(self, user_id, extra=False):

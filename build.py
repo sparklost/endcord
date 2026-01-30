@@ -430,14 +430,17 @@ def build_cython(clang, mingw):
     shutil.rmtree("build")
 
 
-def build_with_pyinstaller(onedir, nosoundcard):
+def build_with_pyinstaller(onedir, nosoundcard, print_cmd=False):
     """Build with pyinstaller"""
-    if check_media_support():
-        pkgname = PKGNAME
-        fprint("ASCII media support is enabled")
+    if not print_cmd:
+        if check_media_support():
+            pkgname = PKGNAME
+            fprint("ASCII media support is enabled")
+        else:
+            pkgname = f"{PKGNAME}-lite"
+            fprint("ASCII media support is disabled")
     else:
-        pkgname = f"{PKGNAME}-lite"
-        fprint("ASCII media support is disabled")
+        pkgname = PKGNAME
 
     mode = "--onedir" if onedir else "--onefile"
     hidden_imports = ["--hidden-import=uuid"]
@@ -480,6 +483,9 @@ def build_with_pyinstaller(onedir, nosoundcard):
         "main.py",
     ]
     cmd = [arg for arg in cmd if arg != ""]
+    if print_cmd:
+        print(" ".join(cmd))
+        sys.exit()
     fprint("Starting pyinstaller")
     try:
         subprocess.run(cmd, check=True)
@@ -497,19 +503,22 @@ def build_with_pyinstaller(onedir, nosoundcard):
     fprint(f"Finished building {pkgname}")
 
 
-def build_with_nuitka(onedir, clang, mingw, nosoundcard, experimental=False):
+def build_with_nuitka(onedir, clang, mingw, nosoundcard, print_cmd=False, experimental=False):
     """Build with nuitka"""
-    if check_media_support():
-        pkgname = PKGNAME
-        fprint("ASCII media support is enabled")
-    else:
-        pkgname = f"{PKGNAME}-lite"
-        fprint("ASCII media support is disabled")
+    if not print_cmd:
+        if check_media_support():
+            pkgname = PKGNAME
+            fprint("ASCII media support is enabled")
+        else:
+            pkgname = f"{PKGNAME}-lite"
+            fprint("ASCII media support is disabled")
 
-    build_numpy_lite(clang)
-    patch_soundcard()
-    clean_emoji()
-    clean_qrcode()
+        build_numpy_lite(clang)
+        patch_soundcard()
+        clean_emoji()
+        clean_qrcode()
+    else:
+        pkgname = PKGNAME
 
     mode = "--standalone" if onedir else "--onefile"
     compiler = ""
@@ -578,6 +587,9 @@ def build_with_nuitka(onedir, clang, mingw, nosoundcard, experimental=False):
         "main.py",
     ]
     cmd = [arg for arg in cmd if arg != ""]
+    if print_cmd:
+        print(" ".join(cmd))
+        sys.exit()
     fprint("Starting nuitka")
     try:
         subprocess.run(cmd, check=True)
@@ -648,6 +660,11 @@ def parser():
         help="disable extensions support in the code, overriding option in the config",
     )
     parser.add_argument(
+        "--print-cmd",
+        action="store_true",
+        help="print build command for nuitka or pyinstaller and exit",
+    )
+    parser.add_argument(
         "--build-licenses",
         action="store_true",
         help="build file containing licenses from all used third party libraries",
@@ -657,6 +674,13 @@ def parser():
 
 if __name__ == "__main__":
     args = parser()
+
+    if args.print_cmd:
+        if args.nuitka:
+            build_with_nuitka(args.onedir, args.clang, args.mingw, args.nosoundcard, print_cmd=True)
+        else:
+            build_with_pyinstaller(args.onedir, args.nosoundcard, print_cmd=True)
+        sys.exit()
 
     check_dev()
     if args.toggle_experimental:
@@ -691,7 +715,7 @@ if __name__ == "__main__":
         build_third_party_licenses(exclude)
 
     if args.nuitka:
-        build_with_nuitka(args.onedir, args.clang, args.mingw, args.nosoundcard, experimental)
+        build_with_nuitka(args.onedir, args.clang, args.mingw, args.nosoundcard, experimental=experimental)
     else:
         build_with_pyinstaller(args.onedir, args.nosoundcard)
 

@@ -579,6 +579,10 @@ So to run endcord, either allow it in anti-virus/windows-defender or run it from
 Open an issue in [issue tracker](https://github.com/sparklost/endcord/issues).  
 Or, if you don't have a github account, want more interactive support, to share a theme or have a question: [Endcord Discord Server](https://discord.gg/judQSxw5K2).
 
+### Creating and maintaining package for Linux distribution
+As endcord build script requires network access in order to install dependencies, it is impossible to use it to build endcord binaries for many distributions/repositories.  
+If thats the case, custom build script must be made, guidelines and commands for writing such are available in [contributing.md](.github/CONTRIBUTING.md#build-steps-for-package-maintainers).  
+After submitting a package to distributions package repository, open an issue here, so I can review it and add it to readme after it gets accepted.
 
 ## Planned features
 Go to [TODO](todo.txt).
