@@ -1309,7 +1309,7 @@ class Gateway():
                                     if self.activities[guild_index][1][list_id][1][memlist["index"]].get("id") == member_id:
                                         self.activities[guild_index][1][list_id][1][memlist["index"]].update(ready_data)
                                     else:   # failsafe
-                                        for num, member in enumerate(self.activities[guild_index][1][list_id]["members"]):
+                                        for num, member in enumerate(self.activities[guild_index][1][list_id][1]):
                                             if member.get("id") == member_id:
                                                 self.activities[guild_index][1][list_id][1][num].update(ready_data)
                                 except IndexError:

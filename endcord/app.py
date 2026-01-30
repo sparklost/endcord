@@ -252,6 +252,7 @@ class Endcord:
         self.channel_cache = []
         self.voice_gateway = None
         self.reset()
+        self.chat.insert(0, f"Connecting to {self.config["custom_host"] or "Discord"}")
         self.gateway_state = self.gateway.get_state()
         self.chat_dim, self.tree_dim, _  = self.tui.get_dimensions()
         self.state = {
@@ -739,27 +740,18 @@ class Endcord:
         else:
             forum = False
 
-            # check if this channel chat is in cache and remove it
-            from_cache = False
-            if self.limit_channel_cache:
-                for num, channel in enumerate(self.channel_cache):
-                    if channel[0] == channel_id and not (len(channel) > 3 and channel[3]):
-                        from_cache = True
-                        break
-
-            # load from cache
-            if from_cache:
-                self.load_from_channel_cache(num)
+            # check cache
+            from_cache = self.load_from_channel_cache(channel_id)
 
             # use preloaded
-            elif preload and self.preloaded:
+            if not from_cache and preload and self.preloaded:
                 self.request_missing_members(guild_id, self.messages)
                 self.last_message_id = self.get_chat_last_message_id()
                 self.preloaded = False
                 self.need_preload = False
 
             # download messages
-            else:
+            elif not from_cache:
                 new_messages = self.get_messages_with_members(num=self.msg_num)
                 if new_messages is not None:
                     self.messages = new_messages
@@ -1196,18 +1188,25 @@ class Endcord:
                             break
 
 
-    def load_from_channel_cache(self, num):
+    def load_from_channel_cache(self, channel_id):
         """Load messages from channel cache"""
+        if not self.limit_channel_cache:
+            return False
+        for num, channel in enumerate(self.channel_cache):
+            if channel[0] == channel_id and not (len(channel) > 3 and channel[3]):
+                break
+        else:
+            return False
         if self.channel_cache[num][2]:
             cached = self.channel_cache[num]
         else:
             cached = self.channel_cache.pop(num)
-        if cached[1]:
+        if cached[1] and len(cached[1]) >= self.msg_num - 10:
             self.messages = cached[1]
         else:
             new_messages = self.get_messages_with_members(num=self.msg_num)
             if new_messages is None:
-                return
+                return True
             self.messages = new_messages
         self.active_channel["pinned"] = cached[2]
 
@@ -1224,6 +1223,7 @@ class Endcord:
             self.active_channel["guild_id"],
             self.messages,
         )
+        return True
 
 
     def remove_channel_cache(self, num=None, active=False):
@@ -3771,17 +3771,10 @@ class Endcord:
         """Go to chat bottom"""
         self.tui.scroll_bot()
         if self.get_chat_last_message_id() != self.last_message_id:
-            # check if this channel chat is in cache and remove it
-            from_cache = False
-            if self.limit_channel_cache:
-                for num, channel in enumerate(self.channel_cache):
-                    if channel[0] == self.active_channel["channel_id"] and not (len(channel) > 3 and channel[3]):
-                        from_cache = True
-                        break
 
             # load from cache
+            from_cache = self.load_from_channel_cache(self.active_channel["channel_id"])
             if from_cache:
-                self.load_from_channel_cache(num)
                 self.update_chat()
 
             # download messages
@@ -7042,7 +7035,6 @@ class Endcord:
 
         self.gateway_state = 1
         logger.info("Gateway is ready")
-        self.chat.insert(0, f"Connecting to {self.config["custom_host"] or "Discord"}")
         self.chat.insert(0, "Loading channels")
         self.tui.update_chat(self.chat, [[[self.colors[0]]]] * len(self.chat))
 
