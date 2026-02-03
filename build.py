@@ -704,7 +704,12 @@ if __name__ == "__main__":
 
     enable_extensions(enable=(not args.disable_extensions))
 
-    if not args.nocython:
+    if args.nocython:
+        bins = get_cython_bins(directory="endcord_cython")
+        for file in bins:
+            os.remove(os.path.join("endcord_cython", file))
+        fprint("Deleted compiled cython extensions")
+    else:
         try:
             build_cython(args.clang, args.mingw)
         except Exception as e:

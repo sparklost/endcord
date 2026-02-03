@@ -74,7 +74,7 @@ def main(args):
         command_bindings = peripherals.convert_keybindings_cmd(command_bindings)
 
     os.environ["ESCDELAY"] = "25"   # 25ms
-    if os.environ.get("TERM", "") in ("xterm", "linux"):
+    if os.environ.get("TERM", "") == "linux" or os.environ.get("TERM", "").startswith("xterm"):   # for xterm-ghostty
         os.environ["REALTERM"] = os.environ["TERM"]
         os.environ["TERM"] = "xterm-256color"   # try to force 256-color mode
     peripherals.ensure_ssl_certificates()
