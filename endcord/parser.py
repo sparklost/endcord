@@ -571,6 +571,8 @@ def command_string(text):
         match = re.search(match_channel, text)
         if match:
             cmd_args = {"channel_id": match.group(1)}
+        elif text.split(" ")[1] == "*":
+            cmd_args = {"channel_id": "*"}
 
     # 33 - INSERT_TIMESTAMP
     elif text_lower.startswith("insert_timestamp"):
@@ -863,5 +865,9 @@ def command_string(text):
     # 68 - REMOVE_ALL_TABS
     elif text_lower.startswith("remove_all_tabs"):
         cmd_type = 68
+
+    # 69 - COLLAPSE_ALL_BUT_CURRENT
+    elif text_lower.startswith("collapse_all_but_current"):
+        cmd_type = 69
 
     return cmd_type, cmd_args

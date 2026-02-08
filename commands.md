@@ -74,7 +74,7 @@
 - `toggle_mute` / `toggle_mute <#[channel_id]>`  
     Mute/unmute selected item in tree or specified channel/category/guild.
 - `mark_as_read` / `mark_as_read <#[channel_id]>`  
-    Mark as read selected item in tree or specified channel/category/guild.
+    Mark selected or specified channel/category/guild/* item in tree as read. use `mark_as_read *` to mark entire current server as read.
 - `mark_as_unread`  
     Mark selected message as unread.
 - `insert_timestamp [time]`  
@@ -126,6 +126,8 @@
     `duration` can be: `4w3d5h30m10s` where `w`is weeks, `d` is days..., can be used partially and mixed: `5h1w`. Default is 7 days and infinite uses.
 - `rename_folder [name]`  
     Locally rename currently selected folder in tree. Custom names are kept in state_profile_name.json in config dir.
+- `collapse_all_but_current`  
+    Collapse all servers except currently opened server.
 - `send_message --channel_id=[channel_id]/<#[channel_id]> --reply_id=[message_id] --ping=[True/False] --attachment=[path] [message_content]`  
     Try not to abuse this command, as its run in a thread and can abuse API!  
     `--channel_id` - accepts both channel_id and formatted channel_id from assist, only last channel_id will be used. Default: current channel.  

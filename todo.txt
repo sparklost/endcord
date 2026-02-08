@@ -1,6 +1,3 @@
-Add mark_current_as_read command
-Add mark_current_server_as_read command
-Add collapse_all_but_current command
 Persist member list state across sessions
 Persist member list state across servers
     dont subscribe if member list is closed

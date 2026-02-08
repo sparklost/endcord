@@ -970,7 +970,7 @@ class Endcord:
         self.update_tree()
 
 
-    def open_guild(self, guild_id, select=False, restore=False, open_only=False):
+    def open_guild(self, guild_id, select=False, restore=False, open_only=False, one_open=False, dont_close_this=False):
         """When opening guild in tree"""
         # check in tree_format if it should be un-/collapsed
         collapse = False
@@ -993,6 +993,8 @@ class Endcord:
                 self.update_tree(collapsed=collapsed)
             return collapsed
 
+        one_open |= self.config["only_one_open_server"]
+
         # keep dms, collapsed and all guilds except one at cursor position
         # copy dms
         if 0 in self.state["collapsed"]:
@@ -1000,10 +1002,10 @@ class Endcord:
         else:
             collapsed = []
         guild_ids = []
-        if self.config["only_one_open_server"]:
+        if one_open:
             # collapse all other guilds
             for guild_1 in self.guilds:
-                if collapse or guild_1["guild_id"] != guild_id:
+                if (collapse and not dont_close_this) or guild_1["guild_id"] != guild_id:
                     collapsed.append(guild_1["guild_id"])
                 guild_ids.append(guild_1["guild_id"])
             # copy categories
@@ -1033,7 +1035,7 @@ class Endcord:
         self.update_tree(collapsed=collapsed)
 
         # keep this guild selected
-        if self.config["only_one_open_server"] and select:
+        if one_open and select:
             for tree_pos, obj in enumerate(self.tree_metadata):
                 if obj and obj["id"] == guild_id:
                     break
@@ -3049,6 +3051,8 @@ class Endcord:
 
         elif cmd_type == 32:   # MARK_AS_READ:
             target_id = cmd_args.get("channel_id")
+            if target_id == "*":
+                target_id = self.active_channel["guild_id"]
             if not target_id:
                 target_id = self.tree_metadata[tree_sel]["id"]
             self.set_mix_seen(target_id)
@@ -3580,6 +3584,9 @@ class Endcord:
                 self.state["tabbed_channels"] = tabbed_channels
                 peripherals.save_json(self.state, f"state_{self.profiles["selected"]}.json")
             self.update_tabs()
+
+        elif cmd_type == 69:   # COLLAPSE_ALL_BUT_CURRENT
+            self.open_guild(self.active_channel["guild_id"], select=True, one_open=True, dont_close_this=True)
 
         if success is None:
             self.gateway.set_offline()
