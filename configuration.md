@@ -34,8 +34,8 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
     Delay in seconds between each ack send. Minimum is 3s. The larger it is, the longer will `[New unreads]` stay in status line.
 - `member_list = True`  
     Whether to download member activities. Disable for lower CPU, RAM and network usage. If disabled, member list will be empty and there will be no presences in profile view screen.
-- `member_list_auto_open = True`  
-    Automatically opem member list on startup and on channel switch to different guild, if enough space.
+- `member_list_auto_open = False`  
+    Automatically opem member list on startup and on channel switch to different guild, if enough space. Will disable persising member list state between sessions.  
 - `use_nick_when_avail = True`  
     Replace global_name with nick when it is available.
 - `remember_state = True`  

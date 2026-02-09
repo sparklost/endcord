@@ -345,6 +345,13 @@ def app_command_string(text, my_commands, guild_commands, permitted_guild_comman
     return command_data, app_id, need_attachment
 
 
+def split_command_binding(text):
+    """Split string into multiple strings on ";" and ignore whitespace and newline"""
+    # Using null chaacter as placeholder
+    parts = text.replace("\\;", "\x00").split(";")
+    return [p.replace("\x00", ";").strip() for p in parts]
+
+
 def command_string(text):
     """Parse command string"""
 

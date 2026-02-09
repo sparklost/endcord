@@ -133,9 +133,12 @@ Keybindings can also be chained like this (maximum 2 bindings in chain, separate
 `"25-97"` for `Ctrl+X-A` which means: press `Ctrl+X` then `A`, `"ALT+120-ALT+100"` for `Alt+X-Alt+D` and so on.  
 To specify multiple keybindings for same action put them in a tuple, eg.: `(2, "25-97", "ALT+120")`.  
 Switch tab keybinding is special - `NUM` is placeholder for 1-9 number keys, eg.:`ALT+NUM` or `ALT+120-NUM`.  
+
+### Command keybinding
 There is additional section `[command_bindings]`, used to make custom client command string executed when keybinding is pressed.  
-command keybinding is added like this: `"25" = "send_message Hello World!"`. This will execute that command when `Ctrl+X` is pressed.  
+Command keybinding is added like this: `"25" = "send_message Hello World!"`. This will execute that command when `Ctrl+X` is pressed.  
 Note that all bindings must be inside quotes, even a single integer.  
+To execute multiple commands in a sequence, type them spearated with `;` character. To use actual `;` character in command type it as `\;`.  
 
 ### Debug mode
 Debug mode can be enabled with `-d` flag.  
@@ -168,7 +171,7 @@ View channel info (selected in tree) - `Alt+I`
 Show summaries for current channel - `Alt+S`  
 Search messages in current channel - `Ctrl+F`  
 Search gifs - `Alt+F`  
-Copy message to clipboard - `Ctrl+M`  
+Copy message to clipboard - `Ctrl+L`  
 Open selected link in browser - `Ctrl+O` *  
 Download selected attachment - `Ctrl+W`  
 View selected attached media (image, gif, video, audio) - `Ctrl+V` *  
@@ -199,7 +202,7 @@ Scroll up/down in all windows
 Single click to select in all windows, in tree also: un/collapse  
 Double click in:  
 Tree - or enter channel  
-Extra window - select item  ctrl+m  
+Extra window - select item
 Member list - view member profile  
 Input line - select a word  
 Double click in chat on:  

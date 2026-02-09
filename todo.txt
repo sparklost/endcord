@@ -1,11 +1,11 @@
-Persist member list state across sessions
-Persist member list state across servers
-    dont subscribe if member list is closed
-Add ability to bind enter and arrow keys
+Replace collapse_all_but_current with collapse_all_except
+    collapse_all_except current/selected/above/bellow
 
 Add next/prev server bindings
 Add next/prev channel bindings
-Fix issues with many wide characters
+Fix issues with many wide characters in chat
+Fix issues with wide characters in username
+Fix issues with wide characters in input line
 Vim-like bindings
     have input mode - type in input line
     have normal mode - single keys can be used as bindings and execute commands

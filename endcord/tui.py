@@ -274,6 +274,13 @@ class TUI():
         # find all keybinding first-chain-parts
         self.init_chainable()
 
+        # for faster keybinding lookup
+        self.KEYBINDINGS_SEND_MESSAGE = self.keybindings["send_message"]
+        self.KEYBINDINGS_CHAT_UP = self.keybindings["chat_up"]
+        self.KEYBINDINGS_CHAT_DOWN = self.keybindings["chat_down"]
+        self.KEYBINDINGS_INPUT_LEFT = self.keybindings["input_left"]
+        self.KEYBINDINGS_INPUT_RIGHT = self.keybindings["input_right"]
+
         # initial values
         if not (self.blink_cursor_on and self.blink_cursor_off):
             self.enable_blink_cursor = False
@@ -2057,7 +2064,7 @@ class TUI():
 
     def common_keybindings(self, key, mouse=False, switch=False, command=False, forum=False):
         """Handle keybinding events that can be executed by mouse events"""
-        if key == curses.KEY_UP:   # UP
+        if key in self.KEYBINDINGS_CHAT_UP:
             if command:
                 return 46
             if self.chat_selected + 1 < len(self.chat_buffer):
@@ -2067,7 +2074,7 @@ class TUI():
                 self.chat_selected += 1   # move selection up
                 self.draw_chat()
 
-        elif key == curses.KEY_DOWN:   # DOWN
+        if key in self.KEYBINDINGS_CHAT_DOWN:
             if command:
                 return 47
             if self.chat_selected >= self.dont_hide_chat_selection:   # if it is -1, selection is hidden
@@ -2313,22 +2320,21 @@ class TUI():
             if self.keybinding_chain:
                 key = f"{self.keybinding_chain}-{key}"
 
-            if key == 10:   # ENTER
+            if key == 10 and self.bracket_paste:
                 # when pasting, dont return, but insert newline character
-                if self.bracket_paste:
-                    self.input_buffer = self.input_buffer[:self.input_index] + "\n" + self.input_buffer[self.input_index:]
-                    self.input_index += 1
-                    self.add_to_delta_store("\n")
-                    pass
-                else:
-                    if forum:
-                        self.input_index = 0
-                        self.input_line_index = 0
-                        self.cursor_pos = 0
-                        self.draw_input_line()
-                    self.cursor_on = True
-                    self.input_select_start = None
-                    return self.return_input_code(0)
+                self.input_buffer = self.input_buffer[:self.input_index] + "\n" + self.input_buffer[self.input_index:]
+                self.input_index += 1
+                self.add_to_delta_store("\n")
+
+            elif key in self.KEYBINDINGS_SEND_MESSAGE:
+                if forum:
+                    self.input_index = 0
+                    self.input_line_index = 0
+                    self.cursor_pos = 0
+                    self.draw_input_line()
+                self.cursor_on = True
+                self.input_select_start = None
+                return self.return_input_code(0)
 
             if isinstance(key, str) and not self.keybinding_chain:
                 if len(key) > 1 and key.startswith("ALT+"):   # switching tab with Alt+Num
@@ -2406,7 +2412,7 @@ class TUI():
                     self.show_cursor()
                 self.spellcheck()
 
-            elif key == curses.KEY_LEFT:
+            elif key in self.KEYBINDINGS_INPUT_LEFT:
                 if self.input_index > 0:
                     # if index hits left screen edge, but there is more text to left, move line right
                     if self.input_index - max(0, len(self.input_buffer) - w + 1 - self.input_line_index) == 0:
@@ -2417,7 +2423,7 @@ class TUI():
                 self.input_select_start = None
                 self.spellcheck()
 
-            elif key == curses.KEY_RIGHT:
+            elif key in self.KEYBINDINGS_INPUT_RIGHT:
                 if self.input_index < len(self.input_buffer):
                     # if index hits right screen edge, but there is more text to right, move line right
                     if self.input_index - max(0, len(self.input_buffer) - w - self.input_line_index) == w:
@@ -2891,9 +2897,9 @@ class TUI():
 
         elif self.mouse_in_window(x, y, self.win_chat):
             if up:
-                self.common_keybindings(curses.KEY_UP)
+                self.common_keybindings(self.KEYBINDINGS_CHAT_UP[0])
             else:
-                self.common_keybindings(curses.KEY_DOWN)
+                self.common_keybindings(self.KEYBINDINGS_CHAT_DOWN[0])
 
         elif self.win_extra_window and self.mouse_in_window(x, y, self.win_extra_window):
             if up:

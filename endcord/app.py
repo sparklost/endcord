@@ -259,6 +259,7 @@ class Endcord:
             "last_guild_id": None,
             "last_channel_id": None,
             "muted": False,
+            "member_list": True,
             "collapsed": [],
             "folder_names": [],
             "tabbed_channels": [],
@@ -278,7 +279,6 @@ class Endcord:
         self.hidden_channels = []
         self.current_subscribed_members = []
         self.recording = False
-        self.member_list_visible = False
         self.assist_word = None
         self.assist_type = None
         self.assist_found = []
@@ -890,13 +890,13 @@ class Endcord:
             self.tui.update_chat(self.chat, self.chat_format)
         self.set_channel_seen(channel_id, self.get_chat_last_message_id(), force_remove_notify=True)   # right after update_chat so new_unreads is determined
         if not guild_id:   # no member list in dms
-            self.member_list_visible = False
             self.tui.remove_member_list()
-        elif self.member_list_visible or open_member_list:
-            self.member_list_visible = True
+        elif self.state.get("member_list") or open_member_list:
             if delay:
                 time.sleep(0.01)   # needed when startup to fix issues with emojis and border lines
             self.update_member_list(reset=True)
+            self.gateway.set_want_member_list(True)
+            self.state["member_list"] = True
         self.close_extra_window()
         if self.disable_sending:
             self.update_extra_line(self.disable_sending, timed=False)
@@ -961,7 +961,6 @@ class Endcord:
         self.chat_map = []
 
         self.tui.update_chat(self.chat, self.chat_format)
-        self.member_list_visible = False
         self.tui.remove_member_list()
         self.update_extra_line()
         self.close_extra_window()
@@ -1747,7 +1746,7 @@ class Endcord:
                                 self.restore_input_text = (new_input_text, "standard")
                             self.tui.input_buffer = new_input_text
                             self.tui.set_input_index(new_input_index)
-                elif self.member_list_visible:   # controls for member list when no extra window
+                elif self.state.get("member_list") and self.active_channel["guild_id"]:   # controls for member list when no extra window
                     mlist_selected = self.tui.get_mlist_selected()
                     if mlist_selected == -1 or mlist_selected >= len(self.member_list):
                         continue
@@ -2167,9 +2166,11 @@ class Endcord:
             elif isinstance(action, tuple):
                 if action[0] == 50:
                     self.restore_input_text = (input_text, "standard")
-                    command_type, command_args = parser.command_string(action[1])
-                    self.execute_command(command_type, command_args, action[1], chat_sel, tree_sel)
-                    self.assist_word = None
+                    commands = parser.split_command_binding(action[1])
+                    for command in commands:
+                        command_type, command_args = parser.command_string(command)
+                        self.execute_command(command_type, command_args, action[1], chat_sel, tree_sel)
+                        self.assist_word = None
 
             # media controls   # handled externally in media.py as curses is fully paused
             # elif action >= 100:
@@ -4446,15 +4447,21 @@ class Endcord:
 
     def toggle_member_list(self):
         """Toggle member list if there is enough space"""
-        if self.member_list_visible:
-            if self.screen.getmaxyx()[1] - self.config["tree_width"] - self.member_list_width - 2 < 32:
-                self.update_extra_line("Not enough space to draw member list.")
-            else:
-                self.tui.remove_member_list()
-                self.member_list_visible = False
+        if not self.get_members or not self.active_channel["guild_id"]:
+            return
+
+        if self.state.get("member_list"):
+            self.tui.remove_member_list()
+            self.state["member_list"] = False
+
+        elif self.screen.getmaxyx()[1] - self.config["tree_width"] - self.member_list_width - 2 < 32:
+            self.update_extra_line("Not enough space to draw member list.")
         else:
             self.update_member_list()
-            self.member_list_visible = True
+            self.state["member_list"] = True
+
+        self.gateway.set_want_member_list(self.state.get("member_list", True))
+        peripherals.save_json(self.state, f"state_{self.profiles["selected"]}.json")
 
 
     def set_status(self, status):
@@ -7091,6 +7098,7 @@ class Endcord:
         if self.config["remember_tabs"]:
             for channel_id in self.state["tabbed_channels"]:
                 self.add_to_channel_cache(channel_id, [], True)
+        self.gateway.set_want_member_list(self.get_members and self.state.get("member_list", True))
         self.tui.set_fun(self.fun)
 
         # load summaries
@@ -7484,9 +7492,8 @@ class Endcord:
                                 last_index = None
 
                             break
-                    if self.active_channel["guild_id"] in changed_guilds:
-                        if self.member_list_visible:
-                            self.update_member_list(last_index)
+                    if self.active_channel["guild_id"] in changed_guilds and self.state.get("member_list"):
+                        self.update_member_list(last_index)
 
             # check for subscribed member presences
             new_members, changed_guilds = self.gateway.get_subscribed_activities()

@@ -14,7 +14,7 @@ settings = {
     "remove_previous_notification": True,
     "ack_throttling": 5,
     "member_list": True,
-    "member_list_auto_open": True,
+    "member_list_auto_open": False,
     "use_nick_when_available": True,
     "remember_state": True,
     "remember_tabs": True,
@@ -174,6 +174,8 @@ keybindings = {
     "channel_info": "ALT+105",   # Alt+I
     "copy_channel_link": "ALT+85",   # Alt+Shift+U
     # input line
+    "input_left": 260,   # Left
+    "input_right": 261,   # Right
     "word_left": 554,   # Ctrl+Left
     "word_right": 569,   # Ctrl+Right
     "insert_newline": 14,   # Ctrl+N
@@ -188,6 +190,9 @@ keybindings = {
     "cut_sel": "ALT+120",   # Alt+X
     "delete_word": 8, # Ctrl+Backspace/Ctrl+H
     # chat
+    "send_message": 10,   # Enter
+    "chat_up": 259,   # Up
+    "chat_down": 258,   # Down
     "reply": 18,   # Ctrl+R
     "edit": 5,   # Ctrl+E
     "delete": 4,   # Ctrl+D
@@ -197,7 +202,7 @@ keybindings = {
     "download": 23,   # Ctrl+W
     "upload": 21,   # Ctrl+U
     "browser": 15,   # Ctrl+O
-    "copy_msg": 10,   # Ctrl+M
+    "copy_msg": 12,   # Ctrl+L
     "view_media": 22,   # Ctrl+V
     "spoil": "ALT+116",   # Alt+T
     "search": 6,   # Ctrl+F
