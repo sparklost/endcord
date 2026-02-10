@@ -883,8 +883,8 @@ def command_string(text):
         elif value_part == "selected":
             cmd_args = {"value": 0}
         elif value_part == "above":
-            cmd_args = {"value": -1}
-        elif value_part == "bellow":
             cmd_args = {"value": 1}
+        elif value_part == "bellow":
+            cmd_args = {"value": -1}
 
     return cmd_type, cmd_args
