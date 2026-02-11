@@ -69,6 +69,7 @@ COMMAND_ASSISTS = (
     ("generate_invite *duration *limit - generate invite to current server, default is 7 days", "generate_invite"),
     ("rename_folder [name] - locally rename currently selected folder in tree", "rename_folder"),
     ("collapse_all_except *[option] - collapse all servers in tree except specific [option]", "collapse_all_except"),
+    ("tree_select *server/channel, *next/prev - select next or previous server or channel in tree", "tree_select"),
     ("send_message * - see commands documentation for options", "send_message"),
     ("redraw - redraw UI if it ever gets messed up", "redraw"),
     ("open_config_dir - open config directory with system file manager", "open_config_dir"),

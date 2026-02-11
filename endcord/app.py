@@ -58,7 +58,7 @@ APP_COMMAND_AUTOCOMPLETE_DELAY = 0.3   # delay for requesting app command autoco
 MB = 1024 * 1024
 USER_UPLOAD_LIMITS = (10*MB, 50*MB, 500*MB, 50*MB)   # premium tier 0, 1, 2, 3 (none, classic, full, basic)
 GUILD_UPLOAD_LIMITS = (10*MB, 10*MB, 50*MB, 100*MB)   # premium tier 0, 1, 2, 3
-FORUM_COMMANDS = (1, 2, 7, 13, 14, 15, 17, 20, 22, 25, 27, 29, 30, 31, 32, 40, 42, 49, 50, 51, 52, 53, 55, 56, 57, 58, 61, 62, 66, 67)
+FORUM_COMMANDS = (1, 2, 7, 13, 14, 15, 17, 20, 22, 25, 27, 29, 30, 31, 32, 40, 42, 49, 50, 51, 52, 53, 55, 56, 57, 58, 61, 62, 66, 67, 68, 69, 70)
 COLLAPSE_ALL_EXCEPT_OPTIONS = ("current", "selected", "above", "bellow")
 
 match_emoji = re.compile(r"<:(.*):(\d*)>")
@@ -979,7 +979,7 @@ class Endcord:
                 collapse = bool(self.tree_format[num] % 10)   # get first digit
                 break
 
-        # dont collapse if its should stay open
+        # dont collapse if it should stay open
         if open_only and collapse:
             collapsed = self.state["collapsed"][:]
             folder_changed = False
@@ -1005,15 +1005,17 @@ class Endcord:
         passed = False
         if one_open:
             # collapse all other guilds
-            for guild_1 in self.guilds:
-                guild_ids.append(guild_1["guild_id"])
-                if guild_1["guild_id"] == guild_id:
-                    passed = True
-                    if collapse and not dont_close_this:
-                        collapsed.append(guild_id)
-                    continue
-                if direction == 0 or (direction == -1 and passed) or (direction == 1 and not passed):
-                    collapsed.append(guild_1["guild_id"])
+            for obj in self.tree_metadata:
+                if obj and obj["type"] < 0:   # guilds and folders
+                    obj_id = obj["id"]
+                    guild_ids.append(obj_id)
+                    if obj_id == guild_id:
+                        passed = True
+                        if collapse and not dont_close_this:
+                            collapsed.append(guild_id)
+                        continue
+                    if direction == 0 or (direction == -1 and not passed) or (direction == 1 and passed):
+                        collapsed.append(obj_id)
             # copy already collapsed categories
             for collapsed_id in self.state["collapsed"]:
                 if collapsed_id not in collapsed:
@@ -2176,8 +2178,11 @@ class Endcord:
                     commands = parser.split_command_binding(action[1])
                     for command in commands:
                         command_type, command_args = parser.command_string(command)
+                        chat_sel, _ = self.tui.get_chat_selected()
+                        tree_sel = self.tui.get_tree_selected()
                         self.execute_command(command_type, command_args, action[1], chat_sel, tree_sel)
-                        self.assist_word = None
+                        self.check_tree_format()
+                    self.assist_word = None
 
             # media controls   # handled externally in media.py as curses is fully paused
             # elif action >= 100:
@@ -2926,6 +2931,8 @@ class Endcord:
                     object_id = self.checkpoint
                     tp = True
             channel_id, channel_name, guild_id, guild_name, parent_hint = self.find_parents_from_id(object_id)
+            if channel_id == guild_id:
+                channel_id = None
             # guild
             if not channel_id:
                 self.tui.tree_select(self.tree_pos_from_id(object_id))
@@ -3606,6 +3613,31 @@ class Endcord:
                         self.open_guild(guild_id, select=True, one_open=True, dont_close_this=True, direction=cmd_args["value"])
             else:
                 self.update_extra_line("Invalid command arguments.")
+                return
+
+        elif cmd_type == 70:   # TREE_SELECT
+            if cmd_args["type"]:   # server
+                current_target_id = self.tree_metadata[tree_sel]["id"]
+                target_types = (-1, )   # server
+            else:   # channel
+                current_target_id = self.active_channel["channel_id"]
+                target_types = (0, 1, 3, 15)   # channel, dm, group, forum
+            if not current_target_id:
+                current_target_id = 0
+            if cmd_args["value"]:   # previous
+                tree_metadata = reversed(self.tree_metadata)
+            else:
+                tree_metadata = self.tree_metadata
+            target_id = None
+            found = False
+            for obj in tree_metadata:
+                if obj and obj["id"] == current_target_id:
+                    found = True
+                elif found and obj and obj["type"] in target_types:
+                    target_id = obj["id"]
+                    break
+            if target_id:
+                self.execute_command(25, {"channel_id": target_id}, "", chat_sel, tree_sel)   # goto command
                 return
 
         if success is None:

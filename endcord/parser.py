@@ -877,7 +877,6 @@ def command_string(text):
     elif text_lower.startswith("collapse_all_except"):
         cmd_type = 69
         value_part = text_lower[20:].strip(" ")
-        logger.info(value_part)
         if value_part == "current":
             cmd_args = {"value": 2}
         elif value_part == "selected":
@@ -886,5 +885,14 @@ def command_string(text):
             cmd_args = {"value": 1}
         elif value_part == "bellow":
             cmd_args = {"value": -1}
+
+    # 70 - TREE_SELECT
+    elif text_lower.startswith("tree_select"):
+        cmd_type = 70
+        all_args = text_lower[12:].strip(" ").split(" ")
+        cmd_args = {
+            "type": "server" in all_args,
+            "value": "prev" in all_args,
+        }
 
     return cmd_type, cmd_args

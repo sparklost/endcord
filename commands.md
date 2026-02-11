@@ -128,6 +128,8 @@
     Locally rename currently selected folder in tree. Custom names are kept in state_profile_name.json in config dir.
 - `collapse_all_except *[option]`  
     Collapse all servers in tree except specific `[option]`: `current` (default), `selected`, `above`, `bellow`.  
+- `tree_select *server/channel, *next/prev`  
+    Select next or previous server or channel in tree. Default is next channel.  
 - `send_message --channel_id=[channel_id]/<#[channel_id]> --reply_id=[message_id] --ping=[True/False] --attachment=[path] [message_content]`  
     Try not to abuse this command, as its run in a thread and can abuse API!  
     `--channel_id` - accepts both channel_id and formatted channel_id from assist, only last channel_id will be used. Default: current channel.  

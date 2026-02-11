@@ -1,5 +1,3 @@
-Add select next/prev server/channel commands
-
 Fix issues with many wide characters in chat
 Fix issues with wide characters in username
 Fix issues with wide characters in input line
