@@ -372,6 +372,14 @@ def convert_keybindings_cmd(keybindings):
     return new_keybindings
 
 
+def normalize_keybindings(keybindings):
+    """Ensure all keybindings are tuples"""
+    for key in keybindings:
+        if not isinstance(keybindings[key], tuple):
+            keybindings[key] = (keybindings[key], )
+    return keybindings
+
+
 def update_config(config, key, value):
     """Update and save config"""
     if not value:

@@ -36,6 +36,6 @@ build = [
 ]
 media = [
     "av>=16.1.0",
-    "pillow>=12.1.0",
+    "pillow>=12.1.1",
     "pynacl>=1.6.2",
 ]

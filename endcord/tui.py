@@ -234,7 +234,7 @@ class TUI():
         curses.init_pair(255, config["color_default"][0], config["color_default"][1])   # temporary
         self.default_color = 255
         self.role_color_start_id = self.last_free_id   # starting id for role colors
-        self.keybindings = {key: (val,) if not isinstance(val, tuple) else val for key, val in keybindings.items()}
+        self.keybindings = keybindings
         self.switch_tab_modifier = self.keybindings["switch_tab_modifier"][0][:-4]
         self.command_bindings = command_bindings
         self.screen = screen
@@ -2203,10 +2203,10 @@ class TUI():
         return tmp, self.chat_selected, self.tree_selected_abs, code
 
 
-    def wait_input(self, prompt="", init_text=None, reset=True, keep_cursor=False, autocomplete=False, clear_delta=False, forum=False, command=False):
+    def wait_input(self, prompt="", init_text=None, reset=True, keep_cursor=False, autocomplete=False, clear_delta=False, forum=False, command=False, press=None):
         """
-        Take input from user, and show it on screen
-        Return typed text, absolute_tree_position and whether channel is changed
+        Take input from user, and show it on screen.
+        Return typed text, absolute_tree_position and whether channel is changed.
         """
         _, w = self.input_hw
         self.enable_autocomplete = autocomplete
@@ -2240,7 +2240,10 @@ class TUI():
         while self.run:
             while self.disable_drawing:
                 time.sleep(0.2)
-            key = get_key(self.screen)
+            if press:
+                key = press
+            else:
+                key = get_key(self.screen)
             if key == -1:
                 continue
 
@@ -2251,29 +2254,7 @@ class TUI():
                 continue
             w = self.input_hw[1]
 
-            # media controls   # handled externally in media.py because curses is fully paused
-            # if self.disable_drawing:
-            #     if key == 27:   # ESCAPE
-            #         self.screen.nodelay(True)
-            #         key = get_key(self.screen)
-            #         if key in (-1, 27):
-            #             self.input_buffer = ""
-            #             self.screen.nodelay(False)
-            #             return None, 0, 0, 100
-            #         self.screen.nodelay(False)
-            #     elif key in self.keybindings["media_pause"]:
-            #         return None, 0, 0, 101
-            #     elif key in self.keybindings["media_replay"]:
-            #         return None, 0, 0, 102
-            #     elif key in self.keybindings["media_seek_forward"]:
-            #         return None, 0, 0, 103
-            #     elif key in self.keybindings["media_seek_backward"]:
-            #         return None, 0, 0, 104
-            #     elif key == curses.KEY_RESIZE:
-            #         pass
-            #     continue   # disable all inputs from main UI
-
-            if key == 27:   # ESCAPE
+            if key == 27 and not press:   # ESCAPE
                 # terminal waits when Esc is pressed, but not when sending escape sequence
                 self.screen.nodelay(True)
                 key = get_key(self.screen)
@@ -2777,21 +2758,24 @@ class TUI():
             elif key in self.keybindings["open_external_editor"] and not forum:
                 return self.return_input_code(45)
 
-            elif key == curses.KEY_RESIZE:
-                self.resize()
-                _, w = self.input_hw
-
             # terminal reserved keys: CTRL+ C, I, J, M, Q, S, Z
 
             elif key in self.command_bindings:
                 return self.return_input_code((50, self.command_bindings.get(key)))
+
+            elif key == curses.KEY_RESIZE:
+                self.resize()
+                _, w = self.input_hw
 
             # keep index inside screen
             self.cursor_pos = self.input_index - max(0, len(self.input_buffer) - w + 1 - self.input_line_index)
             self.cursor_pos = max(self.cursor_pos, 0)
             self.cursor_pos = min(w - 1, self.cursor_pos)
             self.draw_input_line()
-        return None, None, None, None
+
+            if press:
+                break
+        return self.return_input_code(None)
 
 
     def mouse_events(self, key):

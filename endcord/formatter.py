@@ -41,7 +41,7 @@ match_md_all = re.compile(
         (\*\*[^\*]+\*\*)     |   # bold
         # (~~[^~]+~~)        |   # strikethrough - unused
         (?<!\w)_[^_]+_(?!\w) |   # italic _
-        (\*[^\*]+\*)             # italic *
+        (\*[^\*\n]+\*)           # italic * (no newline)
     )
     """,
     re.VERBOSE,

@@ -134,10 +134,12 @@ To specify multiple keybindings for same action put them in a tuple, eg.: `(2, "
 Switch tab keybinding is special - `NUM` is placeholder for 1-9 number keys, eg.:`ALT+NUM` or `ALT+120-NUM`.  
 
 ### Command keybinding
-There is additional section `[command_bindings]`, used to make custom client command string executed when keybinding is pressed.  
+There is additional section `[command_bindings]`, used to make custom client command string or even macros executed when keybinding is pressed.  
 Command keybinding is added like this: `"25" = "send_message Hello World!"`. This will execute that command when `Ctrl+X` is pressed.  
 Note that all bindings must be inside quotes, even a single integer.  
+Alongside commands, standard keybinding names can be used here too. Eg. `"25" = "tree_up; tree_up"` will "press" tree_up binding twice.  
 To execute multiple commands in a sequence, type them spearated with `;` character. To use actual `;` character in command type it as `\;`.  
+Special command is availabe for command_bindings: `sleep [seconds]`. If some sequence fails to execute, adding `sleep 0.1` between the two comands may help.  
 
 ### Debug mode
 Debug mode can be enabled with `-d` flag.  

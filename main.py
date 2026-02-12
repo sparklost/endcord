@@ -73,6 +73,8 @@ def main(args):
         keybindings = peripherals.convert_keybindings(keybindings)
         command_bindings = peripherals.convert_keybindings_cmd(command_bindings)
 
+    keybindings = peripherals.normalize_keybindings(keybindings)
+
     os.environ["ESCDELAY"] = "25"   # 25ms
     if os.environ.get("TERM", "") == "linux" or os.environ.get("TERM", "").startswith("xterm"):   # for xterm-ghostty
         os.environ["REALTERM"] = os.environ["TERM"]

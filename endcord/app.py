@@ -400,7 +400,7 @@ class Endcord:
                         result = method(*data)
                         if result is not None:
                             if not isinstance(result, tuple):
-                                result = (result,)
+                                result = (result, )
                             data = result
                     if data is not None:
                         return data
@@ -417,7 +417,7 @@ class Endcord:
                 result = method(*data)
                 if result is not None:
                     if not isinstance(result, tuple):
-                        result = (result,)
+                        result = (result, )
                     data = result
         if cache:
             self.extension_cache.append((method_name, methods))
@@ -1357,14 +1357,20 @@ class Endcord:
                 return tree_pos
 
 
-    def wait_input(self):
+    def wait_input(self, forced_binding=None):
         """Thread that handles: getting input, formatting, sending, replying, editing, deleting message and switching channel"""
         logger.info("Input handler loop started")
+        ephemeral = False
 
-        while self.run:
+        while self.run and not ephemeral:
             if self.reacting["id"]:
                 self.restore_input_text = (self.restore_input_text[0], "react")
-            if self.restore_input_text[1] == "prompt":
+            if forced_binding:   # externally forced binding
+                init_text = self.restore_input_text[0]
+                self.stop_extra_window()
+                input_text, chat_sel, tree_sel, action = self.tui.wait_input(self.prompt, init_text=init_text, reset=False, keep_cursor=True, forum=self.forum, press=forced_binding)
+                ephemeral = True   # stop loop
+            elif self.restore_input_text[1] == "prompt":
                 self.stop_extra_window()
                 self.restore_input_text = (None, "after prompt")
                 input_text, chat_sel, tree_sel, action = self.tui.wait_input(self.prompt, forum=self.forum)
@@ -2175,12 +2181,22 @@ class Endcord:
             elif isinstance(action, tuple):
                 if action[0] == 50:
                     self.restore_input_text = (input_text, "standard")
-                    commands = parser.split_command_binding(action[1])
-                    for command in commands:
-                        command_type, command_args = parser.command_string(command)
+                    for command in parser.split_command_binding(action[1]):
+                        if command.startswith("sleep"):
+                            try:
+                                time.sleep(float(command[6:]))
+                                continue
+                            except ValueError:
+                                pass
+                        cmd_type, cmd_args = parser.command_string(command)
                         chat_sel, _ = self.tui.get_chat_selected()
                         tree_sel = self.tui.get_tree_selected()
-                        self.execute_command(command_type, command_args, action[1], chat_sel, tree_sel)
+                        if cmd_type == 0:   # try keybindings
+                            binding = self.keybindings.get(command)
+                            if binding and binding[0]:
+                                self.wait_input(forced_binding=binding[0])
+                        if not binding:
+                            self.execute_command(cmd_type, cmd_args, action[1], chat_sel, tree_sel)
                         self.check_tree_format()
                     self.assist_word = None
 
@@ -5368,7 +5384,7 @@ class Endcord:
                 continue
             if message_c_id > int(messages[0]["id"]):
                 # if message_c date is after first message date
-                if int(messages[0]["id"]) >= self.last_message_id:
+                if int(messages[0]["id"]) >= int(self.last_message_id):
                     # if it is not scrolled up
                     messages.insert(0, message_c)
                 continue

@@ -50,8 +50,7 @@ def picker_internal(screen, keybindings, command_bindings):
     curses.init_pair(1, -1, -1)
     screen.bkgd(" ", curses.color_pair(1))
     screen.addstr(1, 0, message)
-    keybindings = {key: (val,) if not isinstance(val, tuple) else val for key, val in keybindings.items()}
-    command_bindings = {val: (key,) for key, val in command_bindings.items()}
+    command_bindings = {val: (key, ) for key, val in command_bindings.items()}
     while True:
         key_code = get_key(screen)
         if key_code == 27:   # escape sequence, when ALT+KEY is pressed
