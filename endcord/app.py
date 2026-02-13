@@ -2191,6 +2191,7 @@ class Endcord:
                         cmd_type, cmd_args = parser.command_string(command)
                         chat_sel, _ = self.tui.get_chat_selected()
                         tree_sel = self.tui.get_tree_selected()
+                        binding = None
                         if cmd_type == 0:   # try keybindings
                             binding = self.keybindings.get(command)
                             if binding and binding[0]:
