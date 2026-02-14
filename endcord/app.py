@@ -1887,7 +1887,7 @@ class Endcord:
                     self.assist_word = " "
                     self.assist_type = 5
                     self.tui.instant_assist = True
-                    self.tui.draw_extra_window(extra_title, extra_body, select=True, start_zero=True)
+                    self.tui.draw_extra_window(extra_title, extra_body, select=True)
                     self.extra_window_open = True
                     self.extra_bkp = (self.tui.extra_window_title, self.tui.extra_window_body)
                 else:
@@ -4564,7 +4564,7 @@ class Endcord:
             self.update_status_line()
 
 
-    def view_profile(self, user_id=None, guild_id=None, user_data=None):
+    def view_profile(self, user_id=None, guild_id=None, user_data=None, reset=True):
         """Format and show extra window with profile information"""
         # get and cache user data
         if not user_id and not user_data:
@@ -4620,7 +4620,7 @@ class Endcord:
         if self.emoji_as_text:
             extra_title = emoji.demojize(extra_title)
             extra_body = [emoji.demojize(x) for x in extra_body]
-        self.tui.draw_extra_window(extra_title, extra_body)
+        self.tui.draw_extra_window(extra_title, extra_body, reset_scroll=reset)
         self.extra_window_open = True
 
 
@@ -4775,7 +4775,7 @@ class Endcord:
             self.state.get("muted"),
             self.tui.get_dimensions()[2][1],
         )
-        self.tui.draw_extra_window(extra_title, extra_body, start_zero=reset)
+        self.tui.draw_extra_window(extra_title, extra_body, reset_scroll=reset)
         self.extra_window_open = True
         self.voice_call_list_open = True
 
@@ -5220,7 +5220,7 @@ class Endcord:
         if (self.search or self.search_gif or self.command) and not (self.assist_word or self.assist_word == " "):
             self.extra_bkp = (self.tui.extra_window_title, self.tui.extra_window_body)
         self.assist_word = assist_word
-        self.tui.draw_extra_window(extra_title, extra_body, select=True, start_zero=True)
+        self.tui.draw_extra_window(extra_title, extra_body, select=True)
 
 
     def stop_assist(self, close=True):
@@ -7582,7 +7582,7 @@ class Endcord:
                         break
                 if self.active_channel["guild_id"] in changed_guilds:
                     if self.viewing_user_data["id"]:
-                        self.view_profile(user_data=self.viewing_user_data)
+                        self.view_profile(user_data=self.viewing_user_data, reset=False)
 
             # check for new member roles
             new_member_roles, nonce = self.gateway.get_member_roles()

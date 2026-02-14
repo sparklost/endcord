@@ -519,7 +519,7 @@ class TUI():
         if self.have_title_tree:
             self.draw_title_tree()
         self.draw_extra_line(self.extra_line_text)
-        self.draw_extra_window(self.extra_window_title, self.extra_window_body, self.extra_select)
+        self.draw_extra_window(self.extra_window_title, self.extra_window_body, select=self.extra_select, reset_scroll=False)
         self.draw_member_list(self.member_list, self.member_list_format, force=True, clean=not(redraw_only))
         self.draw_chat()
 
@@ -591,7 +591,7 @@ class TUI():
         if self.have_title_tree:
             self.draw_title_tree()
         self.draw_extra_line(self.extra_line_text)
-        self.draw_extra_window(self.extra_window_title, self.extra_window_body, self.extra_select)
+        self.draw_extra_window(self.extra_window_title, self.extra_window_body, select=self.extra_select, reset_scroll=False)
         if self.win_extra_window:   # redraw borders for extra window
             extra_window_hwyx = self.win_extra_window.getmaxyx() + self.win_extra_window.getbegyx()
             self.draw_border(extra_window_hwyx, top=False, bot=False)
@@ -1516,7 +1516,7 @@ class TUI():
             self.draw_chat()
 
 
-    def draw_extra_window(self, title_txt, body_text, select=False, start_zero=False):
+    def draw_extra_window(self, title_txt, body_text, select=False, reset_scroll=True):
         """
         Draw extra window above status line and resize chat.
         title_txt is string, body_text is list.
@@ -1527,7 +1527,7 @@ class TUI():
             self.extra_select = select
             self.extra_window_title = title_txt
             self.extra_window_body = body_text
-            if start_zero:
+            if reset_scroll:
                 self.extra_index = 0
                 self.extra_selected = 0
 
@@ -2138,18 +2138,19 @@ class TUI():
 
         elif key in self.keybindings["extra_up"]:
             if self.extra_window_body and not mouse:
-                if self.extra_select and self.extra_selected >= 0:
-                    if self.extra_index and self.extra_selected <= self.extra_index:
-                        self.extra_index -= 1
-                    self.extra_selected -= 1
-                    self.draw_extra_window(self.extra_window_title, self.extra_window_body, self.extra_select)
+                if self.extra_select:
+                    if self.extra_selected > 0:
+                        if self.extra_index and self.extra_selected <= self.extra_index:
+                            self.extra_index -= 1
+                        self.extra_selected -= 1
+                        self.draw_extra_window(self.extra_window_title, self.extra_window_body, select=self.extra_select, reset_scroll=False)
+                    elif self.wrap_around and not self.wrap_around_disable:
+                        self.extra_selected = len(self.extra_window_body) - 1
+                        self.extra_index = max(len(self.extra_window_body) - (self.win_extra_window.getmaxyx()[0] - 1), 0)
+                        self.draw_extra_window(self.extra_window_title, self.extra_window_body, select=self.extra_select, reset_scroll=False)
                 elif self.extra_index > 0:
                     self.extra_index -= 1
-                    self.draw_extra_window(self.extra_window_title, self.extra_window_body, self.extra_select)
-                elif self.wrap_around and not self.wrap_around_disable:
-                    self.extra_selected = len(self.extra_window_body) - 1
-                    self.extra_index = max(len(self.extra_window_body) - (self.win_extra_window.getmaxyx()[0] - 1), 0)
-                    self.draw_extra_window(self.extra_window_title, self.extra_window_body, self.extra_select)
+                    self.draw_extra_window(self.extra_window_title, self.extra_window_body, select=self.extra_select, reset_scroll=False)
             elif self.win_member_list:
                 if self.mlist_selected >= 0:
                     if self.mlist_index and self.mlist_selected <= self.mlist_index:
@@ -2168,14 +2169,14 @@ class TUI():
                         if top_line < len(self.extra_window_body) and self.extra_selected >= top_line - 1:
                             self.extra_index += 1
                         self.extra_selected += 1
-                        self.draw_extra_window(self.extra_window_title, self.extra_window_body, self.extra_select)
+                        self.draw_extra_window(self.extra_window_title, self.extra_window_body, select=self.extra_select, reset_scroll=False)
                     elif self.wrap_around and not self.wrap_around_disable:
                         self.extra_selected = 0
                         self.extra_index = 0
-                        self.draw_extra_window(self.extra_window_title, self.extra_window_body, self.extra_select)
+                        self.draw_extra_window(self.extra_window_title, self.extra_window_body, select=self.extra_select, reset_scroll=False)
                 elif self.extra_index + 1 < len(self.extra_window_body):
                     self.extra_index += 1
-                    self.draw_extra_window(self.extra_window_title, self.extra_window_body, self.extra_select)
+                    self.draw_extra_window(self.extra_window_title, self.extra_window_body, select=self.extra_select, reset_scroll=False)
             elif self.win_member_list:
                 if self.mlist_selected + 1 < len(self.member_list):
                     top_line = self.mlist_index + self.win_member_list.getmaxyx()[0] - 1
@@ -2838,7 +2839,7 @@ class TUI():
         elif self.win_extra_window and self.mouse_in_window(x, y, self.win_extra_window):
             x, y = self.mouse_rel_pos(x, y, self.win_extra_window)
             self.extra_selected = self.extra_index + y - 1
-            self.draw_extra_window(self.extra_window_title, self.extra_window_body, self.extra_select)
+            self.draw_extra_window(self.extra_window_title, self.extra_window_body, select=self.extra_select, reset_scroll=False)
 
         elif self.win_extra_line and self.mouse_in_window(x, y, self.win_extra_line):
             self.mouse_rel_x = self.mouse_rel_pos(x, y, self.win_extra_line)[0]
@@ -2925,10 +2926,10 @@ class TUI():
             if up:
                 if self.extra_index:
                     self.extra_index -= min(self.mouse_scroll_sensitivity, self.extra_index)
-                    self.draw_extra_window(self.extra_window_title, self.extra_window_body, self.extra_select)
+                    self.draw_extra_window(self.extra_window_title, self.extra_window_body, select=self.extra_select, reset_scroll=False)
             elif self.extra_index + self.win_extra_window.getmaxyx()[0] - 1 < len(self.extra_window_body):
                 self.extra_index += self.mouse_scroll_sensitivity
-                self.draw_extra_window(self.extra_window_title, self.extra_window_body, self.extra_select)
+                self.draw_extra_window(self.extra_window_title, self.extra_window_body, select=self.extra_select, reset_scroll=False)
 
         elif self.win_member_list and self.mouse_in_window(x, y, self.win_member_list):
             if up:
