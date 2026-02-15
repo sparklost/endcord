@@ -5,7 +5,17 @@ Each extension should be placed there as a folder containing at least `.py` file
 Extension loading can be toggled in config and is ON by default.  
 During loading process some extensions may fail to load or are invalid, check log for more info.  
 If extension is built for different version of endcord, there is a chance it may misbehave or even cause a crash. But that should be rare.  
-**Disclaimer: You are installing extension at your own risk!** Depending on extension content it may increase risk or even cause your account to be banned. Extensions can be used to steal your token! See [Checking Extensions](#checking-extensions) for some red flags.  
+Extensions can be used to steal your token! See [Checking Extensions](#checking-extensions) for some red flags.  
+
+
+## Disclaimer
+> [!WARNING]
+> Using third-party client is against Discord's Terms of Service and may cause your account to be banned!  
+> **Use endcord and/or this extension at your own risk!**
+> Depending on extension content it may increase risk or even cause your account to be banned.
+> Extensions can be used to steal your token! See [Checking Extensions](#checking-extensions) for some red flags.
+> Extensions may be used for harmful or unintended purposes.
+> **Endcord developer is not responsible for any misuse or for actions taken by users.**
 
 
 ## Misc useful information when installing and writing extensions
@@ -15,7 +25,7 @@ Extensions are loaded in alphanumeric order, and in some cases it can matter bec
 
 ### Settings
 Extensions can access settings loaded from main settings - `config.ini` in config directory.  
-Extensions settings must always be in form: `ext_extension_name_setting_name` - starts with `ext_`, followed by lowercase extension name and then custom setting name.  
+Extensions settings must always be in form: `ext_extension_name_setting_name` - starts with `ext_`, followed by lowercase extension name and then custom setting name. Extension name should be same as repo name, use underscore instead dash, and remove prepended "endcord".
 Settings can be accessed in extension as `app.settings` in extensions `__init__`, it is a dict so do `app.settings.get("ext_extension_name_setting_name", "default_value")`.  
 
 ### Forced build-time disable
@@ -24,7 +34,7 @@ But extension can modify almost everything in endcord, and can even access all t
 To prevent extension injection (malware can modify endcord config to enable extensions and inject extension in extensions directory) - which is very unlikely, there is build script option: `--disable-extensions` which disables extension loading in the code itself, overriding config.  
 
 ### Extension search and publishing
-It is recommended to use `endcord-extension` or `endcord` tags on github and other git hosting services for easier extension search.  
+It is recommended to use `endcord-extension` or `endcord` tags on github and other git hosting services for easier extension search. Repo name should be prepeded with `endcord` eg. `endcord-your-extension-name`.  
 
 ### Logging
 Extensions can add log entries at any level and will have their name in the module name section of log entry.  
@@ -42,9 +52,9 @@ To access files from extension directory: `file_path = os.path.join(os.path.dirn
 
 ### Files structure
 Extension should be one directory containing all extension files.  
-This directory should contain same named `.py` file, which is main extension file. Extension will not be loaded if this is wrong.  
-There can be other `.py` files imported by this main file and any other relevant data, documentation, license or even compiled cython modules.  
-If extension is a git repo then make repo name same as main `.py` file, which is stored in the repo root. (this helps in extension installing process).  
+This directory should contain `.py` file with same name, which is main extension file. Extension will not be loaded if this is wrong.  
+There can be other `.py` files imported by this main file, and files for any other relevant data, documentation, license or even compiled cython modules.  
+If extension is a git repo, then main `.py` file will have same name as repo, and should be placed in repo root. (this helps in extension installing process).  
 
 ### Main extension file structure
 Main extension file has some requirements that must be followed otherwise extension will be flagged as invalid and not loaded.  
