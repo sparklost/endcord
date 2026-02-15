@@ -572,6 +572,7 @@ def build_with_nuitka(onedir, clang, mingw, nosoundcard, print_cmd=False, experi
         clean_qrcode()
     else:
         pkgname = PKGNAME
+    full = pkgname == PKGNAME
 
     mode = "--standalone" if onedir else "--onefile"
     compiler = ""
@@ -580,10 +581,7 @@ def build_with_nuitka(onedir, clang, mingw, nosoundcard, print_cmd=False, experi
     elif mingw:
         compiler = "--mingw64"
     python_flags = ["--python-flag=-OO"]
-    hidden_imports = [
-        "--include-module=uuid",
-        "--include-module=av.sidedata.encparams",
-    ]
+    hidden_imports = ["--include-module=uuid"]
     # excluding zstandard because its nuitka dependency bu also urllib3 optional dependency, and uses lots of space
     exclude_imports = [
         "--nofollow-import-to=cython",
@@ -601,6 +599,8 @@ def build_with_nuitka(onedir, clang, mingw, nosoundcard, print_cmd=False, experi
         package_data.remove("--include-package-data=soundcard")
     if clang:
         os.environ["CFLAGS"] = "-Wno-macro-redefined"
+    if full:
+        hidden_imports += ["--include-module=av.sidedata.encparams"]
 
     # platform-specific
     if sys.platform == "linux":

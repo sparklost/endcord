@@ -56,11 +56,10 @@ def split_char_in(text):
 
 
 def set_list_item(input_list, item, index):
-    """Replace existing item or append to list if it doesnt exist"""
-    try:
-        input_list[index] = item
-    except IndexError:
-        input_list.append(item)
+    """Replace existing item or build list if it doesnt exist"""
+    if index >= len(input_list):
+        input_list.extend([0] * (index - len(input_list) + 1))
+    input_list[index] = item
     return input_list
 
 
@@ -189,7 +188,8 @@ def draw_chat(win_chat, h, w, chat_buffer, chat_format, chat_index, chat_selecte
 
 
 # use cython if available, ~1.5 times faster
-if importlib.util.find_spec("endcord_cython") and importlib.util.find_spec("endcord_cython.tui"):
+if importlib.util.find_spec("endcord_cython") and importlib.util.find_spec("endcord_cython.tui") and sys.platform != "win32":
+    # windows curses returns negative value from curses.color_pair() causing crash in draw_chat cython function
     from endcord_cython.tui import draw_chat
 
 

@@ -55,6 +55,15 @@ def lazy_replace(text, key, value_function):
     return text
 
 
+def lazy_replace_args(text, key, value_function):
+    """Replace key in text with result from value_function, but run it only if key is found"""
+    extra_arg = None
+    if key in text:
+        replacement, extra_arg = value_function()
+        text = text.replace(key, replacement)
+    return text, extra_arg
+
+
 def trim_string(input_string, max_length):
     """If string is too long, trim it and append '...' so returned string is not longer than max_length"""
     if len(input_string) > max_length:
@@ -308,7 +317,7 @@ def normalize_string_count(input_string, max_length, dots=False, fill=True):
     """
     Normalize length of string, by cropping it or appending spaces.
     Set max_length to None to disable.
-    Also return count of wide characters.
+    Also return count of wide characters in normalized string.
     """
     input_string = str(input_string)
     if not max_length:
@@ -353,6 +362,8 @@ def normalize_string_with_suffix(input_string, suffix, max_length, emoji_safe=Fa
 
 def shift_ranges(ranges_lists, index, diff):
     """Range shifter for chained replace_ functions"""
+    if not diff:
+        return
     for ranges in ranges_lists:
         for format_range in ranges:
             if format_range[0] >= index:
@@ -362,6 +373,8 @@ def shift_ranges(ranges_lists, index, diff):
 
 def shift_ranges_all(diff, *ranges_lists):
     """Shifter for chat format ranges"""
+    if not diff:
+        return
     for ranges in ranges_lists:
         for format_range in ranges:
             format_range[0] += diff
@@ -383,6 +396,20 @@ def delete_ranges(outer_ranges, *ranges_lists):
                 if start >= outer_start and end <= outer_end:
                     del ranges[i]
                     break
+
+
+def shift_formats(formats, index, diff, skip=1):
+    """Shift formats for one chat element after specified index, creates copy of initial formats if there is diff"""
+    if not diff:
+        return formats
+    new_formats = []
+    for num, chat_format in enumerate(formats):
+        new_chat_format = chat_format[:]
+        if num >= skip and new_chat_format[1] >= index:
+            new_chat_format[1] += diff
+            new_chat_format[2] += diff
+        new_formats.append(new_chat_format)
+    return new_formats
 
 
 def replace_discord_emoji(text, *ranges_lists):
@@ -1219,15 +1246,17 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
                                 if trim_embed_url_size:
                                     embed_url = trim_string(embed_url, trim_embed_url_size)
                                 content += f"[{clean_type(embed["type"])} embed]: {embed_url}"
-                reply_line = lazy_replace(format_reply, "%username", lambda: normalize_string(ref_message["username"], limit_username, emoji_safe=True))
-                reply_line = lazy_replace(reply_line, "%global_name", lambda: normalize_string(global_name, limit_username, emoji_safe=True))
+                reply_line = lazy_replace(format_reply, "%username", lambda: normalize_string(ref_message["username"], limit_username, emoji_safe=False))
+                reply_line, wide_shift = lazy_replace_args(reply_line, "%global_name", lambda: normalize_string_count(global_name, limit_username))
                 reply_line = lazy_replace(reply_line, "%timestamp", lambda: generate_timestamp(ref_message["timestamp"], format_timestamp, convert_timezone))
                 reply_line = lazy_replace(reply_line, "%content", lambda: content.replace("\r", " ").replace("\n", " "))
+                wide_shift = -wide_shift
             else:
                 reply_line = lazy_replace(format_reply, "%username", lambda: normalize_string("Unknown", limit_username))
                 reply_line = lazy_replace(reply_line, "%global_name", lambda: normalize_string("Unknown", limit_username))
                 reply_line = reply_line.replace("%timestamp", placeholder_timestamp)
                 reply_line = lazy_replace(reply_line, "%content", lambda: ref_message["content"].replace("\r", "").replace("\n", ""))
+                wide_shift = 0
             reply_line, wide = normalize_string_count(reply_line, max_length, dots=True)
             if wide:
                 temp_wide_map.append(len(temp_chat))
@@ -1235,17 +1264,19 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
             if disable_formatting or reply_color_format == color_blocked:
                 temp_format.append([color_base])
             elif mentioned:
-                temp_format.append(color_mention_reply)
+                temp_format.append(shift_formats(color_mention_reply, pre_name_len, wide_shift))
             else:
-                temp_format.append(color_reply)
+                temp_format.append(shift_formats(color_reply, pre_name_len, wide_shift))
             temp_chat_map.append((num, None, True, None, None, None))
 
         # bot interaction
         elif message["interaction"]:
+            global_name, wide_shift = normalize_string_count(get_global_name(message["interaction"], use_nick), limit_username)
+            wide_shift = -wide_shift
             interaction_line = (
                 format_interaction
                 .replace("%username", message["interaction"]["username"][:limit_username])
-                .replace("%global_name", get_global_name(message["interaction"], use_nick)[:limit_username])
+                .replace("%global_name", global_name)
                 .replace("%command", message["interaction"]["command"])
             )
             interaction_line, wide = normalize_string_count(interaction_line, max_length, dots=True)
@@ -1255,9 +1286,9 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
             if disable_formatting or reply_color_format == color_blocked:
                 temp_format.append([color_base])
             elif mentioned:
-                temp_format.append(color_mention_reply)
+                temp_format.append(shift_formats(color_mention_reply, pre_name_len, wide_shift))
             else:
-                temp_format.append(color_reply)
+                temp_format.append(shift_formats(color_reply, pre_name_len, wide_shift))
             temp_chat_map.append((num, None, 2, None, None, None))
 
         # main message
@@ -1320,11 +1351,12 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
             else:
                 content += f"[gif sticker] (can be opened): {sticker["name"]}"
 
-        message_line = lazy_replace(format_message, "%username", lambda: normalize_string(message["username"], limit_username, emoji_safe=True))
-        message_line = lazy_replace(message_line, "%global_name", lambda: normalize_string(global_name, limit_username, emoji_safe=True))
+        message_line = lazy_replace(format_message, "%username", lambda: normalize_string(message["username"], limit_username, emoji_safe=False))
+        message_line, wide_shift = lazy_replace_args(message_line, "%global_name", lambda: normalize_string_count(global_name, limit_username))
         message_line = lazy_replace(message_line, "%timestamp", lambda: generate_timestamp(message["timestamp"], format_timestamp, convert_timezone))
         message_line = message_line.replace("%edited", edited_string if edited else "")
         message_line = message_line.replace("%content", content)
+        wide_shift = -wide_shift
 
         # find all code snippets and blocks
         code_snippets = []
@@ -1356,6 +1388,19 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
         spoiled = message.get("spoiled")
         if spoiled:
             spoilers = [value for i, value in enumerate(spoilers) if i not in spoiled]   # exclude spoiled messages
+
+        # fix for wide in global_name (assuming global_name is always on left side of content)
+        shift_ranges_all(
+            wide_shift,
+            urls,
+            # spoilers,   # not spoilers?
+            code_snippets,
+            code_blocks,
+            emoji_ranges,
+            mention_ranges,
+            channel_ranges,
+            timestamp_ranges,
+        )
 
         # find all markdown and correct format indexes
         message_line, md_format, md_indexes = format_md_all(message_line, pre_content_len, chain(code_snippets, code_blocks, urls))
@@ -1475,6 +1520,7 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
             temp_format.append([color_base])
         elif mentioned:
             format_line = color_mention_message[:]
+            format_line = shift_formats(format_line, pre_name_len+1, wide_shift)
             format_line += format_multiline_one_line_format(md_format, newline_index+1, 0, quote)
             format_line += format_multiline_one_line(urls, newline_index+1, 0, color_mention_chat_url, quote)
             format_line += format_multiline_one_line(code_snippets, newline_index+1, 0, color_code, quote)
@@ -1482,12 +1528,13 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
             format_line += code_block_format
             format_line += format_spoilers
             if alt_role_color:
-                format_line.append([alt_role_color, pre_name_len, end_name])
+                format_line.append([alt_role_color, pre_name_len + bool(wide_shift), end_name])
             if edited and not next_line:
                 format_line.append(color_mention_chat_edited + [len_message_line - len_edited, len_message_line])
             temp_format.append(format_line)
         else:
             format_line = color_message[:]
+            format_line = shift_formats(format_line, pre_name_len+1, wide_shift)
             format_line += format_multiline_one_line_format(md_format, newline_index+1, 0, quote)
             format_line += format_multiline_one_line(urls, newline_index+1, 0, color_chat_url, quote)
             format_line += format_multiline_one_line(code_snippets, newline_index+1, 0, color_code, quote)
@@ -1495,7 +1542,7 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
             format_line += code_block_format
             format_line += format_spoilers
             if role_color:
-                format_line.append([role_color, pre_name_len, end_name])
+                format_line.append([role_color, pre_name_len + bool(wide_shift), end_name])
             if edited and not next_line:
                 format_line.append([*color_chat_edited, len_message_line - len_edited, len_message_line])
             temp_format.append(format_line)

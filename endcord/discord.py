@@ -135,7 +135,8 @@ class Discord():
         }
         if client_prop:
             self.header["X-Super-Properties"] = client_prop
-        if self.header["Authorization"].startswith("Bot"):
+        self.bot = self.header["Authorization"].startswith("Bot")
+        if self.bot:
             self.header.pop("User-Agent", None)
             self.header.pop("X-Super-Properties", None)
         self.user_agent = user_agent
@@ -870,6 +871,8 @@ class Discord():
 
     def send_ack(self, channel_id, message_id, manual=False):
         """Send information that this channel has been seen up to this message"""
+        if self.bot:
+            return True
         last_viewed = ceil((time.time() - DISCORD_EPOCH) / 86400)   # days since first second of 2015 (discord epoch)
         if manual:
             message_data = json.dumps({"manual": True})

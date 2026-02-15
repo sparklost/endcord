@@ -30,8 +30,8 @@ dependencies = [
 [dependency-groups]
 build = [
     "cython>=3.2.4",
-    "nuitka>=4.0",
-    "pyinstaller>=6.18.0",
+    "nuitka>=4.0.1",
+    "pyinstaller>=6.19.0",
     "setuptools>=82.0.0",
 ]
 media = [

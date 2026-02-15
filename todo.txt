@@ -1,5 +1,4 @@
 Fix issues with many wide characters in chat
-Fix issues with wide characters in username
 Fix issues with wide characters in input line
 Vim-like bindings
     have input mode - type in input line
