@@ -4481,19 +4481,18 @@ class Endcord:
         """Get chunk of forum and add it to existing chat, no trimming, entries are cached for each forum"""
         self.add_running_task("Downloading forum", 4)
         logger.debug(f"Requesting forum chunk with offset {len(self.forum_old)}")
-        num_threads, new_chunk = self.discord.get_threads(
+        _, new_chunk = self.discord.get_threads(
             self.active_channel["channel_id"],
             number=25,
             offset=len(self.forum_old),
-            archived=True,
         )
         if self.forum or force:
             self.forum_old += new_chunk
-            if num_threads:
-                self.update_forum(self.active_channel["guild_id"], self.active_channel["channel_id"])
+            if new_chunk or force:
+                self.update_forum()
                 self.tui.update_chat(self.chat, self.chat_format)
             else:
-                self.chat_end = True
+                self.forum_end = True
         self.remove_running_task("Downloading forum", 4)
 
 
@@ -5483,27 +5482,19 @@ class Endcord:
         self.tui.update_chat(self.chat, self.chat_format)
 
 
-    def update_forum(self, guild_id, channel_id):
+    def update_forum(self):
         """Generate forum instead chat and update it in TUI"""
         # using self.messages as forum entries, should not be overwritten while in forum
-        self.messages = []
-        for guild in self.threads:
-            if guild["guild_id"] == guild_id:
-                for channel in guild["channels"]:
-                    if channel["channel_id"] == channel_id:
-                        self.messages = channel["threads"]
-                        break
-                break
-        messages = self.messages + self.forum_old
+        self.messages = self.forum_old
         self.chat, self.chat_format = formatter.generate_forum(
-            messages,
+            self.forum_old,
             self.blocked,
             self.chat_dim[1],
             self.colors,
             self.colors_formatted,
             self.config,
         )
-        self.chat_map = [None] * len(messages)
+        self.chat_map = [None] * len(self.forum_old)
         self.tui.set_wide_map([])
 
     def update_member_list(self, last_index=None, reset=False):
@@ -6153,7 +6144,7 @@ class Endcord:
                 break
         self.update_tree()
         if self.forum:
-            self.update_forum(self.active_channel["guild_id"], self.active_channel["channel_id"])
+            self.update_forum()
             self.tui.update_chat(self.chat, self.chat_format)
 
 
@@ -6175,7 +6166,7 @@ class Endcord:
                     break
         self.update_tree()
         if self.forum:
-            self.update_forum(self.active_channel["guild_id"], self.active_channel["channel_id"])
+            self.update_forum()
             self.tui.update_chat(self.chat, self.chat_format)
 
 
@@ -7490,7 +7481,7 @@ class Endcord:
                 if self.chat_dim[1] != new_chat_dim[1]:
                     self.execute_extensions_methods("on_resize")
                     if self.forum:
-                        self.update_forum(self.active_channel["guild_id"], self.active_channel["channel_id"])
+                        self.update_forum()
                         self.tui.update_chat(self.chat, self.chat_format)
                     else:
                         self.chat_dim = new_chat_dim
@@ -7603,8 +7594,7 @@ class Endcord:
                 elif (selected_line >= len(self.chat) - 1 or self.tui.get_chat_scrolled_top()) and not self.chat_end:
                     self.get_chat_chunk(past=True, scroll=self.tui.get_chat_scrolled_top())
             elif self.forum and not self.forum_end:
-                len_forum = len(self.messages) + len(self.forum_old)
-                if len_forum <= 1 or selected_line >= len_forum - 2:
+                if len(self.forum_old) <= 1 or selected_line >= len(self.forum_old) - 2:
                     self.get_forum_chunk()
 
             # check for message search chunks

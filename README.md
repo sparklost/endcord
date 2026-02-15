@@ -439,8 +439,8 @@ Never tested on macOS. Feedback is welcome.
 ## Disclaimer
 > [!WARNING]
 > Using third-party client is against Discord's Terms of Service and may cause your account to be banned!  
-> **Use endcord at your own risk!**
-> For more info see [FAQ](#FAQ).
+> **Use endcord at your own risk!**  
+> For more info see [FAQ](#FAQ).  
 
 Third party endcord forks may add features that can lead to account ban, or contain malicious code, cause instability, especially if they include LLM generated/modified code.
 

@@ -11,11 +11,11 @@ Extensions can be used to steal your token! See [Checking Extensions](#checking-
 ## Disclaimer
 > [!WARNING]
 > Using third-party client is against Discord's Terms of Service and may cause your account to be banned!  
-> **Use endcord and/or this extension at your own risk!**
-> Depending on extension content it may increase risk or even cause your account to be banned.
-> Extensions can be used to steal your token! See [Checking Extensions](#checking-extensions) for some red flags.
-> Extensions may be used for harmful or unintended purposes.
-> **Endcord developer is not responsible for any misuse or for actions taken by users.**
+> **Use endcord and/or this extension at your own risk!**  
+> Depending on extension content it may increase risk or even cause your account to be banned.  
+> Extensions can be used to steal your token! See [Checking Extensions](#checking-extensions) for some red flags.  
+> Extensions may be used for harmful or unintended purposes.  
+> **Endcord developer is not responsible for any misuse or for actions taken by users.**  
 
 
 ## Misc useful information when installing and writing extensions

@@ -1174,10 +1174,12 @@ class Discord():
         connection.close()
 
 
-    def get_threads(self, channel_id, number=25, offset=0, archived=True):
+    def get_threads(self, channel_id, number=25, offset=0, archived=None):
         """Get specified number of threads with offset for one forum"""
         message_data = None
-        url = f"/api/v9/channels/{channel_id}/threads/search?archived={archived}&sort_by=last_message_time&sort_order=desc&limit={number}&tag_setting=match_some&offset={offset}"
+        url = f"/api/v9/channels/{channel_id}/threads/search?&sort_by=last_message_time&sort_order=desc&limit={number}&tag_setting=match_some&offset={offset}"
+        if archived is not None:
+            url += "&archived={archived}"
         if offset == 0:   # check in cache
             for channel in self.threads:
                 if channel["channel_id"] == channel_id:
