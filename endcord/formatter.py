@@ -57,7 +57,7 @@ def lazy_replace(text, key, value_function):
 
 def lazy_replace_args(text, key, value_function):
     """Replace key in text with result from value_function, but run it only if key is found"""
-    extra_arg = None
+    extra_arg = 0
     if key in text:
         replacement, extra_arg = value_function()
         text = text.replace(key, replacement)

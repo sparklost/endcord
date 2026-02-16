@@ -438,6 +438,9 @@ class VoiceHandler:
         self.mode = encryption_mode
         self.audio_queue = queue.Queue(maxsize=10)
         self.opus_decoder = av.codec.CodecContext.create("opus", "r")
+        # self.opus_decoder.sample_rate = 48000
+        # self.opus_decoder.channels = 2
+        # self.opus_decoder.open()
 
 
     def start(self):
