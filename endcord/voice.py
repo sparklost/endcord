@@ -39,6 +39,17 @@ CODECS = [
 rtp_unpacker = struct.Struct(">xxHII")
 
 
+def strip_rtp_extension(payload):
+    """Remove rtp extension from opus payload"""
+    if len(payload) < 4:
+        return payload
+    profile = int.from_bytes(payload[0:2], "big")
+    if profile == 0xBEDE:
+        length = int.from_bytes(payload[2:4], "big") * 4
+        return payload[4 + length:]
+    return payload
+
+
 # get speaker
 if have_soundcard:
     try:
@@ -438,9 +449,6 @@ class VoiceHandler:
         self.mode = encryption_mode
         self.audio_queue = queue.Queue(maxsize=10)
         self.opus_decoder = av.codec.CodecContext.create("opus", "r")
-        # self.opus_decoder.sample_rate = 48000
-        # self.opus_decoder.channels = 2
-        # self.opus_decoder.open()
 
 
     def start(self):
@@ -501,7 +509,6 @@ class VoiceHandler:
             counter = data[-4:]
             ciphertext = data[cutoff:-4]
 
-
             if 200 <= data[1] <= 204:   # RTCP
                 pass
 
@@ -511,11 +518,15 @@ class VoiceHandler:
                     if self.mode == "aead_aes256_gcm_rtpsize":
                         nonce = bytearray(12)
                         nonce[:4] = counter
-                        payload = nacl.bindings.crypto_aead_aes256gcm_decrypt(bytes(ciphertext), bytes(header), bytes(nonce), self.secret_key)[8:]
+                        payload = nacl.bindings.crypto_aead_aes256gcm_decrypt(bytes(ciphertext), bytes(header), bytes(nonce), self.secret_key)
                     elif self.mode == "aead_xchacha20_poly1305_rtpsize":
                         nonce = bytearray(24)
                         nonce[:4] = counter
-                        payload = nacl.bindings.crypto_aead_xchacha20poly1305_ietf_decrypt(bytes(ciphertext), bytes(header), bytes(nonce), self.secret_key)[8:]
+                        payload = nacl.bindings.crypto_aead_xchacha20poly1305_ietf_decrypt(bytes(ciphertext), bytes(header), bytes(nonce), self.secret_key)
+                    else:
+                        logger.error(f"Unknown mode: {self.mode}")
+                        continue
+                    payload = strip_rtp_extension(payload)
                 except Exception as e:
                     logger.error(f"Decryption failed for mode: {self.mode}. Error: {e}")
                     continue
@@ -528,6 +539,7 @@ class VoiceHandler:
                         self.audio_queue.put(frame)
                 except Exception as e:
                     logger.error(f"PyAV opus decoding failed. Error: {e}")
+
         self.gateway.disconnect()
 
 

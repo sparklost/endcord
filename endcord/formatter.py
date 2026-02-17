@@ -2031,22 +2031,28 @@ def generate_extra_line(attachments, selected, max_len):
     return ""
 
 
-def generate_extra_line_ring(caller_name, max_len):
+def generate_extra_line_ring(caller_name, max_len, bordered):
     """Generate extra line containing iformation about incoming call"""
+    max_len = max_len - bordered * 3
     left_text = f"{caller_name} is calling you, use commands: voice_*"
     right_text = "[Accept] [Reject]"
 
     if len(left_text) + 1 + len(right_text) <= max_len:
         space_num = max_len - (len(left_text) + len(right_text))
-        return left_text + " " * space_num + right_text
+        if bordered:
+            filler = " " + "─" * (space_num - 2) + " "
+        else:
+            filler = " " * space_num
+        return left_text + filler + right_text
 
-    max_str1_length = max_len - len(right_text) - 3   # 3 for ...
-    shortened_str1 = left_text[:max_str1_length] + "..."
-    return shortened_str1 + right_text
+    max_str_length = max_len - len(right_text) - 3   # 3 for ...
+    shortened_str = left_text[:max_str_length] + "..."
+    return shortened_str + right_text
 
 
-def generate_extra_line_call(call_participants, muted, max_len):
+def generate_extra_line_call(call_participants, muted, max_len, bordered):
     """Generate extra line containing iformation about ongoing call"""
+    max_len = max_len - bordered * 3
     left_text = "In the call: You"
     right_text = f"[{"Unmute" if muted else "Mute"}] [Leave]"
 
@@ -2057,11 +2063,15 @@ def generate_extra_line_call(call_participants, muted, max_len):
 
     if len(left_text) + 1 + len(right_text) <= max_len:
         space_num = max_len - (len(left_text) + len(right_text))
-        return left_text + " " * space_num + right_text
+        if bordered:
+            filler = " " + "─" * (space_num - 2) + " "
+        else:
+            filler = " " * space_num
+        return left_text + filler + right_text
 
-    max_str1_length = max_len - len(right_text) - 3   # 3 for ...
-    shortened_str1 = left_text[:max_str1_length] + "..."
-    return shortened_str1 + right_text
+    max_str_length = max_len - len(right_text) - 3   # 3 for ...
+    shortened_str = left_text[:max_str_length] + "..."
+    return shortened_str + right_text
 
 
 def generate_extra_window_call(call_participants, me_muted, max_len):
@@ -2395,6 +2405,8 @@ def generate_extra_window_assist(found, assist_type, max_len):
         title_line = "App command:"
     elif assist_type == 7:
         title_line = "File select:"
+    else:
+        title_line = "Unknown"
     for item in found:
         body.append(f"{prefix}{item[0]}"[:max_len])
     if not body:

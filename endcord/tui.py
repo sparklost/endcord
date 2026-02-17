@@ -756,7 +756,7 @@ class TUI():
                     self.input_buffer[self.assist_start-1] in ASSIST_TRIGGERS
                 ):
                     assist_type = ASSIST_TRIGGERS.index(self.input_buffer[self.assist_start-1]) + 1
-                    if self.assist_start != 1 and self.input_buffer[self.assist_start-2] not in (" ", "\n") and self.input_buffer[self.assist_start] in (" ", "\n"):
+                    if self.assist_start != 1 and (self.input_buffer[self.assist_start-2] not in (" ", "\n") or self.input_buffer[self.assist_start] in (" ", "\n")):
                         # skip trigger if no space before it
                         return None, None
                     assist_word = self.input_buffer[self.assist_start : self.input_index]
@@ -2687,9 +2687,6 @@ class TUI():
                 self.enable_autocomplete = True
                 self.misspelled = []
                 return self.return_input_code(13)
-
-            elif key in self.keybindings["attach_cancel"]:
-                return self.return_input_code(16)
 
             elif key in self.keybindings["view_media"] and self.chat_selected != -1:
                 return self.return_input_code(17)

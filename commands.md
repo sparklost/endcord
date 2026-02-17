@@ -33,8 +33,8 @@
     Copy link of selected channel in tree to clipboard, or from provided channel id.
 - `link_message`  
     Copy link of selected message to clipboard,
-- `cancel`  
-    Prompt to cancel all downloads and uploads.
+- `cancel *[download/1/uploa/2/attachment/3]`  
+    Cancel all downloads and/or uploads. Can use `cancel 1` or `cancel download`... Use just `cancel` to cancel both downloads and uploads.
 - `external_edit`  
     Open external editor to type message in it.
 - `member_list`  
@@ -59,6 +59,7 @@
     Show pinned messages for current channel.
 - `quit`  
     Quit endcord.
+
 
 ## Special commands (no keybinding)
 - `goto <#[channel_id]>`  
@@ -148,3 +149,20 @@
 - `set [key] = [value]` / `set [key]=[value]`  
     Change settings and save them. Usually restart is required.  
     External theme won't be changed, and it can override changed settings.  
+
+
+## Command-bindings only commands
+Special commands availabe only for command-bindings (macros).
+- `sleep [seconds]`  
+    Sleep for specified numbr of seconds. If some macro fails to execute, adding `sleep 0.1` between the two comands may help.
+- `type [text]`  
+    "Type" specifid text at cursor position in input line in current context.
+
+
+## Command-bindings (macros)
+- `Ctrl+K` - `"11" = "command_palette; type 'goto '"`  
+    Open command palette and type `goto `.
+- `Shift+Down` - `"336" = "tree_select server; collapse_all_except selected"`  
+    Select next server in tree and collapse all other servers except it.
+- `Shift+Up` - `"337" = "tree_select server prev; collapse_all_except selected"`  
+    Select previous server in tree and collapse all other servers except it.

@@ -101,22 +101,28 @@ def search_channels_guild(channels, query, limit=50, score_cutoff=15):
     return sorted(results, key=lambda x: x[2], reverse=True)
 
 
-def search_channels_all(guilds, dms, query, full_input, limit=50, score_cutoff=15):
+def search_channels_all(guilds, dms, query, full_input, recent=None, limit=50, score_cutoff=15):
     """Search for guilds/categories/channels/DMs"""
     results = []
     worst_score = score_cutoff
 
     for dm in dms:
+        bonus_score = 0
+        if recent:
+            if dm["id"] in recent:
+                bonus_score = score_cutoff
+            elif not query:
+                continue
         formatted = f"{dm["name"]} (DM)"
-        score = fuzzy_match_score(query, formatted) * 4   # dms get more score so they are on top
-        if score < worst_score:
+        score = fuzzy_match_score(query, formatted) * 4 + bonus_score   # dms get more score so they are on top
+        if score < worst_score * 4:
             continue
         heapq.heappush(results, (formatted, dm["id"], score))
         if len(results) > limit:
             heapq.heappop(results)
             worst_score = results[0][2]
 
-    if full_input.startswith("toggle_mute") or full_input.startswith("mark_as_read") or full_input.startswith("goto"):
+    if (full_input.startswith("toggle_mute") or full_input.startswith("mark_as_read") or full_input.startswith("goto")) and not recent:
         full = True   # include guilds and categories
     else:
         full = False
@@ -131,6 +137,12 @@ def search_channels_all(guilds, dms, query, full_input, limit=50, score_cutoff=1
                     worst_score = results[0][2]
 
         for channel in guild["channels"]:
+            bonus_score = 0
+            if recent:
+                if channel["id"] in recent:
+                    bonus_score = score_cutoff
+                elif not query:
+                    continue
             if channel["permitted"]:
                 if channel["type"] == 2:
                     formatted = f"{channel["name"]} - voice ({guild["name"]})"
@@ -142,7 +154,7 @@ def search_channels_all(guilds, dms, query, full_input, limit=50, score_cutoff=1
                     formatted = f"{channel["name"]} - forum ({guild["name"]})"
                 else:
                     formatted = f"{channel["name"]} ({guild["name"]})"
-                score = fuzzy_match_score(query, formatted)
+                score = fuzzy_match_score(query, formatted) + bonus_score
                 if score < worst_score:
                     continue
                 heapq.heappush(results, (formatted, channel["id"], score))
@@ -150,7 +162,12 @@ def search_channels_all(guilds, dms, query, full_input, limit=50, score_cutoff=1
                     heapq.heappop(results)
                     worst_score = results[0][2]
 
-    return sorted(results, key=lambda x: x[2], reverse=True)
+    results = sorted(results, key=lambda x: x[2], reverse=True)
+    if recent and not query:
+        order = {ch_id: i for i, ch_id in enumerate(recent)}
+        results.sort(key=lambda t: order.get(t[1], len(order)), reverse=True)
+
+    return results
 
 
 def search_usernames_roles(roles, query_results, guild_id, gateway, query, presences=[], limit=50, score_cutoff=15):

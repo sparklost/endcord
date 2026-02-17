@@ -14,7 +14,7 @@ Voice channels
     handle multiple speaking at the same time
 
 Voice calls
-    fix playing sound
+    fix opus decoding and playing audio
     start recorder thread, record, encode, encrypt, pack, send, stop when leave call, leave call on error
     pause recorder when muted
     send and receive RTCP?

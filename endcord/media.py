@@ -360,8 +360,8 @@ class TerminalMedia():
         if not have_sound:
             self.ended = True
             return
-
-        self.draw_blank()
+        if self.ui:
+            self.draw_blank()
 
         container = av.open(path)
         self.ended = False

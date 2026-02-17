@@ -216,7 +216,6 @@ keybindings = {
     # extra line
     "attach_prev": 552,   # Alt+Left
     "attach_next": 567,   # Alt+Right
-    "attach_cancel": 11,   # Ctrl+K
     # extra window
     "extra_up": 573,   # Alt+Up
     "extra_down": 532,   # Alt+Down
@@ -240,6 +239,9 @@ keybindings = {
 
 
 command_bindings = {
+    "11": "command_palette; type 'goto '",
+    "336": "tree_select server; collapse_all_except selected",
+    "337": "tree_select server prev; collapse_all_except selected",
 }
 
 

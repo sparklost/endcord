@@ -1825,7 +1825,7 @@ class Discord():
     def check_ring(self, channel_id):
         """Check if user can ring call in DM"""
         message_data = None
-        url = f"/channels/{channel_id}/call"
+        url = f"/api/v9/channels/{channel_id}/call"
         try:
             connection = self.get_connection(self.host, 443)
             connection.request("GET", url, message_data, self.header)

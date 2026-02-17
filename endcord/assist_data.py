@@ -31,7 +31,7 @@ COMMAND_ASSISTS = (
     ("link_channel *<#[channel_id]> - store channel link in clipboard", "link_channel"),
     ("link_message - store selected message link in clipboard", "link_message"),
     ("goto_mention *[num] - go to channel/message mention in selected message", "goto_mention"),
-    ("cancel - cancel all downloads and uploads", "cancel"),
+    ("cancel *[download/1/upload/2/attachment/3] - cancel all downloads and/or uploads", "cancel"),
     ("external_edit - open external editor to type message in it", "external_edit"),
     ("member_list - toggle member list", "member_list"),
     ("toggle_thread - join/leave currently open thread", "toggle_thread"),

@@ -55,10 +55,11 @@ SUMMARY_SAVE_INTERVAL = 300   # 5min
 LIMIT_SUMMARIES = 5   # max number of summaries per channel
 INTERACTION_THROTTLING = 3   # delay between sending app interactions
 APP_COMMAND_AUTOCOMPLETE_DELAY = 0.3   # delay for requesting app command autocompletions after stop typing
+RECENT_CHANNELS_LIMIT = 10
 MB = 1024 * 1024
 USER_UPLOAD_LIMITS = (10*MB, 50*MB, 500*MB, 50*MB)   # premium tier 0, 1, 2, 3 (none, classic, full, basic)
 GUILD_UPLOAD_LIMITS = (10*MB, 10*MB, 50*MB, 100*MB)   # premium tier 0, 1, 2, 3
-FORUM_COMMANDS = (1, 2, 7, 13, 14, 15, 17, 20, 22, 25, 27, 29, 30, 31, 32, 40, 42, 49, 50, 51, 52, 53, 55, 56, 57, 58, 61, 62, 66, 67, 68, 69, 70)
+FORUM_COMMANDS = (1, 2, 7, 13, 14, 15, 17, 20, 22, 25, 27, 29, 30, 31, 32, 40, 42, 49, 50, 51, 52, 53, 55, 56, 57, 58, 61, 62, 66, 67, 68, 69, 70, 71)
 COLLAPSE_ALL_EXCEPT_OPTIONS = ("current", "selected", "above", "bellow")
 
 match_emoji = re.compile(r"<:(.*):(\d*)>")
@@ -264,6 +265,7 @@ class Endcord:
             "collapsed": [],
             "folder_names": [],
             "tabbed_channels": [],
+            "recent_channels": [],
             "games_blacklist": [],
         }
         self.tree = []
@@ -831,6 +833,7 @@ class Endcord:
                         new_permanent_extra_line = formatter.generate_extra_line_ring(
                             dm["name"],
                             self.tui.get_dimensions()[2][1],
+                            self.tui.bordered,
                         )
                         break
                 if new_permanent_extra_line and new_permanent_extra_line != self.permanent_extra_line:
@@ -881,6 +884,13 @@ class Endcord:
         self.select_current_member_roles()
         self.forum = forum   # changing it here because previous code takes long time
 
+        # add to recent channels
+        if channel_id in self.state["recent_channels"]:
+            self.state["recent_channels"].remove(channel_id)
+        self.state["recent_channels"].append(channel_id)
+        if len(self.state["recent_channels"]) > RECENT_CHANNELS_LIMIT:
+            self.state["recent_channels"].pop(0)
+
         # run extensions
         self.execute_extensions_methods("on_switch_channel_end")
 
@@ -892,7 +902,7 @@ class Endcord:
         self.set_channel_seen(channel_id, self.get_chat_last_message_id(), force_remove_notify=True)   # right after update_chat so new_unreads is determined
         if not guild_id:   # no member list in dms
             self.tui.remove_member_list()
-        elif self.state.get("member_list") or open_member_list:
+        elif self.state["member_list"] or open_member_list:
             if delay:
                 time.sleep(0.01)   # needed when startup to fix issues with emojis and border lines
             self.update_member_list(reset=True)
@@ -911,7 +921,7 @@ class Endcord:
         if self.config["remember_state"] and self.current_channel.get("type") not in (11, 12, 15):
             self.state["last_guild_id"] = guild_id
             self.state["last_channel_id"] = channel_id
-            peripherals.save_json(self.state, f"state_{self.profiles["selected"]}.json")
+        peripherals.save_json(self.state, f"state_{self.profiles["selected"]}.json")
 
         self.remove_running_task("Switching channel", 1)
         logger.debug("Channel switching complete")
@@ -1362,7 +1372,10 @@ class Endcord:
         logger.info("Input handler loop started")
         ephemeral = False
 
-        while self.run and not ephemeral:
+        while self.run:
+            self.previous_input_context = self.restore_input_text[1]
+            if ephemeral:
+                break
             if self.reacting["id"]:
                 self.restore_input_text = (self.restore_input_text[0], "react")
             if forced_binding:   # externally forced binding
@@ -1632,12 +1645,6 @@ class Endcord:
                     self.selected_attachment += 1
                     self.update_extra_line()
 
-            # cancel selected attachment
-            elif action == 16:
-                self.restore_input_text = (input_text, "standard")
-                self.cancel_attachment()
-                self.update_extra_line()
-
             # reveal one-by-one spoiler in a message
             elif action == 18:
                 self.restore_input_text = (input_text, "standard")
@@ -1761,7 +1768,7 @@ class Endcord:
                                 self.restore_input_text = (new_input_text, "standard")
                             self.tui.input_buffer = new_input_text
                             self.tui.set_input_index(new_input_index)
-                elif self.state.get("member_list") and self.active_channel["guild_id"]:   # controls for member list when no extra window
+                elif self.state["member_list"] and self.active_channel["guild_id"]:   # controls for member list when no extra window
                     mlist_selected = self.tui.get_mlist_selected()
                     if mlist_selected == -1 or mlist_selected >= len(self.member_list):
                         continue
@@ -2102,19 +2109,21 @@ class Endcord:
                 if self.extra_line == self.permanent_extra_line and not self.extra_window_open:
                     if self.in_call:
                         mouse_x = self.tui.get_extra_line_clicked()
-                        muted = bool(self.state.get("muted")) * 2
-                        if len(self.extra_line)-13 - muted <= mouse_x < len(self.extra_line)-9:   # TOGGLE MUTE
+                        muted = bool(self.state["muted"]) * 2
+                        border = self.tui.bordered * 4
+                        if len(self.extra_line) - 13 - muted <= mouse_x < len(self.extra_line) - 9 + border:   # TOGGLE MUTE
                             if muted:
                                 self.state["muted"] = False
                                 self.update_voice_mute_in_call()
                             else:
                                 self.state["muted"] = True
                                 self.update_voice_mute_in_call()
-                        elif len(self.extra_line)-6 <= mouse_x < len(self.extra_line)-1:   # LEAVE
+                        elif len(self.extra_line) - 6 <= mouse_x < len(self.extra_line) - 1 + border:   # LEAVE
                             self.leave_call()
                     elif self.most_recent_incoming_call or self.active_channel["channel_id"] in self.incoming_calls:
                         mouse_x = self.tui.get_extra_line_clicked()
-                        if len(self.extra_line)-16 <= mouse_x < len(self.extra_line)-10:   # ACCEPT
+                        border = self.tui.bordered * 4
+                        if len(self.extra_line) - 16 <= mouse_x < len(self.extra_line) - 10 + border:   # ACCEPT
                             if not self.in_call:
                                 if self.most_recent_incoming_call:
                                     incoming_call_ch_id = self.most_recent_incoming_call
@@ -2123,7 +2132,7 @@ class Endcord:
                                 threading.Thread(target=self.start_call, daemon=True, args=(True, None, incoming_call_ch_id)).start()
                             else:
                                 self.update_extra_line("Cant join multiple calls")
-                        elif len(self.extra_line)-7 <= mouse_x < len(self.extra_line)-1:   # REJECT
+                        elif len(self.extra_line) - 7 <= mouse_x < len(self.extra_line) - 1 + border:   # REJECT
                             self.stop_ringing()
                             self.most_recent_incoming_call = None
                             # remove popup if not in this channel
@@ -2182,12 +2191,19 @@ class Endcord:
                 if action[0] == 50:
                     self.restore_input_text = (input_text, "standard")
                     for command in parser.split_command_binding(action[1]):
-                        if command.startswith("sleep"):
+                        if command.startswith("sleep "):
                             try:
                                 time.sleep(float(command[6:]))
                                 continue
                             except ValueError:
                                 pass
+                        elif command.startswith("type "):
+                            text = command[5:].strip(" ").strip("'")
+                            if text:
+                                self.restore_input_text = (input_text + text, self.previous_input_context or "standard")
+                                if self.restore_input_text[1] == "standard":
+                                    self.tui.set_input_index(self.tui.input_index + len(text))
+                                continue
                         cmd_type, cmd_args = parser.command_string(command)
                         chat_sel, _ = self.tui.get_chat_selected()
                         tree_sel = self.tui.get_tree_selected()
@@ -2726,11 +2742,15 @@ class Endcord:
                 reset = False
 
         elif cmd_type == 7:   # CANCEL
-            reset = False
-            self.restore_input_text = (None, "prompt")
-            self.reset_states()
-            self.ignore_typing = True
-            self.cancel_download = True
+            if cmd_args["type"] in (0, 1):
+                self.downloader.cancel()
+                self.download_threads = []
+            if cmd_args["type"] in (0, 2):
+                self.cancel_upload()
+                self.upload_threads = []
+            if cmd_args["type"] == 3:   # attachment
+                self.cancel_attachment()
+                self.update_extra_line()
 
         elif cmd_type == 8:   # COPY_MESSAGE
             msg_index = self.lines_to_msg(chat_sel)
@@ -3456,7 +3476,7 @@ class Endcord:
                     self.update_extra_line(permanent=True)
 
         elif cmd_type == 52:   # VOICE_TOGGLE_MUTE
-            if self.state.get("muted"):
+            if self.state["muted"]:
                 self.state["muted"] = False
                 if self.in_call:
                     self.update_voice_mute_in_call()
@@ -4517,7 +4537,7 @@ class Endcord:
         if not self.get_members or not self.active_channel["guild_id"]:
             return
 
-        if self.state.get("member_list"):
+        if self.state["member_list"]:
             self.tui.remove_member_list()
             self.state["member_list"] = False
 
@@ -4527,7 +4547,7 @@ class Endcord:
             self.update_member_list()
             self.state["member_list"] = True
 
-        self.gateway.set_want_member_list(self.state.get("member_list", True))
+        self.gateway.set_want_member_list(self.state["member_list"])
         peripherals.save_json(self.state, f"state_{self.profiles["selected"]}.json")
 
 
@@ -4771,7 +4791,7 @@ class Endcord:
         self.stop_assist(close=False)
         extra_title, extra_body = formatter.generate_extra_window_call(
             self.call_participants,
-            self.state.get("muted"),
+            self.state["muted"],
             self.tui.get_dimensions()[2][1],
         )
         self.tui.draw_extra_window(extra_title, extra_body, reset_scroll=reset)
@@ -5148,6 +5168,17 @@ class Endcord:
                 self.assist_found = search.search_tabs(
                     self.tabs_names,
                     assist_word[11:],
+                    limit=self.assist_limit,
+                    score_cutoff=self.assist_score_cutoff,
+                )
+
+            elif assist_word.lower().startswith("goto "):
+                self.assist_found = search.search_channels_all(
+                    self.guilds,
+                    self.dms,
+                    assist_word[5:],
+                    self.tui.input_buffer,
+                    recent=self.state["recent_channels"][:-1],   # exclude current channel
                     limit=self.assist_limit,
                     score_cutoff=self.assist_score_cutoff,
                 )
@@ -5798,7 +5829,7 @@ class Endcord:
             self.uncollapsed_threads,
             self.active_channel["channel_id"],
             self.config,
-            folder_names=self.state.get("folder_names", []),
+            folder_names=self.state["folder_names"],
             safe_emoji=self.emoji_as_text,
             max_w=self.tui.get_dimensions()[1][1],
         )
@@ -6626,6 +6657,7 @@ class Endcord:
                 self.permanent_extra_line = formatter.generate_extra_line_ring(
                     dm["name"],
                     self.tui.get_dimensions()[2][1],
+                    self.tui.bordered,
                 )
                 self.update_extra_line(custom_text=self.permanent_extra_line, permanent=True)
                 if event["ringing"]:
@@ -6782,7 +6814,7 @@ class Endcord:
         self.gateway.request_voice_gateway(
             guild_id,
             channel_id,
-            self.state.get("muted", False),
+            self.state["muted"],
             video=False,
             preferred_regions=self.discord.get_best_voice_region(),
         )
@@ -6802,7 +6834,7 @@ class Endcord:
         self.voice_gateway = voice.Gateway(
             voice_gateway_data,
             self.my_id,
-            self.state.get("muted"),
+            self.state["muted"],
             self.user_agent,
             proxy=self.config["proxy"],
         )
@@ -6876,6 +6908,7 @@ class Endcord:
                     new_permanent_extra_line = formatter.generate_extra_line_ring(
                         dm["name"],
                         self.tui.get_dimensions()[2][1],
+                        self.tui.bordered,
                     )
                     self.update_extra_line(custom_text=new_permanent_extra_line, permanent=True)
                     break
@@ -6897,8 +6930,9 @@ class Endcord:
         """Update extra line shown when in call, eg on call participants change"""
         self.permanent_extra_line = formatter.generate_extra_line_call(
             self.call_participants,
-            self.state.get("muted"),
-            self.tui.get_dimensions()[2][1],
+            self.state["muted"],
+            self.tui.get_dimensions()[2][1] - self.tui.bordered,
+            self.tui.bordered,
         )
         self.update_extra_line(custom_text=self.permanent_extra_line, permanent=True)
 
@@ -6906,11 +6940,11 @@ class Endcord:
     def update_voice_mute_in_call(self):
         """Update this client mute state while in voice call"""
         if self.in_call and self.voice_gateway:
-            self.voice_gateway.set_mute(self.state.get("muted", False))
+            self.voice_gateway.set_mute(self.state["muted"])
             self.gateway.update_mute_in_call(
                 self.in_call["guild_id"],
                 self.in_call["channel_id"],
-                self.state.get("muted", False),
+                self.state["muted"],
                 video=False,
                 preferred_regions=self.discord.get_best_voice_region(),
             )
@@ -7166,7 +7200,7 @@ class Endcord:
         if self.config["remember_tabs"]:
             for channel_id in self.state["tabbed_channels"]:
                 self.add_to_channel_cache(channel_id, [], True)
-        self.gateway.set_want_member_list(self.get_members and self.state.get("member_list", True))
+        self.gateway.set_want_member_list(self.get_members and self.state["member_list"])
         self.tui.set_fun(self.fun)
 
         # load summaries
@@ -7497,13 +7531,15 @@ class Endcord:
                             new_permanent_extra_line = formatter.generate_extra_line_ring(
                                 dm["name"],
                                 self.tui.get_dimensions()[2][1],
+                                self.tui.bordered,
                             )
                             break
                     if self.in_call:
                         new_permanent_extra_line = formatter.generate_extra_line_call(
                             self.call_participants,
-                            self.state.get("muted"),
+                            self.state["muted"],
                             self.tui.get_dimensions()[2][1],
+                            self.tui.bordered,
                         )
                     if new_permanent_extra_line and new_permanent_extra_line != self.permanent_extra_line:
                         self.update_extra_line(custom_text=new_permanent_extra_line, permanent=True)
@@ -7560,7 +7596,7 @@ class Endcord:
                                 last_index = None
 
                             break
-                    if self.active_channel["guild_id"] in changed_guilds and self.state.get("member_list"):
+                    if self.active_channel["guild_id"] in changed_guilds and self.state["member_list"]:
                         self.update_member_list(last_index)
 
             # check for subscribed member presences
@@ -7606,8 +7642,10 @@ class Endcord:
             # check if assist is needed
             assist_word, assist_type = self.tui.get_assist()
             if assist_type and not self.uploading:
-                if assist_type == 100:   # esc or (" " in assist_word and assist_type not in (5, 6)):
+                if assist_type == 100 and self.assist_type != 5:   # esc or " " in assist_word or backspace:
                     self.stop_assist()
+                elif assist_type == 100:
+                    self.assist(self.tui.input_buffer, 5)
                 elif assist_type == 6:   # app commands
                     if assist_word != self.assist_word and not (self.disable_sending or self.forum):
                         self.ignore_typing = True

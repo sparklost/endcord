@@ -133,13 +133,13 @@ Keybindings can also be chained like this (maximum 2 bindings in chain, separate
 To specify multiple keybindings for same action put them in a tuple, eg.: `(2, "25-97", "ALT+120")`.  
 Switch tab keybinding is special - `NUM` is placeholder for 1-9 number keys, eg.:`ALT+NUM` or `ALT+120-NUM`.  
 
-### Command keybinding
+### Command keybinding (macros)
 There is additional section `[command_bindings]`, used to make custom client command string or even macros executed when keybinding is pressed.  
 Command keybinding is added like this: `"25" = "send_message Hello World!"`. This will execute that command when `Ctrl+X` is pressed.  
 Note that all bindings must be inside quotes, even a single integer. To use same binding as standard keybindings, set stadard keybinding to `None`.  
 Alongside commands, standard keybinding names can be used here too. Eg. `"25" = "tree_up; tree_up"` will "press" tree_up binding twice.  
 To execute multiple commands in a sequence, type them spearated with `;` character. To use actual `;` character in command type it as `\;`.  
-Special command is availabe for command_bindings: `sleep [seconds]`. If some sequence fails to execute, adding `sleep 0.1` between the two comands may help.  
+Special commands availabe only for command-bindings are documented in [Commands list](commands.md#command-bindings-only-commands).
 
 ### Debug mode
 Debug mode can be enabled with `-d` flag.  
@@ -179,7 +179,7 @@ View selected attached media (image, gif, video, audio) - `Ctrl+V` *
 Upload attachments - `Ctrl+U`  
 Preview selected file in upload assist or when searching gif - `Alt+V`  
 Cancel all downloads/uploads - `Ctrl+X`  
-Cancel selected attachment - `Ctrl+K`  
+Open command palette and type `goto ` - `Ctrl+K`  
 Reveal one spoiler in selected messages - `Alt+T`  
 Paste text - terminal paste, usually `Ctrl+Shift+V`, or better: `paste` command  
 Undo input line - `Alt+Z`  

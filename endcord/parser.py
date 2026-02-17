@@ -415,6 +415,14 @@ def command_string(text):
     # 7 - CANCEL
     elif text_lower.startswith("cancel"):
         cmd_type = 7
+        value_part = text_lower[7:]
+        cmd_args = {"type": 0}
+        if "download" in value_part or "1" in value_part:
+            cmd_args = {"type": 1}
+        if "upload" in value_part or "2" in value_part:
+            cmd_args = {"type": 2}
+        if "attachment" in value_part or "3" in value_part:
+            cmd_args = {"type": 3}
 
     # 8 - COPY_MESSAGE
     elif text_lower.startswith("copy_message"):
