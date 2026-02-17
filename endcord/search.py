@@ -122,7 +122,7 @@ def search_channels_all(guilds, dms, query, full_input, recent=None, limit=50, s
             heapq.heappop(results)
             worst_score = results[0][2]
 
-    if (full_input.startswith("toggle_mute") or full_input.startswith("mark_as_read") or full_input.startswith("goto")) and not recent:
+    if (full_input.startswith("toggle_mute") or full_input.startswith("mark_as_read") or full_input.startswith("goto")) and (not recent or query):
         full = True   # include guilds and categories
     else:
         full = False

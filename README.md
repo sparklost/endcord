@@ -420,20 +420,18 @@ Optional dependencies:
 - `libappindicator-gtk3` - Tray support under wayland, for [experimental windowed mode](#experimental-windowed-mode) only.
 
 ### Windows
-Install [windows terminal](https://github.com/microsoft/terminal) or [cmder](https://github.com/cmderdev/cmder), or any other modern terminal.  
 - Pre-built binaries (built with nuitka using clang) are available in releases
 - [Build](#building) endcord, standalone executable can be found in `./dist/endcord.exe`
-Run exe from wt or cmder. If built with experimental windowed mode, terminal is not required to use endcord.  
-Cmder settings: "Mouse" > check "Send mouse events to console" and "Mark/Copy" > uncheck "Intelligent mode", and set "Main console font" and "Alternative font" to same monospace font.
-Optional dependency, for spellchecking: [aspell](https://github.com/adamyg/aspell-win32). It is expected to be installed in `C:\Program Files (x86)\`. If it is not, please open an issue and provide the actual install path. Alongside with base aspell, dictionary must be installed, even en_US.  
-Emoji and Ctrl+key support depends on terminal.  
-To enable youtube support, download [yt-dlp](https://github.com/yt-dlp/yt-dlp) and provide its executable path in config.  
+Install [WezTerm](https://wezterm.org/) (recommended), [windows terminal](https://github.com/microsoft/terminal), [cmder](https://github.com/cmderdev/cmder), or any other modern terminal. And run exe from there. If built with experimental windowed mode, terminal is not required to use endcord.  
+WezTerm proved to introduce the least drawing issues.  
+Cmder settings: "Mouse" > check "Send mouse events to console" and "Mark/Copy" > uncheck "Intelligent mode", and set "Main console font" and "Alternative font" to same monospace font.  
+Emoji are known to work only with  WezTerm but many will fail to draw and mess-up the UI, so its best to set `emoji_as_text = True` in config.  
+Optional dependency for spellchecking: [aspell](https://github.com/adamyg/aspell-win32). It is expected to be installed in `C:\Program Files (x86)\`. Alongside with base aspell, dictionary must be installed, even en_US.  
 
 ### macOS
 - Pre-built binaries (built with nuitka using clang) are available in releases
 - [Build](#building) endcord, standalone executable can be found in `./dist/`.  
 Optional dependency, for spellchecking: [aspell](https://github.com/adamyg/aspell-win32). Can be installed with: `brew aspell`.  
-Never tested on macOS. Feedback is welcome.
 
 
 ## Disclaimer

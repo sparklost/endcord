@@ -19,7 +19,7 @@ TREE_EMOJI_REPLACE = "▮"
 TIME_DIVS = [1, 60, 3600, 86400, 2678400, 31190400]
 TIME_UNITS = ["second", "minute", "hour", "day", "month", "year"]
 
-match_emoji = re.compile(r"(?<!\\):.+:")
+match_emoji = re.compile(r"(?<!\\):[^:\s]+:")
 match_d_emoji = re.compile(r"<(.?):(.*?):(\d*?)>")
 match_mention = re.compile(r"<@(\d*?)>")
 match_role = re.compile(r"<@&(\d*?)>")
