@@ -271,6 +271,9 @@ class Endcord:
         self.tree = []
         self.tree_format = []
         self.tree_metadata = []
+        self.tab_string = ""
+        self.tab_string_format = []
+        self.tab_string_map = []
         self.uncollapsed_threads = []
         self.my_roles = []
         self.deleted_cache = []
