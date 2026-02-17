@@ -574,11 +574,17 @@ def command_string(text):
     # 31 - SWITCH_TAB
     elif text_lower.startswith("switch_tab"):
         cmd_type = 31
-        try:
-            num = int(text.split(" ")[1])
-            cmd_args = {"num": num}
-        except (IndexError, ValueError):
-            cmd_type = 0
+        value_part = text_lower[11:]
+        if "next" in value_part:
+            cmd_args = {"num": "next"}
+        elif "prev" in value_part:
+            cmd_args = {"num": "prev"}
+        else:
+            try:
+                num = int(text.split(" ")[1]) - 1
+                cmd_args = {"num": num}
+            except (IndexError, ValueError):
+                cmd_type = 0
 
     # 32 - MARK_AS_READ
     elif text_lower.startswith("mark_as_read"):

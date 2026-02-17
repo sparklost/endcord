@@ -525,8 +525,6 @@ class Endcord:
         self.session_id = None
         self.chat = []
         self.chat_format = []
-        self.tab_string = ""
-        self.tab_string_format = []
         self.new_unreads = False
         self.this_unread = False
         self.chat_map = []
@@ -2021,7 +2019,7 @@ class Endcord:
                                     break
                         elif chat_line_map[4] and chat_line_map[4][0] < mouse_x < chat_line_map[4][1]:
                             clicked_type = 1   # message timestamp
-                        elif chat_line_map[5]:   # click on message content elements
+                        elif chat_line_map[5]:   # on message content elements
                             ranges = chat_line_map[5]
                             if ranges[0]:   # url/embed
                                 for num, item in enumerate(ranges[0]):
@@ -2108,7 +2106,7 @@ class Endcord:
             elif action == 48:
                 if self.extra_line == self.permanent_extra_line and not self.extra_window_open:
                     if self.in_call:
-                        mouse_x = self.tui.get_extra_line_clicked()
+                        mouse_x = self.tui.get_x_line_clicked()
                         muted = bool(self.state["muted"]) * 2
                         border = self.tui.bordered * 4
                         if len(self.extra_line) - 13 - muted <= mouse_x < len(self.extra_line) - 9 + border:   # TOGGLE MUTE
@@ -2121,7 +2119,7 @@ class Endcord:
                         elif len(self.extra_line) - 6 <= mouse_x < len(self.extra_line) - 1 + border:   # LEAVE
                             self.leave_call()
                     elif self.most_recent_incoming_call or self.active_channel["channel_id"] in self.incoming_calls:
-                        mouse_x = self.tui.get_extra_line_clicked()
+                        mouse_x = self.tui.get_x_line_clicked()
                         border = self.tui.bordered * 4
                         if len(self.extra_line) - 16 <= mouse_x < len(self.extra_line) - 10 + border:   # ACCEPT
                             if not self.in_call:
@@ -2144,6 +2142,20 @@ class Endcord:
                         False, True,
                     )))
                     self.download_threads[-1].start()
+
+            # mouse single click on title line
+            elif action == 16 and self.format_title_line_r == "%tabs" and self.tab_string_map:   # to simplify things
+                mouse_x = self.tui.get_x_line_clicked()
+                rel_mouse_x = len(self.tab_string) - (self.chat_dim[1] - mouse_x)
+                for tab in self.tab_string_map:
+                    if tab[0] <= rel_mouse_x < tab[1]:
+                        if tab[2] == -1:
+                            self.switch_tab("prev")
+                        elif tab[2] == -2:
+                            self.switch_tab("next")
+                        else:
+                            self.switch_tab(tab[2])
+                        break
 
             # escape in main UI
             elif action == 5:
@@ -3098,8 +3110,8 @@ class Endcord:
                 self.toggle_tab()
 
         elif cmd_type == 31:   # SWITCH_TAB
-            select_num = max(cmd_args.get("num", 1) - 1, 0)
-            self.switch_tab(select_num)
+            # if its number its already converted to index (num-1)
+            self.switch_tab(cmd_args.get("num", 0))
 
         elif cmd_type == 32:   # MARK_AS_READ:
             target_id = cmd_args.get("channel_id")
@@ -3860,8 +3872,30 @@ class Endcord:
                 self.go_to_message(reference_id)
 
 
-    def switch_tab(self, select_num):
-        """Switch to specified tab number if it is available"""
+    def switch_tab(self, target):
+        """Switch to specified tab number if it is available, target can be index or 'prev' and 'next'"""
+        if isinstance(target, str):
+            select_num = None
+            max_num = 0
+            for channel in self.channel_cache:
+                if channel[2]:
+                    if channel[0] == self.active_channel["channel_id"]:
+                        select_num = max_num
+                    max_num += 1
+            if select_num is None:
+                select_num = 0
+            elif target == "next":
+                select_num += 1
+                if select_num > max_num - 1:
+                    select_num = 0
+            elif target == "prev":
+                select_num -= 1
+                if select_num < 0:
+                    select_num = max_num - 1
+        else:
+            select_num = target
+        select_num = max(select_num, 0)
+
         num = 0
         channel_id = None
         for channel in self.channel_cache:
@@ -4547,6 +4581,7 @@ class Endcord:
             self.update_member_list()
             self.state["member_list"] = True
 
+        self.update_tabs()
         self.gateway.set_want_member_list(self.state["member_list"])
         peripherals.save_json(self.state, f"state_{self.profiles["selected"]}.json")
 
@@ -5587,14 +5622,20 @@ class Endcord:
                     self.tabs_names.append(named_tab)
 
         # build tab string
-        self.tab_string, self.tab_string_format = formatter.generate_tab_string(
+        if "%tabs" in self.format_title_line_r:
+            limit_string = min(self.tui.win_chat.getmaxyx()[1] - len(self.tui.title_txt_l) - 3 - 4 * self.tui.bordered, self.config["limit_tabs_string"])
+        elif "%tabs" in self.format_status_line_r:
+            limit_string = min(self.tui.win_chat.getmaxyx()[1] - len(self.tui.status_txt_l) - 3 - 4 * self.tui.bordered, self.config["limit_tabs_string"])
+        else:
+             limit_string = self.config["limit_tabs_string"]
+        self.tab_string, self.tab_string_format, self.tab_string_map = formatter.generate_tab_string(
             self.tabs_names,
             active_tab_index,
             self.read_state,
             self.config["format_tabs"],
             self.config["tabs_separator"],
-            self.config["limit_channel_name"],
-            self.config["limit_tabs_string"],
+            self.config["limit_tab_len"],
+            limit_string,
         )
         if not no_redraw:
             self.update_status_line()

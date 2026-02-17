@@ -248,7 +248,9 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
     Limit to the thread name string length.
 - `limit_thread_name = 0`  
     Limit to `%username`, `%global_name`, `%server` and `%channel` length in `format_prompt`.
-- `limit_tabs_string = 40`  
+- `limit_tab_len = 10`  
+    Limit to individual tab length.
+- `limit_tabs_string = 60`  
     Limit to `%tabs` length in `format_status`.
 - `tree_vert_line = "│"`  
     A single character used to draw vertical line separating channel tree and the chat.

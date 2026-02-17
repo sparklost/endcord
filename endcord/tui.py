@@ -720,8 +720,8 @@ class TUI():
         return self.chat_selected, self.mouse_rel_x
 
 
-    def get_extra_line_clicked(self):
-        """Get clicked x coordinate of extra line"""
+    def get_x_line_clicked(self):
+        """Get clicked x coordinate of some line"""
         return self.mouse_rel_x
 
 
@@ -2809,6 +2809,7 @@ class TUI():
         win_y, win_x = win.getbegyx()
         return (x - win_x, y - win_y)
 
+
     def mouse_single_click(self, x, y):
         """Handle mouse single click events"""
         if self.mouse_in_window(x, y, self.win_tree):
@@ -2841,6 +2842,10 @@ class TUI():
         elif self.win_extra_line and self.mouse_in_window(x, y, self.win_extra_line):
             self.mouse_rel_x = self.mouse_rel_pos(x, y, self.win_extra_line)[0]
             return 48   # special handling
+
+        elif self.win_title_line and self.mouse_in_window(x, y, self.win_title_line):
+            self.mouse_rel_x = self.mouse_rel_pos(x, y, self.win_title_line)[0]
+            return 16   # special handling
 
 
     def mouse_double_click(self, x, y):

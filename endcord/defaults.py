@@ -110,7 +110,8 @@ theme = {
     "limit_typing_string": 30,
     "limit_prompt": 15,
     "limit_thread_name": 0,
-    "limit_tabs_string": 40,
+    "limit_tab_len": 12,
+    "limit_tabs_string": 60,
     "tree_vert_line": "│",
     "tree_drop_down_vline": "│",
     "tree_drop_down_hline": "─",
@@ -214,8 +215,8 @@ keybindings = {
     "show_reactions": "ALT+119",   # Alt+W
     "show_pinned": "ALT+110",   # Alt+N
     # extra line
-    "attach_prev": 552,   # Alt+Left
-    "attach_next": 567,   # Alt+Right
+    "attach_prev": "ALT+44",   # Alt+<
+    "attach_next": "ALT+46",   # Alt+>
     # extra window
     "extra_up": 573,   # Alt+Up
     "extra_down": 532,   # Alt+Down
@@ -239,6 +240,8 @@ keybindings = {
 
 
 command_bindings = {
+    "552": "switch_tab prev",
+    "567": "switch_tab next",
     "11": "command_palette; type 'goto '",
     "336": "tree_select server; collapse_all_except selected",
     "337": "tree_select server prev; collapse_all_except selected",

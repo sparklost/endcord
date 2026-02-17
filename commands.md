@@ -51,8 +51,8 @@
     Show reactions details for selected message.
 - `toggle_tab`  
     Toggle tabbed (pinned) state of currently active channel.
-- `switch_tab [num]`  
-    Switch to specified tab by its number.
+- `switch_tab [num/next/prev]`  
+    Switch to specified tab by its number. Type `prev` or `next` to incrementally switch tab.
 - `remove_all_tabs`  
     Remove all tabbed channels.
 - `show_pinned`  
@@ -122,14 +122,14 @@
     Show all call participants and their states in an updated list. Must be in the call to use this.
 - `voice_toggle_mute`  
     Toggle mute state before joining a call. Persisted across sessions.
-- `generate_invite *duration *limit`  
+- `generate_invite *[duration] *[limit]`  
     Generate invite to current server with custom expiration `duration` and uses `limit`. Set to 0 for infinite. Invite URL will be copied to clipboard.
     `duration` can be: `4w3d5h30m10s` where `w`is weeks, `d` is days..., can be used partially and mixed: `5h1w`. Default is 7 days and infinite uses.
 - `rename_folder [name]`  
     Locally rename currently selected folder in tree. Custom names are kept in state_profile_name.json in config dir.
 - `collapse_all_except *[option]`  
     Collapse all servers in tree except specific `[option]`: `current` (default), `selected`, `above`, `bellow`.  
-- `tree_select *server/channel, *next/prev`  
+- `tree_select *[server/channel], *next/prev`  
     Select next or previous server or channel in tree. Default is next channel.  
 - `send_message --channel_id=[channel_id]/<#[channel_id]> --reply_id=[message_id] --ping=[True/False] --attachment=[path] [message_content]`  
     Try not to abuse this command, as its run in a thread and can abuse API!  

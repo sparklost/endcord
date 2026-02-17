@@ -193,6 +193,7 @@ Copy selected message url to clipboard - `Alt+U`
 Copy selected channel (in tree) url to clipboard - `Alt+Shift+U`  
 Toggle channel tabbed (pinned) state - `Ctrl+T`  
 Switch to tab: `Alt+NUM` (`NUM`: 1-9 in number row, not numeric keypad)  
+Switch tabs incrementally (next/previous): `Alt+Left/Right`
 Media player: quit - `escape`, pause - `Space`, seek - `Left/Right`, replay - `Z`  
 Cancel action, leave media viewer - `Escape`  
 Quit - `Ctrl+C`  
@@ -201,6 +202,7 @@ Quit - `Ctrl+C`
 ### Mouse controls
 Scroll up/down in all windows  
 Single click to select in all windows, in tree also: un/collapse  
+Single click on tab string to switch tabs (only if exactly `format_title_line_r = "%tabs"` in config)
 Double click in:  
 Tree - or enter channel  
 Extra window - select item

@@ -1907,14 +1907,15 @@ def generate_tab_string(tabs, active_tab, read_state, format_tabs, tabs_separato
     """
     tabs_separated = []
     tab_string_format = []   # [[attribute, start, end] ...]
+    tab_string_map = []   # [(start, end, tab_num), ...]   # tab_num = -1 - arrow left -2 - arrow rignt
     trimmed_left = False
     for num, tab in enumerate(tabs):
         tab_text = (
             format_tabs
             .replace("%num", str(num + 1))
-            .replace("%name", tab["channel_name"][:limit_len])
-            .replace("%server", tab["guild_name"][:limit_len])
-        )
+            .replace("%name", tab["channel_name"])
+            .replace("%server", tab["guild_name"])
+        )[:limit_len]
         tabs_separated.append(tab_text)
 
         if num == active_tab:
@@ -1925,6 +1926,7 @@ def generate_tab_string(tabs, active_tab, read_state, format_tabs, tabs_separato
             tab_string_format.append(None)
 
         # scroll to active if string is too long
+        scroll_index = 0
         if num == active_tab:
             while len(tabs_separator.join(tabs_separated)) >= max_len:
                 if not tabs_separated:
@@ -1932,14 +1934,15 @@ def generate_tab_string(tabs, active_tab, read_state, format_tabs, tabs_separato
                 trimmed_left = True
                 tabs_separated.pop(0)
                 tab_string_format.pop(0)
+                scroll_index += 1
         if (active_tab and num >= active_tab) and len(tabs_separator.join(tabs_separated)) >= max_len:
             break
-
     # add format start and end indexes
     for num, tab in enumerate(tabs_separated):
+        start = len(tabs_separator.join(tabs_separated[:num])) + bool(num) * len(tabs_separator) + 2 * trimmed_left
+        end = start + len(tab)
+        tab_string_map.append((start, end, num + scroll_index))
         if tab_string_format[num]:
-            start = len(tabs_separator.join(tabs_separated[:num])) + bool(num) * len(tabs_separator) + 2 * trimmed_left
-            end = start + len(tab)
             tab_string_format[num] = [tab_string_format[num][0], start, end]
     tab_string_format = [x for x in tab_string_format if x is not None and len(x) == 3]
 
@@ -1947,12 +1950,14 @@ def generate_tab_string(tabs, active_tab, read_state, format_tabs, tabs_separato
 
     if trimmed_left:
         tab_string = f"< {tab_string}"
+        tab_string_map.insert(0, (0, 1, -1))
 
     # trim right side of tab string
     if len(tab_string) > max_len:
         tab_string = tab_string[:max_len - 2 * (trimmed_left + 1)] + " >"
+        tab_string_map.insert(0, (len(tab_string)-1, len(tab_string), -2))   # insert so it overrides other ranges
 
-    return tab_string, tab_string_format
+    return tab_string, tab_string_format, tab_string_map
 
 
 def generate_prompt(my_user_data, active_channel, format_prompt, limit_prompt=15):
