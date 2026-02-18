@@ -250,6 +250,7 @@ class TUI():
         self.extra_window_h = config["extra_window_height"]
         self.blink_cursor_on = config["cursor_on_time"]
         self.blink_cursor_off = config["cursor_off_time"]
+        self.enable_blink_cursor = bool(self.blink_cursor_on) and bool(self.blink_cursor_off)
         self.tree_dm_status = config["tree_dm_status"]
         self.member_list_width = config["member_list_width"]
         self.assist = config["assist"]
@@ -283,10 +284,6 @@ class TUI():
         self.KEYBINDINGS_INPUT_RIGHT = self.keybindings["input_right"]
 
         # initial values
-        if not (self.blink_cursor_on and self.blink_cursor_off):
-            self.enable_blink_cursor = False
-        else:
-            self.enable_blink_cursor = True
         self.disable_drawing = False
         self.prompt = "> "
         self.input_buffer = ""
@@ -1254,6 +1251,9 @@ class TUI():
                     # swap so start is always left side
                     selected_start_screen, selected_end_screen = selected_end_screen, selected_start_screen
 
+            # if not line_text:   # only needed if cursor drawing is disabled
+            #     line_text = " "
+
             # draw
             character = " "
             pos = 0
@@ -1769,7 +1769,7 @@ class TUI():
 
     def show_cursor(self):
         """Force cursor to be shown on screen and reset blinking"""
-        if self.enable_blink_cursor and not self.disable_drawing:
+        if not self.disable_drawing:
             self.set_cursor_color(15)
             self.cursor_on = True
             self.hibernate_cursor = 0
