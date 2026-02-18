@@ -262,6 +262,7 @@ class TUI():
         self.corner_dl = config["border_corners"][1]
         self.corner_dr = config["border_corners"][3]
         self.tab_spaces = int(config["tab_spaces"])
+        self.vim_mode = config["vim_mode"]
 
         # select bordered method
         if self.bordered:
@@ -354,6 +355,7 @@ class TUI():
         self.mouse_rel_x = None
         self.wrap_around_disable = False
         self.pressed_num_key = None
+        self.insert_mode = not self.vim_mode   # leave it true to enable input
 
         # lock for thread-safe drawing with curses
         self.lock = threading.RLock()
@@ -2264,6 +2266,9 @@ class TUI():
                     self.screen.nodelay(False)
                     if self.assist_start:
                         self.assist_start = -1
+                    if self.vim_mode and self.insert_mode:
+                        self.insert_mode = False
+                        return self.return_input_code(26)
                     return self.return_input_code(5)
                 # sequence (bracketed paste or ALT+KEY)
                 sequence = [27, key]
@@ -2293,6 +2298,9 @@ class TUI():
                     # holding escape key
                     if self.assist_start:
                         self.assist_start = -1
+                    if self.vim_mode and self.insert_mode:
+                        self.insert_mode = False
+                        return self.return_input_code(26)
                     return self.return_input_code(5)
 
             # handle chained keybindings
@@ -2308,27 +2316,32 @@ class TUI():
                 self.input_index += 1
                 self.add_to_delta_store("\n")
 
-            elif key in self.KEYBINDINGS_SEND_MESSAGE:
-                if forum:
-                    self.input_index = 0
-                    self.input_line_index = 0
-                    self.cursor_pos = 0
-                    self.draw_input_line()
-                self.cursor_on = True
-                self.input_select_start = None
-                return self.return_input_code(0)
+            elif key in self.KEYBINDINGS_SEND_MESSAGE:   # ENTER
+                if self.vim_mode and self.insert_mode:
+                    self.input_buffer = self.input_buffer[:self.input_index] + "\n" + self.input_buffer[self.input_index:]
+                    self.input_index += 1
+                    self.show_cursor()
+                    self.spellcheck()
+                else:
+                    if forum:
+                        self.input_index = 0
+                        self.input_line_index = 0
+                        self.cursor_pos = 0
+                        self.draw_input_line()
+                    self.cursor_on = True
+                    self.input_select_start = None
+                    return self.return_input_code(0)
 
-            if isinstance(key, str) and not self.keybinding_chain:
-                if len(key) > 1 and key.startswith("ALT+"):   # switching tab with Alt+Num
+            if isinstance(key, str):
+                if len(key) > 1 and key.startswith(self.switch_tab_modifier):   # switching tab with Binding+Num
                     try:
-                        modifier = key[:-3]   # skipping +/- sign
                         num = int(key[-2:])
-                        if 49 <= num <= 57 and modifier == self.switch_tab_modifier:
+                        if 49 <= num <= 57:
                             self.pressed_num_key = num - 48
                             return self.return_input_code(42)
                     except ValueError:
                         pass
-                else:   # unicode letters
+                elif not self.keybinding_chain:   # unicode letters
                     if self.input_select_start is not None:
                         self.delete_selection()
                         self.input_select_start = None
@@ -2346,7 +2359,7 @@ class TUI():
             if self.keybinding_chain:   # consume chain
                 self.keybinding_chain = None
 
-            if isinstance(key, int) and 32 <= key <= 126:   # all regular characters
+            if isinstance(key, int) and 32 <= key <= 126 and self.insert_mode:   # all regular characters
                 if self.input_select_start is not None:
                     self.delete_selection()
                     self.input_select_start = None
@@ -2365,6 +2378,11 @@ class TUI():
                         self.assist_start = self.input_index
                 if not self.bracket_paste:
                     self.spellcheck()
+
+            elif not self.insert_mode:   # normal mode in vimmode
+                 if not self.switch_tab_modifier and isinstance(key, int) and 49 <= key <= 57:
+                     self.pressed_num_key = key - 48
+                     return self.return_input_code(42)
 
             elif (code := self.common_keybindings(key, command=command, forum=forum)):
                 return self.return_input_code(code)
@@ -2713,11 +2731,6 @@ class TUI():
             elif key in self.keybindings["extra_select"]:
                 return self.return_input_code(27)
 
-            elif key in self.keybindings["show_summaries"]:
-                self.extra_index = 0
-                self.extra_selected = -1
-                return self.return_input_code(28)
-
             elif key in self.keybindings["search"] and not forum:
                 self.extra_index = 0
                 self.extra_selected = -1
@@ -2755,6 +2768,10 @@ class TUI():
 
             elif key in self.keybindings["open_external_editor"] and not forum:
                 return self.return_input_code(45)
+
+            elif self.vim_mode and key in self.keybindings.get("insert_mode", ()):
+                self.insert_mode = True
+                return self.return_input_code(28)
 
             # terminal reserved keys: CTRL+ C, I, J, M, Q, S, Z
 

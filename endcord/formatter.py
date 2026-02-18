@@ -1713,7 +1713,7 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
     return chat, chat_format, chat_map, wide_map
 
 
-def generate_status_line(my_user_data, my_status, unseen, typing, active_channel, action, tasks, tabs, tabs_format, format_status_line, format_rich, slowmode=None, limit_typing=30, use_nick=True, fun=True):
+def generate_status_line(my_user_data, my_status, unseen, typing, active_channel, action, tasks, tabs, tabs_format, format_status_line, format_rich, slowmode=None, vim_mode=None, limit_typing=30, use_nick=True, fun=True):
     """
     Generate status line according to provided formatting.
     Possible options for format_status_line:
@@ -1733,6 +1733,7 @@ def generate_status_line(my_user_data, my_status, unseen, typing, active_channel
         %tabs
         %slowmode   # 'slowmode {time}'
         %afk   # '[AFK]'
+        %vim_mode   # [--NORMAL--] / [--INSERT--]
     Possible options for format_rich:
         %type
         %name
@@ -1868,6 +1869,13 @@ def generate_status_line(my_user_data, my_status, unseen, typing, active_channel
     else:
         slowmode = f"Slowmode: {format_seconds(slowmode)}"
 
+    if vim_mode is False:
+        vim_mode = "[--NORMAL--]"
+    elif vim_mode is True:
+        vim_mode = "[--INSERT--]"
+    else:
+        vim_mode = ""
+
     status_line = (
         format_status_line
         .replace("%global_name", get_global_name(my_user_data, use_nick))
@@ -1886,6 +1894,7 @@ def generate_status_line(my_user_data, my_status, unseen, typing, active_channel
         .replace("%tabs", tabs)
         .replace("%slowmode", slowmode)
         .replace("%afk", "[AFK]" if my_status["afk"] else "")
+        .replace("%vim_mode", vim_mode)
     )
 
     status_line_format = []
@@ -1960,7 +1969,7 @@ def generate_tab_string(tabs, active_tab, read_state, format_tabs, tabs_separato
     return tab_string, tab_string_format, tab_string_map
 
 
-def generate_prompt(my_user_data, active_channel, format_prompt, limit_prompt=15):
+def generate_prompt(my_user_data, active_channel, format_prompt, limit_prompt=15, vim_mode=None):
     """
     Generate prompt line according to provided formatting.
     Possible options for format_prompt_line:
@@ -1968,14 +1977,22 @@ def generate_prompt(my_user_data, active_channel, format_prompt, limit_prompt=15
         %username
         %server
         %channel
+        %vim_mode
     """
     guild = active_channel["guild_name"]
+    if vim_mode is False:
+        vim_mode = "NORMAL"
+    elif vim_mode is True:
+        vim_mode = "INSERT"
+    else:
+        vim_mode = ""
     return (
         format_prompt
         .replace("%global_name", get_global_name(my_user_data, False)[:limit_prompt])
         .replace("%username", my_user_data["username"][:limit_prompt])
         .replace("%server", guild[:limit_prompt] if guild else "DM")
         .replace("%channel", str(active_channel["channel_name"])[:limit_prompt])
+        .replace("%vim_mode", vim_mode)
     )
 
 

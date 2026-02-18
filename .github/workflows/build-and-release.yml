@@ -128,9 +128,11 @@ jobs:
         shell: bash
         run: |
           version=${GITHUB_REF#refs/tags/}
-          extra="README.md LICENSE commands.md configuration.md extensions.md"
+          extra="README.md LICENSE docs/commands.md docs/configuration.md docs/extensions.md docs/keybindings.md"
           cd dist
-          cp ../{README.md,LICENSE,commands.md,configuration.md,extensions.md} .
+          mkdir -p docs
+          cp ../README.md ../LICENSE .
+          cp ../docs/{commands.md,configuration.md,extensions.md,keybindings.md} docs/
           if [[ "${{ matrix.platform }}" == "linux" ]]; then
             tar -czf "endcord-$version-${{ matrix.platform }}.tar.gz" endcord $extra
             tar -czf "endcord-lite-$version-${{ matrix.platform }}.tar.gz" endcord-lite $extra

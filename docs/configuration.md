@@ -10,8 +10,8 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
     Enable RPC server.
 - `game_detection = True`  
     Enable game detection service.
-- `downloads_path = None`  
-    Directory where to store downloaded files. Set to None to use 'Downloads' directory (cross platform).
+- `vim_mode = False`  
+    Enable vim-like mode.
 - `limit_chat_buffer = 100`  
     Number of messages kept in chat buffer. Initial buffer is 50 messages and is expanded in scroll direction. Limit: 50-1000. Larger value will cause longer chat updates.  
 - `limit_channel_cache = 5`  
@@ -204,9 +204,9 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
     Formatting for single reaction string. Reactions string is assembled by joining these strings with `reactions_separator` in between. See [format_one_reaction](#format_one_reaction) for more info.
 - `format_timestamp = "%H:%M"`  
     Format for timestamps in messages. Same as [datetime format codes](https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes)
-- `format_status_line_l = " %global_name (%username) - %status  %unreads %action %typing"`  
+- `format_status_line_l = " %global_name (%username) - %status %afk %unreads %action %typing"`  
     Formatting for left side of status line. See [format_status](#format_status) for more info. Set to None to disable.
-- `format_status_line_r = "%slowmode"`  
+- `format_status_line_r = "%vim_mode %slowmode"`  
     Formatting for right side of status line. See [format_status](#format_status) for more info.
 - `format_title_line_l = " %server: %channel"`  
     Formatting for left side of title line. See [format_status](#format_status) for more info. Set to None to disable.
@@ -408,6 +408,8 @@ Note: everything after `%content` may be pushed to newline.
 - `%task` - currently running slow task (reconnecting, downloading chat...)
 - `%tabs` - all tabs formatted with `format_tabs` then joined with `tabs_separator`
 - `%slowmode` - `Slowmode: hh:mm:ss` if slowmode is enabled, otherwise its hidden
+- `%afk` - `[AFK]` while afk status is being sent from this client
+- `%vim_mode` - `[--INSERT--]` or `[--NORMAL--]` when `vim_mode` is ON
 
 ### format_rich
 - `%type` - type of rich presence: "Playing" or "Listening to"
@@ -427,6 +429,7 @@ Note: everything after `%content` may be pushed to newline.
 - `%username` - my username
 - `%server` - currently viewed server
 - `%channel` - currently viewed channel
+- `%vim_mode` - `INSERT` or `NORMAL` when `vim_mode` is ON
 
 ### format_forum
 - `%thread_name` - name of a thread

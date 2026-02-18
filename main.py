@@ -67,8 +67,17 @@ def main(args):
         defaults.command_bindings,
         section="command_bindings",
         gen_config=gen_config,
-        merge = True,
+        merge=True,
     )
+    if config["vim_mode"]:
+        vim_keybindings = peripherals.load_config(
+            config_path,
+            defaults.vim_mode_bindings,
+            section="vim_mode_bindings",
+            gen_config=gen_config,
+            merge=True,
+        )
+        keybindings = peripherals.merge_keybindings(keybindings, vim_keybindings, command_bindings)
     if not uses_pgcurses:
         keybindings = peripherals.convert_keybindings(keybindings)
         command_bindings = peripherals.convert_keybindings_cmd(command_bindings)

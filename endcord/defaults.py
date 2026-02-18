@@ -3,7 +3,7 @@ settings = {
     "extensions": True,
     "rpc": True,
     "game_detection": True,
-    "downloads_path": None,
+    "vim_mode": False,
     "limit_chat_buffer": 100,
     "limit_channel_cache": 5,
     "download_msg": 25,
@@ -55,6 +55,7 @@ settings = {
     "assist_score_cutoff": 15,
     "limit_command_history": 50,
     "game_detection_download_delay": 7,
+    "downloads_path": None,
     "linux_notification_sound": "message",
     "custom_notification_sound": None,
     "linux_ringtone_incoming": "phone-incoming-call",
@@ -89,7 +90,7 @@ theme = {
     "format_one_reaction": "%count:%reaction",
     "format_timestamp": "%H:%M",
     "format_status_line_l": " %global_name (%username) - %status %afk %unreads %action %typing",
-    "format_status_line_r": "%slowmode",
+    "format_status_line_r": "%vim_mode %slowmode",
     "format_title_line_l": " %server: %channel",
     "format_title_line_r": "%tabs",
     "format_title_tree": " endcord  %task",
@@ -179,17 +180,17 @@ keybindings = {
     "input_right": 261,   # Right
     "word_left": 554,   # Ctrl+Left
     "word_right": 569,   # Ctrl+Right
-    "insert_newline": 14,   # Ctrl+N
-    "undo": "ALT+122",   # Alt+Z
-    "redo": "ALT+90",   # Alt+Shift+Z
     "select_left": 393,   # Shift+Left
     "select_right": 402,   # Shift+Right
     "select_word_left": 555,   # Ctrl+Shift+Left
     "select_word_right": 570,   # Ctrl+Shift+Right
+    "insert_newline": 14,   # Ctrl+N
+    "undo": "ALT+122",   # Alt+Z
+    "redo": "ALT+90",   # Alt+Shift+Z
     "select_all": "ALT+97",   # Alt+A
     "copy_sel": "ALT+99",   # Alt+C
     "cut_sel": "ALT+120",   # Alt+X
-    "delete_word": 8, # Ctrl+Backspace/Ctrl+H
+    "delete_word": 8,   # Ctrl+Backspace/Ctrl+H
     # chat
     "send_message": 10,   # Enter
     "chat_up": 259,   # Up
@@ -207,11 +208,10 @@ keybindings = {
     "view_media": 22,   # Ctrl+V
     "spoil": "ALT+116",   # Alt+T
     "search": 6,   # Ctrl+F
+    "search_gif": "ALT+102",   # Alt+F
     "profile_info": "ALT+112",   # Alt+P
-    "show_summaries": "ALT+115",   # Alt+S
     "copy_message_link": "ALT+117",   # Alt+U
     "add_reaction": "ALT+114",   # Alt+R
-    "search_gif": "ALT+102",   # Alt+F
     "show_reactions": "ALT+119",   # Alt+W
     "show_pinned": "ALT+110",   # Alt+N
     # extra line
@@ -223,17 +223,17 @@ keybindings = {
     "extra_select": "ALT+10",   # Alt+Enter
     "preview_upload": "ALT+118",   # Alt+V
     # media
-    "media_pause": 32,   # C
+    "media_pause": 32,   # Space
     "media_replay": 122,   # Z
     "media_seek_forward": 261,   # Right
     "media_seek_backward": 260,   # Left
     # other
+    "command_palette": 31,   # Ctrl+/
     "cancel": 24,   # Ctrl+X
     "cycle_status": "ALT+100",   # Alt+D
     "toggle_member_list": "ALT+109",   # Alt+M
     "toggle_tab": 20,   # Ctrl+T
     "switch_tab_modifier": "ALT+NUM",   # Alt+Num
-    "command_palette": 31,   # Ctrl+/
     "open_external_editor": "ALT+101",   # Alt+E
     "quit": None,   # already bound to Ctrl+C
 }
@@ -247,6 +247,75 @@ command_bindings = {
     "337": "tree_select server prev; collapse_all_except selected",
 }
 
+
+vim_mode_bindings = {
+    # special
+    "insert_mode": "i",
+    # tree
+    "tree_up": "K",
+    "tree_down": "J",
+    "tree_select": " ",
+    "tree_collapse_threads": "W",
+    "tree_join_thread": "O",
+    "channel_info": "I",
+    "copy_channel_link": "C",
+    # input line
+    "input_left": "h",
+    "input_right": "l",
+    "word_left": "b",
+    "word_right": "w",
+    "select_left": 8,   # Ctrl+H
+    "select_right": 12,   # Ctrl+L
+    "insert_newline": 14,   # Ctrl+N
+    "undo": "u",
+    "redo": 18,   # Ctrl+R
+    "select_word_left": "H",
+    "select_word_right": "L",
+    "select_all": "a",
+    "copy_sel": "y",
+    "cut_sel": "Y",
+    "delete_word": "X",
+    # chat
+    "send_message": 10,   # Enter
+    "chat_up": "k",
+    "chat_down": "j",
+    "reply": "r",
+    "edit": "e",
+    "delete": "d",
+    "toggle_ping": "p",
+    "scroll_bottom": "B",
+    "go_replied": "g",
+    "download": "D",
+    "upload": "U",
+    "browser": "o",
+    "copy_msg": "c",
+    "view_media": "v",
+    "spoil": "S",
+    "search": "f",
+    "search_gif": "F",
+    "profile_info": "P",
+    "copy_message_link": "M",
+    "add_reaction": "R",
+    "show_reactions": "A",
+    "show_pinned": "n",
+    # extra line
+    "attach_prev": "<",
+    "attach_next": ">",
+    # extra window
+    "extra_up": ",",
+    "extra_down": ".",
+    "extra_select": "q",
+    "preview_upload": "V",
+    # other
+    "command_palette": ":",
+    "cancel": "x",
+    "cycle_status": "s",
+    "toggle_member_list": "m",
+    "toggle_tab": "t",
+    "switch_tab_modifier": "NUM",
+    "open_external_editor": "E",
+    "quit": "Q",
+}
 
 windows_override_keybindings = {
     "command_palette": 28,   # Ctrl+\

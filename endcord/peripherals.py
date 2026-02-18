@@ -380,6 +380,63 @@ def normalize_keybindings(keybindings):
     return keybindings
 
 
+def deduplicate_keybindings(keybindings_a, keybindings_b, command=False):
+    """Deduplicate 2 keubinding dicts that can have strings and tuples of strings as values, keeping keybindings_b"""
+    def deduplicate_value(dedupe_value, keybindings):
+        for key, values in keybindings.items():
+            if isinstance(values, tuple):
+                for num, value in enumerate(values):
+                    if value == dedupe_value:
+                        fresh_values = keybindings[key]
+                        keybindings[key] = fresh_values[:num] + (None,) + fresh_values[num + 1:]
+            elif values == dedupe_value:
+                keybindings[key] = None
+
+    def dedupe_value_command(dedupe_value, keybindings):
+        for key, value in keybindings.items():
+            if key == str(dedupe_value):
+                del keybindings[key]
+
+    if command:
+        deduplicate_value = dedupe_value_command
+
+    for key, values in keybindings_b.items():
+        if isinstance(values, tuple):
+            for value in values:
+                deduplicate_value(value, keybindings_a)
+        else:
+            deduplicate_value(values, keybindings_a)
+
+
+def merge_keybindings(keybindings, vim_keybindings, command_bindings):
+    """Merge standard and vim mode keybindings and remove keybinding collisions favoring vim keybindings"""
+    deduplicate_keybindings(keybindings, vim_keybindings)
+    deduplicate_keybindings(command_bindings, vim_keybindings, command=True)
+
+    for key, value_2_old in vim_keybindings.items():
+        if isinstance(value_2_old, str) and len(value_2_old) == 1:
+            try:
+                value_2 = ord(value_2_old)
+            except TypeError:
+                value_2 = value_2_old
+        else:
+            value_2 = value_2_old
+
+        if key not in keybindings:
+            keybindings[key] = value_2
+        else:
+            value_1 = keybindings[key]
+            if not isinstance(value_1, tuple):
+                value_1 = (value_1, )
+            if not isinstance(value_2, tuple):
+                value_2 = (value_2, )
+            if value_1[0] is None:
+                value_1 = ()
+            keybindings[key] = value_1 + value_2
+
+    return keybindings
+
+
 def update_config(config, key, value):
     """Update and save config"""
     if not value:

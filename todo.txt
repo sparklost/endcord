@@ -1,14 +1,3 @@
-Vim-like mode
-    toggle in config
-    add vim-mode-bindings section
-        add defaults
-    have input mode
-        type in input line
-        esc to go back to normal mode
-    have normal mode
-        single keys and shift-key can be used as bindings and command-bindings
-        start in normal mode
-    show current mode in title/status and prompt
 Fix issues with many wide characters in chat
 Fix issues with wide characters in input line
 

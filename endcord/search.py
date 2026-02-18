@@ -157,7 +157,11 @@ def search_channels_all(guilds, dms, query, full_input, recent=None, limit=50, s
                 score = fuzzy_match_score(query, formatted) + bonus_score
                 if score < worst_score:
                     continue
-                heapq.heappush(results, (formatted, channel["id"], score))
+                if recent:
+                    completion = f"goto <#{channel["id"]}>"
+                else:
+                    completion = channel["id"]
+                heapq.heappush(results, (formatted, completion, score))
                 if len(results) > limit:
                     heapq.heappop(results)
                     worst_score = results[0][2]

@@ -135,6 +135,7 @@ class Endcord:
         self.show_pending_messages = config["show_pending_messages"]
         self.enable_calls = config["calls"]
         self.game_detection_download_delay = config["game_detection_download_delay"]
+        self.vim_mode = config["vim_mode"]
 
         if not self.external_editor or not shutil.which(self.external_editor):
             self.external_editor = os.environ.get("EDITOR", "nano")
@@ -1778,11 +1779,6 @@ class Endcord:
                         self.restore_input_text = (input_text, "standard extra")
                         self.view_profile(member["id"])
 
-            # view summaries
-            elif action == 28:
-                self.restore_input_text = (input_text, "standard extra")
-                self.view_summaries()
-
             # search
             elif action == 29:
                 if not self.search:
@@ -2145,6 +2141,12 @@ class Endcord:
                         False, True,
                     )))
                     self.download_threads[-1].start()
+
+            # leave/enter insert mode (when in vim mode)
+            elif self.vim_mode and (action == 26 or action == 28):
+                # insert_mode already toggled in tui
+                self.restore_input_text = (input_text, "standard")
+                self.update_status_line()
 
             # mouse single click on title line
             elif action == 16 and self.format_title_line_r == "%tabs" and self.tab_string_map:   # to simplify things
@@ -5345,7 +5347,7 @@ class Endcord:
             insert_string = f"<;{self.assist_found[index][1]};>"   # format: "<;ID;>"
         elif self.assist_type == 5:   # command
             if self.assist_found[index][1]:
-                if input_text.endswith(" ") and input_text not in ("set ", "string_select ", "set_notifications ", "game_detection_blacklist ", "switch_tab "):
+                if input_text.endswith(" ") and input_text not in ("set ", "string_select ", "set_notifications ", "game_detection_blacklist ", "switch_tab ", "goto "):
                     self.tui.instant_assist = False
                     command_type, command_args = parser.command_string(input_text)
                     self.close_extra_window()
@@ -5704,6 +5706,7 @@ class Endcord:
                     self.format_status_line_r,
                     self.format_rich,
                     slowmode=self.slowmode_times.get(self.active_channel["channel_id"]),
+                    vim_mode=(self.tui.insert_mode if self.vim_mode else None),
                     limit_typing=self.limit_typing,
                     fun=self.fun,
                 )
@@ -5723,6 +5726,7 @@ class Endcord:
                 self.format_status_line_l,
                 self.format_rich,
                 slowmode=self.slowmode_times.get(self.active_channel["channel_id"]),
+                vim_mode=(self.tui.insert_mode if self.vim_mode else None),
                 limit_typing=self.limit_typing,
                 fun=self.fun,
             )
@@ -5743,6 +5747,7 @@ class Endcord:
                     self.format_title_line_r,
                     self.format_rich,
                     slowmode=self.slowmode_times.get(self.active_channel["channel_id"]),
+                    vim_mode=(self.tui.insert_mode if self.vim_mode else None),
                     limit_typing=self.limit_typing,
                     fun=self.fun,
                 )
@@ -5763,6 +5768,7 @@ class Endcord:
                     self.format_title_line_l,
                     self.format_rich,
                     slowmode=self.slowmode_times.get(self.active_channel["channel_id"]),
+                    vim_mode=(self.tui.insert_mode if self.vim_mode else None),
                     limit_typing=self.limit_typing,
                     fun=self.fun,
                 )
@@ -5783,6 +5789,7 @@ class Endcord:
                     self.format_title_tree,
                     self.format_rich,
                     slowmode=self.slowmode_times.get(self.active_channel["channel_id"]),
+                    vim_mode=(self.tui.insert_mode if self.vim_mode else None),
                     limit_typing=self.limit_typing,
                     fun=self.fun,
                 )
@@ -5797,6 +5804,7 @@ class Endcord:
             self.my_user_data,
             self.active_channel,
             self.config["format_prompt"],
+            vim_mode=(self.tui.insert_mode if self.vim_mode else None),
             limit_prompt=self.config["limit_prompt"],
         )
 
