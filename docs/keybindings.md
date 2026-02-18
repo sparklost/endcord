@@ -146,8 +146,8 @@ Special commands availabe only for command-bindings are documented in [Commands 
 - `i` - Enter insert mode
 
 ### tree
-- `K/J` * - Navigating channel tree
-- `Space` * - Expand selected categories and servers or enter selected channel
+- `K/J` - Navigating channel tree
+- `Space` - Expand selected categories and servers or enter selected channel
 - `W` - Un/collapse channel with threads in tree
 - `O` - Join/leave selected thread in tree
 - `I` - View channel info (selected in tree)
@@ -176,10 +176,10 @@ Special commands availabe only for command-bindings are documented in [Commands 
 - `B` - Scroll back to chat bottom
 - `g` - Go to replied message from selected message
 - `D` - Download selected attachment
-- `U` Upload attachments
-- `o` * - Open selected link in browser
+- `U` - Upload attachments
+- `o` - Open selected link in browser
 - `c` - Copy selected message to clipboard
-- `v` * - View selected attachment (image, gif, video, audio) in media player
+- `v` - View selected attachment (image, gif, video, audio) in media player
 - `S` - Reveal one spoiler in selected messages
 - `f` - Search messages in current server
 - `F` - Search gifs
@@ -200,7 +200,7 @@ Special commands availabe only for command-bindings are documented in [Commands 
 - `V` - Preview selected file in upload assist or when searching gif
 
 ### other
-- `:` * - Open command palette
+- `:` - Open command palette
 - `X` - Cancel all downloads and uploads
 - `s` - Cycle user status (online/away/DnD/invisible)
 - `m` - Toggle member list

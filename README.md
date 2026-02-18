@@ -117,13 +117,13 @@ Manager can be re-opened using `--manager` flag.
 - Email/phone number and password - credentials are used only while logging in and will never be kept in storage
 - Scan QR code - note that some terminals may fail to render QR code
 - Token - used to access Discord through your account without logging-in
-- Token as an argument: `endcord -t [YOUR_TOKEN]`, but note that it might get saved in your terminal history file
+- Token as an argument: `endcord -t [YOUR_TOKEN]`, but note that it might get saved in your terminal history file  
 Email or QR code login may fail because captcha is requested by Discord. In that case first login and complete captcha through official client, from same IP address, then try again. If it still fails, then youll have to use token method.  
 If you want to verify what is happening with credentials, look in profile_manager.py and auth.py.  
 **Do not share your token!**    
 
 ### Configuring keybindings
-Go to [keybindings](docs/keybindings.md#configuring-keybindings)
+Go to [keybindings](docs/keybindings.md#configuring-keybindings).
 
 ### Debug mode
 Debug mode can be enabled with `-d` flag.  
@@ -135,7 +135,7 @@ Current log can be accessed with `show_log` command or in config directory.
 
 ## Usage
 ### Controls and keybindings
-Go to [keybindings](docs/keybindings.md)
+Go to [keybindings](docs/keybindings.md).
 
 ### Channel Tree
 If tree object has `>` before the object name, it means it has sub-objects (its drop-down).  
@@ -374,14 +374,14 @@ To toggle [experimental windowed mode](#experimental-windowed-mode) run: `python
 4. run build script: `python build.py`  
 
 ### Windows
-1. Install [Python](https://www.python.org/) 3.13 or later
+1. Install [Python](https://www.python.org/) 3.12 or later
 2. Install [uv](https://docs.astral.sh/uv/getting-started/installation/)
 3. Clone this repository, unzip it
 4. Open terminal, cd to unzipped folder
 5. run build script: `python build.py`
 
 ### macOS
-1. Install [Python](https://www.python.org/) 3.13 or later
+1. Install [Python](https://www.python.org/) 3.12 or later
 2. Clone this repository, unzip it
 3. Open terminal, cd to unzipped folder
 4. run build script: `python build.py`
