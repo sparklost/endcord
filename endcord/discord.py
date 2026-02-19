@@ -204,7 +204,7 @@ class Discord():
             connection = self.get_connection(self.host, 443)
             connection.request("GET", "/api/v9/users/@me", message_data, self.header)
             response = connection.getresponse()
-        except (socket.gaierror, TimeoutError) as e:
+        except (socket.gaierror, TimeoutError, ConnectionResetError) as e:
             if exit_on_error:
                 logger.warning(f"Network error: {e}")
                 raise SystemExit(f"Network error: {e}")

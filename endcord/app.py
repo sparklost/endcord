@@ -3979,6 +3979,11 @@ class Endcord:
         message = self.messages[msg_index]
         content = ""
 
+        # exclude urls that are replaced with #channel
+        for match in re.finditer(formatter.match_discord_channel_url, message["content"]):
+            if match.group() in urls:
+                urls.remove(match.group())
+
         if "poll" in message:
             content = formatter.format_poll(message["poll"])
 

@@ -6,6 +6,7 @@ import random
 import socket
 import ssl
 import struct
+import sys
 import threading
 import time
 import traceback
@@ -263,7 +264,7 @@ class Gateway():
         except (socket.gaierror, TimeoutError):
             connection.close()
             logger.warning("No internet connection. Exiting...")
-            raise SystemExit("No internet connection. Exiting...")
+            sys.exit("No internet connection. Exiting...")
         response = connection.getresponse()
         if response.status == 200:
             data = response.read()
@@ -272,7 +273,7 @@ class Gateway():
         else:
             connection.close()
             logger.error(f"Failed to get gateway url. Response code: {response.status}. Exiting...")
-            raise SystemExit(f"Failed to get gateway url. Response code: {response.status}. Exiting...")
+            sys.exit(f"Failed to get gateway url. Response code: {response.status}. Exiting...")
 
         self.connect_ws()
         self.state = 1
@@ -1670,7 +1671,7 @@ class Gateway():
         while not self.ready:
             if sleep_time >= self.heartbeat_interval / 100:
                 logger.error("Ready event could not be processed in time, probably because of too many servers. Exiting...")
-                raise SystemExit("Ready event could not be processed in time, probably because of too many servers. Exiting...")
+                sys.exit("Ready event could not be processed in time, probably because of too many servers. Exiting...")
             time.sleep(0.5)
             sleep_time += 5
         heartbeat_interval_rand = int(self.heartbeat_interval * (0.8 - 0.6 * random.random()) / 1000)
