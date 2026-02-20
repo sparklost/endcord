@@ -20,20 +20,18 @@ TIME_DIVS = [1, 60, 3600, 86400, 2678400, 31190400]
 TIME_UNITS = ["second", "minute", "hour", "day", "month", "year"]
 
 match_emoji = re.compile(r"(?<!\\):[^:\s]+:")
-match_d_emoji = re.compile(r"<(.?):(.*?):(\d*?)>")
-match_mention = re.compile(r"<@(\d*?)>")
-match_role = re.compile(r"<@&(\d*?)>")
-match_channel = re.compile(r"<#(\d*?)>")
+match_d_emoji = re.compile(r"<(a?):([a-zA-Z0-9_]+):(\d+)>")
+match_mention = re.compile(r"<@(\d+)>")
+match_role = re.compile(r"<@&(\d+)>")
+match_channel = re.compile(r"<#([\d\/]+)>")
 match_timestamp = re.compile(r"<t:(\d+)(:[tTdDfFR])?>")
-match_channel_id = re.compile(r"(?<=<#)\d*?(?=>)")
 match_escaped_md = re.compile(r"\\(?=[^a-zA-Z\d\s])")
 match_md_spoiler = re.compile(r"(?<!\\)\|\|.+?\|\|")
 match_md_code_snippet = re.compile(r"(?<!`|\\)`[^`]+`")
 match_md_code_block = re.compile(r"(?s)```.*?```")
 match_url = re.compile(r"https?:\/\/[\w-]+(\.[\w-])+[^\s)\]>]*")
 match_discord_channel_url = re.compile(r"https:\/\/discord(?:app)?\.com\/channels\/(\d*)\/(\d*)(?:\/(\d*))?")
-match_discord_channel_combined = re.compile(r"<#(\d*?)>|https:\/\/discord(?:app)?\.com\/channels\/(\d*)\/(\d*)(?:\/(\d*))?")
-match_sticker_id = re.compile(r"<;\d*?;>")
+match_sticker_id = re.compile(r"<;\d+;>")
 match_md_all = re.compile(
     r"""
     (?<!\\)(
@@ -520,7 +518,7 @@ def replace_discord_url(text, *ranges_lists):
         start, end = match.span()
         result.append(text[last_pos:start])
         if match.group(3):
-            new_text = f"<#{match.group(2)}>>MSG"
+            new_text = f"<#{match.group(2)}/{match.group(3)}>>MSG"
         else:
             new_text = f"<#{match.group(2)}>"
         result.append(new_text)
@@ -549,7 +547,11 @@ def replace_channels(text, channels_ids, *ranges_lists):
     for match in re.finditer(match_channel, text):
         start, end = match.span()
         result.append(text[last_pos:start])
-        channel_id = match.group(1)
+        full_id = match.group(1)
+        if "/" in full_id:
+            channel_id = full_id.split("/")[0]
+        else:
+            channel_id = full_id
         for channel in channels_ids:
             if channel_id == channel["id"]:
                 new_text = "#" + channel["name"]
@@ -560,7 +562,7 @@ def replace_channels(text, channels_ids, *ranges_lists):
 
         new_start = start + offset
         new_end = new_start + len(new_text)
-        channel_ranges.append([new_start, new_end, channel_id])
+        channel_ranges.append([new_start, new_end, full_id])
 
         diff = len(new_text) - (end - start)
         if diff != 0:

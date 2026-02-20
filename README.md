@@ -193,7 +193,7 @@ Assist triggers are (the first character): `@username`, `@role`, `#channel`, `:e
 Press `Esc` to stop assist. Re-type trigger to start it again.  
 Navigation: `Alt+Up/Down` - Go up/down, `Alt+Enter` or `Enter` - insert selected item.  
 When inserted in input line, item will usually be shown as `<some_numbers>` - that is intended - do not alter it.  
-Stickers and emojis are sorted into packs, and will be shown as `pack name - emoji/sticker name`, and search is performed on that string.  
+Stickers and emoji are sorted into packs, and will be shown as `pack name - emoji/sticker name`, and search is performed on that string.  
 Sticker will also be added to message text and removed when sending.  
 
 ### Adding/Removing reactions
@@ -230,7 +230,7 @@ Emoji names can be found [here](https://unicode.org/emoji/charts/full-emoji-list
 
 # s/ replacements with regex
 Type `s/old/new` as a message and send it to edit your last message by replacing `old` with `new`.  
-Note that this is using regex. And is very simmilar to how sed works.  
+Note that this is using regex. And is very similar to how sed works.  
 Features other than full regex support:
 - Full regex support
 - Append `/g` to repeat for all matches
@@ -304,7 +304,7 @@ Ebut endcord may crash at any time. Further, each host may have different spam f
 Wether endcord will work or crash depends on hosts api implementation, the more different from discord it is, greater is the rish of a crash.  If endcord crashes its hosts fault. Do not report bugs related to this.
 
 ### Termux
-Endcord does work under termux, but some keybindings dont (`Ctrl/Alt+Space`). It is recommended to rebind them in endcord config or use endcord in desktop environment (like `openbox`) in a terminal emulator with xterm256-colors (like `alacritty`) and with Termux:X11 app.  
+Endcord does work under termux, but some keybindings don't (`Ctrl/Alt+Space`). It is recommended to rebind them in endcord config or use endcord in desktop environment (like `openbox`) in a terminal emulator with xterm256-colors (like `alacritty`) and with Termux:X11 app.  
 Endcord cant be built in termux, so to run it: first install python >= 3.12 and `uv`, then clone this repo, cd to folder and run it from source: `uv run main.py` (it will take some time to download and build numpy and orjson). To skip waiting for some dependencies, or if it fails building them run: `uv remove numpy soundcard soundfile orjson`.
 To enable android notifications simply run `pkg install termux-api` and install Termux:API app. Vibration is disabled by default, to enable it: run endcord at least once, then in Termux:Api notification settings enable vibration for endcord ntifications.  
 Notifications will work as ling as endcord is running, so it might be necessary for termux to "Acquire wakelock".  
@@ -479,7 +479,7 @@ This happens with `Alt+Key` keybindings, but may happen with other modifiers too
 But this also means that it can be added to keybinding config, instead byte, provide character itself eg.: `β` or `ALT+β`.  
 See [keybinding](#keybinding) for instructions on how to add multiple keybindings for same action.
 
-### If some keybindings still dont work
+### If some keybindings still don't work
 Its probably terminal emulator sending different key codes than those in default settings. Check this by running endcord with `-k` or `--keybinding` to start keybinding resolver.  
 Then press key combination and see printed code. Put this code in settings to use it.  
 This mostly happens with `Ctrl+Arrow` and `Alt+Arrow` combinations, on some non-standard terminal emulators like kitty or cmder.

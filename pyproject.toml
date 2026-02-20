@@ -15,7 +15,7 @@ dependencies = [
     "pycryptodome>=3.23.0",
     "pynacl>=1.6.2",
     "pysocks>=1.7.1",
-    "python-socks>=2.8.0",
+    "python-socks>=2.8.1",
     "pywin32>=311; sys_platform == 'win32'",
     "pywin32-ctypes>=0.2.3; sys_platform == 'win32'",
     "qrcode>=8.2",

@@ -35,7 +35,7 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
 - `member_list = True`  
     Whether to download member activities. Disable for lower CPU, RAM and network usage. If disabled, member list will be empty and there will be no presences in profile view screen.
 - `member_list_auto_open = False`  
-    Automatically opem member list on startup and on channel switch to different guild, if enough space. Will disable persising member list state between sessions.  
+    Automatically opem member list on startup and on channel switch to different guild, if enough space. Will disable persisting member list state between sessions.  
 - `use_nick_when_avail = True`  
     Replace global_name with nick when it is available.
 - `remember_state = True`  
@@ -173,7 +173,7 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
 - `custom_host = None`  
     Custom host to connect to, like `old.server.spacebar.chat`. Set to None to use default host (`discord.com`)
 - `capbilities = None`  
-    DO NOT CHANGE, unless you know what youre doing. This might cause some features to not work or client to get unstable.  
+    DO NOT CHANGE, unless you know what you're doing. This might cause some features to not work or client to get unstable.  
     If bot token is used, then this will be used as `intents` parameter instead. See [discord bot documentation](https://discord.com/developers/docs/events/gateway#gateway-intents).  
     Default capabilities: `30717`, default intents: `50364033`.  
 - `easter_eggs = True`  
@@ -464,7 +464,7 @@ Note: everything after `%content` may be pushed to newline.
 - `enable_tray: true`  
     Enable tray icon. closing window will minimize to tray.
 - `tray_icon_normal: null`  
-    Path to tray icon file. Its supposed to be png with size og 32x32 or 64x64, but other formats and sizes should work too. Set to `null` to use default icons.
+    Path to tray icon file. Its supposed to be png with size of 32x32 or 64x64, but other formats and sizes should work too. Set to `null` to use default icons.
 - `tray_icon_unread: null`  
     Path to tray icon file shown when there are unread messages. Set to `null` to disable.
 - `tray_icon_unread: null`  

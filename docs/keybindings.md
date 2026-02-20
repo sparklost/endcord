@@ -14,7 +14,7 @@
 - `Ctrl+Left/Right` - word left/right
 - `Shift+Left/Right` - select left/right
 - `Ctrl+Shift+Left/Right` - select word left/right
-- `Ctrl+N` - Insert newline in input line (wanring `Shift+Enter` doesnt work in terminals)
+- `Ctrl+N` - Insert newline in input line (warning `Shift+Enter` doesn't work in terminals)
 - `Alt+Z` - Undo
 - `Alt+Shift+Z` - Redo
 - `Alt+A` - Select all
@@ -136,10 +136,10 @@ Command bindings can also use vim mode bindings, but they must be typed as key c
 ### Command keybinding (macros)
 There is additional section `[command_bindings]`, used to make custom client command string or even macros executed when keybinding is pressed.  
 Command keybinding is added like this: `"25" = "send_message Hello World!"`. This will execute that command when `Ctrl+X` is pressed.  
-Note that all bindings must be inside quotes, even a single integer. To use same binding as standard keybindings, set stadard keybinding to `None`.  
+Note that all bindings must be inside quotes, even a single integer. To use same binding as standard keybindings, set standard keybinding to `None`.  
 Alongside commands, standard keybinding names can be used here too. Eg. `"25" = "tree_up; tree_up"` will "press" tree_up binding twice.  
-To execute multiple commands in a sequence, type them spearated with `;` character. To use actual `;` character in command type it as `\;`.  
-Special commands availabe only for command-bindings are documented in [Commands list](commands.md#command-bindings-only-commands).
+To execute multiple commands in a sequence, type them separated with `;` character. To use actual `;` character in command type it as `\;`.  
+Special commands available only for command-bindings are documented in [Commands list](commands.md#command-bindings-only-commands).
 
 
 ## Vim mode keybindings
@@ -158,7 +158,7 @@ Special commands availabe only for command-bindings are documented in [Commands 
 - `b/w` - word left/right
 - `Ctrl+h/l` - select left/right
 - `H/L` - select word left/right
-- `Ctrl+N` - Insert newline in input line (wanring `Shift+Enter` doesnt work in terminals)
+- `Ctrl+N` - Insert newline in input line (warning `Shift+Enter` doesn't work in terminals)
 - `u` - Undo
 - `Ctrl+R` - Redo
 - `a` - Select all

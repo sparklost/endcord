@@ -2097,9 +2097,16 @@ class Endcord:
                             self.restore_input_text = (input_text, "standard extra")
                             self.view_profile(clicked_id)
                         elif clicked_type == 9:   # channel
+                            if "/" in clicked_id:
+                                message_id = clicked_id.split("/")[1]
+                                clicked_id = clicked_id.split("/")[0]
+                            else:
+                                message_id = None
                             channel_id, channel_name, guild_id, guild_name, parent_hint = self.find_parents_from_id(clicked_id)
                             if channel_name:
                                 self.switch_channel(channel_id, channel_name, guild_id, guild_name, parent_hint=parent_hint)
+                                if message_id:
+                                    self.go_to_message(message_id)
 
             # mouse single-click on extra line
             elif action == 48:
@@ -2391,20 +2398,23 @@ class Endcord:
 
                 elif self.going_to_ch:
                     try:
+                        num = max(min(int(input_text)-1, len(self.going_to_ch)-1), 0)
                         num = max(int(input_text) - 1, 0)
                     except ValueError:
                         self.reset_states()
                         self.update_status_line()
                         continue
-                    if num <= len(self.going_to_ch):
-                        guild_id = self.going_to_ch[num][0]
-                        channel_id = self.going_to_ch[num][1]
-                        message_id = self.going_to_ch[num][2]
-                        channel_id, channel_name, guild_id, guild_name, parent_hint = self.find_parents_from_id(channel_id)
-                        if channel_name:
-                            self.switch_channel(channel_id, channel_name, guild_id, guild_name, parent_hint=parent_hint)
-                            if message_id:
-                                self.go_to_message(message_id)
+                    object_id = self.going_to_ch[num]
+                    if "/" in object_id:
+                        message_id = object_id.split("/")[1]
+                        object_id = object_id.split("/")[0]
+                    else:
+                        message_id = None
+                    channel_id, channel_name, guild_id, guild_name, parent_hint = self.find_parents_from_id(object_id)
+                    if channel_name:
+                        self.switch_channel(channel_id, channel_name, guild_id, guild_name, parent_hint=parent_hint)
+                        if message_id:
+                            self.go_to_message(message_id)
 
                 elif self.view_reactions["message_id"]:
                     reactions = self.view_reactions["reactions"]
@@ -2891,27 +2901,33 @@ class Endcord:
                 self.copy_msg_url(msg_index)
 
         elif cmd_type == 19:   # GOTO_MENTION
-            msg_index = self.lines_to_msg(chat_sel)
-            if msg_index is None:
-                return
-            select_num = max(cmd_args.get("num", 0), 0)
+            select_num = cmd_args.get("num", None)
             channels = []
-            for match in re.finditer(formatter.match_discord_channel_combined, self.messages[msg_index]["content"]):
-                # groups: 1 - channel_id for <#id>, 2 - guild_id for url, 3 - channel_id for url, 4 - msg_id for url
-                if match.group(1):
-                    guild_id = self.active_channel["guild_id"]
-                    channel_id = match.group(1)
-                    message_id = None
-                else:
-                    guild_id = match.group(2)
-                    channel_id = match.group(3)
-                    message_id = match.group(4)
-                channels.append((guild_id, channel_id, message_id))
+            msg_id = self.lines_to_msg(chat_sel)
+            if msg_id is None:
+                return
+            for chat_line_map in self.chat_map:
+                if not chat_line_map or chat_line_map[0] < msg_id:
+                    continue
+                if chat_line_map[0] > msg_id:
+                    break
+                ranges = chat_line_map[5]
+                if not ranges or not ranges[4]:
+                    continue
+                for item in ranges[4]:
+                    if item[2] not in channels:
+                        channels.insert(0, item[2])
             if len(channels) == 1 or (channels and select_num is not None):
                 if select_num is None:
                     select_num = 0
                 select_num = max(min(select_num-1, len(channels)-1), 0)
-                channel_id, channel_name, guild_id, guild_name, parent_hint = self.find_parents_from_id(channels[select_num][1])
+                object_id = channels[select_num]
+                if "/" in object_id:
+                    message_id = object_id.split("/")[1]
+                    object_id = object_id.split("/")[0]
+                else:
+                    message_id = None
+                channel_id, channel_name, guild_id, guild_name, parent_hint = self.find_parents_from_id(object_id)
                 if channel_name:
                     self.switch_channel(channel_id, channel_name, guild_id, guild_name, parent_hint=parent_hint)
                     if message_id:

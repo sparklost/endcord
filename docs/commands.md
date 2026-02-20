@@ -67,7 +67,7 @@
 - `view_pfp` / `view_pfp <@[user_id]>`  
     View profile picture of user from currently selected message or specified user.
 - `paste`  
-    Try to paste image or file as attachemnt, or text to input line. Requires either media suport (all platforms, no text) or `xclip`/`wl-clipboard` (linux only).  
+    Try to paste image or file as attachment, or text to input line. Requires either media support (all platforms, no text) or `xclip`/`wl-clipboard` (Linux only).  
 - `check_standing`  
     Check account standing. 0-100 value, anything non-100 is concerning.  
 - `hide` / `hide <#[channel_id]>`  
@@ -134,8 +134,8 @@
 - `send_message --channel_id=[channel_id]/<#[channel_id]> --reply_id=[message_id] --ping=[True/False] --attachment=[path] [message_content]`  
     Try not to abuse this command, as its run in a thread and can abuse API!  
     `--channel_id` - accepts both channel_id and formatted channel_id from assist, only last channel_id will be used. Default: current channel.  
-    `--reply_id` - mesage id of message that is being replied to.  
-    `--ping` - If this messahe is a reply, should it ping. Default=`True`.  
+    `--reply_id` - message id of message that is being replied to.  
+    `--ping` - If this message is a reply, should it ping. Default=`True`.  
     `--attachment` - Absolute path to file to be uploaded as an attachment, can be multiple.  
     Everything after these flags is considered as message content.  
 - `redraw`  
@@ -152,7 +152,7 @@
 
 
 ## Command-bindings only commands
-Special commands availabe only for command-bindings (macros).
+Special commands available only for command-bindings (macros).
 - `sleep [seconds]`  
     Sleep for specified numbr of seconds. If some macro fails to execute, adding `sleep 0.1` between the two comands may help.
 - `type [text]`  

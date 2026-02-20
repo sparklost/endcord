@@ -34,7 +34,7 @@ But extension can modify almost everything in endcord, and can even access all t
 To prevent extension injection (malware can modify endcord config to enable extensions and inject extension in extensions directory) - which is very unlikely, there is build script option: `--disable-extensions` which disables extension loading in the code itself, overriding config.  
 
 ### Extension search and publishing
-It is recommended to use `endcord-extension` or `endcord` tags on github and other git hosting services for easier extension search. Repo name should be prepeded with `endcord` eg. `endcord-your-extension-name`.  
+It is recommended to use `endcord-extension` or `endcord` tags on github and other git hosting services for easier extension search. Repo name should be prepended with `endcord` eg. `endcord-your-extension-name`.  
 
 ### Logging
 Extensions can add log entries at any level and will have their name in the module name section of log entry.  
@@ -59,7 +59,7 @@ If extension is a git repo, then main `.py` file will have same name as repo, an
 ### Main extension file structure
 Main extension file has some requirements that must be followed otherwise extension will be flagged as invalid and not loaded.  
 These requirements are:
-- Extension metadata at the global space of the file, in form of constants: `EXT_NAME`, `EXT_VERSION`, `EXT_ENDCORD_VERSION`, `EXT_DESCRIPTION` and `EXT_SOURCE` (url to the source coe). They should all be strings and not empty.
+- Extension metadata at the global space of the file, in form of constants: `EXT_NAME`, `EXT_VERSION`, `EXT_ENDCORD_VERSION`, `EXT_DESCRIPTION` and `EXT_SOURCE` (url to the source code). They should all be strings and not empty.
 - `Extension` class.
 - `Extension` class must contain `__init__` method that takes one argument - `app` which is entire endcord app class. it is recommended to keep `app` as `self.app` so other methods can access anything from app class later.
 
