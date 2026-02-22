@@ -544,6 +544,7 @@ def command_string(text):
             cmd_args = {"channel_id": "special"}
         else:
             cmd_type = 0
+            cmd_args = {"value": 1}
 
     # 26 - VIEW_PFP
     elif text_lower.startswith("view_pfp"):
@@ -604,6 +605,7 @@ def command_string(text):
             cmd_args = {"timestamp": timestamp}
         except (IndexError, ValueError):
             cmd_type = 0
+            cmd_args = {"value": 1}
 
     # 34 - VOTE
     elif text_lower.startswith("vote"):
@@ -613,6 +615,7 @@ def command_string(text):
             cmd_args = {"num": num}
         except (IndexError, ValueError):
             cmd_type = 0
+            cmd_args = {"value": 1}
 
     # 35 - SHOW_PINNED
     elif text_lower.startswith("show_pinned"):
@@ -633,6 +636,7 @@ def command_string(text):
             cmd_args = {"name": name}
         except IndexError:
             cmd_type = 0
+            cmd_args = {"value": 1}
 
     # 38 - STRING_SELECT
     elif text_lower.startswith("string_select"):
@@ -644,6 +648,7 @@ def command_string(text):
             cmd_args = {"num": num, "text": string}
         else:
             cmd_type = 0
+            cmd_args = {"value": 1}
 
     # 39 - DUMP_CHAT
     elif text_lower.startswith("dump_chat"):
@@ -665,6 +670,7 @@ def command_string(text):
                 cmd_args["setting"] = cmd_split[1 + have_id].lower()
             else:
                 cmd_type = 0
+                cmd_args = {"value": 1}
 
     # 41 - GIF
     elif text_lower.startswith("gif"):
@@ -687,12 +693,14 @@ def command_string(text):
             cmd_args = {"emoji": text[20:]}
             if len(text) <= 20:
                 cmd_type = 0
+                cmd_args = {"value": 1}
         elif text_lower.startswith("custom_status_remove"):
             pass
         else:
             cmd_args = {"text": text[14:]}
             if len(text) <= 14:
                 cmd_type = 0
+                cmd_args = {"value": 1}
 
     # 45 - BLOCK
     elif text_lower.startswith("block"):
@@ -705,6 +713,7 @@ def command_string(text):
             }
         else:
             cmd_type = 0
+            cmd_args = {"value": 1}
 
     # 46 - UNBLOCK
     elif text_lower.startswith("unblock"):
@@ -717,6 +726,7 @@ def command_string(text):
             }
         else:
             cmd_type = 0
+            cmd_args = {"value": 1}
 
     # 47 - TOGGLE_BLOCKED_MESSGAES
     elif text_lower.startswith("toggle_blocked_messages"):
@@ -780,6 +790,7 @@ def command_string(text):
             cmd_args = {"name": name}
         else:
             cmd_type = 0
+            cmd_args = {"value": 1}
 
     # 57 - VIEW_EMOJI
     elif text_lower.startswith("view_emoji"):
@@ -811,6 +822,7 @@ def command_string(text):
             cmd_args = {"name": name}
         else:
             cmd_type = 0
+            cmd_args = {"value": 1}
 
     # 62 - OPEN_CONFIG_DIR
     elif text_lower.split(" ")[0] == "open_config_dir":

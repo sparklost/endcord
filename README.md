@@ -516,6 +516,6 @@ Go to [TODO](todo.txt).
 
 ### Features that will not be added
 Following features have significant risk of triggering discords spam filter, and may cause account to be limited or even banned:  
-Sending friend request, opening new DM, creating new thread, anything payment related.  
+Sending friend request, opening new DM, creating new thread, editing profile, anything payment related.  
 
 Therefore, they will NOT be implemented in endcord.  

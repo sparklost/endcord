@@ -2294,14 +2294,14 @@ class Endcord:
 
                 if self.editing:
                     text_to_send = emoji.emojize(input_text, language="alias", variant="emoji_type")
-                    self.put_to_message_sender(self.discord.send_update_message,
+                    self.put_to_message_sender(self.discord.update_message,
                         channel_id=self.active_channel["channel_id"],
                         message_id=self.editing,
                         message_content=text_to_send,
                     )
 
                 elif self.deleting and input_text.lower() == "y":
-                    self.put_to_message_sender(self.discord.send_delete_message,
+                    self.put_to_message_sender(self.discord.delete_message,
                         channel_id=self.active_channel["channel_id"],
                         message_id=self.deleting,
                     )
@@ -2531,7 +2531,7 @@ class Endcord:
                     self.update_status_line()
 
                 if self.deleting:
-                    self.put_to_message_sender(self.discord.send_delete_message,
+                    self.put_to_message_sender(self.discord.delete_message,
                         channel_id=self.active_channel["channel_id"],
                         message_id=self.deleting,
                     )
@@ -3109,7 +3109,7 @@ class Endcord:
             if guild_id:   # mute channel/category
                 mute = self.toggle_mute(channel_id, guild_id=guild_id)
                 if mute is not None:
-                    success = self.discord.send_mute_channel(mute, channel_id, guild_id)
+                    success = self.discord.mute_channel(mute, channel_id, guild_id)
 
             else:
                 is_dm = False
@@ -3120,11 +3120,11 @@ class Endcord:
                 if is_dm:   # mute DM
                     mute = self.toggle_mute(channel_id, is_dm=True)
                     if mute is not None:
-                        success = self.discord.send_mute_dm(mute, channel_id)
+                        success = self.discord.mute_dm(mute, channel_id)
                 else:   # mute guild
                     mute = self.toggle_mute(channel_id)
                     if mute is not None:
-                        success = self.discord.send_mute_guild(mute, channel_id)
+                        success = self.discord.mute_guild(mute, channel_id)
 
         elif cmd_type == 30:   # TOGGLE_TAB
             if not self.forum:
@@ -3314,7 +3314,7 @@ class Endcord:
                 if cmd_args["setting"].startswith("suppress"):
                     self.update_extra_line("Cant set that option for channel.")
                 else:
-                    self.discord.send_notification_setting_channel(cmd_args["setting"], channel_id, guild_id)
+                    self.discord.set_notification_setting_channel(cmd_args["setting"], channel_id, guild_id)
             else:
                 for dm in self.dms:
                     if dm["id"] == channel_id:
@@ -3333,7 +3333,7 @@ class Endcord:
                             value = not guild.get("suppress_roles")
                         else:
                             value = None
-                        self.discord.send_notification_setting_guild(cmd_args["setting"], channel_id, value)
+                        self.discord.set_notification_setting_guild(cmd_args["setting"], channel_id, value)
                     else:
                         self.update_extra_line("Guild not found.")
 
@@ -4167,7 +4167,7 @@ class Endcord:
             return
         new_content = formatter.substitute(content, input_text)
         if new_content and content != new_content:
-            self.put_to_message_sender(self.discord.send_update_message,
+            self.put_to_message_sender(self.discord.update_message,
                 channel_id=self.active_channel["channel_id"],
                 message_id=message_id,
                 message_content=new_content,
@@ -5954,6 +5954,7 @@ class Endcord:
         if line_index >= len(self.chat_map):
             line_index = len(self.chat_map) - 1
         while i < 5:
+            logger.info(self.chat_map)
             line_map = self.chat_map[line_index - i]
             if line_map and line_map[0] is not None:
                 if line_map[4]:   # when it reaches message base line
@@ -6036,7 +6037,7 @@ class Endcord:
                             })
 
             if channels:
-                success = self.discord.send_ack_bulk(channels)
+                success = self.discord.ack_bulk(channels)
                 if success is None:
                     self.gateway.set_offline()
                     self.update_extra_line("Network error.")
@@ -6141,7 +6142,7 @@ class Endcord:
 
         # try to send
         if self.pending_acks and time.time() - self.sent_ack_time > self.ack_throttling:
-            success = self.discord.send_ack(*self.pending_acks.pop(0), manual=manual)
+            success = self.discord.ack(*self.pending_acks.pop(0), manual=manual)
             if success is None:
                 self.gateway.set_offline()
                 self.update_extra_line("Network error.")

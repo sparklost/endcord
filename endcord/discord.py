@@ -811,7 +811,7 @@ class Discord():
         return False
 
 
-    def send_update_message(self, channel_id, message_id, message_content):
+    def update_message(self, channel_id, message_id, message_content):
         """Update the message in the channel"""
         message_data = json.dumps({"content": message_content})
         url = f"/api/v9/channels/{channel_id}/messages/{message_id}"
@@ -844,12 +844,12 @@ class Discord():
                 "stickers": data.get("sticker_items", []),
             }
 
-        log_api_error(response, "send_update_message")
+        log_api_error(response, "update_message")
         connection.close()
         return False
 
 
-    def send_delete_message(self, channel_id, message_id):
+    def delete_message(self, channel_id, message_id):
         """Delete the message from the channel"""
         message_data = None
         url = f"/api/v9/channels/{channel_id}/messages/{message_id}"
@@ -863,13 +863,12 @@ class Discord():
         if response.status == 204:
             connection.close()
             return True
-        log_api_error(response, "send_delete_message")
+        log_api_error(response, "delete_message")
         connection.close()
         return False
 
 
-
-    def send_ack(self, channel_id, message_id, manual=False):
+    def ack(self, channel_id, message_id, manual=False):
         """Send information that this channel has been seen up to this message"""
         if self.bot:
             return True
@@ -893,12 +892,12 @@ class Discord():
         if response.status == 200:
             connection.close()
             return True
-        log_api_error(response, "send_ack")
+        log_api_error(response, "ack")
         connection.close()
         return False
 
 
-    def send_ack_bulk(self, channels):
+    def ack_bulk(self, channels):
         """
         Send information that this channel has been seen up to this message
         channels is a list of dicts: [{channel_id, message_id}, ...]
@@ -918,7 +917,7 @@ class Discord():
         if response.status == 204:
             connection.close()
             return True
-        log_api_error(response, "send_ack_bulk")
+        log_api_error(response, "ack_bulk")
         connection.close()
         return False
 
@@ -986,7 +985,7 @@ class Discord():
         return False
 
 
-    def send_mute_guild(self, mute, guild_id):
+    def mute_guild(self, mute, guild_id):
         """Mute/unmute guild"""
         guild_id = str(guild_id)
 
@@ -1015,12 +1014,12 @@ class Discord():
         if response.status == 200:
             connection.close()
             return True
-        log_api_error(response, "send_mute_guild")
+        log_api_error(response, "mute_guild")
         connection.close()
         return False
 
 
-    def send_mute_channel(self, mute, channel_id, guild_id):
+    def mute_channel(self, mute, channel_id, guild_id):
         """Mute/unmute channel or category"""
         channel_id = str(channel_id)
         guild_id = str(guild_id)
@@ -1055,12 +1054,12 @@ class Discord():
         if response.status == 200:
             connection.close()
             return True
-        log_api_error(response, "send_mute_channel")
+        log_api_error(response, "mute_channel")
         connection.close()
         return False
 
 
-    def send_mute_dm(self, mute, dm_id):
+    def mute_dm(self, mute, dm_id):
         """Mute/unmute DM"""
         dm_id = str(dm_id)
 
@@ -1089,12 +1088,12 @@ class Discord():
         if response.status == 200:
             connection.close()
             return True
-        log_api_error(response, "send_mute_dm")
+        log_api_error(response, "mute_dm")
         connection.close()
         return False
 
 
-    def send_notification_setting_guild(self, setting, guild_id, value=None):
+    def set_notification_setting_guild(self, setting, guild_id, value=None):
         """Send notification settings for guild"""
         guild_id = str(guild_id)
         option = None
@@ -1127,12 +1126,12 @@ class Discord():
             if response.status == 200:
                 connection.close()
                 return True
-            log_api_error(response, "send_notification_setting_guild")
+            log_api_error(response, "set_notification_setting_guild")
             connection.close()
         return False
 
 
-    def send_notification_setting_channel(self, setting, channel_id, guild_id):
+    def set_notification_setting_channel(self, setting, channel_id, guild_id):
         """Send notification settings for channel or category"""
         channel_id = str(channel_id)
         guild_id = str(guild_id)
@@ -1170,7 +1169,37 @@ class Discord():
         if response.status == 200:
             connection.close()
             return True
-        log_api_error(response, "send_notification_setting_channel")
+        log_api_error(response, "set_notification_setting_channel")
+        connection.close()
+
+
+    def set_profile(self, setting, value, guild_id=None, profile=False):
+        """Change some profile settings: global_name, pronouns, bio, server_nick, server_pronouns"""
+        # WARNING: DISABLED BECAUSE DISCORD WILL LOGOUT USER AND REQUIRE MOBILE VERIFICATION
+        return None
+
+        if profile:   # used for: pronouns, bio, banner, accent_color, theme_color, popout_animation_particle_type, emoji_id, profile_effect_id
+            if guild_id:
+                url = f"/api/v9/guilds/{guild_id}/members/@me"
+            else:
+                url = "/api/v9/users/@me"
+        elif guild_id:   # used for global_name and username
+            url = f"/api/v9/guilds/{guild_id}/profile/%40me"
+        else:
+            url = "/api/v9/users/%40me/profile"
+
+        message_data = json.dumps({setting: value})
+        try:
+            connection = self.get_connection(self.host, 443)
+            connection.request("PATCH", url, message_data, self.header)
+            response = connection.getresponse()
+        except (socket.gaierror, TimeoutError):
+            connection.close()
+            return None
+        if response.status == 200:
+            connection.close()
+            return True
+        log_api_error(response, "set_profile")
         connection.close()
 
 
@@ -1982,7 +2011,7 @@ class Discord():
         return False
 
 
-    def send_update_activity_session(self, app_id, exe_path, closed, session_id, media_session_id=None, voice_channel_id=None):
+    def update_activity_session(self, app_id, exe_path, closed, session_id, media_session_id=None, voice_channel_id=None):
         """Send update for currently running activity session"""
         message_data = json.dumps({
             "token": self.activity_token,
@@ -2006,7 +2035,7 @@ class Discord():
             self.activity_token = json.loads(response.read())["token"]
             connection.close()
             return self.activity_token
-        log_api_error(response, "send_update_activity_session")
+        log_api_error(response, "update_activity_session")
         connection.close()
         return False
 

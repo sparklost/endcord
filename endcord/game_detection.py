@@ -363,7 +363,7 @@ class GameDetection:
 
                 # when identified app appears
                 # update activity session
-                self.discord.send_update_activity_session(
+                self.discord.update_activity_session(
                     app_id,
                     exe_path=app_path,
                     closed=False,
@@ -394,7 +394,7 @@ class GameDetection:
                     continue
 
                 # update activity session
-                self.discord.send_update_activity_session(
+                self.discord.update_activity_session(
                     app_id,
                     exe_path=app_path,
                     closed=True,
@@ -452,7 +452,7 @@ class GameDetection:
                 continue
 
             # update activity session
-            self.discord.send_update_activity_session(
+            self.discord.update_activity_session(
                 app_id,
                 exe_path=app_path,
                 closed=True,
