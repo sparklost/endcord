@@ -25,6 +25,8 @@ APP_NAME = "endcord"
 ASPELL_TIMEOUT = 0.1   # aspell limit for looking-up one word
 NO_NOTIFY_SOUND_DE = ("kde", "plasma")   # linux desktops without notification sound
 
+match_youtube = re.compile(r"(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)[a-zA-Z0-9_-]{11}")
+
 
 # platform specific code
 have_termux_notify = False
@@ -847,6 +849,34 @@ def get_can_play(path):
     kind = filetype.guess(path)
     if kind and kind.mime:
         return kind.mime.split("/")[0] in ("image", "video", "audio")
+
+
+def get_mime(path):
+    """Try to get mime type of the file"""
+    kind = filetype.guess(path)
+    if kind:
+        return kind.mime
+    return "unknown/unknown"
+
+
+def get_media_type(path, hint=None):
+    """Try to get media type"""
+    if re.search(match_youtube, path):
+        return "YT"
+    if "https://" in path:
+        return "URL"
+    mime = get_mime(path).split("/")
+    if hint:
+        mime = [hint, None]
+    if mime[0] == "image":
+        if mime[1] == "gif":
+            return "gif"
+        return "img"
+    if mime[0] == "video":
+        return "video"
+    if mime[0] == "audio":
+        return "audio"
+    logger.warning(f"Unsupported media format: {mime}")
 
 
 def complete_path(path, separator=True):

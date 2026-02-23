@@ -5494,8 +5494,28 @@ class Endcord:
     def open_media(self, path):
         """
         If TUI mode: prevent other UI updates, draw media and wait for input, after quitting - update UI
-        If native mode: just open the file/url
+        If native mode: just open the file/url with xdg-open
+        If custom mode: run command from custom_media_player if
         """
+        if self.config["custom_media_player"]:
+            media_hint = peripherals.get_media_type(path)
+            if not self.config["custom_media_blacklist"] or media_hint not in self.config["custom_media_blacklist"]:
+                if self.config["custom_media_terminal"]:
+                    self.update_extra_line()
+                    self.tui.pause_curses()
+                cmd = [self.config["custom_media_player"], path]
+                if self.config["custom_media_hint"]:
+                    cmd.append(media_hint)
+                _ = subprocess.run(
+                    cmd,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    check=False,
+                )
+                if self.config["custom_media_terminal"]:
+                    time.sleep(0.1)
+                    self.tui.resume_curses()
+                return
         if support_media and not self.config["native_media_player"] and not uses_pgcurses:
             if not self.terminal_media:
                 from endcord import media

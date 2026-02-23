@@ -146,6 +146,14 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
     Sound played when there is outgoing call. Linux only. Set to None to disable. Sound names can be found in `/usr/share/sounds/freedesktop/stereo`, without extension.
 - `custom_ringtone_outgoing = None`  
     Path to audio file played when there is outgoing call. Set to `None` to disable. The file will be played in loop.
+- `custom_media_player = None`  
+    Custom script, command, or path to executable that will be used to play media. File path will be passed as first argument. Do not use custom arguments, instead write bash wrapper script that will pass file to specific command. If paired with `custom_media_hint`, the script can be made to decide between multiple media player based on media type.
+- `custom_media_blacklist = None`  
+    List of media types to be ignored for custom media player and will be played in endcord builtin or with native media player. Available options: `"img"`, `"gif"`, `"video"`, `"audio"`, `"URL"`, `"YT"`. Example to allow only images and gifs: `["img", "gif"]`.
+- `custom_media_terminal = False`  
+    If custom media player is supposed to be opened in terminal, set this to True, so endcord drawing will be "paused" while media is playing.
+- `custom_media_hint = False`  
+    Whether to pass media type (same as in `custom_media_blacklist`) to the custom_media_player command. Media type is passed as a second argument, after file path. This is useful for custom scripts.
 - `yt_dlp_path = "yt-dlp"`  
     Path to [yt-dlp](https://github.com/yt-dlp/yt-dlp) executable or command. Used for playing youtube videos.
 - `yt_dlp_format = 18`  
