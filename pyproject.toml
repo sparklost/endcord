@@ -10,7 +10,6 @@ dependencies = [
     "filetype>=1.2.0",
     "numpy>=2.4.2",
     "orjson>=3.11.7",
-    "pexpect>=4.9.0",
     "psutil>=7.2.1; sys_platform != 'linux'",
     "pycryptodome>=3.23.0",
     "pynacl>=1.6.2",

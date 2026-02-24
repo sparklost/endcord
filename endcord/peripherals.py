@@ -15,14 +15,11 @@ from ast import literal_eval
 from configparser import ConfigParser
 
 import filetype
-import pexpect
-import pexpect.popen_spawn
 
 from endcord import defaults
 
 logger = logging.getLogger(__name__)
 APP_NAME = "endcord"
-ASPELL_TIMEOUT = 0.1   # aspell limit for looking-up one word
 NO_NOTIFY_SOUND_DE = ("kde", "plasma")   # linux desktops without notification sound
 
 match_youtube = re.compile(r"(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)[a-zA-Z0-9_-]{11}")
@@ -1005,9 +1002,11 @@ class SpellCheck():
     """Sentence and word spellchecker"""
 
     def __init__(self, aspell_mode, aspell_language):
+        self.aspell = None
         self.aspell_mode = aspell_mode
         self.aspell_language = aspell_language
         self.enable = False
+        self.first_run = True
         self.lock = threading.Lock()
         if aspell_mode:
             aspell_path = find_aspell()
@@ -1023,57 +1022,59 @@ class SpellCheck():
 
     def start_aspell(self):
         """Start aspell with selected mode and language"""
-        # cross-platform replacement for pexpect.spawn() because aspell works with it
-        self.proc = pexpect.popen_spawn.PopenSpawn(f"{self.aspell_path} -a --sug-mode={self.aspell_mode} --lang={self.aspell_language}", encoding="utf-8", codec_errors="replace")
-        self.proc.delaybeforesend = None
+        if self.aspell:
+            return
         try:
             start = time.time()
-            self.proc.expect(r"\r?\n", timeout=1)
+            self.aspell = subprocess.Popen(
+                ["aspell", "-a", "--sug-mode", self.aspell_mode, "--lang", self.aspell_language],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                bufsize=1,
+            )
+            self.aspell.stdout.readline()
             logger.info(f"Aspell initialized in {round((time.time() - start)*1000, 3)} ms")
-        except pexpect.exceptions.EOF:
-            logger.info("Aspell initialization %s", "error")
-            self.enable = False
-        except pexpect.exceptions.TIMEOUT:
-            logger.info("Aspell initialization %s", "timed out")
+        except Exception as e:
+            logger.error(f"Aspell initialization error: {e}")
             self.enable = False
 
 
-    def check_word_pexpect(self, word):
-        """Spellcheck single word with aspell"""
-        if word.isdigit():
-            return False   # dont spellcheck numbers
-        with self.lock:
-            try:
-                self.proc.sendline(word)
-                status = self.proc.expect([r"^[&\#\*].*\r?\n", r"\r?\n", pexpect.TIMEOUT], timeout=ASPELL_TIMEOUT)
-                if status == 0:
-                    line = self.proc.after.strip()
-                    return line[0] != "*"
-                return False
-            except pexpect.exceptions.TIMEOUT:
-                return False   # if timed-out return it as correct
-            except pexpect.exceptions.EOF:
-                if self.enable:
-                    self.start_aspell()
-                return False
+    def check_word(self, word):
+        """Spellcheck single word using aspell"""
+        if not self.aspell:
+            return False
+        try:
+            with self.lock:
+                self.aspell.stdin.write(word + "\n")
+                self.aspell.stdin.flush()
+                result = self.aspell.stdout.readline().strip()
+                self.aspell.stdout.readline()   # it prints 2 lines
+                if result.startswith("*"):
+                    return False
+                return True
+        except Exception as e:
+            logger.error(f"Spellchecker error: {e}")
+            if self.first_run:   # a fuse if it fails on first word
+                self.enable = False
+            if self.enable:
+                self.stop_aspell()
+                self.start_aspell()
+            return False
+        self.first_run = False
 
 
-    # def check_word_subprocess(self, word):
-    #     """Spellcheck single word with aspell"""
-    #     try:
-    #         proc = subprocess.Popen(
-    #             [self.aspell_path, "-a", f"--sug-mode={self.aspell_mode}", f"--lang={self.aspell_language}"],
-    #             stdin=subprocess.PIPE,
-    #             stdout=subprocess.PIPE,
-    #             stderr=subprocess.DEVNULL,
-    #         )
-    #         output, error = proc.communicate(word.encode())
-    #         check = output.decode().split("\n")[1]
-    #         if check == "*":
-    #             return False
-    #         return True
-    #     except FileNotFoundError:   # aspell not installed
-    #         return False
+    def stop_aspell(self):
+        """Nicely stop aspell process"""
+        if not self.aspell:
+            return
+        self.aspell.stdin.close()
+        self.aspell.terminate()
+        self.aspell.wait()
+        self.aspell = None
 
 
     def check_list(self, words):
@@ -1087,7 +1088,7 @@ class SpellCheck():
                 if word == "":
                     misspelled.append(False)
                 else:
-                    misspelled.append(self.check_word_pexpect(word))
+                    misspelled.append(self.check_word(word))
         else:
             return [False] * len(words)
         return misspelled

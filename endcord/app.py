@@ -5974,7 +5974,6 @@ class Endcord:
         if line_index >= len(self.chat_map):
             line_index = len(self.chat_map) - 1
         while i < 5:
-            logger.info(self.chat_map)
             line_map = self.chat_map[line_index - i]
             if line_map and line_map[0] is not None:
                 if line_map[4]:   # when it reaches message base line

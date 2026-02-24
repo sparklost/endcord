@@ -151,9 +151,9 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
 - `custom_media_blacklist = None`  
     List of media types to be ignored for custom media player and will be played in endcord builtin or with native media player. Available options: `"img"`, `"gif"`, `"video"`, `"audio"`, `"URL"`, `"YT"`. Example to allow only images and gifs: `["img", "gif"]`.
 - `custom_media_terminal = False`  
-    If custom media player is supposed to be opened in terminal, set this to True, so endcord drawing will be "paused" while media is playing.
+    If custom media player is supposed to be opened in terminal, set this to `True`, so endcord drawing will be "paused" while media is playing.
 - `custom_media_hint = False`  
-    Whether to pass media type (same as in `custom_media_blacklist`) to the custom_media_player command. Media type is passed as a second argument, after file path. This is useful for custom scripts.
+    Whether to pass media type (same as in `custom_media_blacklist`) to the `custom_media_player` command as a second argument, after file path. This is useful for custom scripts.
 - `yt_dlp_path = "yt-dlp"`  
     Path to [yt-dlp](https://github.com/yt-dlp/yt-dlp) executable or command. Used for playing youtube videos.
 - `yt_dlp_format = 18`  
