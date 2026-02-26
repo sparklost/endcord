@@ -79,6 +79,9 @@ def get_user_processes_diff_linux():
         if "/" not in path:
             continue
 
+        # cleanup path
+        path = path.lower().replace(":", "")
+
         # add to cache and newly added processes
         proc_cache[pid] = [path, True]
         if path not in added:
@@ -137,6 +140,9 @@ def get_user_processes_diff_windows():
         if "/" not in path:
             continue
 
+        # cleanup path
+        path = path.lower().replace(":", "")
+
         # add to cache and newly added processes
         proc_cache[pid] = [path, True]
         if path not in added:
@@ -190,11 +196,15 @@ def get_user_processes_diff_darwin():
             continue
         cmdline = cmdline[0]
 
-        # add to cache and newly added processes
+        # cleanup path
         path = cmdline.replace("\\", "/").replace("\x00", "")
+        path = path.lower().replace(":", "")
+
+        # add to cache and newly added processes
         proc_cache[pid] = [path, True]
         if path not in added:
             added.append(path)
+
 
     # remove all not alive processes, and flip alive status
     for key in list(proc_cache.keys()):

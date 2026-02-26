@@ -904,7 +904,7 @@ class Endcord:
         self.set_channel_seen(channel_id, self.get_chat_last_message_id(), force_remove_notify=True)   # right after update_chat so new_unreads is determined
         if not guild_id:   # no member list in dms
             self.tui.remove_member_list()
-        elif self.state["member_list"] or open_member_list:
+        elif self.get_members and self.state["member_list"] or open_member_list:
             if delay:
                 time.sleep(0.01)   # needed when startup to fix issues with emojis and border lines
             self.update_member_list(reset=True)
@@ -1770,7 +1770,7 @@ class Endcord:
                                 self.restore_input_text = (new_input_text, "standard")
                             self.tui.input_buffer = new_input_text
                             self.tui.set_input_index(new_input_index)
-                elif self.state["member_list"] and self.active_channel["guild_id"]:   # controls for member list when no extra window
+                elif self.get_members and self.state["member_list"] and self.active_channel["guild_id"]:   # controls for member list when no extra window
                     mlist_selected = self.tui.get_mlist_selected()
                     if mlist_selected == -1 or mlist_selected >= len(self.member_list):
                         continue
@@ -7689,7 +7689,7 @@ class Endcord:
                                 last_index = None
 
                             break
-                    if self.active_channel["guild_id"] in changed_guilds and self.state["member_list"]:
+                    if self.active_channel["guild_id"] in changed_guilds and self.get_members and self.state["member_list"]:
                         self.update_member_list(last_index)
 
             # check for subscribed member presences
