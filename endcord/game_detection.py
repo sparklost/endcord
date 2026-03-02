@@ -205,7 +205,6 @@ def get_user_processes_diff_darwin():
         if path not in added:
             added.append(path)
 
-
     # remove all not alive processes, and flip alive status
     for key in list(proc_cache.keys()):
         if not proc_cache[key][1]:

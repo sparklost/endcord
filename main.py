@@ -122,7 +122,9 @@ def main(args):
                 sys.exit("Curses error, see log for more info")
         sys.exit(0)
     elif args.install_extension:
-        peripherals.install_extension(args.install_extension)
+        from endcord import git
+        _, text = git.install_extension(args.install_extension, cli=True)
+        print(text)
         sys.exit(0)
 
     if args.proxy:

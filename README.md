@@ -19,7 +19,6 @@ It is built with Python (this [doesnt mean its slow](#note-on-python-performance
 
 ## Features
 - Extremely low CPU and RAM usage (values greatly depend on number of servers and channels)
-- Extension API
 - Voice calls (WIP)
 - Vim-mode
 - Integrated RPC (only Rich Presence) and game detection
@@ -74,12 +73,14 @@ It is built with Python (this [doesnt mean its slow](#note-on-python-performance
 - Show discord emoji as `:emoji_name:` and view them in media player
 - Show mentions as `@username`, `@role`, `#channel_name`
 - Channel chat caching
-- Remember last open channel and tree state
+- Extension API, builtin extensions search
+- Macro keybindings support (bind key to chain of commands)
 - Proxy support
 - Profile manager for multiple accounts
 - Store token in system keyring
 - Experimental windowed mode with tray icon
 - Works in termux, with android notifications
+- Auto endcord and extensions check for updates
 - Lots of easter eggs
 
 
@@ -330,6 +331,7 @@ Optional dependencies:
 - `wl-clipboard` - Clipboard support on Wayland
 - `yazi` / `zenity` / `kdialog` - File dialog when uploading
 - `aspell` - Spellchecking (and `aspell-en` dictionary)
+- `git` - Install and update extensions from other sources than github
 - `yt-dlp` - youtube support
 - `mpv` - Play youtube videos in native player (non-ascii)
 - `libsecret` - Store token in system keyring (`gnome-keyring` is also required, with `dbus` as dependency)

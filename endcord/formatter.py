@@ -1689,8 +1689,8 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
                 )
             reactions_line = lazy_replace(format_reactions, "%timestamp", lambda: generate_timestamp(message["timestamp"], format_timestamp, convert_timezone))
             reactions_line = reactions_line.replace("%reactions", reactions_separator.join(reactions))
-            reactions_line, wide = normalize_string_count(reactions_line, max_length, dots=True, fill=True)
-            if wide:
+            reactions_line, wide_shift = normalize_string_count(reactions_line, max_length, dots=True, fill=True)
+            if wide_shift:
                 temp_wide_map.append(len(temp_chat))
             temp_chat.append(reactions_line)
             if disable_formatting:
@@ -1701,9 +1701,10 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
                 temp_format.append(color_reactions)
             reactions_map = []
             offset = 0
-            for reaction in reactions:
-                reactions_map.append([pre_reaction_len + offset, pre_reaction_len + len(reaction) + offset])
-                offset += len(reactions_separator) + len(reaction)
+            for num_r, reaction in enumerate(reactions):
+                wide = not emoji_as_text and len(message["reactions"][num_r]["emoji"]) == 1   # emoji reaction will be one character
+                reactions_map.append([pre_reaction_len + offset, pre_reaction_len + len(reaction) + wide + offset])
+                offset += len(reactions_separator) + len(reaction) + wide
             temp_chat_map.append((num, None, False, reactions_map, None, None))
 
         # invert message lines order and append them to chat
@@ -2397,6 +2398,17 @@ def generate_extra_window_search_gif(gifs, max_len):
         else:
             gif_title = url
         body.append(gif_title[:max_len])
+
+    return title_line, body
+
+
+def generate_extra_window_search_ext(extensions, max_len):
+    """Generate extra window title and body for extensions search view"""
+    title_line = f"Extensions search results: {len(extensions)} extensions"
+    body = []
+
+    for extension in extensions:
+        body.append(normalize_string(extension[1] +  " - " + str(extension[2]), max_len, emoji_safe=True, dots=True, fill=False))
 
     return title_line, body
 

@@ -475,7 +475,7 @@ def command_string(text):
             cmd_args = {"channel_id": match.group(1)}
 
     # 16 - SEARCH
-    elif text_lower.startswith("search"):
+    elif text_lower.startswith("search "):
         cmd_type = 16
         search_text = text[7:].strip(" ")
         cmd_args = {"search_text": search_text}
@@ -920,5 +920,19 @@ def command_string(text):
             "type": "server" in all_args,
             "value": "prev" in all_args,
         }
+
+    # 71 - CHECK_FOR_UPDATES
+    elif text_lower.startswith("check_for_updates"):
+        cmd_type = 71
+        cmd_args = {"open": "open" in text_lower}
+
+    # 72 - INSTALL_EXTENSION
+    elif text_lower.startswith("install_extension"):
+        cmd_type = 72
+        cmd_args = {"text": text[18:]}
+
+    # 73 - SEARCH_EXTENSIONS
+    elif text_lower.startswith("search_extensions"):
+        cmd_type = 73
 
     return cmd_type, cmd_args

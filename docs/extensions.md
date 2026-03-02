@@ -1,7 +1,8 @@
 ## Installing extensions
 Extensions can be installed in `Extensions` directory located in endcord config directory.  
-Installation can be done by simply git cloning extension github repo into the extensions directory or by running `endcord -i extension_url`.  
-Each extension should be placed there as a folder containing at least `.py` file with same name as folder.  
+Installation can be done by simply git cloning extension repo into the extensions directory or by running `endcord -i [url]`.  
+There is also client command available: `install_extension [url]`. Running it without url will update all installed extensions.    
+Instead `url` can also be used `repo_owner/repo_name` which assumes github.  
 Extension loading can be toggled in config and is ON by default.  
 During loading process some extensions may fail to load or are invalid, check log for more info.  
 If extension is built for different version of endcord, there is a chance it may misbehave or even cause a crash. But that should be rare.  
@@ -34,7 +35,7 @@ But extension can modify almost everything in endcord, and can even access all t
 To prevent extension injection (malware can modify endcord config to enable extensions and inject extension in extensions directory) - which is very unlikely, there is build script option: `--disable-extensions` which disables extension loading in the code itself, overriding config.  
 
 ### Extension search and publishing
-It is recommended to use `endcord-extension` or `endcord` tags on github and other git hosting services for easier extension search. Repo name should be prepended with `endcord` eg. `endcord-your-extension-name`.  
+It is recommended to use `endcord-extension` tag on github and other git hosting services for easier extension search. Repo name should be prepended with `endcord` eg. `endcord-your-extension-name`.  
 
 ### Logging
 Extensions can add log entries at any level and will have their name in the module name section of log entry.  
@@ -46,6 +47,10 @@ Now to add an `info` level log entry anywhere in the code: `logger.info("Text to
 To import any endcord module simply do `from endcord import endcord_module`.  
 To import other modules just do `import module`, extension directory is temporarily added to sys.path.  
 To access files from extension directory: `file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "file.json")`.  
+
+### Extension updates
+Only extensions published on github can be updated with endcord built-in system.  
+To publish new update, simply create new release named with version number.  
 
 
 ## Extension structure
@@ -159,7 +164,7 @@ It is possible to add entire library to extension directory, which can be import
 ## Checking extensions
 Extensions can be malicious, trying to steal your token.  
 Always check extension contents before running it, few red flags are:
-- Any usage of word `token`
+- Any usage of word `token`, unless its only checking for `"Bot"`
 - Attempting to access: `app.discord.headers`, `app.profiles`
 - Modifying app.discord methods to change their host
 - Having discord snowflakes hardcoded or in some of the files

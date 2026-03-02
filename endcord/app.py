@@ -59,7 +59,7 @@ RECENT_CHANNELS_LIMIT = 10
 MB = 1024 * 1024
 USER_UPLOAD_LIMITS = (10*MB, 50*MB, 500*MB, 50*MB)   # premium tier 0, 1, 2, 3 (none, classic, full, basic)
 GUILD_UPLOAD_LIMITS = (10*MB, 10*MB, 50*MB, 100*MB)   # premium tier 0, 1, 2, 3
-FORUM_COMMANDS = (1, 2, 7, 13, 14, 15, 17, 20, 22, 25, 27, 29, 30, 31, 32, 40, 42, 49, 50, 51, 52, 53, 55, 56, 57, 58, 61, 62, 66, 67, 68, 69, 70, 71)
+FORUM_COMMANDS = (1, 2, 7, 13, 14, 15, 17, 20, 22, 25, 27, 29, 30, 31, 32, 40, 42, 49, 50, 51, 52, 53, 55, 56, 57, 58, 61, 62, 66, 67, 68, 69, 70, 71, 72)
 COLLAPSE_ALL_EXCEPT_OPTIONS = ("current", "selected", "above", "bellow")
 
 match_emoji = re.compile(r"<:(.*):(\d*)>")
@@ -196,6 +196,7 @@ class Endcord:
         self.cached_downloads = []
         self.tabs_names = []
         self.last_summary_save = time.time() - SUMMARY_SAVE_INTERVAL - 1
+        self.new_version = None
 
         # get client properties
         if config["client_properties"].lower() == "anonymous":
@@ -365,6 +366,8 @@ class Endcord:
                     log_text_invalid.append(f"  {ext_name} - ERROR: Extension class is invalid")
                     continue
                 ext_command_assist = getattr(module, "EXT_COMMAND_ASSIST", None)
+                ext_class.EXT_VERSION = ext_version   # needed for updating
+                ext_class.EXT_SOURCE = getattr(module, "EXT_SOURCE", None)
                 if ext_command_assist:   # merge assist data
                     global COMMAND_ASSISTS
                     COMMAND_ASSISTS += ext_command_assist
@@ -572,6 +575,7 @@ class Endcord:
         self.search = False
         self.search_end = False
         self.search_gif = False
+        self.search_ext = False
         self.command = False
         self.app_command_autocomplete = ""
         self.app_command_autocomplete_resp = []
@@ -904,7 +908,8 @@ class Endcord:
         self.set_channel_seen(channel_id, self.get_chat_last_message_id(), force_remove_notify=True)   # right after update_chat so new_unreads is determined
         if not guild_id:   # no member list in dms
             self.tui.remove_member_list()
-        elif self.get_members and self.state["member_list"] or open_member_list:
+        elif self.get_members and self.state["member_list"] and open_member_list:
+            logger.info("NOOOOO")
             if delay:
                 time.sleep(0.01)   # needed when startup to fix issues with emojis and border lines
             self.update_member_list(reset=True)
@@ -1749,6 +1754,17 @@ class Endcord:
                         gif = self.search_messages[extra_selected]["url"]
                         self.restore_input_text = (gif, "standard")
                         continue
+                    elif self.search_ext:
+                        extra_selected = self.tui.get_extra_selected()
+                        if extra_selected < 0:
+                            continue
+                        repo = self.search_messages[extra_selected]
+                        from endcord import git
+                        status, message = git.install_extension(repo[0] + "/" + repo[1], cli=False)
+                        self.stop_extra_window()
+                        self.update_extra_line(message)
+                        self.restore_input_text = (input_text, "standard")
+                        continue
                     elif self.assist_found:
                         new_input_text, new_input_index = self.insert_assist(
                             input_text,
@@ -2012,7 +2028,7 @@ class Endcord:
                             clicked_type = 3   # replied line
                         elif chat_line_map[3]:
                             for num, reaction in enumerate(chat_line_map[3]):
-                                if reaction[0] < mouse_x < reaction[1]:
+                                if reaction[0] < mouse_x <= reaction[1]:
                                     clicked_type = 4   # reaction
                                     clicked_id = num
                                     break
@@ -2148,6 +2164,8 @@ class Endcord:
                         False, True,
                     )))
                     self.download_threads[-1].start()
+                elif self.new_version and self.extra_line and self.extra_line.startswith("New endcord version is available:"):
+                    webbrowser.open(f"https://github.com/{peripherals.REPO_OWNER}/{peripherals.APP_NAME}/releases/tag/{self.new_version}", new=0, autoraise=True)
 
             # leave/enter insert mode (when in vim mode)
             elif self.vim_mode and (action == 26 or action == 28):
@@ -3710,6 +3728,32 @@ class Endcord:
                 self.execute_command(25, {"channel_id": target_id}, "", chat_sel, tree_sel)   # goto command
                 return
 
+        elif cmd_type == 71:   # CHECK_FOR_UPDATES
+            threading.Thread(target=self.check_for_updates, daemon=True, args=(True, cmd_args["open"])).start()
+
+        elif cmd_type == 72:   # INSTALL_EXTENSION
+            if cmd_args["text"]:
+                from endcord import git
+                status, message = git.install_extension(cmd_args["text"], cli=False)
+                self.update_extra_line(message)
+            else:   # update
+                threading.Thread(target=self.check_for_updates, daemon=True, args=(True, False, False, True, True)).start()
+
+        elif cmd_type == 73:   # SEARCH_EXTENSIONS
+            from endcord import git
+            extensions = git.search_gh_repos("endcord-extension")
+            if extensions:
+                self.tui.disable_wrap_around(True)
+                max_w = self.tui.get_dimensions()[2][1]
+                self.search_ext = True
+                self.search_messages = extensions
+                extra_title, extra_body = formatter.generate_extra_window_search_ext(extensions, max_w)
+                self.stop_assist(close=False)
+                self.tui.draw_extra_window(extra_title, extra_body, select=True)
+                self.extra_window_open = True
+            else:
+                self.update_extra_line("Extension search failed")
+
         if success is None:
             self.gateway.set_offline()
             self.update_extra_line("Network error.")
@@ -4602,7 +4646,7 @@ class Endcord:
             self.state["member_list"] = False
 
         elif self.screen.getmaxyx()[1] - self.config["tree_width"] - self.member_list_width - 2 < 32:
-            self.update_extra_line("Not enough space to draw member list.")
+            self.update_extra_line("Not enough space to draw member list")
         else:
             self.update_member_list()
             self.state["member_list"] = True
@@ -5339,6 +5383,7 @@ class Endcord:
             self.tui.typing = time.time() - 5
         self.search = False
         self.search_gif = False
+        self.search_ext = False
         self.tui.disable_wrap_around(False)
         self.search_end = False
         self.search_messages = []
@@ -5954,13 +5999,14 @@ class Endcord:
 
     def lines_to_msg(self, line_index, space=False):
         """Convert line index from formatted chat to message index"""
+        line_index = max(min(line_index, len(self.chat_map) - 1), 0)
         line_map = self.chat_map[line_index]
         if line_map and line_map[0] is not None:   # has timestamp range
             return line_map[0]
         if space:
             i = 0
             while i < 5:
-                line_map = self.chat_map[line_index - i]
+                line_map = self.chat_map[max(line_index - i, 0)]
                 if line_map and line_map[0]:
                     return line_map[0]
                 i += 1
@@ -5971,10 +6017,9 @@ class Endcord:
     def lines_to_msg_with_remainder(self, line_index, space=False):
         """Convert line index from formatted chat to message index and remainder"""
         i = 0
-        if line_index >= len(self.chat_map):
-            line_index = len(self.chat_map) - 1
+        line_index = min(line_index, len(self.chat_map) - 1)
         while i < 5:
-            line_map = self.chat_map[line_index - i]
+            line_map = self.chat_map[max(line_index - i, 0)]
             if line_map and line_map[0] is not None:
                 if line_map[4]:   # when it reaches message base line
                     return line_map[0], 0 - (i * space)
@@ -7173,6 +7218,73 @@ class Endcord:
             })
 
 
+    def check_for_updates(self, force=False, open_web=False, app=True, extensions=True, update=False):
+        """Periodically check endcord and extensions for updates"""
+        from endcord import git
+        if not force and not self.config["check_for_updates"]:
+            return
+        last_check = peripherals.load_json("version.json", {
+            "time": int(time.time()),
+            "version": peripherals.VERSION,
+            "extensions": {},
+        }, create=True)
+        if not force and int(time.time()) - last_check["time"] < self.config["check_update_interval"] * 86400:
+            return
+        if force or git.ver_to_tuple(peripherals.VERSION) > git.ver_to_tuple(last_check["version"]):
+            last_check["version"] = peripherals.VERSION
+        last_check["time"] = int(time.time())
+        text = ""
+
+        if app:
+            self.new_version = git.check_for_update(last_check["version"], peripherals.REPO_OWNER, peripherals.APP_NAME)
+            last_check["version"] = self.new_version if self.new_version else last_check["version"]
+            if self.new_version:
+                text = "New endcord version is available:" + f" {peripherals.VERSION} -> {self.new_version}; Click to open github releases."
+                if open_web:
+                    webbrowser.open(f"https://github.com/{peripherals.REPO_OWNER}/{peripherals.APP_NAME}/releases/tag/{self.new_version}", new=0, autoraise=True)
+            elif force:
+                self.update_extra_line("Endcord is up to date")
+
+        if extensions and self.config["check_for_updates"] <= 2:
+            extension_updates = 0
+            for extension in self.extensions:
+                if not extension.EXT_SOURCE:
+                    continue
+                parts = extension.EXT_SOURCE.strip("/").split("/")
+                if len(parts) < 2:
+                    continue
+                repo_owner = parts[-2]
+                repo_name = parts[-1]
+                ext_version = last_check["extensions"].get(repo_name, extension.EXT_VERSION)
+                if force or git.ver_to_tuple(extension.EXT_VERSION) > git.ver_to_tuple(ext_version):
+                    ext_version = extension.EXT_VERSION
+                if "github.com" not in extension.EXT_SOURCE:
+                    continue
+                new_version = git.check_for_update(ext_version, repo_owner, repo_name)
+                last_check["extensions"][repo_name] = new_version if new_version else ext_version
+                if new_version:
+                    if update:
+                        status, status_text = git.install_extension(extension.EXT_SOURCE, prefer_tag=new_version, update=True)
+                        if status in (0, 3, 4) and force:
+                            self.update_extra_line(status_text.replace("installed", "updated"))
+                    else:
+                        extension_updates += 1
+            if extension_updates:
+                if text:
+                    text += ". "
+                text += f"{extension_updates} extensions can be updated"
+            elif force and not app:
+                self.update_extra_line("All extensions are up to date")
+
+        if text:
+            if extension_updates and self.config["check_for_updates"] in (2, 4):
+                peripherals.notify_send("Updates available", text)
+            self.update_extra_line(text)
+            logger.info(text)
+
+        peripherals.save_json(last_check, "version.json")
+
+
     def main(self):
         """Main app method"""
         logger.info("Init sequence started")
@@ -7373,6 +7485,9 @@ class Endcord:
 
         # start extra line remover thread
         threading.Thread(target=self.extra_line_remover, daemon=True).start()
+
+        # check for updates
+        threading.Thread(target=self.check_for_updates, daemon=True, args=()).start()
 
         # startup popups
         if self.fun in (3, 4):
@@ -7607,6 +7722,7 @@ class Endcord:
             if new_chat_dim != self.chat_dim:
                 if self.chat_dim[1] != new_chat_dim[1]:
                     self.execute_extensions_methods("on_resize")
+                    self.update_tabs()
                     if self.forum:
                         self.update_forum()
                         self.tui.update_chat(self.chat, self.chat_format)
@@ -7689,7 +7805,8 @@ class Endcord:
                                 last_index = None
 
                             break
-                    if self.active_channel["guild_id"] in changed_guilds and self.get_members and self.state["member_list"]:
+                    if (self.active_channel["guild_id"] in changed_guilds and self.get_members and self.state["member_list"] and
+                        self.screen.getmaxyx()[1] - self.config["tree_width"] - self.member_list_width - 2 >= 32):
                         self.update_member_list(last_index)
 
             # check for subscribed member presences

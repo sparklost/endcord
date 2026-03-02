@@ -72,6 +72,8 @@ settings = {
     "yt_dlp_format": 18,
     "mpv_path": "mpv",
     "yt_in_mpv": False,
+    "check_for_updates": 1,
+    "check_update_interval": 1,
     "client_properties": "default",
     "custom_user_agent": None,
     "send_x_super_properties": True,

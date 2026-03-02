@@ -673,10 +673,11 @@ class TUI():
 
     def get_dimensions(self):
         """Return current dimensions for screen objects"""
+        status_line = self.win_status_line.getmaxyx()
         return (
             tuple(self.win_chat.getmaxyx()),
             tuple(self.win_tree.getmaxyx()),
-            tuple(self.win_status_line.getmaxyx()),
+            (status_line[0], status_line[1] - 2*self.bordered),
         )
 
     def get_chat_selected(self):

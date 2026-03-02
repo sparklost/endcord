@@ -19,7 +19,9 @@ import filetype
 from endcord import defaults
 
 logger = logging.getLogger(__name__)
+REPO_OWNER = "sparklost"
 APP_NAME = "endcord"
+VERSION = "1.3.0"
 NO_NOTIFY_SOUND_DE = ("kde", "plasma")   # linux desktops without notification sound
 
 match_youtube = re.compile(r"(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)[a-zA-Z0-9_-]{11}")
@@ -164,6 +166,7 @@ def ensure_terminal():
         "xfce4-terminal",
         "lxterminal",
         "alacritty",
+        "ghostty",
         "kitty",
         "urxvt",
         "x-terminal-emulator",
@@ -529,19 +532,6 @@ def get_extensions(path):
     return extensions, invalid
 
 
-def install_extension(url):
-    """Install extension from specified git repo url"""
-    if shutil.which("git"):
-        ext_path = os.path.expanduser(os.path.join(config_path, "Extensions"))
-        if not os.path.exists(ext_path):
-            os.makedirs(os.path.expanduser(path), exist_ok=True)
-        print("Installing extension to: {ext_path}")
-        result = subprocess.run(["git", "clone", url], cwd=ext_path, capture_output=True, text=True, check=False)
-        print(result.stdout + result.stderr)
-    else:
-        print("git is needed to install extension")
-
-
 def find_linux_sound(name):
     """Return path of sound file from its name, if it exists"""
     if sys.platform == "linux":
@@ -610,10 +600,12 @@ def notify_remove(notification_id):
         )
 
 
-def load_json(file, default=None, dir_path=config_path):
+def load_json(file, default=None, dir_path=config_path, create=False):
     """Load saved json from same location where default config is saved"""
     path = os.path.expanduser(os.path.join(dir_path, file))
     if not os.path.exists(path):
+        if create:
+            save_json(default, file, dir_path=dir_path)
         return default
     try:
         with open(path, "r") as f:
@@ -1027,10 +1019,10 @@ class SpellCheck():
         try:
             start = time.time()
             self.aspell = subprocess.Popen(
-                ["aspell", "-a", "--sug-mode", self.aspell_mode, "--lang", self.aspell_language],
+                [self.aspell_path, "-a", "--sug-mode", self.aspell_mode, "--lang", self.aspell_language],
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
                 text=True,
                 encoding="utf-8",
                 errors="replace",
@@ -1039,7 +1031,11 @@ class SpellCheck():
             self.aspell.stdout.readline()
             logger.info(f"Aspell initialized in {round((time.time() - start)*1000, 3)} ms")
         except Exception as e:
-            logger.error(f"Aspell initialization error: {e}")
+            if self.aspell.poll() is not None:
+                aspell_error = self.aspell.stderr.read()
+            else:
+                aspell_error = ""
+            logger.error(f"Aspell initialization error: {e}\n  {aspell_error}")
             self.enable = False
 
 
@@ -1047,17 +1043,25 @@ class SpellCheck():
         """Spellcheck single word using aspell"""
         if not self.aspell:
             return False
+        if word.isdigit():
+            return False   # dont spellcheck numbers
         try:
             with self.lock:
                 self.aspell.stdin.write(word + "\n")
                 self.aspell.stdin.flush()
                 result = self.aspell.stdout.readline().strip()
-                self.aspell.stdout.readline()   # it prints 2 lines
+                next_line = result
+                while next_line != "\n":   # read until it prints empty line
+                    next_line = self.aspell.stdout.readline()
                 if result.startswith("*"):
                     return False
                 return True
         except Exception as e:
-            logger.error(f"Spellchecker error: {e}")
+            if self.aspell.poll() is not None:
+                aspell_error = self.aspell.stderr.read()
+            else:
+                aspell_error = ""
+            logger.error(f"Spellchecker error: {e}\n  {aspell_error}")
             if self.first_run:   # a fuse if it fails on first word
                 self.enable = False
             if self.enable:

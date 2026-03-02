@@ -1,3 +1,8 @@
+Add unreads up and down markers to tree
+Add webhook and app sign to message
+Add ability to resize extra window
+
+Fix ping sent to other client after disconnect
 Fix issues with many wide characters in chat
 Fix issues with wide characters in input line
 
@@ -23,7 +28,6 @@ after fixing https://github.com/python/cpython/issues/119138
     Add bg color for mentions and channels in chat
 
 Investigate read state reverting after reconnect
-Add webhook and app sign to message
 Add option to select individual message
 Add scrollbar to chat
 Fix per-channel member list

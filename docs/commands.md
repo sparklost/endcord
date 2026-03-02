@@ -140,6 +140,13 @@
     Everything after these flags is considered as message content.  
 - `redraw`  
     Redraw UI if it ever gets messed up.
+- `check_for_updates *open`  
+    Check endcord and extensions for updates and optionally open github release for new endcord version.
+- `search_extensions`  
+    Search all endcord extensions on GitHub. Alt+Enter to install selected one.
+- `install_extension *[url]`  
+    Install extension from specified git url. Or use `repo_owner/repo_name`, which assumes github.  
+    If url is not provided it will update all installed extensions.
 - `open_config_dir`  
     Open config directory with system file manager.
 - `show_log`  

@@ -5,7 +5,7 @@ description = "Feature rich Discord TUI client."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "discord-protos>=0.0.2",
+    "discord-protos>=1.2.120",
     "emoji>=2.15.0",
     "filetype>=1.2.0",
     "numpy>=2.4.2",
