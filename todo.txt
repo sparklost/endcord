@@ -1,4 +1,3 @@
-Add unreads up and down markers to tree
 Add webhook and app sign to message
 Add ability to resize extra window
 

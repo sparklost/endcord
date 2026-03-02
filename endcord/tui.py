@@ -262,6 +262,7 @@ class TUI():
         self.corner_ur = config["border_corners"][2]
         self.corner_dl = config["border_corners"][1]
         self.corner_dr = config["border_corners"][3]
+        self.hline = config["tree_drop_down_hline"]
         self.tab_spaces = int(config["tab_spaces"])
         self.vim_mode = config["vim_mode"]
 
@@ -1332,17 +1333,19 @@ class TUI():
     def draw_tree(self):
         """Draw channel tree"""
         with self.lock:
+            h, w = self.tree_hw
+            # drawing from top to down
+            skipped = 0   # skipping drop-down ends (code 1XXX)
+            drop_down_skip_folder = False
+            drop_down_skip_guild = False
+            drop_down_skip_category = False
+            drop_down_skip_channel = False
+            drop_down_level = 0
+            above_mention = False
+            self.tree_clean_len = 0
+            y = 0
+            num = 0
             try:
-                h, w = self.tree_hw
-                # drawing from top to down
-                skipped = 0   # skipping drop-down ends (code 1XXX)
-                drop_down_skip_folder = False
-                drop_down_skip_guild = False
-                drop_down_skip_category = False
-                drop_down_skip_channel = False
-                drop_down_level = 0
-                self.tree_clean_len = 0
-                y = 0
                 for num, line in enumerate(self.tree):
                     code = self.tree_format[num]
                     first_digit = (code % 10)
@@ -1380,8 +1383,12 @@ class TUI():
                         drop_down_skip_category = True
                     elif first_digit == 0 and 500 <= code <= 599:
                         drop_down_skip_channel = True
+                    if num < self.tree_index:   # above visible area
+                        if not above_mention and (code % 100) // 10 == 2:
+                            above_mention = True
+                        continue
                     y = max(num - skipped - self.tree_index, 0)
-                    if y >= h:
+                    if y >= h:   # bellow visible area
                         break
                     second_digit = (code % 100) // 10
                     color = curses.color_pair(3)
@@ -1422,6 +1429,13 @@ class TUI():
                 while y < h:
                     self.win_tree.insstr(y, 0, "\n", curses.color_pair(1))
                     y += 1
+                while num < len(self.tree_format):   # continue loop to detect mentions bellow visible area
+                    if (self.tree_format[num] % 100) // 10 == 2:
+                        self.win_tree.insstr(h-1, 0, " Mentions down ".center(w, self.hline), curses.color_pair(8) | self.attrib_map[8])
+                        break
+                    num += 1
+                if above_mention:
+                    self.win_tree.insstr(0, 0, " Mentions up ".center(w, self.hline), curses.color_pair(8) | self.attrib_map[8])
                 self.win_tree.noutrefresh()
                 self.need_update.set()
             except curses.error:

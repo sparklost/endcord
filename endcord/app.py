@@ -909,7 +909,6 @@ class Endcord:
         if not guild_id:   # no member list in dms
             self.tui.remove_member_list()
         elif self.get_members and self.state["member_list"] and open_member_list:
-            logger.info("NOOOOO")
             if delay:
                 time.sleep(0.01)   # needed when startup to fix issues with emojis and border lines
             self.update_member_list(reset=True)
@@ -4634,6 +4633,7 @@ class Endcord:
             if self.need_preload and messages:
                 self.messages = messages
                 self.preloaded = True
+            self.last_message_id = self.get_chat_last_message_id()
 
 
     def toggle_member_list(self):

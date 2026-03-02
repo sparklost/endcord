@@ -478,12 +478,13 @@ class Gateway():
         # threads
         threads = []
         for thread in guild.get("threads", []):
-            if thread["member"]["flags"] == 3:
+            if "member" not in thread or thread["member"]["flags"] == 3:
                 message_notifications = 0
             elif thread["member"]["flags"] == 5:
                 message_notifications = 1
             else:
                 message_notifications = 2
+            muted = "member" in thread and thread["member"]["muted"]
             threads.append({
                 "id": thread["id"],
                 "type": thread["type"],
@@ -496,7 +497,7 @@ class Gateway():
                 "suppress_everyone": False,   # no config for threads
                 "suppress_roles": False,
                 "message_notifications": message_notifications,
-                "muted": thread["member"]["muted"],
+                "muted": muted,
                 "joined": True,
             })
         self.threads_buffer.append({
