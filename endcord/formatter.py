@@ -1095,6 +1095,12 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
         .replace("%reactions", ""),
     ) - 1
     end_name = pre_name_len + limit_username + 1
+    pre_name_len_reply = len(format_reply
+        .replace("%username", "\n")
+        .replace("%global_name", "\n")
+        .replace("%timestamp", placeholder_timestamp)
+        .split("\n")[0],
+    )
     if dynamic_name_len:
         dynamic_name_len = 2 if "%global_name" in format_message else 1
     dyn_limit_username = max_length-15 if dynamic_name_len else limit_username
@@ -1274,27 +1280,38 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
                                 if trim_embed_url_size:
                                     embed_url = trim_string(embed_url, trim_embed_url_size)
                                 content += f"[{clean_type(embed["type"])} embed]: {embed_url}"
-                reply_line = lazy_replace(format_reply, "%username", lambda: normalize_string(ref_message["username"], limit_username, emoji_safe=False))
-                reply_line, wide_shift = lazy_replace_args(reply_line, "%global_name", lambda: normalize_string_count(global_name, limit_username))
+                reply_line = lazy_replace(format_reply, "%username", lambda: normalize_string(ref_message["username"], dyn_limit_username, emoji_safe=False, fill=not(dynamic_name_len)))
+                reply_line, wide_shift = lazy_replace_args(reply_line, "%global_name", lambda: normalize_string_count(global_name, dyn_limit_username, fill=not(dynamic_name_len)))
                 reply_line = lazy_replace(reply_line, "%timestamp", lambda: generate_timestamp(ref_message["timestamp"], format_timestamp, convert_timezone))
                 reply_line = lazy_replace(reply_line, "%content", lambda: content.replace("\r", " ").replace("\n", " "))
                 wide_shift = -wide_shift
             else:
-                reply_line = lazy_replace(format_reply, "%username", lambda: normalize_string("Unknown", limit_username))
-                reply_line = lazy_replace(reply_line, "%global_name", lambda: normalize_string("Unknown", limit_username))
+                reply_line = lazy_replace(format_reply, "%username", lambda: normalize_string("Unknown", dyn_limit_username, emoji_safe=False, fill=not(dynamic_name_len)))
+                reply_line = lazy_replace(reply_line, "%global_name", lambda: normalize_string("Unknown", dyn_limit_username, emoji_safe=False, fill=not(dynamic_name_len)))
                 reply_line = reply_line.replace("%timestamp", placeholder_timestamp)
                 reply_line = lazy_replace(reply_line, "%content", lambda: ref_message["content"].replace("\r", "").replace("\n", ""))
                 wide_shift = 0
             reply_line, wide = normalize_string_count(reply_line, max_length, dots=True)
             if wide:
                 temp_wide_map.append(len(temp_chat))
+            if dynamic_name_len:
+                if dynamic_name_len == 1:
+                    name_len = len(ref_message["username"][:dyn_limit_username])
+                else:
+                    name_len = len(limit_width_wch(global_name, dyn_limit_username)[0])
+                end_name_reply = pre_name_len_reply + name_len + 1
             temp_chat.append(reply_line)
             if disable_formatting or reply_color_format == color_blocked:
                 temp_format.append([color_base])
             elif mentioned:
-                temp_format.append(shift_formats(color_mention_reply, pre_name_len, wide_shift))
+                if dynamic_name_len:
+                    temp_format.append(shift_formats(color_mention_reply, end_name_reply, name_len - limit_username))
+                else:
+                    temp_format.append(shift_formats(color_mention_reply, pre_name_len_reply, wide_shift))
+            elif dynamic_name_len:
+                temp_format.append(shift_formats(color_reply, end_name_reply, name_len - limit_username))
             else:
-                temp_format.append(shift_formats(color_reply, pre_name_len, wide_shift))
+                temp_format.append(shift_formats(color_reply, pre_name_len_reply, wide_shift))
             temp_chat_map.append((num, None, True, None, None, None))
 
         # bot interaction
@@ -1337,7 +1354,8 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
             pre_content_len = default_pre_content_len = len(placeholder_message)
         else:
             pre_content_len = default_pre_content_len
-        if edited_before_content:
+            name_len = limit_username
+        if edited_before_content and edited:
             pre_content_len += len_edited
         quote = False
         content = ""
@@ -1440,17 +1458,18 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
             spoilers = [value for i, value in enumerate(spoilers) if i not in spoiled]   # exclude spoiled messages
 
         # fix for wide in global_name (assuming global_name is always on left side of content)
-        shift_ranges_all(
-            wide_shift,
-            # urls,   # no?
-            # spoilers,   # no?
-            code_snippets,
-            code_blocks,
-            emoji_ranges,
-            mention_ranges,
-            channel_ranges,
-            timestamp_ranges,
-        )
+        if not dynamic_name_len:
+            shift_ranges_all(
+                wide_shift,
+                # urls,   # no?
+                # spoilers,   # no?
+                code_snippets,
+                code_blocks,
+                emoji_ranges,
+                mention_ranges,
+                channel_ranges,
+                timestamp_ranges,
+            )
 
         # find all markdown and correct format indexes
         message_line, md_format, md_indexes = format_md_all(message_line, default_pre_content_len, chain(code_snippets, code_blocks, urls))
@@ -1570,9 +1589,10 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
             temp_format.append([color_base])
         elif mentioned:
             format_line = color_mention_message[:]
-            format_line = shift_formats(format_line, pre_name_len+1, wide_shift)
             if dynamic_name_len:
                 format_line = shift_formats(format_line, end_name, name_len - limit_username)
+            else:
+                format_line = shift_formats(format_line, pre_name_len+1, wide_shift)
             format_line += format_multiline_one_line_format(md_format, newline_index+1, 0, quote)
             format_line += format_multiline_one_line(urls, newline_index+1, 0, color_mention_chat_url, quote)
             format_line += format_multiline_one_line(code_snippets, newline_index+1, 0, color_code, quote)
@@ -1588,9 +1608,10 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
             temp_format.append(format_line)
         else:
             format_line = color_message[:]
-            format_line = shift_formats(format_line, pre_name_len+1, wide_shift)
             if dynamic_name_len:
                 format_line = shift_formats(format_line, end_name, name_len - limit_username)
+            else:
+                format_line = shift_formats(format_line, pre_name_len+1, wide_shift)
             format_line += format_multiline_one_line_format(md_format, newline_index+1, 0, quote)
             format_line += format_multiline_one_line(urls, newline_index+1, 0, color_chat_url, quote)
             format_line += format_multiline_one_line(code_snippets, newline_index+1, 0, color_code, quote)

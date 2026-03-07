@@ -707,7 +707,7 @@ class Endcord:
 
         # check if should open member list
         open_member_list = (
-            self.member_list_auto_open and guild_id != self.active_channel["guild_id"] and
+            guild_id != self.active_channel["guild_id"] and
             self.screen.getmaxyx()[1] - self.config["tree_width"] - self.member_list_width - 2 >= 32
         )
 
@@ -908,7 +908,7 @@ class Endcord:
         self.set_channel_seen(channel_id, self.get_chat_last_message_id(), force_remove_notify=True)   # right after update_chat so new_unreads is determined
         if not guild_id:   # no member list in dms
             self.tui.remove_member_list()
-        elif self.get_members and self.state["member_list"] and open_member_list:
+        elif self.get_members and open_member_list and (self.state["member_list"] or self.member_list_auto_open):
             if delay:
                 time.sleep(0.01)   # needed when startup to fix issues with emojis and border lines
             self.update_member_list(reset=True)

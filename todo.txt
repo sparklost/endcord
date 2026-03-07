@@ -1,10 +1,8 @@
-New 2-line format
 Reuse api connections - speed up requests
 Optimize chat generation with a class ???
 Add ability to resize extra window
 Fix issues with many wide characters in chat
 Fix issues with wide characters in input line
-Dont send message while uploading attachments
 
 Voice channels
     add voice channels to tree
