@@ -1956,7 +1956,7 @@ class Endcord:
                 self.tui.pause_curses()
                 channel = self.active_channel["channel_id"]
                 timestamp = int(time.time() * 1000)
-                temp_message_path = os.path.join(peripherals.temp_path, f"message-{timestamp}")
+                temp_message_path = os.path.join(os.path.expanduser(peripherals.temp_path), f"message-{timestamp}")
                 with open(temp_message_path, "w", encoding="utf-8") as file:
                     file.write(input_text)
                 subprocess.run([self.external_editor, temp_message_path], check=True)
@@ -3394,7 +3394,7 @@ class Endcord:
             self.tui.pause_curses()
             channel = self.active_channel["channel_id"]
             timestamp = int(time.time() * 1000)
-            temp_message_path = os.path.join(peripherals.temp_path, f"message-{timestamp}")
+            temp_message_path = os.path.join(os.path.expanduser(peripherals.temp_path), f"message-{timestamp}")
             for num, channel in enumerate(self.input_store):
                 if channel["id"] == self.active_channel["channel_id"]:
                     input_text = self.input_store[num]["content"]
@@ -5585,11 +5585,15 @@ class Endcord:
         if self.messages is None:
             return
 
-        if keep_selected:
-            selected_line, text_index = self.tui.get_chat_selected()
+        if keep_selected and self.messages:
+            selected_line, _ = self.tui.get_chat_selected()
             if selected_line == -1:
                 keep_selected = False
             selected_msg, remainder = self.lines_to_msg_with_remainder(selected_line, space=True)
+        else:
+            selected_line = 0
+            selected_msg = 0
+            remainder = 0
 
         # spacebar_fix - message/referenced_message is always null, instead only for deleted message
         if self.gateway.legacy:

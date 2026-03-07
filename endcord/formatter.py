@@ -100,6 +100,13 @@ def demojize_message(message):
     return message
 
 
+def is_substring_before(main_string, substring_1, substring_2):
+    """Check if substring_1 is before substring_2"""
+    index_1 = main_string.find(substring_1)
+    index_2 = main_string.find(substring_2)
+    return index_1 != -1 and index_2 != -1 and index_1 < index_2
+
+
 def discord_timestamp(unix_time, timezone=True):
     """Generate discord timestamp from unix time"""
     time_obj = datetime.fromtimestamp(unix_time)
@@ -974,7 +981,8 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
         %username
         %global_name
         %timestamp
-        %edited
+        %edited   # edited_string
+        %app   # (app)/(webhook)
     Possible options for format_newline:
         %content   # remainder from previous line
         %timestamp
@@ -1009,6 +1017,7 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
     format_one_reaction = config["format_one_reaction"]
     format_timestamp = config["format_timestamp"]
     edited_string = config["edited_string"]
+    app_string_format = config["app_string"]
     reactions_separator = config["reactions_separator"]
     limit_username = config["limit_username"]
     use_nick = config["use_nick_when_available"]
@@ -1021,6 +1030,7 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
     message_spacing = config["message_spacing"]
     quote_character = config["quote_character"]
     trim_embed_url_size = max(config["trim_embed_url_size"], 20)
+    dynamic_name_len = config["dynamic_name_len"]
     use_global_name = "%global_name" in format_message
 
     chat = []
@@ -1062,9 +1072,10 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
         .replace("%global_name", " " * limit_username)
         .replace("%timestamp", placeholder_timestamp)
         .replace("%edited", "")
-        .replace("%content", "")
-    )
-    pre_content_len = len(placeholder_message) - 1
+        .replace("%app", "")
+        # .replace("%content", "")   # will be splitted on %content
+    ).split("%content")[0]
+    default_pre_content_len = len(placeholder_message)
     timestamp_range = find_timestamp(placeholder_message, placeholder_timestamp)
     pre_name_len = len(format_message
         .replace("%username", "\n")
@@ -1084,6 +1095,21 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
         .replace("%reactions", ""),
     ) - 1
     end_name = pre_name_len + limit_username + 1
+    if dynamic_name_len:
+        dynamic_name_len = 2 if "%global_name" in format_message else 1
+    dyn_limit_username = max_length-15 if dynamic_name_len else limit_username
+    if "%content" not in format_message:
+        format_message += "/n%content"
+    have_edited = "%edited" in format_message
+    edited_before_content = is_substring_before(format_message, "%edited", "%content")
+    if edited_before_content:
+        pre_edited_len = len(format_message
+            .replace("%username", " " * limit_username)
+            .replace("%global_name", " " * limit_username)
+            .replace("%timestamp", placeholder_timestamp)
+            .replace("%app", "")
+            .split("%edited")[0],
+        )
     len_messages = len(messages)
 
     for num, message in enumerate(messages):
@@ -1094,7 +1120,7 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
         temp_chat_map = []
         temp_wide_map = []
         mentioned = False
-        edited = message.get("edited")   # failsafe
+        edited = message.get("edited") and have_edited
         user_id = message.get("user_id")
         selected_color_spoiler = color_spoiler
         disable_formatting = False
@@ -1294,8 +1320,26 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
             temp_chat_map.append((num, None, 2, None, None, None))
 
         # main message
-        quote = False
         global_name = get_global_name(message, use_nick) if use_global_name else ""
+        if dynamic_name_len:
+            if dynamic_name_len == 1:
+                name_len = len(message["username"][:dyn_limit_username])
+            else:
+                name_len = len(limit_width_wch(global_name, dyn_limit_username)[0])
+            end_name = pre_name_len + name_len + 1
+            placeholder_message = (format_message
+                .replace("%username", " " * name_len)
+                .replace("%global_name", " " * name_len)
+                .replace("%timestamp", placeholder_timestamp)
+                .replace("%edited", "")
+                .replace("%app", "")
+            ).split("%content")[0]
+            pre_content_len = default_pre_content_len = len(placeholder_message)
+        else:
+            pre_content_len = default_pre_content_len
+        if edited_before_content:
+            pre_content_len += len_edited
+        quote = False
         content = ""
         if "poll" in message:
             message["content"] = format_poll(message["poll"])
@@ -1352,11 +1396,15 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
                 content += f"[lottie sticker] (cannot be opened): {sticker["name"]}"
             else:
                 content += f"[gif sticker] (can be opened): {sticker["name"]}"
-
-        message_line = lazy_replace(format_message, "%username", lambda: normalize_string(message["username"], limit_username, emoji_safe=False))
-        message_line, wide_shift = lazy_replace_args(message_line, "%global_name", lambda: normalize_string_count(global_name, limit_username))
+        if "app" in message or "webhook" in message:
+            app_string = app_string_format.replace("%app", "App" if "app" in message else "Webhook")
+        else:
+            app_string = None
+        message_line = lazy_replace(format_message, "%username", lambda: normalize_string(message["username"], dyn_limit_username, emoji_safe=False, fill=not(dynamic_name_len)))
+        message_line, wide_shift = lazy_replace_args(message_line, "%global_name", lambda: normalize_string_count(global_name, dyn_limit_username, fill=not(dynamic_name_len)))
         message_line = lazy_replace(message_line, "%timestamp", lambda: generate_timestamp(message["timestamp"], format_timestamp, convert_timezone))
         message_line = message_line.replace("%edited", edited_string if edited else "")
+        message_line = lazy_replace(message_line, "%app", lambda: app_string if app_string else "")
         message_line = message_line.replace("%content", content)
         wide_shift = -wide_shift
 
@@ -1394,8 +1442,8 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
         # fix for wide in global_name (assuming global_name is always on left side of content)
         shift_ranges_all(
             wide_shift,
-            urls,
-            # spoilers,   # not spoilers?
+            # urls,   # no?
+            # spoilers,   # no?
             code_snippets,
             code_blocks,
             emoji_ranges,
@@ -1405,7 +1453,7 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
         )
 
         # find all markdown and correct format indexes
-        message_line, md_format, md_indexes = format_md_all(message_line, pre_content_len, chain(code_snippets, code_blocks, urls))
+        message_line, md_format, md_indexes = format_md_all(message_line, default_pre_content_len, chain(code_snippets, code_blocks, urls))
         if md_indexes:
             move_by_indexes(
                 md_indexes,
@@ -1523,6 +1571,8 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
         elif mentioned:
             format_line = color_mention_message[:]
             format_line = shift_formats(format_line, pre_name_len+1, wide_shift)
+            if dynamic_name_len:
+                format_line = shift_formats(format_line, end_name, name_len - limit_username)
             format_line += format_multiline_one_line_format(md_format, newline_index+1, 0, quote)
             format_line += format_multiline_one_line(urls, newline_index+1, 0, color_mention_chat_url, quote)
             format_line += format_multiline_one_line(code_snippets, newline_index+1, 0, color_code, quote)
@@ -1531,12 +1581,16 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
             format_line += format_spoilers
             if alt_role_color:
                 format_line.append([alt_role_color, pre_name_len + bool(wide_shift), end_name])
-            if edited and not next_line:
+            if edited_before_content:
+                format_line.append([*color_mention_chat_edited, pre_edited_len + (name_len - limit_username), pre_edited_len + (name_len - limit_username) + len_edited])
+            elif edited and not next_line:
                 format_line.append(color_mention_chat_edited + [len_message_line - len_edited, len_message_line])
             temp_format.append(format_line)
         else:
             format_line = color_message[:]
             format_line = shift_formats(format_line, pre_name_len+1, wide_shift)
+            if dynamic_name_len:
+                format_line = shift_formats(format_line, end_name, name_len - limit_username)
             format_line += format_multiline_one_line_format(md_format, newline_index+1, 0, quote)
             format_line += format_multiline_one_line(urls, newline_index+1, 0, color_chat_url, quote)
             format_line += format_multiline_one_line(code_snippets, newline_index+1, 0, color_code, quote)
@@ -1545,7 +1599,9 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
             format_line += format_spoilers
             if role_color:
                 format_line.append([role_color, pre_name_len + bool(wide_shift), end_name])
-            if edited and not next_line:
+            if edited_before_content:
+                format_line.append([*color_chat_edited, pre_edited_len + (name_len - limit_username), pre_edited_len + (name_len - limit_username) + len_edited])
+            elif edited and not next_line:
                 format_line.append([*color_chat_edited, len_message_line - len_edited, len_message_line])
             temp_format.append(format_line)
 
@@ -1656,7 +1712,7 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
                 format_line += format_multiline_one_line(standout_ranges, len_new_line, newline_len, color_standout, this_quote)
                 format_line += code_block_format
                 format_line += format_spoilers
-                if edited and not next_line:
+                if edited and not next_line and not edited_before_content:
                     format_line.append(color_mention_chat_edited + [len_new_line - len_edited, len_new_line])
                 temp_format.append(format_line)
             else:
@@ -1667,7 +1723,7 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
                 format_line += format_multiline_one_line(standout_ranges, len_new_line, newline_len, color_standout, this_quote)
                 format_line += code_block_format
                 format_line += format_spoilers
-                if edited and not next_line:
+                if edited and not next_line and not edited_before_content:
                     format_line.append([*color_chat_edited, len_new_line - len_edited, len_new_line])
                 temp_format.append(format_line)
             line_num += 1

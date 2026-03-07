@@ -41,11 +41,17 @@ def get_version_number():
 
 def get_python_version():
     """Get python major and minor versions"""
-    version_result = subprocess.run(["uv", "run", "python", "--version"], capture_output=True, text=True, check=True)
-    parts = version_result.stdout.strip().replace("Python ", "").split(".")
-    if len(parts) < 2:
-        return None
-    return int(parts[0]), int(parts[1])
+    if shutil.which("uv"):
+        try:
+            version_result = subprocess.run(["uv", "run", "python", "--version"], capture_output=True, text=True, check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"uv error: {e}", file=sys.stderr)
+            return sys.version_info.major, sys.version_info.minor
+        parts = version_result.stdout.strip().replace("Python ", "").split(".")
+        if len(parts) < 2:
+            return sys.version_info.major, sys.version_info.minor
+        return int(parts[0]), int(parts[1])
+    return sys.version_info.major, sys.version_info.minor
 
 
 def supports_color():
@@ -105,8 +111,6 @@ def check_python():
 
 def ensure_python():
     """Check current python and download correct python if needed"""
-    if sys.version_info.minor >= 12 and sys.version_info.minor <= PYTHON_MAX_MINOR:
-        return None
     _, minor = get_python_version()
     if minor >= 12 and minor <= PYTHON_MAX_MINOR:
         return None

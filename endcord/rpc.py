@@ -113,7 +113,7 @@ class RPC:
         if sys.platform == "win32":
             self.rpc_thread = threading.Thread(target=self.server_thread_win, daemon=True, args=())
             self.rpc_thread.start()
-        elif sys.platform == "linux":
+        elif sys.platform in ("linux", "darwin"):
             self.rpc_thread = threading.Thread(target=self.server_thread_linux, daemon=True, args=())
             self.rpc_thread.start()
         else:
@@ -350,12 +350,12 @@ class RPC:
                 win32pipe.ConnectNamedPipe(pipe, None)
                 threading.Thread(target=self.client_thread, daemon=True, args=(pipe,)).start()
             except pywintypes.error as e:
-                logger.error(f"Named pipe error: {e}")
+                logger.error(e)
 
 
     def server_thread_linux(self):
         """Thread that listens for new connections on socket and starts new client_thread for each connection"""
-        if sys.platform in ("linux", "darwin"):
+        try:
             if not os.path.isdir(os.path.dirname(DISCORD_SOCKET)):
                 logger.warning("Error starting RPC server: could not create socket")
                 return
@@ -363,6 +363,9 @@ class RPC:
                 os.unlink(DISCORD_SOCKET)
             self.server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             self.server.bind(DISCORD_SOCKET)
+        except Exception as e:
+            logger.error(e)
+            return
         logger.info("RPC server started")
         while self.run:
             self.server.listen(1)

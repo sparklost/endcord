@@ -73,7 +73,7 @@ if sys.platform == "linux":
         # fallback to .cache
         if not os.access(f"/run/user/{os.getuid()}", os.W_OK):
             temp_path = f"~/.cache/{APP_NAME}"
-    os.makedirs(temp_path, exist_ok=True)
+    os.makedirs(os.path.expanduser(temp_path), exist_ok=True)
 
     path = os.environ.get("XDG_DOWNLOAD_DIR", "")
     if path.strip():
@@ -211,7 +211,8 @@ def ensure_ssl_certificates():
 def save_config(path, data, section):
     """Save config section"""
     path = os.path.expanduser(path)
-    os.makedirs(os.path.dirname(path), exist_ok=True)
+    if os.path.dirname(path):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
     config = ConfigParser(interpolation=None)
     if os.path.exists(path):
         with open(path, "r", encoding="utf-8") as f:
@@ -252,7 +253,7 @@ def load_config(path, default, section="main", gen_config=False, merge=False):
         for key in default:
             if key in list(config[section].keys()):
                 try:
-                    eval_value = literal_eval(config_data_raw[key].replace("\\", "\\\\"))
+                    eval_value = literal_eval(config_data_raw[key])
                     config_data[key] = eval_value
                 except ValueError:
                     config_data[key] = config_data_raw[key]
@@ -261,7 +262,7 @@ def load_config(path, default, section="main", gen_config=False, merge=False):
         for key, value in config_data_raw.items():
             if key.startswith("ext_") or merge:
                 try:
-                    eval_value = literal_eval(value.replace("\\", "\\\\"))
+                    eval_value = literal_eval(value)
                     config_data[key] = eval_value
                 except ValueError:
                     config_data[key] = value
@@ -673,6 +674,7 @@ def copy_to_clipboard(text):
 
 def paste_clipboard_files(save_path=None):
     """Get files paths from clipboard, linux only, needs xclip or wl-clipboard"""
+    save_path = os.path.expanduser(save_path)
     if sys.platform == "linux":
 
         if os.getenv("WAYLAND_DISPLAY"):
@@ -1150,7 +1152,7 @@ class Recorder():
             self.record_thread.join()
             self.record_thread = None
             self.audio_data = np.concatenate(self.audio_data, axis=0)
-            save_path = os.path.join(temp_path, "rec-audio-message.ogg")
+            save_path = os.path.join(os.path.expanduser(temp_path), "rec-audio-message.ogg")
             soundfile.write(save_path, self.audio_data, 48000, format="OGG", subtype="OPUS")
             del self.audio_data
             return save_path

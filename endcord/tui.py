@@ -244,8 +244,8 @@ class TUI():
         self.bordered = not(config["compact"])
         self.have_title = bool(config["format_title_line_l"])
         self.have_title_tree = bool(config["format_title_tree"])
-        vert_line = config["tree_vert_line"][0]
-        self.vert_line = acs_map.get(vert_line, vert_line)
+        vline = config["tree_drop_down_vline"][0]
+        self.vline = acs_map.get(vline, vline)
         self.tree_width = config["tree_width"]
         self.extra_window_h = config["extra_window_height"]
         self.blink_cursor_on = config["cursor_on_time"]
@@ -503,10 +503,10 @@ class TUI():
 
         # redraw
         with self.lock:
-            self.screen.vline(0, self.tree_hw[1], self.vert_line, self.screen_hw[0], curses.color_pair(self.default_color))
+            self.screen.vline(0, self.tree_hw[1], self.vline, self.screen_hw[0], curses.color_pair(self.default_color))
             if self.have_title and self.have_title_tree:
                 # fill gap between titles
-                self.screen.addch(0, self.tree_hw[1], self.vert_line, curses.color_pair(12))
+                self.screen.addch(0, self.tree_hw[1], self.vline, curses.color_pair(12))
             self.screen.noutrefresh()
             self.need_update.set()
         self.draw_status_line()
@@ -1384,7 +1384,8 @@ class TUI():
                     elif first_digit == 0 and 500 <= code <= 599:
                         drop_down_skip_channel = True
                     if num < self.tree_index:   # above visible area
-                        if not above_mention and (code % 100) // 10 == 2:
+                        # if mentioned and (its not collapsed or its forum/channel_with_threads)
+                        if not above_mention and (code % 100) // 10 == 2 and (first_digit != 1 or 500 < code < 599):
                             above_mention = True
                         continue
                     y = max(num - skipped - self.tree_index, 0)
@@ -1669,7 +1670,7 @@ class TUI():
                             self.title_hw = self.win_title_line.getmaxyx()
                             self.draw_title_line()
                     else:
-                        self.screen.vline(self.have_title, w - self.member_list_width-1, self.vert_line, common_h, curses.color_pair(self.default_color))
+                        self.screen.vline(self.have_title, w - self.member_list_width-1, self.vline, common_h, curses.color_pair(self.default_color))
 
                 # draw member list
                 h, w = self.win_member_list.getmaxyx()

@@ -260,8 +260,10 @@ def prepare_message(message):
         message_dict["poll"] = poll
     if component_info:
         message_dict["component_info"] = component_info
-    # if message["author"].get("bot"):
-    #     message_dict["bot"] = True
+    if "bot" in message["author"]:
+        message_dict["bot"] = True
+    if "webhook_id" in message:
+        message_dict["webhook"] = True
     return message_dict
 
 

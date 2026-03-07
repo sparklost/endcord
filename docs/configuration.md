@@ -244,7 +244,9 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
 - `format_search_message = "%channel: [%date] <%global_name> | %content"`  
     Formatting for message line in extra window when searching. See [format_search_message](#format_search_message) for more info.
 - `edited_string = "(edited)"`  
-    A string added to the end of the message when it is edited.
+    A string that replaces `%edited` in the message format when the message is edited.
+ - `app_string = "- (%app)"`  
+    A string that replaces `%app` in the message format when the message is sent from app or webhook.
 - `quote_character = "║"`  
     A character that is prepended to each line of single or multiline quote.
 - `reactions_separator = "; "`  
@@ -269,10 +271,8 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
     Limit to individual tab length.
 - `limit_tabs_string = 60`  
     Limit to `%tabs` length in `format_status`.
-- `tree_vert_line = "│"`  
-    A single character used to draw vertical line separating channel tree and the chat.
 - `tree_drop_down_vline = "│"`  
-    A single character used to draw vertical line in tree drop down menus.
+    A single character used to draw vertical line in tree drop down menus. Also used to draw vertical line separating channel tree and the chat in compact mode.
 - `tree_drop_down_hline = "─"`  
     A single character used to draw horizontal line in tree drop down menus.
 - `tree_drop_down_intersect = "├"`  
@@ -293,6 +293,10 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
     Characters used to draw corners in bordered mode.
 - `username_role_colors = True`  
     Allow `%username` and `%global_name` to have color of primary role.
+- `dynamic_name_len = False`  
+    Use dynamic name length for usernames and global names in `format_message` only. Overrides `limit_username` option and name length is limited to `chat_width - 15`.  
+    If this is ON, `color_format_message` still works same as with dynamic_name_len OFF, and it will internally correct for dynamic name difference.  
+    Eg.: if color format has red character set to be at index 20, and `limit_username = 10`, `format_message = "abcd %username1234X67` but dynamic name is ON, then red character will always be 5 characters after `%username`. because `20 - length("abcd ") - 10 = 5`.
 - `media_use_blocks = False`  
     Wether to use "block" characters (`▀`) for drawing media instead traditional characters from media_ascii_palette.  
     This will result in clearer picture with pixel-like characters, vertical resolution will be doubled.  
@@ -377,13 +381,13 @@ Every next list has additional `start` and `end`- indexes on a line where color 
 - `media_bar_ch = "━"`  
     A single character used to draw progress bar in media player when playing video or audio.
 
-
 ### format_message
-- `%content` - message text
+- `%content` - message text; to make text appear on next line (`format_newline`), add `\n` just before `%content`, this will ensure `%edited` stays at the end of content
 - `%username` - of message author
 - `%global_name` - of message author
 - `%timestamp` - formatted with `format_timestamp`
-- `%edited` - replaced with `edited_string` assumed to be at the end of format_message line  
+- `%edited` - replaced with `edited_string`  
+- `%app` - replaced with `app_string` if this message is sent by app or webhook
 Note: everything after `%content` may be pushed to newline.
 
 ### format_newline
@@ -459,6 +463,9 @@ Note: everything after `%content` may be pushed to newline.
 - `%global_name` - of message author
 - `%date` - formatted same as `format_forum_timestamp`
 - `%channel` - to which channel in this server the message belongs, limited with `limit_channel_name`
+
+### app_string
+- `%app` - either `App` or `Webhook`
 
 
 ## pgcurses.json - config for experimental windowed mode

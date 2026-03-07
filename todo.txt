@@ -1,9 +1,10 @@
-Add webhook and app sign to message
+New 2-line format
+Reuse api connections - speed up requests
+Optimize chat generation with a class ???
 Add ability to resize extra window
-
-Fix ping sent to other client after disconnect
 Fix issues with many wide characters in chat
 Fix issues with wide characters in input line
+Dont send message while uploading attachments
 
 Voice channels
     add voice channels to tree
@@ -26,7 +27,6 @@ after fixing https://github.com/python/cpython/issues/119138
     Show inline media in chat
     Add bg color for mentions and channels in chat
 
-Investigate read state reverting after reconnect
 Add option to select individual message
 Add scrollbar to chat
 Fix per-channel member list
