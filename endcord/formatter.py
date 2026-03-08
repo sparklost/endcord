@@ -1027,6 +1027,7 @@ class ChatGenerator:
         self.enable_separator = self.format_date and self.date_separator
         self.my_id = my_id
         self.edited_before_content = is_substring_before(self.format_message, "%edited", "%content")
+        self.have_edited = "%edited" in self.format_message
         self.last_width = 0
 
         # calculate stuff
@@ -1069,7 +1070,6 @@ class ChatGenerator:
             self.dynamic_name_len = 2 if "%global_name" in self.format_message else 1
         if "%content" not in self.format_message:
             self.format_message += "/n%content"
-        self.have_edited = "%edited" in self.format_message
         if self.edited_before_content:
             self.pre_edited_len = len(self.format_message
                 .replace("%username", " " * self.limit_username)
@@ -1095,49 +1095,22 @@ class ChatGenerator:
             format_message (main message line)
             format_newline (if main message is too long, it goes on newlines)
             format_reactions (reactions added to main message)
-        Possible options for format_message:
-            %content
-            %username
-            %global_name
-            %timestamp
-            %edited   # edited_string
-            %app   # (app)/(webhook)
-        Possible options for format_newline:
-            %content   # remainder from previous line
-            %timestamp
-        Possible options for format_reply:
-            %content
-            %username
-            %global_name
-            %timestamp   # of replied message
-        Possible options for format_reactions:
-            %timestamp   # of message
-            %reactions   # all reactions after they pass through format_one_reaction
-        Possible options for format_one_reaction:
-            %reaction
-            %count
-        Possible options for format_timestamp:
-            same as format codes for datetime package
-        Possible options for blocked_mode:
-            0 - no blocking
-            1 - mask blocked messages
-            2 - hide blocked messages
-        limit_username normalizes length of username and global_name, by cropping them or appending spaces. Set to None to disable.
-        Returned indexes correspond to each message as how many lines it is covering.
-        use_nick will make it use nick instead global_name whenever possible.
+        chat = [one_message_line, ...]
+        chat_format = [[[default_color_id], [color_id, start, end], ...], ...]
+        chat_map = [(msg_num, username:(st, end), is_reply, reactions:((st, end), ...), date:(st, end), ranges), ...]
+            ranges = (url:(st, end, index), spoiler:(st, end, index), emoji:(st, end, id), mentions:(st, end, id), channels:(st, end, id))
+        wide_map = [index_of_line_with_wide_char, ...]
         """
+        num_messages = len(messages)
         if max_length != self.last_width:
             self.last_width = max_length
             self.dyn_limit_username = max_length-15 if self.dynamic_name_len else self.limit_username
 
         chat = []
         chat_format = []
-        # chat map = ((num, username:(st, end), is_reply, reactions:((st, end), ...), date:(st, end), ranges), ...)
-        # ranges = (url:(st, end, index), spoiler:(st, end, index), emoji:(st, end, id), mentions:(st, end, id), channels:(st, end, id))
         chat_map = []
         wide_map = []
         self.have_unseen_messages_line = False
-        num_messages = len(messages)
         for num, message in enumerate(messages):
             message_chat, message_format, message_chat_map, message_wide_map = self.generate_message(
                 message,
@@ -1169,7 +1142,7 @@ class ChatGenerator:
         if not message:   # failsafe
             return None, None, None, None
 
-        chat = []   # stores only one multiline message
+        chat = []
         chat_format = []
         chat_map = []
         chat_wide_map = []
@@ -1400,10 +1373,11 @@ class ChatGenerator:
                 .replace("%edited", "")
                 .replace("%app", "")
             ).split("%content")[0]
-            pre_content_len = default_pre_content_len = len(placeholder_message)
+            pre_content_len = self.default_pre_content_len = len(placeholder_message)
         else:
-            pre_content_len = default_pre_content_len
+            pre_content_len = self.default_pre_content_len
             name_len = self.limit_username
+            end_name = self.end_name
         if self.edited_before_content and edited:
             pre_content_len += self.len_edited
         quote = False
@@ -1521,7 +1495,7 @@ class ChatGenerator:
             )
 
         # find all markdown and correct format indexes
-        message_line, md_format, md_indexes = format_md_all(message_line, default_pre_content_len, chain(code_snippets, code_blocks, urls))
+        message_line, md_format, md_indexes = format_md_all(message_line, self.default_pre_content_len, chain(code_snippets, code_blocks, urls))
         if md_indexes:
             move_by_indexes(
                 md_indexes,
