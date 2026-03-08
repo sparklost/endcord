@@ -251,6 +251,7 @@ class Endcord:
         self.tui.update_chat(self.chat, [[[self.colors[0]]]] * len(self.chat))
         self.tui.update_status_line(" CONNECTING")
         self.my_id = None   # will be taken from gateway in main()
+        self.formatter = formatter.ChatGenerator(self.config, self.colors, self.colors_formatted, self.my_id)
         self.premium = None    # same
         self.my_user_data = None    # same
         self.channel_cache = []
@@ -5611,20 +5612,16 @@ class Endcord:
             if last_acked_unreads_line and (not last_message_id or int(last_acked_unreads_line) < int(last_message_id)):
                 last_seen_msg = channel["last_acked_unreads_line"]
 
-        self.chat, self.chat_format, self.chat_map, wide_map = formatter.generate_chat(
+        self.chat, self.chat_format, self.chat_map, wide_map = self.formatter.generate_chat(
             self.messages,
             self.current_roles,
             self.current_channels,
             self.chat_dim[1],
-            self.my_id,
             self.current_my_roles,
             self.current_member_roles,
-            self.colors,
-            self.colors_formatted,
             self.blocked,
             last_seen_msg,
             self.show_blocked_messages,
-            self.config,
         )
         self.tui.set_wide_map(wide_map)
 
@@ -5973,7 +5970,7 @@ class Endcord:
             self.config,
             folder_names=self.state["folder_names"],
             safe_emoji=self.emoji_as_text,
-            max_w=self.tui.get_dimensions()[1][1],
+            max_width=self.tui.get_dimensions()[1][1],
         )
         # debug_guilds_tree
         # debug.save_json(self.tree, "tree.json", False)
@@ -7302,6 +7299,7 @@ class Endcord:
                 sys.exit(self.gateway.error + ERROR_TEXT)
             time.sleep(0.2)
         self.my_id = self.gateway.get_my_id()
+        self.formatter.set_my_id(self.my_id)
         self.premium = self.gateway.get_premium()
         self.my_user_data = self.gateway.get_my_user_data()
         self.update_prompt()
