@@ -1308,7 +1308,6 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
                 else:
                     temp_format.append(shift_formats(color_mention_reply, pre_name_len_reply, wide_shift))
             elif dynamic_name_len:
-                logger.info((color_reply, pre_name_len_reply, name_len - limit_username))
                 temp_format.append(shift_formats(color_reply, pre_name_len_reply, name_len - limit_username))
             else:
                 temp_format.append(shift_formats(color_reply, pre_name_len_reply, wide_shift))
@@ -1601,10 +1600,11 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
             format_line += format_spoilers
             if alt_role_color:
                 format_line.append([alt_role_color, pre_name_len + bool(wide_shift), end_name])
-            if edited_before_content:
-                format_line.append([*color_mention_chat_edited, pre_edited_len + (name_len - limit_username), pre_edited_len + (name_len - limit_username) + len_edited])
-            elif edited and not next_line:
-                format_line.append(color_mention_chat_edited + [len_message_line - len_edited, len_message_line])
+            if edited:
+                if edited_before_content:
+                    format_line.append([*color_mention_chat_edited, pre_edited_len + (name_len - limit_username), pre_edited_len + (name_len - limit_username) + len_edited])
+                elif edited and not next_line:
+                    format_line.append(color_mention_chat_edited + [len_message_line - len_edited, len_message_line])
             temp_format.append(format_line)
         else:
             format_line = color_message[:]
@@ -1620,10 +1620,11 @@ def generate_chat(messages, roles, channels, max_length, my_id, my_roles, member
             format_line += format_spoilers
             if role_color:
                 format_line.append([role_color, pre_name_len + bool(wide_shift), end_name])
-            if edited_before_content:
-                format_line.append([*color_chat_edited, pre_edited_len + (name_len - limit_username), pre_edited_len + (name_len - limit_username) + len_edited])
-            elif edited and not next_line:
-                format_line.append([*color_chat_edited, len_message_line - len_edited, len_message_line])
+            if edited:
+                if edited_before_content:
+                    format_line.append([*color_chat_edited, pre_edited_len + (name_len - limit_username), pre_edited_len + (name_len - limit_username) + len_edited])
+                elif edited and not next_line:
+                    format_line.append([*color_chat_edited, len_message_line - len_edited, len_message_line])
             temp_format.append(format_line)
 
         # newline

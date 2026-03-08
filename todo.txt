@@ -1,4 +1,7 @@
 Reuse api connections - speed up requests
+20-40% faster requests (chat load, message send/edit/react...)
+Fix app/webhook in modern theme
+
 Optimize chat generation with a class ???
 Add ability to resize extra window
 Fix issues with many wide characters in chat

@@ -5,6 +5,7 @@ import os
 import re
 import socket
 import ssl
+import threading
 import time
 import urllib.parse
 import uuid
@@ -28,6 +29,8 @@ DISCORD_HOST = "discord.com"
 DISCORD_CDN_HOST = "cdn.discordapp.com"
 DYN_DISCORD_CDN_HOST = "media.discordapp.net"
 DISCORD_EPOCH = 1420070400
+MAX_CONNECTION_POOL = 10
+MAX_CONNECTION_AGE = 55 * 60  # discord closes keepalive connection after 60 min
 SEARCH_PARAMS = ("content", "channel_id", "author_id", "mentions", "has", "max_id", "min_id", "pinned", "offset")
 SEARCH_HAS_OPTS = ("link", "embed", "poll", "file", "video", "image", "sound", "sticker", "forward")
 PING_OPTIONS = ["all", "mentions", "nothing", "default"]   # must be list
@@ -44,10 +47,9 @@ def ceil(x):
     return -int(-1 * x // 1)
 
 
-def log_api_error(response, function_name):
+def log_api_error(data, status, function_name):
     """Add api response error to log"""
-    text = f"{function_name}: Response code {response.status}"
-    data = response.read()
+    text = f"{function_name}: Response code {status}"
     if data:
         try:
             data = json.loads(data)
@@ -141,6 +143,12 @@ class Discord():
             self.header.pop("X-Super-Properties", None)
         self.user_agent = user_agent
         self.proxy = urllib.parse.urlsplit(proxy)
+
+        self.connection = None
+        self.connection_time = 0
+        self.connection_pool = []
+        self.connection_pool_lock = threading.Lock()
+
         self.my_id = self.get_my_id(exit_on_error=True)
         self.activity_token = None
         self.protos = [[], []]
@@ -177,48 +185,108 @@ class Discord():
         """Get connection object and handle proxying"""
         if self.proxy.scheme:
             if self.proxy.scheme.lower() == "http":
-                connection = http.client.HTTPSConnection(self.proxy.hostname, self.proxy.port)
+                connection = http.client.HTTPSConnection(self.proxy.hostname, self.proxy.port, timeout=timeout)
                 connection.set_tunnel(host, port=port)
             elif "socks" in self.proxy.scheme.lower():
                 proxy_sock = socks.socksocket()
                 proxy_sock.set_proxy(socks.SOCKS5, self.proxy.hostname, self.proxy.port)
-                proxy_sock.settimeout(10)
+                proxy_sock.settimeout(timeout)
                 proxy_sock.connect((host, port))
                 ssl_context = ssl.create_default_context()
                 ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
                 proxy_sock = ssl_context.wrap_socket(proxy_sock, server_hostname=host)
                 # proxy_sock.do_handshake()   # seems like its not needed
-                connection = http.client.HTTPSConnection(host, port, timeout=timeout + 5)
+                connection = http.client.HTTPSConnection(host, port, timeout=timeout + 5)   # extra time for tor
                 connection.sock = proxy_sock
             else:
-                connection = http.client.HTTPSConnection(host, port)
+                connection = http.client.HTTPSConnection(host, port, timeout=timeout)
         else:
             connection = http.client.HTTPSConnection(host, port, timeout=timeout)
         return connection
 
 
+    def request(self, method, path, body=None, headers=None, timeout=5, exit_on_error=False):
+        """Perform discord api request; try to use existing keepalive connection, or create new one; handle threading by using connection pool; and recreate connections if server timeout them after 55 minutes"""
+        entry = None
+        connection = None
+        now = int(time.time())
+
+        # get first free connection or create new one
+        with self.connection_pool_lock:
+            for num, e in enumerate(self.connection_pool):
+                if not e[1]:
+                    entry = e
+                    connection = e[0]
+                    # discord closes keepalive connection after 60 min
+                    if now - e[2] > MAX_CONNECTION_AGE or connection.sock is None:
+                        try:
+                            connection.close()
+                        except Exception:
+                            pass
+                        connection = self.get_connection(self.host, 443, timeout)
+                        e[0] = connection
+                    break
+            if entry is None:
+                if len(self.connection_pool) < MAX_CONNECTION_POOL:
+                    connection = self.get_connection(self.host, 443, timeout)
+                    entry = [connection, True, now]
+                    self.connection_pool.append(entry)
+                else:   # all connections busy
+                    logger.error("Could not perform request: connection pool is full!")
+                    return None, None
+            entry[1] = True
+
+        # do request
+        try:
+            try:
+                connection.request(method, path, body, headers)
+                response = connection.getresponse()
+                data = response.read()
+            except (BrokenPipeError, ConnectionResetError, http.client.RemoteDisconnected, TimeoutError):
+                # server closed keepalive
+                try:
+                    connection.close()
+                except Exception:
+                    pass
+                connection = self.get_connection(self.host, 443, timeout)
+                entry[0] = connection
+                connection.request(method, path, body, headers)
+                response = connection.getresponse()
+                data = response.read()
+            return data, response.status
+
+        # network errors
+        except Exception as e:
+            # connection is probably unusable so remove it
+            try:
+                connection.close()
+            except Exception:
+                pass
+            with self.connection_pool_lock:
+                self.connection_pool.remove(entry)
+            logger.error(f"Network error: {e}")
+            if exit_on_error:
+                raise SystemExit(f"Network error: {e}")
+            return None, None
+        finally:
+            if entry:
+                entry[1] = False
+                entry[2] = now
+
+
     def get_my_id(self, exit_on_error=False):
         """Get my discord user ID"""
         message_data = None
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("GET", "/api/v9/users/@me", message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError, ConnectionResetError) as e:
-            if exit_on_error:
-                logger.warning(f"Network error: {e}")
-                raise SystemExit(f"Network error: {e}")
-            connection.close()
+        data, status = self.request("GET", "/api/v9/users/@me", message_data, self.header, exit_on_error=exit_on_error)
+        if not status:
             return None
-        if response.status == 200:
-            data = json.loads(response.read())
-            connection.close()
+        if status == 200:
+            data = json.loads(data)
             return data["id"]
-        if response.status in (400, 401):   # bad request or unauthorized
+        if status in (400, 401):   # bad request or unauthorized
             logger.error("unauthorized access. Probably invalid token. Exiting...")
             raise SystemExit("unauthorized access. Probably invalid token. Exiting...")
-        log_api_error(response, "get_my_id")
-        connection.close()
+        log_api_error(data, status, "get_my_id")
         raise SystemExit(f"Network error: {"See log for more info"}")
 
 
@@ -226,16 +294,11 @@ class Discord():
         """Get relevant information about specified user"""
         message_data = None
         url = f"/api/v9/users/{user_id}/profile"
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("GET", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("GET", url, message_data, self.header)
+        if not status:
             return None
-        if response.status == 200:
-            data = json.loads(response.read())
-            connection.close()
+        if status == 200:
+            data = json.loads(data)
             if extra:   # extra data for rpc
                 extra_data = {
                     "avatar": data["user"]["avatar"],
@@ -270,8 +333,7 @@ class Discord():
                 "extra": extra_data,
                 "roles": None,
             }
-        log_api_error(response, "get_user")
-        connection.close()
+        log_api_error(data, status, "get_user")
         return False
 
 
@@ -279,16 +341,11 @@ class Discord():
         """Get relevant information about specified user in a guild"""
         message_data = None
         url = f"/api/v9/users/{user_id}/profile?with_mutual_guilds=true&with_mutual_friends=true&guild_id={guild_id}"
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("GET", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("GET", url, message_data, self.header)
+        if not status:
             return None
-        if response.status == 200:
-            data = json.loads(response.read())
-            connection.close()
+        if status == 200:
+            data = json.loads(data)
             if "guild_member" in data:
                 nick = data["guild_member"]["nick"]
                 roles = data["guild_member"]["roles"]
@@ -326,8 +383,7 @@ class Discord():
                 "bot": data["user"].get("bot"),
                 "roles": roles,
             }
-        log_api_error(response, "get_user_guild")
-        connection.close()
+        log_api_error(data, status, "get_user_guild")
         return False
 
 
@@ -341,16 +397,11 @@ class Discord():
         """
         message_data = None
         url = f"/api/v9/users/{self.my_id}/channels"
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("GET", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
-            return None, None
-        if response.status == 200:
-            data = json.loads(response.read())
-            connection.close()
+        data, status = self.request("GET", url, message_data, self.header)
+        if not status:
+            return None
+        if status == 200:
+            data = json.loads(data)
             dms = []
             dms_id = []
             for dm in data:
@@ -373,8 +424,7 @@ class Discord():
                 })
                 dms_id.append(dm["id"])
             return dms, dms_id
-        log_api_error(response, "get_dms")
-        connection.close()
+        log_api_error(data, status, "get_dms")
         return [], []
 
 
@@ -391,16 +441,11 @@ class Discord():
         """
         message_data = None
         url = f"/api/v9/guilds/{guild_id}/channels"
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("GET", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("GET", url, message_data, self.header)
+        if not status:
             return None
-        if response.status == 200:
-            data = json.loads(response.read())
-            connection.close()
+        if status == 200:
+            data = json.loads(data)
             channels = []
             for channel in data:
                 channels.append({
@@ -412,8 +457,7 @@ class Discord():
                     "position": channel["position"],
                 })
             return channels
-        log_api_error(response, "get_channels")
-        connection.close()
+        log_api_error(data, status, "get_channels")
         return []
 
 
@@ -427,22 +471,16 @@ class Discord():
             url += f"&after={after}"
         if around:
             url += f"&around={around}"
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("GET", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("GET", url, message_data, self.header)
+        if not status:
             return None
-        if response.status == 200:
-            data = json.loads(response.read())
-            connection.close()
+        if status == 200:
+            data = json.loads(data)
             # debug_chat
             # from endcord import debug
             # debug.save_json(data, "messages.json", False)
             return prepare_messages(data)
-        log_api_error(response, "get_messages")
-        connection.close()
+        log_api_error(data, status, "get_messages")
         return []
 
 
@@ -451,16 +489,11 @@ class Discord():
         encoded_reaction = urllib.parse.quote(reaction)
         message_data = None
         url = f"/api/v9/channels/{channel_id}/messages/{message_id}/reactions/{encoded_reaction}?limit=50&type=0"
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("GET", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("GET", url, message_data, self.header)
+        if not status:
             return None
-        if response.status == 200:
-            data = json.loads(response.read())
-            connection.close()
+        if status == 200:
+            data = json.loads(data)
             reaction = []
             for user in data:
                 reaction.append({
@@ -469,8 +502,7 @@ class Discord():
                     "global_name": user["global_name"],
                 })
             return reaction
-        log_api_error(response, "get_reactions")
-        connection.close()
+        log_api_error(data, status, "get_reactions")
         return []
 
 
@@ -482,16 +514,11 @@ class Discord():
         if everyone:
             url += "&everyone=true"
         message_data = None
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("GET", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("GET", url, message_data, self.header)
+        if not status:
             return None
-        if response.status == 200:
-            data = json.loads(response.read())
-            connection.close()
+        if status == 200:
+            data = json.loads(data)
             mentions = []
             for mention in data:
                 mentions.append({
@@ -504,8 +531,7 @@ class Discord():
                     "global_name": mention["author"].get("global_name"),   # spacebar_fix - get
                 })
             return mentions
-        log_api_error(response, "get_mentions")
-        connection.close()
+        log_api_error(data, status, "get_mentions")
         return []
 
 
@@ -515,16 +541,11 @@ class Discord():
             return self.stickers
         url = "/api/v9/sticker-packs?locale=en-US"
         message_data = None
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("GET", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("GET", url, message_data, self.header)
+        if not status:
             return []
-        if response.status == 200:
-            data = json.loads(response.read())
-            connection.close()
+        if status == 200:
+            data = json.loads(data)
             for pack in data["sticker_packs"]:
                 pack_stickers = []
                 for sticker in pack["stickers"]:
@@ -539,8 +560,7 @@ class Discord():
                 })
             del (data, pack_stickers)
             return self.stickers
-        log_api_error(response, "get_stickers")
-        connection.close()
+        log_api_error(data, status, "get_stickers")
         return []
 
 
@@ -554,16 +574,11 @@ class Discord():
             return self.protos[num-1]
         message_data = None
         url = f"/api/v9/users/@me/settings-proto/{num}"
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("GET", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("GET", url, message_data, self.header)
+        if not status:
             return None
-        if response.status == 200:
-            data = json.loads(response.read())["settings"]
-            connection.close()
+        if status == 200:
+            data = json.loads(data)["settings"]
             if num == 1:
                 decoded = PreloadedUserSettings.FromString(base64.b64decode(data))
             elif num == 2:
@@ -572,8 +587,7 @@ class Discord():
                 return {}
             self.protos[num-1] = MessageToDict(decoded)
             return self.protos[num-1]
-        log_api_error(response, "get_settings_proto")
-        connection.close()
+        log_api_error(data, status, "get_settings_proto")
         return False
 
 
@@ -594,18 +608,12 @@ class Discord():
 
         message_data = json.dumps({"settings": encoded})
         url = f"/api/v9/users/@me/settings-proto/{num}"
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("PATCH", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("PATCH", url, message_data, self.header)
+        if not status:
             return None
-        if response.status == 200:
-            connection.close()
+        if status == 200:
             return True
-        log_api_error(response, "patch_settings_proto")
-        connection.close()
+        log_api_error(data, status, "patch_settings_proto")
         return False
 
 
@@ -613,18 +621,12 @@ class Discord():
         """Patch account settings, used only for spacebar compatibility"""
         url = "/api/v9/users/@me/settings"
         message_data = json.dumps({str(setting): value})
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("PATCH", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("PATCH", url, message_data, self.header)
+        if not status:
             return None
-        if response.status == 200:
-            connection.close()
+        if status == 200:
             return True
-        log_api_error(response, "patch_settings_old")
-        connection.close()
+        log_api_error(data, status, "patch_settings_old")
         return False
 
 
@@ -632,25 +634,19 @@ class Discord():
         """Get data about Discord RPC application"""
         message_data = None
         url = f"/api/v9/oauth2/applications/{app_id}/rpc"
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("GET", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("GET", url, message_data, self.header)
+        if not status:
             return 1, None
-        if response.status == 200:
-            data = json.loads(response.read())
-            connection.close()
+        if status == 200:
+            data = json.loads(data)
             return 0, {
                 "id": data["id"],
                 "name": data["name"],
                 "description": data["description"],
             }
-        if response.status == 404:
+        if status == 404:
             return 2, None
-        log_api_error(response, "get_rpc_app")
-        connection.close()
+        log_api_error(data, status, "get_rpc_app")
         return 3, None
 
 
@@ -658,16 +654,11 @@ class Discord():
         """Get Discord application assets list"""
         message_data = None
         url = f"/api/v9/oauth2/applications/{app_id}/assets"
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("GET", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("GET", url, message_data, self.header)
+        if not status:
             return None
-        if response.status == 200:
-            data = json.loads(response.read())
-            connection.close()
+        if status == 200:
+            data = json.loads(data)
             assets = []
             for asset in data:
                 assets.append({
@@ -675,8 +666,7 @@ class Discord():
                     "name": asset["name"],
                 })
             return assets
-        log_api_error(response, "get_rpc_app_assets")
-        connection.close()
+        log_api_error(data, status, "get_rpc_app_assets")
         return False
 
 
@@ -684,25 +674,17 @@ class Discord():
         """Get Discord application external assets"""
         message_data = json.dumps({"urls": [asset_url]})
         url = f"/api/v9/applications/{app_id}/external-assets"
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("POST", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("POST", url, message_data, self.header)
+        if not status:
             return None
-        if response.status == 200:
-            data = json.loads(response.read())
-            connection.close()
-            return data
-        if response.status == 429:
-            data = json.loads(response.read())
-            connection.close()
+        if status == 200:
+            return json.loads(data)
+        if status == 429:
+            data = json.loads(data)
             retry_after = float(data["retry_after"])
             logger.error(f"get_rpc_app_external: Response code 429 - Retry after: {retry_after}")
             return retry_after
-        log_api_error(response, "get_rpc_app_external")
-        connection.close()
+        log_api_error(data, status, "get_rpc_app_external")
         return False
 
 
@@ -768,16 +750,11 @@ class Discord():
             message_dict["sticker_ids"] = stickers
         message_data = json.dumps(message_dict)
         url = f"/api/v9/channels/{channel_id}/messages"
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("POST", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("POST", url, message_data, self.header)
+        if not status:
             return None
-        if response.status == 200:
-            data = json.loads(response.read())
-            connection.close()
+        if status == 200:
+            data = json.loads(data)
             if "referenced_message" in data:
                 reference = {
                     "id": data["referenced_message"]["id"],
@@ -806,8 +783,7 @@ class Discord():
                 "reactions": [],
                 "stickers": data.get("sticker_items", []),
             }
-        log_api_error(response, "send_message")
-        connection.close()
+        log_api_error(data, status, "send_message")
         return False
 
 
@@ -815,16 +791,11 @@ class Discord():
         """Update the message in the channel"""
         message_data = json.dumps({"content": message_content})
         url = f"/api/v9/channels/{channel_id}/messages/{message_id}"
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("PATCH", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("PATCH", url, message_data, self.header)
+        if not status:
             return None
-        if response.status == 200:
-            data = json.loads(response.read())
-            connection.close()
+        if status == 200:
+            data = json.loads(data)
             mentions = []
             if data["mentions"]:
                 for mention in data["mentions"]:
@@ -843,9 +814,7 @@ class Discord():
                 "mention_everyone": data["mention_everyone"],
                 "stickers": data.get("sticker_items", []),
             }
-
-        log_api_error(response, "update_message")
-        connection.close()
+        log_api_error(data, status, "update_message")
         return False
 
 
@@ -853,18 +822,12 @@ class Discord():
         """Delete the message from the channel"""
         message_data = None
         url = f"/api/v9/channels/{channel_id}/messages/{message_id}"
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("DELETE", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("DELETE", url, message_data, self.header)
+        if not status:
             return None
-        if response.status == 204:
-            connection.close()
+        if status == 204:
             return True
-        log_api_error(response, "delete_message")
-        connection.close()
+        log_api_error(data, status, "delete_message")
         return False
 
 
@@ -882,18 +845,12 @@ class Discord():
             })
         url = f"/api/v9/channels/{channel_id}/messages/{message_id}/ack"
         logger.debug("Sending message ack")
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("POST", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("POST", url, message_data, self.header)
+        if not status:
             return None
-        if response.status == 200:
-            connection.close()
+        if status == 200:
             return True
-        log_api_error(response, "ack")
-        connection.close()
+        log_api_error(data, status, "ack")
         return False
 
 
@@ -907,18 +864,12 @@ class Discord():
         message_data = json.dumps({"read_states": channels})
         url = "/api/v9/read-states/ack-bulk"
         logger.debug("Sending bulk message ack")
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("POST", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("POST", url, message_data, self.header)
+        if not status:
             return None
-        if response.status == 204:
-            connection.close()
+        if status == 204:
             return True
-        log_api_error(response, "ack_bulk")
-        connection.close()
+        log_api_error(data, status, "ack_bulk")
         return False
 
 
@@ -926,22 +877,15 @@ class Discord():
         """Set '[username] is typing...' status on specified channel"""
         message_data = None
         url = f"/api/v9/channels/{channel_id}/typing"
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("POST", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("POST", url, message_data, self.header)
+        if not status:
             return None
-        if response.status == 204:
-            connection.close()
+        if status == 204:
             return True
-        if response.status == 200:
-            data = json.loads(response.read())
-            connection.close()
+        if status == 200:
+            data = json.loads(data)
             return int(data["message_send_cooldown_ms"] / 1000)
-        log_api_error(response, "send_typing")
-        connection.close()
+        log_api_error(data, status, "send_typing")
         return False
 
 
@@ -950,18 +894,12 @@ class Discord():
         encoded_reaction = urllib.parse.quote(reaction)
         message_data = None
         url = f"/api/v9/channels/{channel_id}/messages/{message_id}/reactions/{encoded_reaction}/%40me?location=Message%20Reaction%20Picker&type=0"
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("PUT", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("PUT", url, message_data, self.header)
+        if not status:
             return None
-        if response.status == 204:
-            connection.close()
+        if status == 204:
             return True
-        log_api_error(response, "send_reaction")
-        connection.close()
+        log_api_error(data, status, "send_reaction")
         return False
 
 
@@ -970,18 +908,12 @@ class Discord():
         encoded_reaction = urllib.parse.quote(reaction)
         message_data = None
         url = f"/api/v9/channels/{channel_id}/messages/{message_id}/reactions/{encoded_reaction}/0/%40me?location=Message%20Inline%20Button&burst=false"
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("DELETE", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("DELETE", url, message_data, self.header)
+        if not status:
             return None
-        if response.status == 204:
-            connection.close()
+        if status == 204:
             return True
-        log_api_error(response, "remove_reaction")
-        connection.close()
+        log_api_error(data, status, "remove_reaction")
         return False
 
 
@@ -1004,18 +936,12 @@ class Discord():
 
         url = "/api/v9/users/@me/guilds/settings"
         message_data = json.dumps(message_dict)
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("PATCH", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("PATCH", url, message_data, self.header)
+        if not status:
             return None
-        if response.status == 200:
-            connection.close()
+        if status == 200:
             return True
-        log_api_error(response, "mute_guild")
-        connection.close()
+        log_api_error(data, status, "mute_guild")
         return False
 
 
@@ -1044,18 +970,12 @@ class Discord():
 
         url = "/api/v9/users/@me/guilds/settings"
         message_data = json.dumps(message_dict)
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("PATCH", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("PATCH", url, message_data, self.header)
+        if not status:
             return None
-        if response.status == 200:
-            connection.close()
+        if status == 200:
             return True
-        log_api_error(response, "mute_channel")
-        connection.close()
+        log_api_error(data, status, "mute_channel")
         return False
 
 
@@ -1078,18 +998,12 @@ class Discord():
 
         url = "/api/v9/users/@me/guilds/%40me/settings"
         message_data = json.dumps(message_dict)
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("PATCH", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("PATCH", url, message_data, self.header)
+        if not status:
             return None
-        if response.status == 200:
-            connection.close()
+        if status == 200:
             return True
-        log_api_error(response, "mute_dm")
-        connection.close()
+        log_api_error(data, status, "mute_dm")
         return False
 
 
@@ -1116,18 +1030,12 @@ class Discord():
 
             url = "/api/v9/users/@me/guilds/settings"
             message_data = json.dumps(message_dict)
-            try:
-                connection = self.get_connection(self.host, 443)
-                connection.request("PATCH", url, message_data, self.header)
-                response = connection.getresponse()
-            except (socket.gaierror, TimeoutError):
-                connection.close()
+            data, status = self.request("PATCH", url, message_data, self.header)
+            if not status:
                 return None
-            if response.status == 200:
-                connection.close()
+            if status == 200:
                 return True
-            log_api_error(response, "set_notification_setting_guild")
-            connection.close()
+            log_api_error(data, status, "set_notification_setting_guild")
         return False
 
 
@@ -1159,18 +1067,12 @@ class Discord():
 
         url = "/api/v9/users/@me/guilds/settings"
         message_data = json.dumps(message_dict)
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("PATCH", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("PATCH", url, message_data, self.header)
+        if not  status:
             return None
-        if response.status == 200:
-            connection.close()
+        if status == 200:
             return True
-        log_api_error(response, "set_notification_setting_channel")
-        connection.close()
+        log_api_error(data, status, "set_notification_setting_channel")
 
 
     def set_profile(self, setting, value, guild_id=None, profile=False):
@@ -1189,18 +1091,12 @@ class Discord():
             url = "/api/v9/users/%40me/profile"
 
         message_data = json.dumps({setting: value})
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("PATCH", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("PATCH", url, message_data, self.header)
+        if not status:
             return None
-        if response.status == 200:
-            connection.close()
+        if status == 200:
             return True
-        log_api_error(response, "set_profile")
-        connection.close()
+        log_api_error(data, status, "set_profile")
 
 
     def get_threads(self, channel_id, number=25, offset=0, archived=None):
@@ -1213,16 +1109,11 @@ class Discord():
             for channel in self.threads:
                 if channel["channel_id"] == channel_id:
                     return len(channel["threads"]), channel["threads"]
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("GET", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("GET", url, message_data, self.header)
+        if not status:
             return 0, []
-        if response.status == 200:
-            data = json.loads(response.read())
-            connection.close()
+        if status == 200:
+            data = json.loads(data)
             threads = []
             total = data["total_results"]
             for thread in data["threads"]:
@@ -1252,8 +1143,7 @@ class Discord():
                         "threads": threads,
                     })
             return total, threads
-        log_api_error(response, "get_threads")
-        connection.close()
+        log_api_error(data, status, "get_threads")
         return 0, []
 
 
@@ -1262,18 +1152,12 @@ class Discord():
         message_data = None
         # location is not necessarily "Sidebar Overflow"
         url = f"/api/v9/channels/{thread_id}/thread-members/@me?location=Sidebar%20Overflow"
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("POST", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("POST", url, message_data, self.header)
+        if not status:
             return None
-        if response.status == 204:
-            connection.close()
+        if status == 204:
             return True
-        log_api_error(response, "join_thread")
-        connection.close()
+        log_api_error(data, status, "join_thread")
         return False
 
 
@@ -1282,18 +1166,12 @@ class Discord():
         message_data = None
         # location is not necessarily "Sidebar Overflow"
         url = f"/api/v9/channels/{thread_id}/thread-members/@me?location=Sidebar%20Overflow"
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("DELETE", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("DELETE", url, message_data, self.header)
+        if not status:
             return None
-        if response.status == 204:
-            connection.close()
+        if status == 204:
             return True
-        log_api_error(response, "leave_thread")
-        connection.close()
+        log_api_error(data, status, "leave_thread")
         return False
 
 
@@ -1328,23 +1206,17 @@ class Discord():
                 if item:
                     url += f"{SEARCH_PARAMS[num]}={urllib.parse.quote(item)}&"
         url = url.rstrip("&")
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("GET", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("GET", url, message_data, self.header)
+        if not status:
             return None, []
-        if response.status == 200:
-            data = json.loads(response.read())
-            connection.close()
+        if status == 200:
+            data = json.loads(data)
             messages = []
             total = data["total_results"]
             for message in data["messages"]:
                 messages.append(message[0])
             return total, prepare_messages(messages, have_channel_id=True)
-        log_api_error(response, "search")
-        connection.close()
+        log_api_error(data, status, "search")
         return 0, []
 
 
@@ -1355,17 +1227,11 @@ class Discord():
 
         message_data = None
         url = "/api/v9/users/@me/application-command-index"
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("GET", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("GET", url, message_data, self.header)
+        if not status:
             return [], []
-        if response.status == 200:
-            data = json.loads(response.read())
-            connection.close()
-
+        if status == 200:
+            data = json.loads(data)
             applications = data["applications"]
             commands = []
             apps = []
@@ -1399,8 +1265,7 @@ class Discord():
             self.my_commands = commands
             self.my_apps = apps
             return commands, apps
-        log_api_error(response, "get_my_commands")
-        connection.close()
+        log_api_error(data, status, "get_my_commands")
         return [], []
 
 
@@ -1412,17 +1277,11 @@ class Discord():
 
         message_data = None
         url = f"/api/v9/guilds/{guild_id}/application-command-index"
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("GET", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("GET", url, message_data, self.header)
+        if not status:
             return [], []
-        if response.status == 200:
-            data = json.loads(response.read())
-            connection.close()
-
+        if status == 200:
+            data = json.loads(data)
             applications = data["applications"]
             commands = []
             apps = []
@@ -1460,8 +1319,7 @@ class Discord():
                 "apps": apps,
             })
             return commands, apps
-        log_api_error(response, "get_guild_commands")
-        connection.close()
+        log_api_error(data, status, "get_guild_commands")
         return [], []
 
 
@@ -1496,18 +1354,12 @@ class Discord():
             message_dict["analytics_location"] = "slash_ui"
         message_data = json.dumps(message_dict)
         url = "/api/v9/interactions"
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("POST", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("POST", url, message_data, self.header)
+        if not status:
             return None
-        if response.status == 204:
-            connection.close()
+        if status == 204:
             return True
-        log_api_error(response, "send_interaction")
-        connection.close()
+        log_api_error(data, status, "send_interaction")
         return False
 
 
@@ -1518,18 +1370,12 @@ class Discord():
         else:
             message_data = json.dumps({"answer_ids": [str(x) for x in vote_ids]})
         url = f"/api/v9/channels/{channel_id}/polls/{message_id}/answers/@me"
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("PUT", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("PUT", url, message_data, self.header)
+        if not status:
             return None
-        if response.status == 204:
-            connection.close()
+        if status == 204:
             return True
-        log_api_error(response, "send_vote")
-        connection.close()
+        log_api_error(data, status, "send_vote")
         return False
 
 
@@ -1542,18 +1388,12 @@ class Discord():
         url = f"/api/v9/users/@me/relationships/{user_id}"
         if ignore:
             url = url + "/ignore"
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("PUT", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("PUT", url, message_data, self.header)
+        if not status:
             return None
-        if response.status == 204:
-            connection.close()
+        if status == 204:
             return True
-        log_api_error(response, "block_user")
-        connection.close()
+        log_api_error(data, status, "block_user")
         return False
 
 
@@ -1563,18 +1403,12 @@ class Discord():
         url = f"/api/v9/users/@me/relationships/{user_id}"
         if ignore:
             url = url + "/ignore"
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("DELETE", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("DELETE", url, message_data, self.header)
+        if not status:
             return None
-        if response.status == 204:
-            connection.close()
+        if status == 204:
             return True
-        log_api_error(response, "unblock_user")
-        connection.close()
+        log_api_error(data, status, "unblock_user")
         return False
 
 
@@ -1582,19 +1416,13 @@ class Discord():
         """Get pinned messages for specified channel"""
         message_data = None
         url = f"/api/v9/channels/{channel_id}/pins"
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("GET", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("GET", url, message_data, self.header)
+        if not  status:
             return None
-        if response.status == 200:
-            data = json.loads(response.read())
-            connection.close()
+        if status == 200:
+            data = json.loads(data)
             return prepare_messages(data, have_channel_id=True)
-        log_api_error(response, "get_pinned")
-        connection.close()
+        log_api_error(data, status, "get_pinned")
         return False
 
 
@@ -1602,18 +1430,12 @@ class Discord():
         """Send what message should be pinned in specified channel"""
         message_data = None
         url = f"/api/v9/channels/{channel_id}/pins/{message_id}"
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("PUT", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("PUT", url, message_data, self.header)
+        if not status:
             return None
-        if response.status == 204:
-            connection.close()
+        if status == 204:
             return True
-        log_api_error(response, "send_pin")
-        connection.close()
+        log_api_error(data, status, "send_pin")
         return False
 
 
@@ -1622,16 +1444,11 @@ class Discord():
         message_data = None
         query = urllib.parse.quote(query)
         url = f"/api/v9/gifs/search?q={query}&media_format=webm&provider=tenor&locale=en-US"
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("GET", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("GET", url, message_data, self.header)
+        if not status:
             return []
-        if response.status == 200:
-            data = json.loads(response.read())
-            connection.close()
+        if status == 200:
+            data = json.loads(data)
             gifs = []
             for gif in data:
                 gifs.append({
@@ -1640,8 +1457,7 @@ class Discord():
                     "gif": gif["gif_src"],
                 })
             return gifs
-        log_api_error(response, "search_gifs")
-        connection.close()
+        log_api_error(data, status, "search_gifs")
         return []
 
 
@@ -1668,23 +1484,16 @@ class Discord():
         })
         url = f"/api/v9/channels/{channel_id}/attachments"
         self.attachment_id += 1
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("POST", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("POST", url, message_data, self.header)
+        if not status:
             return None, 3   # network error
-        if response.status == 200:
-            data = json.loads(response.read())
-            connection.close()
+        if status == 200:
+            data = json.loads(data)
             return data["attachments"][0], 0
-        if response.status == 413:
+        if status == 413:
             logger.warning("Failed to get attachment upload link: 413 - File too large.")
-            connection.close()
             return None, 2   # file too large
-        log_api_error(response, "request_attachment_url")
-        connection.close()
+        log_api_error(data, status, "request_attachment_url")
         return None, 1
 
 
@@ -1720,7 +1529,7 @@ class Discord():
                 connection.close()
                 return True
             # discord client is also performing OPTIONS request, idk why, not needed here
-            log_api_error(response, "upload_attachment")
+            log_api_error(response.read(), response.status, "upload_attachment")
             connection.close()
             return False
 
@@ -1748,24 +1557,17 @@ class Discord():
         attachment_name = urllib.parse.quote(attachment_name, safe="")
         message_data = None
         url = f"/api/v9/attachments/{attachment_name}"
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("DELETE", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("DELETE", url, message_data, self.header)
+        if not status:
             return None
-        if response.status == 204:
-            connection.close()
+        if status == 204:
             return True
-        if response.status == 429:
+        if status == 429:
             # discord usually returns 429 for this request, but original client does not retry after some time
             # so this wont retry either, file wont be sent in the message anyway
             logger.debug("Failed to delete attachment. Response code: 429 - Too Many Requests")
-            connection.close()
             return True
-        log_api_error(response, "cancel_attachment")
-        connection.close()
+        log_api_error(data, status, "cancel_attachment")
         return False
 
 
@@ -1773,20 +1575,14 @@ class Discord():
         """Request refreshed attachment url"""
         message_data = json.dumps({"attachment_urls": [url]})
         url = "/api/v9/attachments/refresh-urls"
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("POST", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("POST", url, message_data, self.header)
+        if not status:
             return None
-        if response.status == 200:
-            data = json.loads(response.read())
-            connection.close()
+        if status == 200:
+            data = json.loads(data)
             if data["refreshed_urls"]:
                 return data["refreshed_urls"][0]["refreshed"]
-        log_api_error(response, "refresh_attachment_url")
-        connection.close()
+        log_api_error(data, status, "refresh_attachment_url")
         return False
 
 
@@ -1836,18 +1632,12 @@ class Discord():
                     }
         message_data = json.dumps(message_dict)
         url = f"/api/v9/channels/{channel_id}/messages"
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("POST", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("POST", url, message_data, self.header)
+        if not status:
             return None
-        if response.status == 200:
-            connection.close()
+        if status == 200:
             return True
-        log_api_error(response, "send_voice_message")
-        connection.close()
+        log_api_error(data, status, "send_voice_message")
         return False
 
 
@@ -1855,18 +1645,12 @@ class Discord():
         """Check if user can ring call in DM"""
         message_data = None
         url = f"/api/v9/channels/{channel_id}/call"
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("GET", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("GET", url, message_data, self.header)
+        if not status:
             return None
-        if response.status == 200:
-            data = json.loads(response.read())
-            connection.close()
+        if status == 200:
+            data = json.loads(data)
             return bool(data["ringable"])
-        connection.close()
         return False
 
 
@@ -1880,19 +1664,12 @@ class Discord():
             "recipients": recipients,
         })
         url = f"/api/v9/channels/{channel_id}/call/ring"
-        logger.debug("Ringing provate channel recipients")
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("POST", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("POST", url, message_data, self.header)
+        if not status:
             return None
-        if response.status == 204:
-            connection.close()
+        if status == 204:
             return True
-        log_api_error(response, "send_ring")
-        connection.close()
+        log_api_error(data, status, "send_ring")
         return False
 
 
@@ -1922,7 +1699,7 @@ class Discord():
                 f.write(response.read())
             connection.close()
             return destination
-        log_api_error(response, "get_pfp")
+        log_api_error(response.read(), response.status, "get_pfp")
         connection.close()
         return False
 
@@ -1955,7 +1732,7 @@ class Discord():
                 f.write(response.read())
             connection.close()
             return destination
-        log_api_error(response, "get_emoji")
+        log_api_error(response.read(), response.status, "get_emoji")
         connection.close()
         return False
 
@@ -1973,21 +1750,15 @@ class Discord():
         }
         url = f"/api/v9/channels/{channel_id}/invites"
         message_data = json.dumps(message_dict)
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("POST", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("POST", url, message_data, self.header)
+        if not status:
             return None
-        if response.status == 200:
-            data = json.loads(response.read())
-            connection.close()
+        if status == 200:
+            data = json.loads(data)
             if data["code"]:
                 return f"https://{self.host}/invite/{data["code"]}"
             return None
-        log_api_error(response, "get_invite_url")
-        connection.close()
+        log_api_error(data, status, "get_invite_url")
         return False
 
 
@@ -1995,19 +1766,13 @@ class Discord():
         """Get my account standing"""
         message_data = None
         url = "/api/v9/safety-hub/@me"
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("GET", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("GET", url, message_data, self.header)
+        if not status:
             return None
-        if response.status == 200:
-            data = json.loads(response.read())
-            connection.close()
+        if status == 200:
+            data = json.loads(data)
             return data["account_standing"]["state"]
-        log_api_error(response, "get_my_standing")
-        connection.close()
+        log_api_error(data, status, "get_my_standing")
         return False
 
 
@@ -2024,19 +1789,13 @@ class Discord():
             "closed": closed,
         })
         url = "/api/v9/activities"
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("POST", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("POST", url, message_data, self.header)
+        if not status:
             return None
-        if response.status == 200:
-            self.activity_token = json.loads(response.read())["token"]
-            connection.close()
+        if status == 200:
+            self.activity_token = json.loads(data)["token"]
             return self.activity_token
-        log_api_error(response, "update_activity_session")
-        connection.close()
+        log_api_error(data, status, "update_activity_session")
         return False
 
 
@@ -2046,16 +1805,11 @@ class Discord():
             return self.voice_regions
         message_data = None
         url = "/api/v9/voice/regions"
-        try:
-            connection = self.get_connection(self.host, 443)
-            connection.request("GET", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        data, status = self.request("GET", url, message_data, self.header)
+        if not status:
             return None
-        if response.status == 200:
-            data = json.loads(response.read())
-            connection.close()
+        if status == 200:
+            data = json.loads(data)
             regions = []
             optimal = None
             for num, region in enumerate(data):
@@ -2069,8 +1823,7 @@ class Discord():
                 regions.insert(0, optimal)
             self.voice_regions = regions
             return regions
-        log_api_error(response, "get_voice_regions")
-        connection.close()
+        log_api_error(data, status, "get_voice_regions")
         return False
 
 
@@ -2097,7 +1850,7 @@ class Discord():
                 regions.append(region["region"])
             self.ranked_voice_regions = regions
             return self.ranked_voice_regions
-        log_api_error(response, "get_best_voice_region")
+        log_api_error(response.read(), response.status, "get_best_voice_region")
         connection.close()
         return self.ranked_voice_regions
 
@@ -2155,6 +1908,6 @@ class Discord():
             current_time = int(time.time()/1000)
             save_path = os.path.expanduser(os.path.join(save_dir, f"detectable_apps_{etag}_{current_time}.ndjson"))
             return save_path, etag
-        log_api_error(response, "get_detectable_apps")
+        log_api_error(response.read(), response.status, "get_detectable_apps")
         connection.close()
         return None, etag
