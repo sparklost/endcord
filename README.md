@@ -295,7 +295,7 @@ Keybinding remain the same, but all codes are like on Linux, so old keybinding c
 If using external editor, use editor with graphical interface. TUI editors will not work, as this is no longer in terminal.  
 Also, endcord built-in media player will not work because its standalone TUI thats not using curses. All meda will be opened in native player.  
 Building with nuitka on python >=3.13 will create executable that segfaults! Building with pyinstaller is not recommended because it generates huge binary.  
-You can toggle experimental mode bu running: `python build.py --experimental`.  
+You can toggle experimental mode by running: `python build.py --experimental`.  
 Then run endcord from source: `uv run main.py`.  
 After first run in experimental mode, extra config will be generated in endcord config path in file called `pgcurses.json`. More info in [configuration](docs/configuration.md).
 

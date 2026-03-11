@@ -1308,14 +1308,17 @@ class TUI():
                 self.resize()
 
 
-    def set_wide_map(self, wide_map):
+    def set_wide(self, chat_map):
         """Update wide characters map"""
-        self.wide_map = wide_map
+        self.wide_map = []
+        for num, line in enumerate(chat_map):
+            if line and line[6]:
+                self.wide_map.append(num + 1)
 
 
     def clear_chat_wide(self):
         """Clear specific chat lines that are containing emoji"""
-        if self.disable_drawing:
+        if self.disable_drawing or not self.wide_map:
             return
         h, w = self.win_chat.getmaxyx()
         for y in self.wide_map:

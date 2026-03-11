@@ -5,10 +5,10 @@ description = "Feature rich Discord TUI client."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "discord-protos>=1.2.120",
+    "discord-protos>=1.2.123",
     "emoji>=2.15.0",
     "filetype>=1.2.0",
-    "numpy>=2.4.2",
+    "numpy>=2.4.3",
     "orjson>=3.11.7",
     "psutil>=7.2.1; sys_platform != 'linux'",
     "pycryptodome>=3.23.0",
@@ -29,7 +29,7 @@ dependencies = [
 [dependency-groups]
 build = [
     "cython>=3.2.4",
-    "nuitka>=4.0.1",
+    "nuitka>=4.0.4",
     "pyinstaller>=6.19.0",
     "setuptools>=82.0.0",
 ]

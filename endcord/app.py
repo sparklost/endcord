@@ -4119,7 +4119,7 @@ class Endcord:
             if not spoiler_index:
                 spoiler_index = 0
             self.messages[msg_index]["spoiled"] = [spoiler_index]
-        self.update_chat(keep_selected=True, scroll=False)
+        self.update_chat(keep_selected=True, scroll=False, change_id=self.messages[msg_index]["id"], change_type=3)
 
 
     def add_pending_message(self, content, nonce, reply_id=None, attachments=None, stickers=None):
@@ -4195,7 +4195,7 @@ class Endcord:
             message = formatter.demojize_message(message)
         self.messages.insert(0, message)
         self.last_message_id = message["id"]
-        self.update_chat(change_amount=1, scroll=False)
+        self.update_chat(change_amount=1, scroll=False, change_id=nonce, change_type=1)
 
 
     def substitute_in_last_message(self, input_text):
@@ -5581,7 +5581,7 @@ class Endcord:
             peripherals.native_open(path, mpv_path, yt_in_mpv=self.config["yt_in_mpv"])
 
 
-    def update_chat(self, keep_selected=True, change_amount=0, select_message_index=None, scroll=True, select_unread=False):
+    def update_chat(self, keep_selected=True, change_amount=0, select_message_index=None, scroll=True, select_unread=False, change_id=None, change_type=None):
         """Generate chat and update it in TUI"""
         if self.messages is None:
             return
@@ -5612,7 +5612,7 @@ class Endcord:
             if last_acked_unreads_line and (not last_message_id or int(last_acked_unreads_line) < int(last_message_id)):
                 last_seen_msg = channel["last_acked_unreads_line"]
 
-        self.chat, self.chat_format, self.chat_map, wide_map = self.formatter.generate_chat(
+        self.chat, self.chat_format, self.chat_map = self.formatter.generate_chat(
             self.messages,
             self.current_roles,
             self.current_channels,
@@ -5622,8 +5622,10 @@ class Endcord:
             self.blocked,
             last_seen_msg,
             self.show_blocked_messages,
+            change_id=change_id,
+            change_type=change_type,
         )
-        self.tui.set_wide_map(wide_map)
+        self.tui.set_wide(self.chat_map)
 
         if keep_selected:
             selected_msg = selected_msg + change_amount
@@ -5640,6 +5642,32 @@ class Endcord:
         self.tui.update_chat(self.chat, self.chat_format)
 
 
+    def update_chat_noui(self, change_id=None, change_type=None):
+        """Update chat without pushing changes to UI"""
+        last_seen_msg = None
+        channel = self.read_state.get(self.active_channel["channel_id"])
+        if channel:
+            last_acked_unreads_line = channel.get("last_acked_unreads_line")
+            last_message_id = channel["last_message_id"]
+            if last_acked_unreads_line and (not last_message_id or int(last_acked_unreads_line) < int(last_message_id)):
+                last_seen_msg = channel["last_acked_unreads_line"]
+
+        self.chat_map = self.chat_map[:]   # need to keep original for lines_to_msg_with_remainder
+        self.formatter.generate_chat(
+            self.messages,
+            self.current_roles,
+            self.current_channels,
+            self.chat_dim[1],
+            self.current_my_roles,
+            self.current_member_roles,
+            self.blocked,
+            last_seen_msg,
+            self.show_blocked_messages,
+            change_id=change_id,
+            change_type=change_type,
+        )
+
+
     def update_forum(self):
         """Generate forum instead chat and update it in TUI"""
         # using self.messages as forum entries, should not be overwritten while in forum
@@ -5653,7 +5681,7 @@ class Endcord:
             self.config,
         )
         self.chat_map = [None] * len(self.forum_old)
-        self.tui.set_wide_map([])
+        self.tui.set_wide([])
 
     def update_member_list(self, last_index=None, reset=False):
         """Generate member list and update it in TUI"""
@@ -6049,7 +6077,7 @@ class Endcord:
             else:
                 in_msg_start_index = 0
         for line_index, line_map in enumerate(self.chat_map):
-            if line_map and line_map[0] == msg_index and line_map[4]:      # message root has timestamp range
+            if line_map and line_map[0] == msg_index and line_map[4]:   # message root has timestamp range
                 if full:
                     next_line_map = self.chat_map[line_index + 1]
                     if next_line_map and next_line_map[0] == line_map[0] and next_line_map[2]:
@@ -6177,6 +6205,7 @@ class Endcord:
             self.set_channel_seen(self.active_channel["channel_id"], message_id)
         if (update_tree or ping) and not skip_unread:
             self.update_tree()
+        return update_tree
 
 
     def set_channel_me_seen(self, channel_id, message_id):
@@ -6410,7 +6439,7 @@ class Endcord:
                 peripherals.save_json(self.state, f"state_{self.profiles["selected"]}.json")
 
 
-    def process_msg_events_active_channel(self, new_message, selected_line, latest_chat=True):
+    def process_msg_events_active_channel(self, new_message, latest_chat=True):
         """Process message events for currently active channel"""
         data = new_message["d"]
         op = new_message["op"]
@@ -6430,6 +6459,7 @@ class Endcord:
                     if "pending" in message and message["id"] == nonce:
                         self.messages.pop(num)
                         change_amount -=1
+                        self.update_chat_noui(change_id=num-1, change_type=2)   # -1 because new message is inserted
                         break
             # limit chat size
             if len(self.messages) > self.limit_chat_buffer:
@@ -6457,7 +6487,7 @@ class Endcord:
                 # remove unreads line
                 if self.read_state.get(channel_id):
                     self.read_state[channel_id]["last_acked_unreads_line"] = None
-            self.update_chat(change_amount=change_amount, scroll=False)
+            self.update_chat(change_amount=change_amount, scroll=False, change_id=data["id"], change_type=1)
             if update_status_line:
                 self.update_status_line()
         else:
@@ -6474,17 +6504,18 @@ class Endcord:
                         if msg_line_index in self.tui.wide_map:
                             self.tui.wide_map = [msg_line_index]
                             self.tui.clear_chat_wide()
-                        self.update_chat(scroll=False)
+                        self.update_chat(scroll=False, change_id=data["id"], change_type=3)
                     elif op == "MESSAGE_DELETE":
                         if self.keep_deleted:
                             self.messages[num]["deleted"] = True
                         else:
                             self.messages.pop(num)
                         self.last_message_id = self.get_chat_last_message_id()
-                        if num < selected_line and not self.keep_deleted:
-                            self.update_chat(change_amount=-1, scroll=False)
+                        if self.keep_deleted:
+                            self.update_chat(scroll=False, change_id=data["id"], change_type=3)
                         else:
-                            self.update_chat(scroll=False)
+                            this_selected = num == self.lines_to_msg(self.tui.get_chat_selected()[0])
+                            self.update_chat(change_amount=(0 if this_selected else -1), scroll=False, change_id=num, change_type=2)
                     elif op == "MESSAGE_REACTION_ADD":
                         for num2, reaction in enumerate(loaded_message["reactions"]):
                             if data["emoji_id"] == reaction["emoji_id"] and data["emoji"] == reaction["emoji"]:
@@ -6499,7 +6530,7 @@ class Endcord:
                                 "count": 1,
                                 "me": my_message,
                             })
-                        self.update_chat(scroll=False)
+                        self.update_chat(scroll=False, change_id=data["id"], change_type=3)
                     elif op == "MESSAGE_REACTION_REMOVE":
                         for num2, reaction in enumerate(loaded_message["reactions"]):
                             if data["emoji_id"] == reaction["emoji_id"] and data["emoji"] == reaction["emoji"]:
@@ -6510,7 +6541,7 @@ class Endcord:
                                     if my_message:
                                         loaded_message["reactions"][num2]["me"] = False
                                 break
-                        self.update_chat(scroll=False)
+                        self.update_chat(scroll=False, change_id=data["id"], change_type=3)
                     elif op in ("MESSAGE_POLL_VOTE_ADD", "MESSAGE_POLL_VOTE_REMOVE") and "poll" in loaded_message:
                         if "poll" in loaded_message:
                             add = op == "MESSAGE_POLL_VOTE_ADD"
@@ -6520,7 +6551,7 @@ class Endcord:
                                     if my_message:
                                         loaded_message["poll"]["options"][num2]["me_voted"] = add
                                     break
-                        self.update_chat(scroll=False)
+                        self.update_chat(scroll=False, change_id=data["id"], change_type=3)
 
 
     def process_msg_events_cached_channel(self, new_message, ch_num):
@@ -6659,7 +6690,7 @@ class Endcord:
                         last_acked_message_id = self.messages[1]["id"]
                     else:
                         last_acked_message_id = 1
-                    self.set_channel_unseen(
+                    update = self.set_channel_unseen(
                         new_message_channel_id,
                         data["id"],
                         ping,
@@ -6668,8 +6699,9 @@ class Endcord:
                         set_line=not(self.new_unreads and this_channel),
                         set_line_now=this_channel and not self.new_unreads,
                     )
-                    if this_channel and self.new_unreads:
-                        self.update_chat(scroll=False)
+                    if update and this_channel and self.new_unreads:
+                        # when scrolled up and received a message - update chat to add "New" separator
+                        self.update_chat(scroll=False, change_id=data["id"], change_type=3)
 
 
     def process_msg_events_ghost_ping(self, new_message):
@@ -7521,7 +7553,7 @@ class Endcord:
                     new_message_channel_id = new_message["d"]["channel_id"]
                     this_channel = (new_message_channel_id == self.active_channel["channel_id"])
                     if this_channel and self.get_chat_last_message_id() == self.last_message_id:   # if its scrolled far up, this channel bot is cached
-                        self.process_msg_events_active_channel(new_message, selected_line)
+                        self.process_msg_events_active_channel(new_message)
                     # handle cached channels
                     elif self.limit_channel_cache:
                         in_cache = False
@@ -7533,7 +7565,7 @@ class Endcord:
                             self.process_msg_events_cached_channel(new_message, ch_num)
                         if this_channel:
                             # still have to do this when scrolled far up, only to handle message delete/edit/react/poll
-                            self.process_msg_events_active_channel(new_message, selected_line, latest_chat=False)
+                            self.process_msg_events_active_channel(new_message, latest_chat=False)
                     # handle unseen and mentions
                     if not this_channel or (this_channel and (self.new_unreads or self.ping_this_channel or self.tui.disable_drawing or self.tui.is_window_open())):
                         self.process_msg_events_other_channels(new_message)

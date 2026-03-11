@@ -475,7 +475,7 @@ def build_cython(clang, mingw):
     )
     for line in process.stdout:
         line_clean = line.rstrip("\n")
-        if len(line_clean) < 100 and "Cythonizing" not in line_clean and "Compiling" not in line_clean and "creating" not in line_clean:
+        if len(line_clean) < 100 and not any(s in line_clean for s in ("Cythonizing", "Compiling", "creating", "  warn(")):
             print(line_clean)
     process.wait()
     if process.returncode != 0:

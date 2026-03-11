@@ -995,6 +995,7 @@ class ChatGenerator:
         self.quote_character = config["quote_character"]
         self.trim_embed_url_size = max(config["trim_embed_url_size"], 20)
         self.dynamic_name_len = config["dynamic_name_len"]
+        self.limit_chat_buffer = config["limit_chat_buffer"]
 
         # load colors
         self.color_default = [colors[0]]
@@ -1028,7 +1029,13 @@ class ChatGenerator:
         self.my_id = my_id
         self.edited_before_content = is_substring_before(self.format_message, "%edited", "%content")
         self.have_edited = "%edited" in self.format_message
+
+        # initial
         self.last_width = 0
+        self.chat = []
+        self.chat_format = []
+        self.chat_map = []
+        # self.chat_lock = threading.Lock()   # enable if threads collide which is very unlikely
 
         # calculate stuff
         self.placeholder_timestamp = generate_timestamp("2015-01-01T00:00:00.000000+00:00", self.format_timestamp)
@@ -1087,7 +1094,7 @@ class ChatGenerator:
         self.my_id = my_id
 
 
-    def generate_chat(self, messages, roles, channels, max_length, my_roles, member_roles, blocked, last_seen_msg, show_blocked):
+    def generate_chat(self, messages, roles, channels, max_length, my_roles, member_roles, blocked, last_seen_msg, show_blocked, change_id=None, change_type=None):
         """
         Generate chat according to provided formatting.
         Message shape:
@@ -1099,22 +1106,100 @@ class ChatGenerator:
         chat_format = [[[default_color_id], [color_id, start, end], ...], ...]
         chat_map = [(msg_num, username:(st, end), is_reply, reactions:((st, end), ...), date:(st, end), ranges), ...]
             ranges = (url:(st, end, index), spoiler:(st, end, index), emoji:(st, end, id), mentions:(st, end, id), channels:(st, end, id))
-        wide_map = [index_of_line_with_wide_char, ...]
+        change_id hints that only one specific message got changed, change_type hints type of that change: 1 - append, 2 - delete, 3 - edit.
         """
+        # with self.chat_lock:   # enable if threads collide which is very unlikely
         num_messages = len(messages)
         if max_length != self.last_width:
             self.last_width = max_length
             self.dyn_limit_username = max_length-15 if self.dynamic_name_len else self.limit_username
 
-        chat = []
-        chat_format = []
-        chat_map = []
-        wide_map = []
+        # if its small change then only update data
+        elif change_id is not None and self.chat:
+            if change_type == 1:   # append message
+                if num_messages == self.limit_chat_buffer:
+                    self.remove_message(len(messages) - 1)
+                message_chat, message_format, message_chat_map = self.generate_message(
+                    messages[0],
+                    0,
+                    roles,
+                    channels,
+                    max_length,
+                    my_roles,
+                    member_roles,
+                    blocked,
+                    last_seen_msg,
+                    show_blocked,
+                    num_messages,
+                    messages[1] if num_messages > 1 else None,
+                )
+                self.insert_data_into(self.chat, message_chat, 0)
+                self.insert_data_into(self.chat_format, message_format, 0)
+                self.shift_chat_map(-1, 1)
+                self.insert_data_into(self.chat_map, message_chat_map, 0)
+
+            elif change_type == 2:   # fully delete messsage
+                self.remove_message(change_id)   # change_id is msg_num in this case
+                if change_id != 0:   # have to reconstruct a message bellow, to update separator lines
+                    message_index = change_id - 1
+                    line_index = self.remove_message(message_index, shift_chat_map=False)
+                    if line_index is None:
+                        return self.chat, self.chat_format, self.chat_map
+                    message_chat, message_format, message_chat_map = self.generate_message(
+                        messages[message_index],
+                        message_index,
+                        roles,
+                        channels,
+                        max_length,
+                        my_roles,
+                        member_roles,
+                        blocked,
+                        last_seen_msg,
+                        show_blocked,
+                        num_messages,
+                        messages[message_index+1] if num_messages > message_index+1 else None,
+                    )
+                    self.insert_data_into(self.chat, message_chat, line_index)
+                    self.insert_data_into(self.chat_format, message_format, line_index)
+                    self.insert_data_into(self.chat_map, message_chat_map, line_index)
+
+            else:   # update existing message and handle pending->sent message transition
+                for message_index, message in enumerate(messages):
+                    if message["id"] == change_id:
+                        break
+                else:
+                    return self.chat, self.chat_format, self.chat_map
+                line_index = self.remove_message(message_index, shift_chat_map=False)
+                if line_index is None:
+                    return self.chat, self.chat_format, self.chat_map
+                message_chat, message_format, message_chat_map = self.generate_message(
+                    messages[message_index],
+                    message_index,
+                    roles,
+                    channels,
+                    max_length,
+                    my_roles,
+                    member_roles,
+                    blocked,
+                    last_seen_msg,
+                    show_blocked,
+                    num_messages,
+                    messages[message_index+1] if num_messages > message_index+1 else None,
+                )
+                self.insert_data_into(self.chat, message_chat, line_index)
+                self.insert_data_into(self.chat_format, message_format, line_index)
+                self.insert_data_into(self.chat_map, message_chat_map, line_index)
+            return self.chat, self.chat_format, self.chat_map
+
+        # reconstruct full chat
+        self.chat = []
+        self.chat_format = []
+        self.chat_map = []
         self.have_unseen_messages_line = False
-        for num, message in enumerate(messages):
-            message_chat, message_format, message_chat_map, message_wide_map = self.generate_message(
+        for message_index, message in enumerate(messages):
+            message_chat, message_format, message_chat_map = self.generate_message(
                 message,
-                num,
+                message_index,
                 roles,
                 channels,
                 max_length,
@@ -1124,17 +1209,65 @@ class ChatGenerator:
                 last_seen_msg,
                 show_blocked,
                 num_messages,
-                messages[num+1] if num+1 < num_messages else None,
+                messages[message_index+1] if num_messages > message_index+1 else None,
             )
             if not message_chat:
                 continue
             # invert message lines order and append them to chat
             # it is inverted because chat is drawn from down to upside
-            wide_map.extend([len(chat) + len(message_chat) - x for x in message_wide_map])
-            chat.extend(message_chat[::-1])
-            chat_format.extend(message_format[::-1])
-            chat_map.extend(message_chat_map[::-1])
-        return chat, chat_format, chat_map, wide_map
+            self.chat.extend(message_chat[::-1])
+            self.chat_format.extend(message_format[::-1])
+            self.chat_map.extend(message_chat_map[::-1])
+        return self.chat, self.chat_format, self.chat_map
+
+
+    def insert_data_into(self, data_list, data, index):
+        """Insert data into data list at specific index, like data_list.extend(data) at custom index. Data order will be inverted."""
+        for value in data:
+            data_list.insert(index, value)
+
+
+    def shift_chat_map(self, after_index, diff):
+        """Shift chat map message indexes by diff after specified message index"""
+        for num, entry in enumerate(self.chat_map):
+            if entry is None:
+                continue
+            message_index = entry[0]
+            if message_index is not None and message_index > after_index:
+                self.chat_map[num] = (message_index + diff, *entry[1:])
+
+
+    def remove_message(self, target_index, shift_chat_map=True):
+        """Remove message by its index and clear spacing above it"""
+        # find all target message line indexes
+        remove_lines = []
+        found = False
+        for i, entry in enumerate(self.chat_map):
+            if entry is None:
+                if found:
+                    remove_lines.append(i)
+                continue
+            message_index = entry[0]
+            if message_index == target_index:
+                found = True
+                remove_lines.append(i)
+                continue
+            if found:
+                break
+        if not remove_lines:
+            return None
+
+        # remove lines
+        for i in reversed(remove_lines):
+            del self.chat[i]
+            del self.chat_format[i]
+            del self.chat_map[i]
+
+        # fix message_index in chat_map
+        if shift_chat_map:
+            self.shift_chat_map(target_index, -1)
+
+        return remove_lines[0]
 
 
     def generate_message(self, message, num, roles, channels, max_length, my_roles, member_roles, blocked, last_seen_msg, show_blocked, num_messages, next_msg):
@@ -1145,7 +1278,6 @@ class ChatGenerator:
         chat = []
         chat_format = []
         chat_map = []
-        chat_wide_map = []
         mentioned = False
         edited = message.get("edited") and self.have_edited
         user_id = message.get("user_id")
@@ -1214,7 +1346,7 @@ class ChatGenerator:
                 if self.message_spacing:
                     chat.append(" " * max_length)
                     chat_format.append([color_base])
-                    chat_map.append((None, None, None, None, None, None))
+                    chat_map.append((None, None, None, None, None, None, None))
                 # keep text always in center
                 filler = max_length - 3
                 filler_l = filler // 2
@@ -1315,8 +1447,6 @@ class ChatGenerator:
                 reply_line = lazy_replace(reply_line, "%content", lambda: ref_message["content"].replace("\r", "").replace("\n", ""))
                 wide_shift = 0
             reply_line, wide = normalize_string_count(reply_line, max_length, dots=True)
-            if wide:
-                chat_wide_map.append(len(chat))
             if self.dynamic_name_len:
                 if self.dynamic_name_len == 1:
                     name_len = len(ref_message["username"][:self.dyn_limit_username])
@@ -1334,7 +1464,7 @@ class ChatGenerator:
                 chat_format.append(shift_formats(self.color_reply, self.pre_name_len_reply, name_len - self.limit_username))
             else:
                 chat_format.append(shift_formats(self.color_reply, self.pre_name_len_reply, wide_shift))
-            chat_map.append((num, None, True, None, None, None))
+            chat_map.append((num, None, True, None, None, None, bool(wide)))
 
         # bot interaction
         elif message["interaction"]:
@@ -1347,8 +1477,6 @@ class ChatGenerator:
                 .replace("%command", message["interaction"]["command"])
             )
             interaction_line, wide = normalize_string_count(interaction_line, max_length, dots=True)
-            if wide:
-                chat_wide_map.append(len(chat))
             chat.append(interaction_line)
             if disable_formatting or reply_color_format == self.color_blocked:
                 chat_format.append([color_base])
@@ -1356,7 +1484,7 @@ class ChatGenerator:
                 chat_format.append(shift_formats(self.color_mention_reply, self.pre_name_len, wide_shift))
             else:
                 chat_format.append(shift_formats(self.color_reply, self.pre_name_len, wide_shift))
-            chat_map.append((num, None, 2, None, None, None))
+            chat_map.append((num, None, 2, None, None, None, bool(wide)))
 
         # main message
         global_name = get_global_name(message, self.use_nick) if self.use_global_name else ""
@@ -1595,8 +1723,6 @@ class ChatGenerator:
         if code_block_format:
             message_line = message_line.ljust(max_length-1)
 
-        if wide:
-            chat_wide_map.append(len(chat))
         chat.append(message_line)
         urls_this_line = ranges_multiline_one_line(urls, newline_index+1, 0, quote)
         spoilers_this_line = ranges_multiline_one_line(spoilers, newline_index+1, 0, quote)
@@ -1604,7 +1730,7 @@ class ChatGenerator:
         mentions_this_line = ranges_multiline_one_line(mention_ranges, newline_index+1, 0, quote)
         channels_this_line = ranges_multiline_one_line(channel_ranges, newline_index+1, 0, quote)
         this_line_ranges = (urls_this_line, spoilers_this_line, emoji_this_line, mentions_this_line, channels_this_line)
-        chat_map.append((num, (self.pre_name_len, end_name), False, None, self.timestamp_range, this_line_ranges))
+        chat_map.append((num, (self.pre_name_len, end_name), False, None, self.timestamp_range, this_line_ranges, bool(wide)))
 
         # formatting
         len_message_line = len(message_line)
@@ -1736,8 +1862,6 @@ class ChatGenerator:
                 new_line = new_line.ljust(max_length-1)
             len_new_line = len(new_line)
 
-            if wide:
-                chat_wide_map.append(len(chat))
             chat.append(new_line)
             urls_this_line = ranges_multiline_one_line(urls, len_new_line, self.newline_len, quote)
             spoilers_this_line = ranges_multiline_one_line(spoilers, len_new_line, self.newline_len, quote)
@@ -1745,7 +1869,7 @@ class ChatGenerator:
             mentions_this_line = ranges_multiline_one_line(mention_ranges, len_new_line, self.newline_len, quote)
             channels_this_line = ranges_multiline_one_line(channel_ranges, len_new_line, self.newline_len, quote)
             this_line_ranges = (urls_this_line, spoilers_this_line, emoji_this_line, mentions_this_line, channels_this_line)
-            chat_map.append((num, None, None, None, None, this_line_ranges))
+            chat_map.append((num, None, None, None, None, this_line_ranges, bool(wide)))
 
             # formatting
             if disable_formatting:
@@ -1792,8 +1916,6 @@ class ChatGenerator:
             reactions_line = lazy_replace(self.format_reactions, "%timestamp", lambda: generate_timestamp(message["timestamp"], self.format_timestamp, self.convert_timezone))
             reactions_line = reactions_line.replace("%reactions", self.reactions_separator.join(reactions))
             reactions_line, wide_shift = normalize_string_count(reactions_line, max_length, dots=True, fill=True)
-            if wide_shift:
-                chat_wide_map.append(len(chat))
             chat.append(reactions_line)
             if disable_formatting:
                 chat_format.append([color_base])
@@ -1807,9 +1929,9 @@ class ChatGenerator:
                 wide = not self.emoji_as_text and len(message["reactions"][num_r]["emoji"]) == 1   # emoji reaction will be one character
                 reactions_map.append([self.pre_reaction_len + offset, self.pre_reaction_len + len(reaction) + wide + offset])
                 offset += len(self.reactions_separator) + len(reaction) + wide
-            chat_map.append((num, None, False, reactions_map, None, None))
+            chat_map.append((num, None, False, reactions_map, None, None, bool(wide)))
 
-        return chat, chat_format, chat_map, chat_wide_map
+        return chat, chat_format, chat_map
 
 
 def generate_status_line(my_user_data, my_status, unseen, typing, active_channel, action, tasks, tabs, tabs_format, format_status_line, format_rich, slowmode=None, vim_mode=None, limit_typing=30, use_nick=True, fun=True):

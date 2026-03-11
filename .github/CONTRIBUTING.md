@@ -26,6 +26,14 @@ So, before even thinking about putting it through a LLM, open an issue and save 
 2. Run main.py: `uv run main.py`
 
 
+## Architecture
+Endcord is developed in "Modular composition and component-based architecture using singleton services with a central orchestrator".
+Explanation:
+- Modular component-based - program is split into independent modules (classes in separate files), each responsible for a specific thing.
+- Composition - main app class contains and uses instances of other classes instead of inheriting from them.
+- Singleton services - for each class only one instance is used.
+- Central orchestrator - Main app class is controller that: creates all instances, wires them together, does core logic.
+
 ## Useful debugging things
 
 ### Debug points in the code
