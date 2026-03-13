@@ -1,6 +1,6 @@
+Switch to python 3.14
+Add pfp to notifications
 Add ability to resize extra window
-Fix issues with many wide characters in chat
-Fix issues with wide characters in input line
 
 Voice channels
     add voice channels to tree
@@ -22,9 +22,10 @@ after fixing https://github.com/python/cpython/issues/119138
     Add red fg gray bg color for active and unread in tree
     Show inline media in chat
     Add bg color for mentions and channels in chat
+    Add status dot color to active line in tree
 
-Add pfp to notifications
 Add binding to toggle tree
+Fix issues with wide characters in input line
 Add option to select individual message
 Add scrollbar to chat
 Fix per-channel member list

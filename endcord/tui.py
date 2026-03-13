@@ -1316,21 +1316,23 @@ class TUI():
                 self.wide_map.append(num + 1)
 
 
-    def clear_chat_wide(self):
+    def clear_chat_wide(self, wait=True):
         """Clear specific chat lines that are containing emoji"""
         if self.disable_drawing or not self.wide_map:
             return
-        h, w = self.win_chat.getmaxyx()
-        for y in self.wide_map:
-            chat_y = y - self.chat_index
-            if chat_y <= 0:
-                continue
-            if chat_y > h:
-                break
-            self.win_chat.insstr(h - chat_y, 0, " " * w, curses.color_pair(1))
-        self.win_chat.noutrefresh()
-        self.need_update.set()
-        time.sleep(self.screen_update_delay/2)
+        with self.lock:
+            h, w = self.win_chat.getmaxyx()
+            for y in self.wide_map:
+                chat_y = y - self.chat_index
+                if chat_y <= 0:
+                    continue
+                if chat_y > h:
+                    break
+                self.win_chat.insstr(h - chat_y, 0, " " * w, curses.color_pair(1))
+            self.win_chat.noutrefresh()
+            self.need_update.set()
+        if wait:
+            time.sleep(self.screen_update_delay/2)
 
 
     def draw_tree(self):
@@ -1640,6 +1642,7 @@ class TUI():
         """Draw member list and resize chat"""
         if self.disable_drawing:
             return
+
         with self.lock:
             self.member_list = member_list
             self.member_list_format = member_list_format
@@ -1653,9 +1656,9 @@ class TUI():
                         self.mlist_selected = -1
                         self.mlist_index = 0
                     if clean:
-                        self.clear_chat_wide()
+                        self.clear_chat_wide(wait=False)
                     common_h = self.init_chat()
-                    # chat will be regenerated and resized in app main loop
+                    # self.draw_chat()   # chat will be regenerated and resized in app main loop
 
                     # init member list
                     member_list_hwyx = (
@@ -1729,8 +1732,8 @@ class TUI():
                 time.sleep(self.screen_update_delay/2)
 
             # remove member list and redraw chat
+            self.clear_chat_wide()
             with self.lock:
-                self.clear_chat_wide()
                 del (self.win_member_list, self.win_chat)
                 self.member_list = []
                 self.member_list_format = []

@@ -5,6 +5,7 @@ import os
 import re
 import socket
 import ssl
+import sys
 import threading
 import time
 import urllib.parse
@@ -183,25 +184,30 @@ class Discord():
 
     def get_connection(self, host, port, timeout=10):
         """Get connection object and handle proxying"""
+        if sys.platform == "darwin":
+            import certifi
+            ssl_context = ssl.create_default_context(cafile=certifi.where())
+        else:
+            ssl_context = ssl.create_default_context()
+        ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
+
         if self.proxy.scheme:
             if self.proxy.scheme.lower() == "http":
-                connection = http.client.HTTPSConnection(self.proxy.hostname, self.proxy.port, timeout=timeout)
+                connection = http.client.HTTPSConnection(self.proxy.hostname, self.proxy.port, timeout=timeout, context=ssl_context)
                 connection.set_tunnel(host, port=port)
             elif "socks" in self.proxy.scheme.lower():
                 proxy_sock = socks.socksocket()
                 proxy_sock.set_proxy(socks.SOCKS5, self.proxy.hostname, self.proxy.port)
                 proxy_sock.settimeout(timeout)
                 proxy_sock.connect((host, port))
-                ssl_context = ssl.create_default_context()
-                ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
                 proxy_sock = ssl_context.wrap_socket(proxy_sock, server_hostname=host)
                 # proxy_sock.do_handshake()   # seems like its not needed
                 connection = http.client.HTTPSConnection(host, port, timeout=timeout + 5)   # extra time for tor
                 connection.sock = proxy_sock
             else:
-                connection = http.client.HTTPSConnection(host, port, timeout=timeout)
+                connection = http.client.HTTPSConnection(host, port, timeout=timeout, context=ssl_context)
         else:
-            connection = http.client.HTTPSConnection(host, port, timeout=timeout)
+            connection = http.client.HTTPSConnection(host, port, timeout=timeout, context=ssl_context)
         return connection
 
 
@@ -1763,7 +1769,15 @@ class Discord():
 
 
     def get_my_standing(self):
-        """Get my account standing"""
+        """
+        Get my account standing and number of active violations
+        Standing values:
+        0 - All Good
+        1 - Limited
+        2 - Very Limited
+        3 - At risk
+        4 - Suspended
+        """
         message_data = None
         url = "/api/v9/safety-hub/@me"
         data, status = self.request("GET", url, message_data, self.header)
@@ -1771,7 +1785,7 @@ class Discord():
             return None
         if status == 200:
             data = json.loads(data)
-            return data["account_standing"]["state"]
+            return int(data["account_standing"]["state"]/100) - 1, len(data.get("classifications", []))
         log_api_error(data, status, "get_my_standing")
         return False
 

@@ -46,6 +46,14 @@ match_md_all = re.compile(
 )
 
 
+def ceil(x):
+    """To avoid importing math.ceil"""
+    int_part = int(x)
+    if x > int_part:
+        return int_part + 1
+    return int_part
+
+
 def lazy_replace(text, key, value_function):
     """Replace key in text with result from value_function, but run it only if key is found"""
     if key in text:
@@ -280,16 +288,35 @@ def len_wch(text):
     return total_width
 
 
+def split_index_wch(text, max_width):
+    """Get split index for string with wide characters"""
+    width = 0
+    for i, ch in enumerate(text):
+        character = ord(ch)
+        if 32 <= character < 0x7f:
+            w = 1
+        else:
+            w = 1 + binary_search(character, WIDE_RANGES)
+        if width + w > max_width:
+            return i
+        width += w
+    return len(text)
+
+
 # use cython if available, ~5 times faster
 if importlib.util.find_spec("endcord_cython") and importlib.util.find_spec("endcord_cython.formatter"):
     from endcord_cython.formatter import len_wch as len_wch_cython
     from endcord_cython.formatter import limit_width_wch as limit_width_wch_cython
+    from endcord_cython.formatter import split_index_wch as split_index_wch_cython
     def limit_width_wch(text, max_width):
         """Limit width of the text on the screen, because "wide characters" are 2 characters wide"""
         return limit_width_wch_cython(text, max_width, WIDE_RANGES)
     def len_wch(text):
         """Calculate lenght of each character and store it in a bool list"""
         return len_wch_cython(text, WIDE_RANGES)
+    def split_index_wch(text, max_width):
+        """Calculate lenght of each character and store it in a bool list"""
+        return split_index_wch_cython(text, max_width, WIDE_RANGES)
 
 
 def normalize_string(input_string, max_length, emoji_safe=False, dots=False, fill=True):
@@ -1682,14 +1709,11 @@ class ChatGenerator:
                 quote = False
                 newline_sign = True
                 split_on_space = 0
+            elif newline_index <= self.newline_len:
+                newline_index = split_index_wch(message_line, max_length)
+                quote_nl = False
             else:
-                newline_text = lazy_replace(self.format_newline, "%timestamp", lambda: generate_timestamp(message["timestamp"], self.format_timestamp, self.convert_timezone))
-                newline_text = newline_text.replace("%content", "")
-                if newline_index <= len(newline_text):
-                    newline_index = max_length - (len_wch(message_line[:max_length]) - len(message_line[:max_length]))
-                    quote_nl = False
-                else:
-                    quote_nl = False
+                quote_nl = False
             if message_line[newline_index] in (" ", "\n"):   # remove space and \n
                 next_line = message_line[newline_index + 1:]
                 split_on_space = 1
@@ -1813,7 +1837,7 @@ class ChatGenerator:
 
             # limit new_line and split to next line
             newline_sign = False
-            if len_wch(new_line) > max_length - bool(code_block_format):
+            if len_wch(new_line) > max_length:
                 newline_index = len(limit_width_wch(new_line, max_length - bool(code_block_format))[0].rsplit(" ", 1)[0])   # split line on space
                 if "\n" in new_line[:max_length]:
                     newline_index = new_line.index("\n")
@@ -1821,7 +1845,7 @@ class ChatGenerator:
                     newline_sign = True
                     split_on_space = 0
                 elif newline_index <= self.newline_len + 2*quote:
-                    newline_index = max_length - bool(code_block_format) - (len_wch(message_line[:max_length]) - len(message_line[:max_length]))
+                    newline_index = split_index_wch(message_line, max_length)
                 try:
                     if new_line[newline_index] in (" ", "\n"):   # remove space and \n
                         next_line = new_line[newline_index + 1:]

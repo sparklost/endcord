@@ -54,3 +54,22 @@ cpdef len_wch(str text, tuple ranges):
             total_width += 1 + binary_search(character, ranges)
 
     return total_width
+
+
+cpdef Py_ssize_t split_index_wch(str text, int max_width, tuple ranges):
+    cdef int width = 0
+    cdef int character
+    cdef Py_ssize_t i, n = len(text)
+    cdef int w
+
+    for i in range(n):
+        character = ord(text[i])
+        if 32 <= character < 0x7f:
+            w = 1
+        else:
+            w = 1 + binary_search(character, ranges)
+        if width + w > max_width:
+            return i
+        width += w
+
+    return n

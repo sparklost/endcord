@@ -61,6 +61,7 @@ USER_UPLOAD_LIMITS = (10*MB, 50*MB, 500*MB, 50*MB)   # premium tier 0, 1, 2, 3 (
 GUILD_UPLOAD_LIMITS = (10*MB, 10*MB, 50*MB, 100*MB)   # premium tier 0, 1, 2, 3
 FORUM_COMMANDS = (1, 2, 7, 13, 14, 15, 17, 20, 22, 25, 27, 29, 30, 31, 32, 40, 42, 49, 50, 51, 52, 53, 55, 56, 57, 58, 61, 62, 66, 67, 68, 69, 70, 71, 72)
 COLLAPSE_ALL_EXCEPT_OPTIONS = ("current", "selected", "above", "bellow")
+STANDING_TYPES = ("All Good", "Limited", "Very Limited", "At risk", "Suspended")
 
 match_emoji = re.compile(r"<:(.*):(\d*)>")
 match_youtube = re.compile(r"(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)[a-zA-Z0-9_-]{11}")
@@ -3089,8 +3090,8 @@ class Endcord:
                     self.media_thread.start()
 
         elif cmd_type == 27:   # CHECK_STANDING
-            standing = self.discord.get_my_standing()
-            self.update_extra_line(f"Account standing: {standing}/100")
+            standing, violations = self.discord.get_my_standing()
+            self.update_extra_line(f"Account standing: {STANDING_TYPES[standing]}; Active violations: {violations}")
 
         elif cmd_type == 28:   # PASTE
             paths = []
@@ -4637,7 +4638,7 @@ class Endcord:
             self.last_message_id = self.get_chat_last_message_id()
 
 
-    def toggle_member_list(self):
+    def toggle_member_list(self, quick=False):
         """Toggle member list if there is enough space"""
         if not self.get_members or not self.active_channel["guild_id"]:
             return
@@ -4652,9 +4653,10 @@ class Endcord:
             self.update_member_list()
             self.state["member_list"] = True
 
-        self.update_tabs()
-        self.gateway.set_want_member_list(self.state["member_list"])
-        peripherals.save_json(self.state, f"state_{self.profiles["selected"]}.json")
+        if not quick:
+            self.update_tabs()
+            self.gateway.set_want_member_list(self.state["member_list"])
+            peripherals.save_json(self.state, f"state_{self.profiles["selected"]}.json")
 
 
     def set_status(self, status):
@@ -5682,6 +5684,7 @@ class Endcord:
         )
         self.chat_map = [None] * len(self.forum_old)
         self.tui.set_wide([])
+
 
     def update_member_list(self, last_index=None, reset=False):
         """Generate member list and update it in TUI"""
@@ -7761,6 +7764,10 @@ class Endcord:
                         self.update_forum()
                         self.tui.update_chat(self.chat, self.chat_format)
                     else:
+                        if abs(self.chat_dim[1] - new_chat_dim[1]) - 1 != self.member_list_width and self.state["member_list"]:   # skip member list changes
+                            self.toggle_member_list(quick=True)   # hide and show to fix emoji mess
+                            self.tui.clear_chat_wide()
+                            self.toggle_member_list(quick=True)
                         self.chat_dim = new_chat_dim
                         self.update_chat(scroll=False)
                 if self.most_recent_incoming_call or self.active_channel["channel_id"] in self.incoming_calls:
