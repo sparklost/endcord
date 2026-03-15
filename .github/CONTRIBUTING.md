@@ -34,6 +34,16 @@ Explanation:
 - Singleton services - for each class only one instance is used.
 - Central orchestrator - Main app class is controller that: creates all instances, wires them together, does core logic.
 
+
+## Rebuild protobuf
+```bash
+sudo pacman -Syu protobuf
+protoc -I tools --python_out=endcord user_settings.proto
+sed -i '/wrappers_pb2/s/$/   # noqa/' endcord/user_settings_pb2.py
+ruff check --fix endcord/user_settings_pb2.py
+```
+
+
 ## Useful debugging things
 
 ### Debug points in the code

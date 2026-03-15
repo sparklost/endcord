@@ -10,8 +10,9 @@ import subprocess
 import sys
 import tomllib
 
-PYTHON_MAX_MINOR = 13
-
+PYTHON_MAX_MINOR = 14
+PYTHON_FREETHREADED = 14
+PYTHON_LAST_SAFE = 13
 
 def get_app_name():
     """Get app name from pyproject.toml"""
@@ -39,19 +40,28 @@ def get_version_number():
     sys.exit(1)
 
 
+def is_gil_enabled():
+    """Safely check if GIL is enabled"""
+    try:
+        return sys._is_gil_enabled()
+    except AttributeError:
+        return True
+
+
 def get_python_version():
     """Get python major and minor versions"""
     if shutil.which("uv"):
         try:
-            version_result = subprocess.run(["uv", "run", "python", "--version"], capture_output=True, text=True, check=True)
+            version_result = subprocess.run(["uv", "run", "--no-sync", "python", "-VV"], capture_output=True, text=True, check=True)
         except subprocess.CalledProcessError as e:
             print(f"uv error: {e}", file=sys.stderr)
-            return sys.version_info.major, sys.version_info.minor
-        parts = version_result.stdout.strip().replace("Python ", "").split(".")
-        if len(parts) < 2:
-            return sys.version_info.major, sys.version_info.minor
-        return int(parts[0]), int(parts[1])
-    return sys.version_info.major, sys.version_info.minor
+            return sys.version_info.major, sys.version_info.minor, is_gil_enabled()
+        all_parts = version_result.stdout.strip().split(" ")
+        version_parts = all_parts[1].split(".")
+        if len(version_parts) < 2:
+            return sys.version_info.major, sys.version_info.minor, is_gil_enabled()
+        return int(version_parts[0]), int(version_parts[1]), "free-threading" in all_parts[2]
+    return sys.version_info.major, sys.version_info.minor, is_gil_enabled()
 
 
 def supports_color():
@@ -96,6 +106,11 @@ def check_python():
             except Exception:
                 pass
             fprint(f"Using Python {sys.version}")
+        if not is_gil_enabled():
+            if sys.version_info.minor == PYTHON_FREETHREADED:
+                fprint("WARNING: While endcord works with freethreaded python, final binary is much larger. Nutka doesnt yet support freethreaded python, so build is likely to fail.", color_code="\033[1;31m")
+            else:
+                fprint(f'WARNING: Endcord is known to only build with freethreaded python version 3.{PYTHON_FREETHREADED}. Buil is likely to fail on other versions. Run "python build.py" to let uv download and setup recommended temporary python interpreter, optionally with flag "--freethreaded".', color_code="\033[1;31m")
         return False
 
     try:
@@ -109,15 +124,29 @@ def check_python():
     return True
 
 
-def ensure_python():
+def ensure_python(freethreaded, safe=False):
     """Check current python and download correct python if needed"""
-    _, minor = get_python_version()
-    if minor >= 12 and minor <= PYTHON_MAX_MINOR:
-        return None
-    version = f"3.{PYTHON_MAX_MINOR}"
-    fprint(f"Setting up python {version} for this project")
+    if safe:
+        selected_version = PYTHON_LAST_SAFE
+    else:
+        selected_version = PYTHON_MAX_MINOR
+
+    _, minor, have_freethreaded = get_python_version()
+    if minor == selected_version and freethreaded == have_freethreaded:
+        return None, have_freethreaded
+
+    if freethreaded:
+        version = f"3.{PYTHON_FREETHREADED}+freethreaded"
+    else:
+        version = f"3.{selected_version}"
+        # ensure there is no same-name freethreaded python
+        subprocess.run(["uv", "python", "uninstall", f"3.{minor}+freethreaded"], check=False)
+
+    freethreaded_string = "freethreaded " if freethreaded else ""
+    fprint(f"Setting up {freethreaded_string}python {version} for this project")
     subprocess.run(["uv", "python", "install", version], check=True)
-    return version
+
+    return version, have_freethreaded or freethreaded
 
 
 def check_media_support():
@@ -140,13 +169,23 @@ def remove_media():
     """Remove media support"""
     if check_media_support():
         fprint("Removing media support dependencies")
-        subprocess.run(["uv", "pip", "uninstall", "pillow" , "av", "pynacl"], check=True)
+        subprocess.run(["uv", "pip", "uninstall", "pillow", "av", "pynacl"], check=True)
 
 
 def check_dev():
     """Check if its dev environment and set it up"""
     if importlib.util.find_spec("PyInstaller") is None or importlib.util.find_spec("nuitka") is None:
         subprocess.run(["uv", "sync", "--group", "build"], check=True)
+
+
+def force_ujson():
+    """Remove orjson and force installing ujson instead. WARNING: this modifies pyproject.toml"""
+    try:
+        subprocess.run(["uv", "remove", "orjson"], check=True, stderr=subprocess.DEVNULL)
+        fprint("Switching orjson -> ujson   !! pyproject.toml is modified !!")
+        subprocess.run(["uv", "add", "ujson"], check=True)
+    except subprocess.CalledProcessError:
+        pass
 
 
 def build_third_party_licenses(exclude=[]):
@@ -589,6 +628,7 @@ def build_with_nuitka(onedir, clang, mingw, nosoundcard, print_cmd=False, experi
     # excluding zstandard because its nuitka dependency bu also urllib3 optional dependency, and uses lots of space
     exclude_imports = [
         "--nofollow-import-to=cython",
+        "--nofollow-import-to=tkinter",
         "--nofollow-import-to=zstandard",
         "--nofollow-import-to=google._upb",
     ]
@@ -712,6 +752,21 @@ def parser():
         help="toggle experimental mode and exit",
     )
     parser.add_argument(
+        "--freethreaded",
+        action="store_true",
+        help="build with freethreaded python, will noticeably improve terminal media player performance at the cost of much larger binary",
+    )
+    parser.add_argument(
+        "--safe",
+        action="store_true",
+        help=f"Use python 3.{PYTHON_LAST_SAFE} which is known to build endcord without any issues",
+    )
+    parser.add_argument(
+        "--nobuild",
+        action="store_true",
+        help="only configure environment, but dont build endcord",
+    )
+    parser.add_argument(
         "--disable-extensions",
         action="store_true",
         help="disable extensions support in the code, overriding option in the config",
@@ -740,12 +795,17 @@ if __name__ == "__main__":
         sys.exit(0)
 
     if check_python():
-        version = ensure_python()
+        version, freethreaded = ensure_python(args.freethreaded, args.safe)
         if version:
+            if freethreaded:
+                force_ujson()
             os.execvp("uv", ["uv", "run", "-p", version, *sys.argv])
         else:
             os.execvp("uv", ["uv", "run", *sys.argv])
         sys.exit(0)
+
+    if args.freethreaded:
+        force_ujson()
 
     check_dev()
     if args.toggle_experimental:
@@ -785,10 +845,11 @@ if __name__ == "__main__":
         exclude = ["ordered-set", "zstandard", "altgraph", "packaging", "pyinstaller-hooks-contrib", "packaging", "setuptools"]
         build_third_party_licenses(exclude)
 
-    if args.nuitka:
-        build_with_nuitka(args.onedir, args.clang, args.mingw, args.nosoundcard, experimental=experimental)
-    else:
-        build_with_pyinstaller(args.onedir, args.nosoundcard)
+    if not args.nobuild:
+        if args.nuitka:
+            build_with_nuitka(args.onedir, args.clang, args.mingw, args.nosoundcard, experimental=experimental)
+        else:
+            build_with_pyinstaller(args.onedir, args.nosoundcard)
 
     enable_extensions(enable=True, silent=True)
 

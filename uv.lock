@@ -171,19 +171,6 @@ wheels = [
 ]
 
 [[package]]
-name = "discord-protos"
-version = "1.2.126"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "mypy-protobuf" },
-    { name = "protobuf" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/31/b5/4ce66d5cb709299a949558c3556e43b455406fa51e34d754524be5bfb60f/discord_protos-1.2.126.tar.gz", hash = "sha256:227dcc4d47a72b741ee170d28106cfacb274347713db2a9963fdabd1f50abd18", size = 162942, upload-time = "2026-03-12T18:59:38.438Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/71/67/01f5084e5bef70cb389f4204355e58846f286ea78791a89ca0c5adb7f10f/discord_protos-1.2.126-py3-none-any.whl", hash = "sha256:95f7d9008136bff3cca4d720bdd9654ecfd089286f3bff572e42157be65cf4d0", size = 180010, upload-time = "2026-03-12T18:59:37.017Z" },
-]
-
-[[package]]
 name = "emoji"
 version = "2.15.0"
 source = { registry = "https://pypi.org/simple" }
@@ -198,11 +185,11 @@ version = "1.3.0"
 source = { virtual = "." }
 dependencies = [
     { name = "certifi", marker = "sys_platform == 'darwin'" },
-    { name = "discord-protos" },
     { name = "emoji" },
     { name = "filetype" },
     { name = "numpy" },
     { name = "orjson" },
+    { name = "protobuf" },
     { name = "psutil", marker = "sys_platform != 'linux'" },
     { name = "pycryptodome" },
     { name = "pynacl" },
@@ -235,11 +222,11 @@ media = [
 [package.metadata]
 requires-dist = [
     { name = "certifi", marker = "sys_platform == 'darwin'", specifier = ">=2026.2.25" },
-    { name = "discord-protos", specifier = ">=1.2.126" },
     { name = "emoji", specifier = ">=2.15.0" },
     { name = "filetype", specifier = ">=1.2.0" },
     { name = "numpy", specifier = ">=2.4.3" },
     { name = "orjson", specifier = ">=3.11.7" },
+    { name = "protobuf", specifier = ">=7.34.0" },
     { name = "psutil", marker = "sys_platform != 'linux'", specifier = ">=7.2.1" },
     { name = "pycryptodome", specifier = ">=3.23.0" },
     { name = "pynacl", specifier = ">=1.6.2" },
@@ -288,19 +275,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/10/2f/97589876ea967487978071c9042518d28b958d87b17dceb7cdc1d881f963/macholib-1.16.4.tar.gz", hash = "sha256:f408c93ab2e995cd2c46e34fe328b130404be143469e41bc366c807448979362", size = 59427, upload-time = "2025-11-22T08:28:38.373Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c7/d1/a9f36f8ecdf0fb7c9b1e78c8d7af12b8c8754e74851ac7b94a8305540fc7/macholib-1.16.4-py2.py3-none-any.whl", hash = "sha256:da1a3fa8266e30f0ce7e97c6a54eefaae8edd1e5f86f3eb8b95457cae90265ea", size = 38117, upload-time = "2025-11-22T08:28:36.939Z" },
-]
-
-[[package]]
-name = "mypy-protobuf"
-version = "5.0.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "protobuf" },
-    { name = "types-protobuf" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/d5/48/658827446368bca30a94e545598065587ece9cd09b678d7d2895c37a59d2/mypy_protobuf-5.0.0.tar.gz", hash = "sha256:6fdd1cfdbb4419c713291d800a332d4bba6510dbd1341ed95e0bcc82fcadb6b5", size = 37309, upload-time = "2026-01-13T17:10:12.616Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/b4/b1/ab1e7a49930a8c1d1f7a570bbd4ec7d552ef035acc7aa4b97906e17a34a9/mypy_protobuf-5.0.0-py3-none-any.whl", hash = "sha256:3a7dd753ef3e3b8783a824eb51f07983f62812f9ec066e4fbb1b22d6c5dc36d0", size = 26008, upload-time = "2026-01-13T17:10:11.053Z" },
 ]
 
 [[package]]
@@ -759,15 +733,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/57/5e/70bdd9579b35003a489fc850b5047beeda26328053ebadc1fb60f320f7db/soundfile-0.13.1-py2.py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:03267c4e493315294834a0870f31dbb3b28a95561b80b134f0bd3cf2d5f0e618", size = 1313646, upload-time = "2025-01-25T09:16:54.872Z" },
     { url = "https://files.pythonhosted.org/packages/fe/df/8c11dc4dfceda14e3003bb81a0d0edcaaf0796dd7b4f826ea3e532146bba/soundfile-0.13.1-py2.py3-none-win32.whl", hash = "sha256:c734564fab7c5ddf8e9be5bf70bab68042cd17e9c214c06e365e20d64f9a69d5", size = 899881, upload-time = "2025-01-25T09:16:56.663Z" },
     { url = "https://files.pythonhosted.org/packages/14/e9/6b761de83277f2f02ded7e7ea6f07828ec78e4b229b80e4ca55dd205b9dc/soundfile-0.13.1-py2.py3-none-win_amd64.whl", hash = "sha256:1e70a05a0626524a69e9f0f4dd2ec174b4e9567f4d8b6c11d38b5c289be36ee9", size = 1019162, upload-time = "2025-01-25T09:16:59.573Z" },
-]
-
-[[package]]
-name = "types-protobuf"
-version = "6.32.1.20260221"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/5f/e2/9aa4a3b2469508bd7b4e2ae11cbedaf419222a09a1b94daffcd5efca4023/types_protobuf-6.32.1.20260221.tar.gz", hash = "sha256:6d5fb060a616bfb076cbb61b4b3c3969f5fc8bec5810f9a2f7e648ee5cbcbf6e", size = 64408, upload-time = "2026-02-21T03:55:13.916Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/2e/e8/1fd38926f9cf031188fbc5a96694203ea6f24b0e34bd64a225ec6f6291ba/types_protobuf-6.32.1.20260221-py3-none-any.whl", hash = "sha256:da7cdd947975964a93c30bfbcc2c6841ee646b318d3816b033adc2c4eb6448e4", size = 77956, upload-time = "2026-02-21T03:55:12.894Z" },
 ]
 
 [[package]]

@@ -24,10 +24,9 @@ except ImportError:
 
 import socks
 import websocket
-from discord_protos import PreloadedUserSettings
 from google.protobuf.json_format import MessageToDict
 
-from endcord import debug, perms
+from endcord import debug, perms, user_settings_pb2
 from endcord.message import prepare_message
 
 DISCORD_HOST = "discord.com"
@@ -829,7 +828,7 @@ class Gateway():
                     ready_time_mid = time.time()
                     # get user settings
                     if "user_settings_proto" in data and not self.legacy:
-                        decoded = PreloadedUserSettings.FromString(base64.b64decode(data["user_settings_proto"]))
+                        decoded = user_settings_pb2.UserSettings.FromString(base64.b64decode(data["user_settings_proto"]))
                         self.user_settings_proto = MessageToDict(decoded)
                     else:
                         self.legacy = True
@@ -837,9 +836,9 @@ class Gateway():
                         old_user_settings.update({
                             "status": {
                                 "status": old_user_settings.get("status", "online"),
-                                "guildFolders": {
-                                    "guildPositions": old_user_settings.get("guild_positions"),
-                                },
+                            },
+                            "guildFolders": {
+                                "guildPositions": old_user_settings.get("guild_positions"),
                             },
                         })
                         self.user_settings_proto = old_user_settings
@@ -1030,7 +1029,7 @@ class Gateway():
                 elif optext == "MESSAGE_CREATE" and "content" in response["d"]:
                     message = response["d"]
                     # saving roles to cache
-                    if  message["channel_id"] in self.subscribed_channels and "member" in message and "roles" in message["member"]:
+                    if message["channel_id"] in self.subscribed_channels and "member" in message and "roles" in message["member"]:
                         self.add_member_roles(
                             message.get("guild_id"),
                             message["author"]["id"],
@@ -1326,7 +1325,7 @@ class Gateway():
                 elif optext == "USER_SETTINGS_PROTO_UPDATE":
                     if data["partial"] or data["settings"]["type"] != 1:
                         continue
-                    decoded = PreloadedUserSettings.FromString(base64.b64decode(data["settings"]["proto"]))
+                    decoded = user_settings_pb2.UserSettings.FromString(base64.b64decode(data["settings"]["proto"]))
                     self.user_settings_proto = MessageToDict(decoded)
                     self.proto_changed = True
 

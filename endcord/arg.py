@@ -7,6 +7,7 @@ def parser(app_name, version, default_config_path, log_path):
         prog=app_name,
         description="Feature rich Discord client in terminal using ncurses",
     )
+    parser.suggest_on_error = True
     parser._positionals.title = "arguments"
     parser.add_argument(
         "-c",

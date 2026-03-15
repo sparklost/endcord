@@ -1,4 +1,4 @@
-# cython: boundscheck=False, wraparound=False
+# cython: boundscheck=False, wraparound=False, freethreading_compatible=True
 
 cdef inline int binary_search(int codepoint, tuple ranges):
     cdef Py_ssize_t low = 0

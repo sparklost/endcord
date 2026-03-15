@@ -398,12 +398,10 @@ Nuitka requirements:
 - on macOS install XCode via Apple Store
 
 ### Free-threaded Python
-Endcord does work with free-threaded python, and it significantly improves media player performance with large video resolutions, by allowing decoding, video and sound to be played in separate threads, completely removing crackling sound when playing on high "terminal resolution".  
-But currently building does not work in this mode, nuitka [doesn't support free-threaded mode](<https://github.com/Nuitka/Nuitka/issues/3062>) yet.  
-Anyway, to run it from source:  
-Install dependencies: `uv sync -p 3.14t --group media`.  
-Remove orjson (doesn't support freethreaded python): `uv remove orjson`. (ujson also doesn't support freethreaded).  
-Run main.py: `uv run -p 3.14t main.py`.  
+Endcord does work with free-threaded python (3.14 only), and it significantly improves media player performance with large video resolutions, by allowing decoding, video and sound playing to be run in separate CPU threads, completely removing crackling sound when playing on high "terminal resolution".  
+This comes at the cost of much larger binary, increased CPU and RAM usage.  
+Currently nuitka [doesn't support free-threaded mode](<https://github.com/Nuitka/Nuitka/issues/3062>) yet. Pyinstaller (without `--nutka` flag) does build it successfully.  
+To make it use freethreaded python run `python build.py` (not `uv`!) with `--freethreaded` arument.  
 
 ### Building without orjson
 If you want to build without `orjson` (uses rust), run `uv remove orjson` for the first time, before running anything else.  

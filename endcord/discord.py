@@ -20,10 +20,9 @@ except ImportError:
         import json
 
 import socks
-from discord_protos import FrecencyUserSettings, PreloadedUserSettings
 from google.protobuf.json_format import MessageToDict, ParseDict
 
-from endcord import peripherals
+from endcord import peripherals, user_settings_pb2
 from endcord.message import prepare_messages
 
 DISCORD_HOST = "discord.com"
@@ -574,7 +573,7 @@ class Discord():
         """
         Get account settings:
         num=1 - General user settings
-        num=2 - Frecency and favorites storage for various things
+        num=2 - Frecency and favorites storage for various things - unsupported
         """
         if self.protos[num-1]:
             return self.protos[num-1]
@@ -586,9 +585,9 @@ class Discord():
         if status == 200:
             data = json.loads(data)["settings"]
             if num == 1:
-                decoded = PreloadedUserSettings.FromString(base64.b64decode(data))
+                decoded = user_settings_pb2.UserSettings.FromString(base64.b64decode(data))
             elif num == 2:
-                decoded = FrecencyUserSettings.FromString(base64.b64decode(data))
+                return {}   # unsupported
             else:
                 return {}
             self.protos[num-1] = MessageToDict(decoded)
@@ -606,9 +605,9 @@ class Discord():
             self.get_settings_proto(num)
         self.protos[num-1].update(data)
         if num == 1:
-            encoded = base64.b64encode(ParseDict(data, PreloadedUserSettings()).SerializeToString()).decode("utf-8")
+            encoded = base64.b64encode(ParseDict(data, user_settings_pb2.UserSettings()).SerializeToString()).decode("utf-8")
         elif num == 2:
-            encoded = base64.b64encode(ParseDict(data, FrecencyUserSettings()).SerializeToString()).decode("utf-8")
+            return False   # unsupported
         else:
             return False
 

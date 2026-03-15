@@ -1,4 +1,4 @@
-# cython: boundscheck=False, wraparound=False
+# cython: boundscheck=False, wraparound=False, freethreading_compatible=True
 
 from libc.stdint cimport int16_t, int32_t
 

@@ -1,4 +1,4 @@
-# cython: boundscheck=False, wraparound=False
+# cython: boundscheck=False, wraparound=False, freethreading_compatible=True
 
 cpdef inline int fuzzy_match_score_single(str query, str candidate):
     """

@@ -1,4 +1,4 @@
-# cython: boundscheck=False, wraparound=False
+# cython: boundscheck=False, wraparound=False, freethreading_compatible=True
 
 cpdef img_to_term(
     object img,

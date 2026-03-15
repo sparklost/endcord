@@ -1,4 +1,4 @@
-Switch to python 3.14
+Optimize gateway message events
 Add pfp to notifications
 Add ability to resize extra window
 
@@ -22,7 +22,7 @@ after fixing https://github.com/python/cpython/issues/119138
     Add red fg gray bg color for active and unread in tree
     Show inline media in chat
     Add bg color for mentions and channels in chat
-    Add status dot color to active line in tree
+    Add status dot color to active and muted line in tree
 
 Add binding to toggle tree
 Fix issues with wide characters in input line

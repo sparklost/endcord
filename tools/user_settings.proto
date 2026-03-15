@@ -1,0 +1,74 @@
+syntax = "proto3";
+import "google/protobuf/wrappers.proto";
+package endcord.user_settings.v1;
+
+message UserSettings {
+
+  // channel and guild settings - UNUSED
+  // message channel_icon_emoji {
+  //   optional google.protobuf.UInt64Value id = 1;
+  //   optional google.protobuf.StringValue name = 2;
+  //   optional google.protobuf.UInt64Value color = 3;
+  // }
+  // message ChannelSettings {
+  //   bool collapsed_in_inbox = 1;
+  //   optional channel_icon_emoji icon_emoji = 2;
+  // }
+  // message ChannelListSettings {
+  //   optional google.protobuf.StringValue layout = 1;
+  //   optional google.protobuf.StringValue message_previews = 2;
+  // }
+  // message GuildSettings {
+  //   map<fixed64, ChannelSettings> channels = 1;
+  // }
+  // message AllGuildSettings {
+  //   map<fixed64, GuildSettings> guilds = 1;
+  // }
+
+  // text and images
+  message DefaultReactionEmoji {
+    optional google.protobuf.UInt64Value emoji_id = 1;
+    optional google.protobuf.StringValue emoji_name = 2;
+    optional google.protobuf.BoolValue animated = 3;
+  }
+  message TextAndImagesSettings {
+    optional google.protobuf.BoolValue gif_auto_play = 11;
+    optional google.protobuf.BoolValue render_embeds = 12;
+    optional DefaultReactionEmoji default_reaction_emoji = 33;
+  }
+
+  // status
+  message CustomStatus {
+    string text = 1;
+    fixed64 emoji_id = 2;
+    string emoji_name = 3;
+    fixed64 expires_at_ms = 4;
+    fixed64 created_at_ms = 5;
+    optional google.protobuf.StringValue label = 6;
+  }
+  message StatusSettings {
+    optional google.protobuf.StringValue status = 1;
+    optional CustomStatus custom_status = 2;
+    optional google.protobuf.BoolValue show_current_game = 3;
+    fixed64 status_expires_at_ms = 4;
+    optional google.protobuf.UInt64Value status_created_at_ms = 5;
+  }
+
+  // guild folders
+  message GuildFolder {
+    repeated fixed64 guild_ids = 1;
+    optional google.protobuf.Int64Value id = 2;
+    optional google.protobuf.StringValue name = 3;
+    optional google.protobuf.UInt64Value color = 4;
+  }
+  message GuildFolders {
+    repeated GuildFolder folders = 1;
+    repeated fixed64 guild_positions = 2;
+  }
+
+  // root
+  // optional AllGuildSettings guilds = 3;
+  optional TextAndImagesSettings text_and_images = 6;
+  optional StatusSettings status = 11;
+  optional GuildFolders guild_folders = 14;
+}

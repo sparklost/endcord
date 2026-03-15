@@ -1,4 +1,4 @@
-# cython: boundscheck=False, wraparound=False, cdivision=True
+# cython: boundscheck=False, wraparound=False, cdivision=True, freethreading_compatible=True
 
 from cpython.tuple cimport PyTuple_GET_ITEM
 import pygame
