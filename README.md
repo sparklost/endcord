@@ -336,6 +336,7 @@ Optional dependencies:
 - `mpv` - Play youtube videos in native player (non-ascii)
 - `libsecret` - Store token in system keyring (`gnome-keyring` is also required, with `dbus` as dependency)
 - `libappindicator-gtk3` - Tray support under wayland, for [experimental windowed mode](#experimental-windowed-mode) only.
+- `imagemagick` - To make notification images round; only needed for endcord-lite.
 
 ### Windows
 - Pre-built binaries (built with nuitka using clang) are available in releases

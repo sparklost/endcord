@@ -18,6 +18,7 @@ import emoji
 from endcord import (
     client_properties,
     color,
+    config,
     debug,
     discord,
     downloader,
@@ -31,6 +32,7 @@ from endcord import (
     rpc,
     search,
     tui,
+    utils,
 )
 from endcord.assist_data import COMMAND_ASSISTS, SEARCH_HELP_TEXT
 
@@ -39,8 +41,6 @@ support_media = (
     importlib.util.find_spec("av") is not None and
     importlib.util.find_spec("nacl") is not None
 )
-if support_media:
-    from endcord import clipboard
 cythonized = importlib.util.find_spec("endcord_cython") and importlib.util.find_spec("endcord_cython.search")
 uses_pgcurses = tui.uses_pgcurses
 
@@ -137,6 +137,7 @@ class Endcord:
         self.enable_calls = config["calls"]
         self.game_detection_download_delay = config["game_detection_download_delay"]
         self.vim_mode = config["vim_mode"]
+        self.notifications_pfp = config["notifications_pfp"]
 
         if not self.external_editor or not shutil.which(self.external_editor):
             self.external_editor = os.environ.get("EDITOR", "nano")
@@ -156,7 +157,7 @@ class Endcord:
         self.default_msg_alt_color = self.colors[1]
 
         # write properties to log
-        properties = [peripherals.detect_runtime()]
+        properties = [utils.detect_runtime()]
         if support_media:
             properties.append("ASCII media")
         if cythonized:
@@ -295,7 +296,7 @@ class Endcord:
         self.restore_input_text = (None, None)
         self.extra_bkp = None
         self.checkpoint = None
-        self.command_history = peripherals.load_json("command_history.json", [])
+        self.command_history = utils.load_json("command_history.json", [])
         self.command_history_index = 0
         self.command_history_stored_current = None
         self.show_blocked_messages = False
@@ -304,6 +305,7 @@ class Endcord:
         self.timed_extra_line = threading.Event()
         self.log_queue_manager = None
         self.message_send_queue = queue.Queue()
+        self.notify_queue = queue.Queue()
         self.notifications = []
         self.terminal_media = None
         # threading.Thread(target=self.profiling_auto_exit, daemon=True).start()
@@ -345,7 +347,7 @@ class Endcord:
         path = os.path.expanduser(os.path.join(peripherals.config_path, "Extensions"))
         if not os.path.exists(path):
             os.makedirs(os.path.expanduser(path), exist_ok=True)
-        extensions, invalid = peripherals.get_extensions(path)
+        extensions, invalid = utils.get_extensions(path)
 
         # load extensions
         log_text = []
@@ -490,6 +492,8 @@ class Endcord:
                             break
             except Exception:
                 pass
+            finally:
+                self.message_send_queue.task_done()
 
 
     def put_to_message_sender(self, func, *args, **kwargs):
@@ -525,6 +529,16 @@ class Endcord:
             tree = "%slowmode" in self.format_title_tree
             self.update_status_line(status=status, title=title, tree=tree)
             time.sleep(1)
+
+
+    def notification_sender(self):
+        """Thread that takes messages that should send desktop notification and does it one-by-one"""
+        while self.run:
+            message, avatar_id = self.notify_queue.get()
+            try:
+                self.send_desktop_message_notification(message, avatar_id)
+            finally:
+                self.notify_queue.task_done()
 
 
     def reset(self, online=False):
@@ -929,7 +943,7 @@ class Endcord:
         if self.config["remember_state"] and self.current_channel.get("type") not in (11, 12, 15):
             self.state["last_guild_id"] = guild_id
             self.state["last_channel_id"] = channel_id
-        peripherals.save_json(self.state, f"state_{self.profiles["selected"]}.json")
+        utils.save_json(self.state, f"state_{self.profiles["selected"]}.json")
 
         self.remove_running_task("Switching channel", 1)
         logger.debug("Channel switching complete")
@@ -1184,7 +1198,7 @@ class Endcord:
                 self.command_history.pop(0)
                 if self.command_history_index:
                     self.command_history_index -= 1
-            peripherals.save_json(self.command_history, "command_history.json")
+            utils.save_json(self.command_history, "command_history.json")
 
 
     def add_to_channel_cache(self, channel_id, messages, set_pinned):
@@ -1288,7 +1302,7 @@ class Endcord:
                 if self.active_channel["pinned"]:
                     tabbed_channels.append(self.active_channel["channel_id"])
                 self.state["tabbed_channels"] = tabbed_channels
-                peripherals.save_json(self.state, f"state_{self.profiles["selected"]}.json")
+                utils.save_json(self.state, f"state_{self.profiles["selected"]}.json")
             self.update_tabs(add_current=True)
 
 
@@ -1331,7 +1345,6 @@ class Endcord:
         if reacting:
             self.reacting = {
                 "id": None,
-                "msg_index": None,
                 "username": None,
                 "global_name": None,
             }
@@ -1874,7 +1887,6 @@ class Endcord:
                     self.ignore_typing = True
                     self.reacting = {
                         "id": message["id"],
-                        "msg_index": msg_index,
                         "username": message["username"],
                         "global_name": message["global_name"],
                     }
@@ -2412,7 +2424,7 @@ class Endcord:
                         "channel_id": channel_id,
                         "guild_id": guild_id,
                         })
-                    peripherals.save_json(self.hidden_channels, "hidden_channels.json")
+                    utils.save_json(self.hidden_channels, "hidden_channels.json")
                     self.update_tree()
 
                 elif self.going_to_ch:
@@ -2630,7 +2642,7 @@ class Endcord:
                         "channel_id": channel_id,
                         "guild_id": guild_id,
                         })
-                    peripherals.save_json(self.hidden_channels, "hidden_channels.json")
+                    utils.save_json(self.hidden_channels, "hidden_channels.json")
                     self.update_tree()
 
                 elif self.recording:
@@ -2690,7 +2702,7 @@ class Endcord:
             value = cmd_args["value"]
             if key in self.config:
                 self.update_extra_line("Restart needed for changes to take effect.")
-                self.config = peripherals.update_config(self.config, key, value)
+                self.config = config.update_config(self.config, key, value)
             else:
                 self.update_extra_line("Unknow settings key.")
 
@@ -2993,7 +3005,6 @@ class Endcord:
                     self.ignore_typing = True
                     self.reacting = {
                         "id": self.messages[msg_index]["id"],
-                        "msg_index": msg_index,
                         "username": self.messages[msg_index]["username"],
                         "global_name": self.messages[msg_index]["global_name"],
                     }
@@ -3078,15 +3089,14 @@ class Endcord:
                 avatar_id = self.discord.get_user(user_id, extra=True)["extra"]["avatar"]
             if avatar_id:
                 if self.config["native_media_player"]:
-                    size = 160
+                    avatar_path = self.discord.get_pfp(user_id, avatar_id)
                 else:
-                    size = None
-                pfp_path = self.discord.get_pfp(user_id, avatar_id, size)
-                if pfp_path is None:
+                    avatar_path = self.discord.get_pfp(user_id, avatar_id, size=128)
+                if avatar_path is None:
                     self.gateway.set_offline()
                     self.update_extra_line("Network error.")
-                elif pfp_path:
-                    self.media_thread = threading.Thread(target=self.open_media, daemon=True, args=(pfp_path, ))
+                elif avatar_path:
+                    self.media_thread = threading.Thread(target=self.open_media, daemon=True, args=(avatar_path, ))
                     self.media_thread.start()
 
         elif cmd_type == 27:   # CHECK_STANDING
@@ -3098,7 +3108,7 @@ class Endcord:
             if shutil.which("xclip") or shutil.which("wl-paste"):
                 paths = peripherals.paste_clipboard_files(peripherals.temp_path)
             elif support_media:
-                paths = clipboard.save_image()
+                paths = peripherals.pillow_paste_image()
             else:
                 self.update_extra_line("No media support.")
             if isinstance(paths, str):
@@ -3540,7 +3550,7 @@ class Endcord:
                     self.update_voice_mute_in_call()
                 else:
                     self.update_extra_line("Client voice has been MUTED.")
-            peripherals.save_json(self.state, f"state_{self.profiles["selected"]}.json")
+            utils.save_json(self.state, f"state_{self.profiles["selected"]}.json")
 
         elif cmd_type == 53:   # VOICE_LIST_CALL
             if self.in_call:
@@ -3585,7 +3595,7 @@ class Endcord:
                 for num, folder in enumerate(self.state["folder_names"]):
                     if folder["id"] not in guild_folders_ids:
                         self.state["folder_names"].pop(num)
-                peripherals.save_json(self.state, f"state_{self.profiles["selected"]}.json")
+                utils.save_json(self.state, f"state_{self.profiles["selected"]}.json")
                 self.update_tree()
 
         elif cmd_type == 57:   # VIEW_EMOJI
@@ -3638,7 +3648,7 @@ class Endcord:
                     else:
                         self.state["games_blacklist"].append(app_id)
                     self.game_detection.set_blacklist(self.state["games_blacklist"])
-                    peripherals.save_json(self.state, f"state_{self.profiles["selected"]}.json")
+                    utils.save_json(self.state, f"state_{self.profiles["selected"]}.json")
             else:
                 self.update_extra_line("Game detection service is disabled or not running.")
 
@@ -3675,7 +3685,7 @@ class Endcord:
             self.fun = 1 if self.fun == 3 else 3
             self.tui.set_fun(self.fun)
             self.state["snow"] = self.fun == 3
-            peripherals.save_json(self.state, f"state_{self.profiles["selected"]}.json")
+            utils.save_json(self.state, f"state_{self.profiles["selected"]}.json")
 
         elif cmd_type == 68:   # REMOVE_ALL_TABS
             for channel in reversed(self.channel_cache):
@@ -3686,7 +3696,7 @@ class Endcord:
                 if self.active_channel["pinned"]:
                     tabbed_channels.append(self.active_channel["channel_id"])
                 self.state["tabbed_channels"] = tabbed_channels
-                peripherals.save_json(self.state, f"state_{self.profiles["selected"]}.json")
+                utils.save_json(self.state, f"state_{self.profiles["selected"]}.json")
             self.update_tabs()
 
         elif cmd_type == 69:   # COLLAPSE_ALL_EXCEPT
@@ -4262,7 +4272,7 @@ class Endcord:
                 if url == file[0] and os.path.exists(file[1]):
                     destination = file[1]
                     from_cache = True
-                    if open_move and peripherals.get_can_play(destination):
+                    if open_move and utils.get_can_play(destination):
                         open_media = True
                     break
 
@@ -4280,7 +4290,7 @@ class Endcord:
                 path, filename = self.downloader.download(url, file_id)
                 if path:
                     if open_move:
-                        if peripherals.get_can_play(path):
+                        if utils.get_can_play(path):
                             open_media = True
                         else:
                             move = True
@@ -4298,7 +4308,7 @@ class Endcord:
 
             self.remove_running_task("Downloading file", 2)
             if move:
-                self.update_extra_line(f"File saved to {peripherals.collapseuser(self.downloads_path)}")
+                self.update_extra_line(f"File saved to {utils.collapseuser(self.downloads_path)}")
 
         # open media
         if open_media:
@@ -4321,7 +4331,7 @@ class Endcord:
         if not channel_id:
             channel_id = self.active_channel["channel_id"]
 
-        size = peripherals.get_file_size(path)
+        size = utils.get_file_size(path)
         limit = max(USER_UPLOAD_LIMITS[self.premium], GUILD_UPLOAD_LIMITS[self.premium])
         if size > limit:
             self.update_extra_line(f"File is larger than current upload limit: {int(limit/MB)}MB")
@@ -4623,7 +4633,7 @@ class Endcord:
 
     def preload_chat(self):
         """Download chat before switching channel to allow faster switching, used for initial chat when starting up"""
-        self.state = peripherals.load_json(f"state_{self.profiles["selected"]}.json")
+        self.state = utils.load_json(f"state_{self.profiles["selected"]}.json")
         if self.state and self.state["last_channel_id"]:
             messages = self.discord.get_messages(self.state["last_channel_id"], self.msg_num)
             if messages is None:   # network error
@@ -4656,7 +4666,7 @@ class Endcord:
         if not quick:
             self.update_tabs()
             self.gateway.set_want_member_list(self.state["member_list"])
-            peripherals.save_json(self.state, f"state_{self.profiles["selected"]}.json")
+            utils.save_json(self.state, f"state_{self.profiles["selected"]}.json")
 
 
     def set_status(self, status):
@@ -4969,10 +4979,14 @@ class Endcord:
         """Build and send reaction from provided text"""
         first = text.split(" ")[0]
         if msg_index is None:
-            msg_index = self.reacting["msg_index"]
-        if msg_index is None or msg_index < 0:
-            return
-        all_reactions = self.messages[msg_index]["reactions"]
+            for message in self.messages:
+                if message["id"] == self.reacting["id"]:
+                    all_reactions = message["reactions"]
+                    break
+            else:
+                return
+        else:
+            all_reactions = self.messages[msg_index]["reactions"]
 
         my_present_emojis = []
         my_present_ids = []
@@ -5546,7 +5560,7 @@ class Endcord:
         If custom mode: run command from custom_media_player if
         """
         if self.config["custom_media_player"]:
-            media_hint = peripherals.get_media_type(path)
+            media_hint = utils.get_media_type(path)
             if not self.config["custom_media_blacklist"] or media_hint not in self.config["custom_media_blacklist"]:
                 if self.config["custom_media_terminal"]:
                     self.update_extra_line()
@@ -6439,7 +6453,7 @@ class Endcord:
                     self.uncollapsed_threads.append(self.tree_metadata[num]["id"])
             if self.state["collapsed"] != collapsed:
                 self.state["collapsed"] = collapsed
-                peripherals.save_json(self.state, f"state_{self.profiles["selected"]}.json")
+                utils.save_json(self.state, f"state_{self.profiles["selected"]}.json")
 
 
     def process_msg_events_active_channel(self, new_message, latest_chat=True):
@@ -6626,7 +6640,7 @@ class Endcord:
                                     break
 
 
-    def process_msg_events_other_channels(self, new_message):
+    def process_msg_events_other_channels(self, new_message, avatar_id=None):
         """Process message events that should ping and send notification"""
         data = new_message["d"]
         op = new_message["op"]
@@ -6684,9 +6698,9 @@ class Endcord:
                         if not this_channel or self.new_unreads:   # new_unreads already set in process events for active channel
                             ping = True
                         if message_notifications != 2:
-                            self.send_desktop_notification(new_message)
+                            self.notify_queue.put((new_message, avatar_id))
                     elif message_notifications == 0:
-                        self.send_desktop_notification(new_message)
+                        self.notify_queue.put((new_message, avatar_id))
 
                     # set unseen
                     if this_channel and self.new_unreads:
@@ -6836,7 +6850,7 @@ class Endcord:
                 self.update_extra_line(custom_text=self.permanent_extra_line, permanent=True)
                 if event["ringing"]:
                     custom_ringtone = self.config["custom_ringtone_incoming"]
-                    linux_ringtone = peripherals.find_linux_sound(self.config["linux_ringtone_incoming"])
+                    linux_ringtone = utils.find_linux_sound(self.config["linux_ringtone_incoming"])
                     if custom_ringtone and os.path.exists(custom_ringtone):
                         self.start_ringing(custom_ringtone)
                     elif linux_ringtone and os.path.exists(linux_ringtone):
@@ -6847,7 +6861,7 @@ class Endcord:
         elif event["op"] == "CALL_UPDATE" and not (self.in_call or self.joining_call):
             if event["ringing"]:
                 custom_ringtone = self.config["custom_ringtone_incoming"]
-                linux_ringtone = peripherals.find_linux_sound(self.config["linux_ringtone_incoming"])
+                linux_ringtone = utils.find_linux_sound(self.config["linux_ringtone_incoming"])
                 if custom_ringtone and os.path.exists(custom_ringtone):
                     self.start_ringing(custom_ringtone)
                 elif linux_ringtone and os.path.exists(linux_ringtone):
@@ -7048,7 +7062,7 @@ class Endcord:
         self.stop_ringing()
         if not incoming:
             custom_ringtone = self.config["custom_ringtone_outgoing"]
-            linux_ringtone = peripherals.find_linux_sound(self.config["linux_ringtone_outgoing"])
+            linux_ringtone = utils.find_linux_sound(self.config["linux_ringtone_outgoing"])
             if custom_ringtone and os.path.exists(custom_ringtone):
                 self.start_ringing(custom_ringtone, loop_delay=1.5, loop_max=30)
             elif linux_ringtone and os.path.exists(linux_ringtone):
@@ -7154,7 +7168,7 @@ class Endcord:
                 "summaries": [summary],
             })
         if time.time() - self.last_summary_save > SUMMARY_SAVE_INTERVAL:
-            peripherals.save_json(self.summaries, "summaries.json")
+            utils.save_json(self.summaries, "summaries.json")
             self.last_summary_save = time.time()
 
 
@@ -7197,7 +7211,7 @@ class Endcord:
             return self.in_call["channel_id"]
 
 
-    def send_desktop_notification(self, new_message):
+    def send_desktop_message_notification(self, new_message, avatar_id=None):
         """
         Send desktop notification, and keep its ID so it can be removed.
         """
@@ -7240,10 +7254,28 @@ class Endcord:
                 use_global_name=("%global_name" in self.config["format_message"]),
                 use_nick=self.config["use_nick_when_available"],
             )
+
+            # download pfp
+            if self.notifications_pfp and avatar_id:
+                # check if cached
+                cache_path = os.path.expanduser(peripherals.cache_path)
+                for file_name in os.listdir(cache_path):
+                    avatar_path = os.path.join(cache_path, file_name)
+                    if os.path.isfile(avatar_path) and os.path.splitext(file_name)[0].strip("_round") == avatar_id:
+                        break
+                else:   # download to cache
+                    if self.notifications_pfp != 1:
+                        avatar_path = self.discord.get_pfp(data["user_id"], avatar_id, size=self.notifications_pfp, save_path=cache_path)
+                    else:
+                        avatar_path = self.discord.get_pfp(data["user_id"], avatar_id, size=256, save_path=peripherals.cache_path)
+            else:
+                avatar_path = None
+
             notification_id = peripherals.notify_send(
                 title,
                 body,
                 sound=self.notification_sound,
+                image_path=avatar_path,
                 custom_sound=self.notification_path,
             )
 
@@ -7259,7 +7291,7 @@ class Endcord:
         from endcord import git
         if not force and not self.config["check_for_updates"]:
             return
-        last_check = peripherals.load_json("version.json", {
+        last_check = utils.load_json("version.json", {
             "time": int(time.time()),
             "version": peripherals.VERSION,
             "extensions": {},
@@ -7318,7 +7350,7 @@ class Endcord:
             self.update_extra_line(text)
             logger.info(text)
 
-        peripherals.save_json(last_check, "version.json")
+        utils.save_json(last_check, "version.json")
 
 
     def main(self):
@@ -7374,14 +7406,15 @@ class Endcord:
                 })
                 found += folder["guildIds"]
             # if some folders are missing use default positions
-            missing_guilds = []
-            for guild in self.discord_settings["guildFolders"].get("guildPositions", []):
-                if guild not in found:   # deduplicate
-                    missing_guilds.append(guild)
-            self.guild_folders.append({
-                "id": "MISSING",
-                "guilds": missing_guilds,
-            })
+            if self.discord_settings["guildFolders"].get("guildPositions", []):
+                missing_guilds = []
+                for guild in self.discord_settings["guildFolders"].get("guildPositions", []):
+                    if guild not in found:   # deduplicate
+                        missing_guilds.append(guild)
+                self.guild_folders.append({
+                    "id": "MISSING",
+                    "guilds": missing_guilds,
+                })
         if logger.getEffectiveLevel() == logging.DEBUG:
             debug.save_json(debug.anonymize_guild_folders(self.guild_folders), "guild_folders.json")
         del found
@@ -7406,7 +7439,7 @@ class Endcord:
         self.compute_permissions()
 
         # load locally hidden channels
-        self.hidden_channels = peripherals.load_json("hidden_channels.json")
+        self.hidden_channels = utils.load_json("hidden_channels.json")
         if not self.hidden_channels:
             self.hidden_channels = []
         for hidden in self.hidden_channels:
@@ -7431,7 +7464,7 @@ class Endcord:
 
         # restore last state
         if self.config["remember_state"]:
-            self.state = peripherals.load_json(f"state_{self.profiles["selected"]}.json", self.state)
+            self.state = utils.load_json(f"state_{self.profiles["selected"]}.json", self.state)
             if self.fun == 3 and "snow" in self.state and not self.state["snow"]:
                 self.fun = 1
         if self.state["last_guild_id"] in self.state["collapsed"]:
@@ -7447,7 +7480,7 @@ class Endcord:
 
         # load summaries
         if self.save_summaries:
-            self.summaries = peripherals.load_json("summaries.json", [])
+            self.summaries = utils.load_json("summaries.json", [])
 
         # load messages
         if self.state["last_channel_id"]:
@@ -7503,9 +7536,10 @@ class Endcord:
             afk=self.my_status["afk"],
         )
 
-        # start input and sender threads
+        # start daemon threads
         threading.Thread(target=self.wait_input, daemon=True, args=()).start()
         threading.Thread(target=self.message_sender, daemon=True).start()
+        threading.Thread(target=self.notification_sender, daemon=True).start()
 
         # start RPC server
         if self.enable_rpc:
@@ -7555,6 +7589,7 @@ class Endcord:
                     new_message = self.execute_extensions_methods("on_message_event", new_message, cache=True)[0]
                     new_message_channel_id = new_message["d"]["channel_id"]
                     this_channel = (new_message_channel_id == self.active_channel["channel_id"])
+                    avatar_id = new_message["d"].pop("avatar", None)
                     if this_channel and self.get_chat_last_message_id() == self.last_message_id:   # if its scrolled far up, this channel bot is cached
                         self.process_msg_events_active_channel(new_message)
                     # handle cached channels
@@ -7571,7 +7606,7 @@ class Endcord:
                             self.process_msg_events_active_channel(new_message, latest_chat=False)
                     # handle unseen and mentions
                     if not this_channel or (this_channel and (self.new_unreads or self.ping_this_channel or self.tui.disable_drawing or self.tui.is_window_open())):
-                        self.process_msg_events_other_channels(new_message)
+                        self.process_msg_events_other_channels(new_message, avatar_id)
                     # remove ghost pings
                     self.process_msg_events_ghost_ping(new_message)
                     # rearrange dms
@@ -7927,7 +7962,7 @@ class Endcord:
                 elif assist_word != self.assist_word:
                     self.assist(assist_word, assist_type)
             elif assist_type == 7 and assist_word != self.assist_word:   # path
-                paths = peripherals.complete_path(assist_word, separator=True)
+                paths = utils.complete_path(assist_word, separator=True)
                 self.assist(assist_word, assist_type, query_results=paths)
 
             # check member assist query results

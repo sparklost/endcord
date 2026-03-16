@@ -22,7 +22,7 @@ except ImportError:
 import socks
 from google.protobuf.json_format import MessageToDict, ParseDict
 
-from endcord import peripherals, user_settings_pb2
+from endcord import peripherals, user_settings_pb2, utils
 from endcord.message import prepare_messages
 
 DISCORD_HOST = "discord.com"
@@ -1481,10 +1481,10 @@ class Discord():
             filename = os.path.basename(path)
         message_data = json.dumps({
             "files": [{
-                "file_size": peripherals.get_file_size(path),
+                "file_size": utils.get_file_size(path),
                 "filename": filename,
                 "id": self.attachment_id,
-                "is_clip": peripherals.get_is_clip(path),
+                "is_clip": utils.get_is_clip(path),
             }],
         })
         url = f"/api/v9/channels/{channel_id}/attachments"
@@ -1593,7 +1593,7 @@ class Discord():
 
     def send_voice_message(self, channel_id, path, reply_id=None, reply_channel_id=None, reply_guild_id=None, reply_ping=None):
         """Send voice message from file path, file must be ogg"""
-        waveform, duration = peripherals.get_audio_waveform(path)
+        waveform, duration = utils.get_audio_waveform(path)
         if not duration:
             logger.warning(f"Couldn't read voice message file: {path}")
         upload_data, status = self.request_attachment_url(channel_id, path, custom_name="voice-message.ogg")
@@ -1678,14 +1678,18 @@ class Discord():
         return False
 
 
-    def get_pfp(self, user_id, pfp_id, size=80):
+    def get_pfp(self, user_id, avatar_id, size=None, save_path=None):
         """Download pfp for specified user"""
-        destination = os.path.join(os.path.expanduser(peripherals.temp_path), f"{pfp_id}.webp")
+        if size is not None:
+            size = min(max(size, 16), 4096)
+        if not save_path:
+            save_path = peripherals.temp_path
+        destination = os.path.join(os.path.expanduser(save_path), f"{avatar_id}.webp")
         if os.path.exists(destination):
             return destination
 
         message_data = None
-        url = f"/avatars/{user_id}/{pfp_id}.webp?size={size}"
+        url = f"/avatars/{user_id}/{avatar_id}.webp?size={size}"
         header = {
             "Origin": f"https://{self.host}",
             "Sec-Fetch-Mode": "no-cors",
@@ -1887,7 +1891,7 @@ class Discord():
         except (socket.gaierror, TimeoutError):
             connection.close()
             return None, etag
-        json_array_objects = peripherals.json_array_objects   # to skip name lookup
+        json_array_objects = utils.json_array_objects   # to skip name lookup
         if response.status == 200:
             current_time = int(time.time()/1000)
             etag = response.getheader("ETag")[3:-1]

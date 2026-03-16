@@ -1,5 +1,4 @@
 Optimize gateway message events
-Add pfp to notifications
 Add ability to resize extra window
 
 Voice channels

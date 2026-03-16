@@ -134,6 +134,12 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
     Command or path to executable for launching external editor. Set to `None` to use system default.
 - `calls = True`  
     If disabled, wont be able to receive nor start calls and calls wont ring.
+- `downloads_path = None`  
+    Path to custom downloads directory. Set to `None` to use system default.
+- `notifications_pfp = True`  
+    Whether to include profile pictures in notifications.   
+    If enabled will slightly delay notification if picture is being downloaded. Pictures are cached in system default cache dir.  
+    Set to number to change maximum picture resolution, eg. `notifications_pfp = 128` will always download image with resolution 128x128 or worse.  
 - `linux_notification_sound = "message"`  
     Sound played when notification is displayed. Linux only. Set to None to disable. Sound names can be found in `/usr/share/sounds/freedesktop/stereo`, without extension.
 - `custom_notification_sound = None`  
@@ -163,7 +169,7 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
 - `yt_in_mpv = False`  
     Whether to open youtube links in mpv or in browser.  
 - `check_for_updates = 1`  
-    Wether to check for endcord and all extensions updates.
+    Whether to check for endcord and all extensions updates.
     0 - Do not check  
     1 - Show popup if there are updates  
     2 - Show popup and send desktop notification  
@@ -298,7 +304,7 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
     If this is ON, `color_format_message` still works same as with dynamic_name_len OFF, and it will internally correct for dynamic name difference.  
     Eg.: if color format has red character set to be at index 20, and `limit_username = 10`, `format_message = "abcd %username1234X67` but dynamic name is ON, then red character will always be 5 characters after `%username`. because `20 - length("abcd ") - 10 = 5`.
 - `media_use_blocks = False`  
-    Wether to use "block" characters (`▀`) for drawing media instead traditional characters from media_ascii_palette.  
+    Whether to use "block" characters (`▀`) for drawing media instead traditional characters from media_ascii_palette.  
     This will result in clearer picture with pixel-like characters, vertical resolution will be doubled.  
     media_ascii_palette and media_saturation have no effect when this is ON.  
 - `media_ascii_palette = "  ..',;:c*loexk#O0XNW"`  

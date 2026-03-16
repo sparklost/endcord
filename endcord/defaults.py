@@ -56,6 +56,7 @@ settings = {
     "limit_command_history": 50,
     "game_detection_download_delay": 7,
     "downloads_path": None,
+    "notifications_pfp": True,
     "linux_notification_sound": "message",
     "custom_notification_sound": None,
     "linux_ringtone_incoming": "phone-incoming-call",

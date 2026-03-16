@@ -7,7 +7,7 @@ import sys
 import threading
 import time
 
-from endcord import acs, peripherals
+from endcord import acs, peripherals, utils
 
 logger = logging.getLogger(__name__)
 uses_pgcurses = hasattr(curses, "PGCURSES")
@@ -2652,7 +2652,7 @@ class TUI():
             elif key == 9:   # TAB - same as CTRL+I
                 if self.enable_autocomplete:
                     if self.input_buffer and self.input_index == len(self.input_buffer):
-                        completions = peripherals.complete_path(self.input_buffer, separator=False)
+                        completions = utils.complete_path(self.input_buffer, separator=False)
                         if completions:
                             path = completions[selected_completion]
                             self.input_buffer = path

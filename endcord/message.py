@@ -255,6 +255,7 @@ def prepare_message(message):
         "embeds": embeds,
         "stickers": message.get("sticker_items", []),   # {name, id, format_type}
         "interaction": interaction,
+        "avatar": message["author"]["avatar"],   # removed just before message is added to the chat
     }
     if poll:
         message_dict["poll"] = poll
@@ -267,11 +268,14 @@ def prepare_message(message):
     return message_dict
 
 
-def prepare_messages(data, have_channel_id=False):
+def prepare_messages(data, have_channel_id=False, clean=True):
     """Prepare list of messages"""
     messages = []
     for message in data:
-        messages.append(prepare_message(message))
+        ready_message = prepare_message(message)
+        if clean:
+            del ready_message["avatar"]
+        messages.append(ready_message)
         if have_channel_id:
             messages[-1]["channel_id"] = message["channel_id"]
     return messages

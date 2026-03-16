@@ -1,22 +1,12 @@
-import base64
-import glob
 import importlib.util
-import json
 import logging
 import os
-import re
 import shutil
 import subprocess
 import sys
 import threading
 import time
 import webbrowser
-from ast import literal_eval
-from configparser import ConfigParser
-
-import filetype
-
-from endcord import defaults
 
 logger = logging.getLogger(__name__)
 REPO_OWNER = "sparklost"
@@ -24,14 +14,11 @@ APP_NAME = "endcord"
 VERSION = "1.3.0"
 NO_NOTIFY_SOUND_DE = ("kde", "plasma")   # linux desktops without notification sound
 
-match_youtube = re.compile(r"(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)[a-zA-Z0-9_-]{11}")
-
-
 # platform specific code
 have_termux_notify = False
 if sys.platform == "win32":
     import win32clipboard
-    from windows_toasts import Toast, WindowsToaster
+    from windows_toasts import Toast, ToastDisplayImage, WindowsToaster
     toaster = WindowsToaster(APP_NAME)
 elif sys.platform == "linux":
     have_gdbus = shutil.which("gdbus")
@@ -59,36 +46,42 @@ elif sys.platform == "linux":
 if sys.platform == "linux":
     path = os.environ.get("XDG_DATA_HOME", "")
     if path.strip():
-        config_path = os.path.join(path, f"{APP_NAME}")
-        log_path = os.path.join(path, f"{APP_NAME}")
+        config_path = os.path.join(path, APP_NAME)
+        log_path = os.path.join(path, APP_NAME)
     else:
         config_path = f"~/.config/{APP_NAME}"
         log_path = f"~/.config/{APP_NAME}"
     path = os.environ.get("XDG_RUNTIME_DIR", "")
     if path.strip():
-        temp_path = os.path.join(path, f"{APP_NAME}")
+        temp_path = os.path.join(path, APP_NAME)
     else:
         # per-user temp dir
         temp_path = f"/run/user/{os.getuid()}/{APP_NAME}"
         # fallback to .cache
         if not os.access(f"/run/user/{os.getuid()}", os.W_OK):
-            temp_path = f"~/.cache/{APP_NAME}"
+            temp_path = f"~/.cache/{APP_NAME}/temp"
     os.makedirs(os.path.expanduser(temp_path), exist_ok=True)
-
+    path = os.environ.get("XDG_CACHE_HOME", "")
+    if path.strip():
+        cache_path = os.path.join(path, APP_NAME)
+    else:
+        cache_path = f"~/.cache/{APP_NAME}"
     path = os.environ.get("XDG_DOWNLOAD_DIR", "")
     if path.strip():
-        downloads_path = os.path.join(path, f"{APP_NAME}")
+        downloads_path = os.path.join(path, APP_NAME)
     else:
         downloads_path = "~/Downloads"
 elif sys.platform == "win32":
     config_path = os.path.join(os.environ["LOCALAPPDATA"], APP_NAME)
     log_path = os.path.join(os.environ["LOCALAPPDATA"], APP_NAME)
     temp_path = os.path.join(os.environ["LOCALAPPDATA"], "Temp", APP_NAME)
+    cache_path = os.path.join(os.environ["LOCALAPPDATA"], APP_NAME, "Cache")
     downloads_path = os.path.join(os.environ["USERPROFILE"], "Downloads")
 elif sys.platform == "darwin":
     config_path = f"~/Library/Application Support/{APP_NAME}"
     log_path = f"~/Library/Application Support/{APP_NAME}"
-    temp_path = f"~/Library/Caches/TemporaryItems{APP_NAME}"
+    temp_path = f"~/Library/Caches/TemporaryItems/{APP_NAME}"
+    cache_path = f"~/Library/Caches/{APP_NAME}"
     downloads_path = "~/Downloads"
 else:
     print(f"Unsupported platform: {sys.platform}", file=sys.stderr)
@@ -96,7 +89,7 @@ else:
 
 
 # ensure paths exists
-for app_path in (config_path, log_path, temp_path, downloads_path):
+for app_path in (config_path, log_path, temp_path, cache_path, downloads_path):
     if not os.path.exists(os.path.expanduser(app_path)):
         os.makedirs(os.path.expanduser(app_path), exist_ok=True)
 
@@ -148,401 +141,11 @@ def import_soundcard():
         return None
 
 
-def ensure_terminal():
-    """
-    Ensure that app is running inside a terminal emulator, launch inside terminal if not.
-    Prefer $TERMINAL env var, fallback to few common terminal emulators.
-    """
-    if sys.stdout.isatty():
-        return
-
-    terminals = []
-    if "TERMINAL" in os.environ:
-        terminals.append(os.environ["TERMINAL"])
-    terminals += [
-        "gnome-terminal",
-        "kgx",
-        "konsole",
-        "xfce4-terminal",
-        "lxterminal",
-        "alacritty",
-        "ghostty",
-        "kitty",
-        "urxvt",
-        "x-terminal-emulator",
-        "xterm",
-    ]
-
-    for t in terminals:
-        if shutil.which(t):
-            terminal = t
-            break
-    else:
-        terminal = None
-
-    if not terminal:
-        print("No terminal emulator found.", file=sys.stderr)
-        sys.exit(1)
-
-    cmd = [sys.executable] + sys.argv
-    if terminal in ("gnome-terminal", "kgx"):
-        subprocess.Popen([terminal, "--"] + cmd)
-    else:
-        subprocess.Popen([terminal, "-e"] + cmd)
-    sys.exit(0)
-
-
-def ensure_ssl_certificates():
-    """Ensure that there are ssl certificates available to http.client module"""
-    if not ("__compiled__" in globals() or getattr(sys, "frozen", False)):   # skip if running from source
-        return
-    if sys.platform == "linux":
-        cert_path = "/etc/ssl/certs/ca-certificates.crt"
-        if os.path.exists(cert_path):
-            os.environ["SSL_CERT_FILE"] = cert_path
-        elif importlib.util.find_spec("certifi") is not None:
-            import certifi
-            os.environ["SSL_CERT_FILE"] = certifi.where()
-    elif sys.platform == "darwin" and importlib.util.find_spec("certifi") is not None:
-        import certifi
-        os.environ["SSL_CERT_FILE"] = certifi.where()
-
-
-def save_config(path, data, section):
-    """Save config section"""
-    path = os.path.expanduser(path)
-    if os.path.dirname(path):
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-    config = ConfigParser(interpolation=None)
-    if os.path.exists(path):
-        with open(path, "r", encoding="utf-8") as f:
-            config.read_file(f)
-    if not config.has_section(section):
-        config.add_section(section)
-    for key in data:
-        if data[key] in (True, False, None) or isinstance(data[key], (list, tuple, int, float)):
-            config.set(section, key, str(data[key]))
-        else:
-            config.set(section, key, f'"{str(data[key]).replace("\\", "\\\\")}"')
-    with open(path, "w", encoding="utf-8") as f:
-        config.write(f)
-
-
-def load_config(path, default, section="main", gen_config=False, merge=False):
-    """
-    Load settings and theme from config
-    If some value is missing, it is replaced with default value
-    """
-    if not path:
-        path = os.path.join(config_path, "config.ini")
-    path = os.path.expanduser(path)
-
-    if not os.path.exists(path) or gen_config:
-        save_config(path, default, section)
-        if not gen_config:
-            print(f"Default config generated at: {path}")
-        config_data = default
-    else:
-        config = ConfigParser(interpolation=None)
-        with open(path, "r", encoding="utf-8") as f:
-            config.read_file(f)
-        if not config.has_section(section):
-            return default
-        config_data_raw = config._sections[section]
-        config_data = dict.fromkeys(default)
-        for key in default:
-            if key in list(config[section].keys()):
-                try:
-                    eval_value = literal_eval(config_data_raw[key])
-                    config_data[key] = eval_value
-                except ValueError:
-                    config_data[key] = config_data_raw[key]
-            else:
-                config_data[key] = default[key]
-        for key, value in config_data_raw.items():
-            if key.startswith("ext_") or merge:
-                try:
-                    eval_value = literal_eval(value)
-                    config_data[key] = eval_value
-                except ValueError:
-                    config_data[key] = value
-    return config_data
-
-
-def get_themes():
-    """Return list of all themes found in Themes directory"""
-    themes_path = os.path.expanduser(os.path.join(config_path, "Themes"))
-    if not os.path.exists(themes_path):
-        os.makedirs(themes_path, exist_ok=True)
-    themes = []
-    for file in os.listdir(themes_path):
-        if file.endswith(".ini"):
-            themes.append(os.path.join(themes_path, file))
-    return themes
-
-
-def merge_configs(custom_config_path, theme_path):
-    """Merge config and themes, from various locations"""
-    gen_config = False
-    error = None
-    if not custom_config_path:
-        default_config_path = os.path.expanduser(os.path.join(config_path, "config.ini"))
-        if not os.path.exists(default_config_path):
-            logger.info("Using default config")
-            gen_config = True
-        custom_config_path = default_config_path
-    elif not os.path.exists(os.path.expanduser(custom_config_path)):
-        gen_config = True
-    config = load_config(custom_config_path, defaults.settings)
-    config["config_path"] = custom_config_path
-    if not theme_path and config["theme"]:
-        theme_path = os.path.expanduser(config["theme"])
-    saved_themes = get_themes()
-    theme = load_config(custom_config_path, defaults.theme, section="theme", gen_config=gen_config)
-    theme["theme_path"] = None
-    if theme_path:
-        # if path is only file name without extension
-        if os.path.splitext(os.path.basename(theme_path))[0] == theme_path:
-            for saved_theme in saved_themes:
-                if os.path.splitext(os.path.basename(saved_theme))[0] == theme_path:
-                    theme_path = saved_theme
-                    break
-            else:
-                error = f'Theme "{theme_path}" not found in themes directory.'
-        if not error:
-            theme_path = os.path.expanduser(theme_path)
-            theme = load_config(theme_path, theme, section="theme")
-            theme["theme_path"] = theme_path
-    config.update(theme)
-    return config, gen_config, error
-
-
-def alt_shift(value, shift):
-    """Try to change "ALT+Key into integer key value"""
-    val = re.sub(r"ALT\+(\d+)", lambda m: str(int(m.group(1)) + shift), value)
-    try:
-        return int(val)
-    except ValueError:
-        return val
-
-
-
-def convert_keybindings(keybindings):
-    """Convert keybinding codes to os-specific codes"""
-    if sys.platform == "win32":   # windows has different codes for Alt+Key
-        shift = 320
-        swap_backspace = True   # config - 8 (ctrl+backspace) with real - 263 (backspace)
-    elif os.environ.get("TERM", "") == "xterm":   # xterm has different codes for Alt+Key
-        shift = 64
-        swap_backspace = True
-        # for ALT+Key it actually sends 195 then Key+64
-        # but this is simpler since key should already be uniquely shifted
-    else:
-        return keybindings
-
-    for key, value in keybindings.items():
-        if isinstance(value, str):
-            keybindings[key] = alt_shift(value, shift)
-        elif swap_backspace and value == 8:
-            keybindings[key] = 263
-
-    return keybindings
-
-
-def convert_keybindings_cmd(keybindings):
-    """Convert keybinding codes to os-specific codes, for command bindings"""
-    if sys.platform == "win32":
-        shift = 320
-    elif os.environ.get("TERM", "") == "xterm":
-        shift = 64
-    else:
-        shift = 0
-
-    new_keybindings = {}
-    for key, value in keybindings.items():
-        new_key = key.replace('"', "")
-        if isinstance(new_key, str) and "alt" in new_key:
-            new_key = new_key.replace("alt", "ALT")
-        if isinstance(new_key, str) and shift:
-            new_key = alt_shift(new_key, shift)
-        else:
-            try:
-                new_key = int(new_key)
-            except ValueError:
-                pass
-        new_keybindings[new_key] = value
-
-    return new_keybindings
-
-
-def normalize_keybindings(keybindings):
-    """Ensure all keybindings are tuples"""
-    for key in keybindings:
-        if not isinstance(keybindings[key], tuple):
-            keybindings[key] = (keybindings[key], )
-    return keybindings
-
-
-def deduplicate_keybindings(keybindings_a, keybindings_b, command=False):
-    """Deduplicate 2 keubinding dicts that can have strings and tuples of strings as values, keeping keybindings_b"""
-    def deduplicate_value(dedupe_value, keybindings):
-        for key, values in keybindings.items():
-            if isinstance(values, tuple):
-                for num, value in enumerate(values):
-                    if value == dedupe_value:
-                        fresh_values = keybindings[key]
-                        keybindings[key] = fresh_values[:num] + (None,) + fresh_values[num + 1:]
-            elif values == dedupe_value:
-                keybindings[key] = None
-
-    def dedupe_value_command(dedupe_value, keybindings):
-        for key, value in keybindings.items():
-            if key == str(dedupe_value):
-                del keybindings[key]
-
-    if command:
-        deduplicate_value = dedupe_value_command
-
-    for key, values in keybindings_b.items():
-        if isinstance(values, tuple):
-            for value in values:
-                deduplicate_value(value, keybindings_a)
-        else:
-            deduplicate_value(values, keybindings_a)
-
-
-def merge_keybindings(keybindings, vim_keybindings, command_bindings):
-    """Merge standard and vim mode keybindings and remove keybinding collisions favoring vim keybindings"""
-    deduplicate_keybindings(keybindings, vim_keybindings)
-    deduplicate_keybindings(command_bindings, vim_keybindings, command=True)
-
-    for key, value_2_old in vim_keybindings.items():
-        if isinstance(value_2_old, str) and len(value_2_old) == 1:
-            try:
-                value_2 = ord(value_2_old)
-            except TypeError:
-                value_2 = value_2_old
-        else:
-            value_2 = value_2_old
-
-        if key not in keybindings:
-            keybindings[key] = value_2
-        else:
-            value_1 = keybindings[key]
-            if not isinstance(value_1, tuple):
-                value_1 = (value_1, )
-            if not isinstance(value_2, tuple):
-                value_2 = (value_2, )
-            if value_1[0] is None:
-                value_1 = ()
-            keybindings[key] = value_1 + value_2
-
-    return keybindings
-
-
-def update_config(config, key, value):
-    """Update and save config"""
-    if not value:
-        value = ""
-    else:
-        try:
-            value = literal_eval(value)
-        except ValueError:
-            pass
-    config[key] = value
-    config_path = config["config_path"]
-    saved_config = ConfigParser(interpolation=None)
-    if os.path.exists(config_path):
-        with open(os.path.expanduser(config_path), "r", encoding="utf-8") as f:
-            saved_config.read_file(f)
-    new_config = {}
-    new_theme = {}
-    # split config and theme
-    for key_all, value_all in config.items():
-        if key_all in defaults.settings:
-            new_config[key_all] = value_all
-        elif key_all in defaults.theme:
-            new_theme[key_all] = value_all
-    save_config(config_path, new_config, "main")
-    save_config(config_path, new_theme, "theme")
-    return config
-
-
-def collapseuser(path):
-    """Opposite of os.path.expanduser()"""
-    home = os.path.expanduser("~")
-    abs_path = os.path.abspath(path)
-    home = os.path.abspath(home)
-    if abs_path.startswith(home):
-        return "~" + abs_path[len(home):]
-    return path
-
-
-def detect_runtime():
-    """Detect if code is running from source, pyinstaller or nuitka binary"""
-    if hasattr(sys, "_MEIPASS"):
-        return "pyinstaller"
-    if "__compiled__" in globals():
-        return "nuitka"
-    if getattr(sys, "frozen", False):
-        return "unknown"
-    return "source"
-
-
-def get_extensions(path):
-    """Get list of valid extensions from specified path"""
-    extensions = []
-    invalid = []
-
-    # get list of valid extensions (dir name and py file name)
-    for entry in os.listdir(path):
-        full_path = os.path.join(path, entry)
-        if os.path.isdir(full_path):
-            main_file = os.path.join(full_path, entry + ".py")
-            if os.path.isfile(main_file):
-                extensions.append((main_file, entry))
-            else:
-                invalid.append((main_file, entry))
-    if not extensions:
-        return extensions, invalid
-
-    # safely check py file contents
-    match_class = re.compile(r"^class\s+Extension(\s*\(|\s*:)")
-    match_constant = re.compile(r"^(\w+)\s*=\s*(.+)$")
-    has_extension_class = False
-    constants = ["EXT_NAME", "EXT_VERSION", "EXT_ENDCORD_VERSION", "EXT_DESCRIPTION", "EXT_SOURCE"]
-    for ext_file, ext_name in extensions:
-        with open(ext_file, "r", encoding="utf-8") as f:
-            lines = f.readlines()
-        for line in lines:
-            if not line or line.startswith(("#", "'", '"')):
-                continue
-            if re.match(match_class, line):
-                has_extension_class = True
-                continue
-            match = match_constant.match(line)
-            if match:
-                name, value = match.groups()
-                if name in constants and value:
-                    constants.remove(name)
-        if not has_extension_class or constants:
-            extensions.remove((ext_file, ext_name))
-            invalid.append((ext_file, ext_name))
-
-    extensions = sorted(extensions, key=lambda x: x[1])
-    return extensions, invalid
-
-
-def find_linux_sound(name):
-    """Return path of sound file from its name, if it exists"""
-    if sys.platform == "linux":
-        path = os.path.join("/usr/share/sounds/freedesktop/stereo/", name + ".oga")
-        if os.path.exists(path):
-            return path
-
-
-def notify_send(title, message, sound="message", custom_sound=None):
-    """Send simple notification containing title and message. Cross-platform."""
+def notify_send(title, message, sound="message", image_path=None, custom_sound=None):
+    """Send simple notification containing title, message and optionally image, with optional custom notification sound. Cross-platform."""
+    if image_path:
+        image_path = os.path.expanduser(image_path)
+    image_path = make_round_image(image_path)
     if sys.platform == "linux":
         if custom_sound:
             threading.Thread(target=play_audio, daemon=True, args=(custom_sound, )).start()
@@ -554,6 +157,9 @@ def notify_send(title, message, sound="message", custom_sound=None):
             include_sound = ["-h", f"string:sound-name:{sound}"]
         if have_termux_notify:
             command = ["termux-notification", "--icon=chat", "--sound", "--channel=1000", "-t", title, "-c", message]
+            if image_path:
+                command.insert(2, "--image-path")
+                command.insert(3, image_path)
             proc = subprocess.Popen(
                 command,
                 stdout=subprocess.PIPE,
@@ -561,6 +167,9 @@ def notify_send(title, message, sound="message", custom_sound=None):
             )
         elif have_notify_send:
             command = ["notify-send", "-p", "--app-name", APP_NAME, *include_sound, title, message]
+            if image_path:
+                command.insert(4, "-i")
+                command.insert(5, image_path)
             proc = subprocess.Popen(
                 command,
                 stdin=subprocess.PIPE,
@@ -577,11 +186,14 @@ def notify_send(title, message, sound="message", custom_sound=None):
             threading.Thread(target=play_audio, daemon=True, args=(custom_sound, )).start()
         notification = Toast()
         notification.text_fields = [message]
+        if image_path:
+            notification.AddImage(ToastDisplayImage.fromPath(image_path))
         toaster.show_toast(notification)
     elif sys.platform == "darwin":
         if custom_sound:
             threading.Thread(target=play_audio, daemon=True, args=(custom_sound, )).start()
         command = ["osascript", "-e", f"'display notification \"{message}\" with title \"{title}\"'"]
+        # osascript cant display image in notification
         _ = subprocess.Popen(
             command,
             stdout=subprocess.DEVNULL,
@@ -599,36 +211,6 @@ def notify_remove(notification_id):
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
-
-
-def load_json(file, default=None, dir_path=config_path, create=False):
-    """Load saved json from same location where default config is saved"""
-    path = os.path.expanduser(os.path.join(dir_path, file))
-    if not os.path.exists(path):
-        if create:
-            save_json(default, file, dir_path=dir_path)
-        return default
-    try:
-        with open(path, "r") as f:
-            data = json.load(f)
-            if default:
-                for key, value in default.items():
-                    _ = data.setdefault(key, value)
-            return data
-    except Exception:
-        return default
-
-
-def save_json(data, file, compact=False, dir_path=config_path):
-    """Save json to same location where default config is saved"""
-    if not os.path.exists(dir_path):
-        os.makedirs(os.path.expanduser(dir_path), exist_ok=True)
-    path = os.path.expanduser(os.path.join(dir_path, file))
-    with open(path, "w") as f:
-        if compact:
-            json.dump(data, f, indent=None, separators=(",", ":"))
-        else:
-            json.dump(data, f, indent=2)
 
 
 def copy_to_clipboard(text):
@@ -736,6 +318,17 @@ def paste_clipboard_files(save_path=None):
     return []
 
 
+def pillow_paste_image():
+    """If there is image in clipboard, save it to temp path using pillow"""
+    from PIL import Image, ImageGrab
+    img = ImageGrab.grabclipboard()
+    if isinstance(img, Image.Image):
+        save_path = os.path.join(os.path.expanduser(temp_path), f"clipboard_image_{int(time.time())}.png")
+        img.save(save_path)
+        return [save_path]
+    return []
+
+
 def native_select_files(file_filter=None, multiple=True, auto=False):
     """Get one or more file paths with native dialog"""
     if filedialog == "windows":
@@ -823,67 +416,6 @@ def native_select_files(file_filter=None, multiple=True, auto=False):
     return []
 
 
-def get_file_size(path):
-    """Get file size in bytes"""
-    return os.stat(path).st_size
-
-
-def get_is_clip(path):
-    """Get whether file is video or not"""
-    kind = filetype.guess(path)
-    if kind and kind.mime:
-        return kind.mime.split("/")[0] == "video"
-
-
-def get_can_play(path):
-    """Get whether file can be played as media"""
-    kind = filetype.guess(path)
-    if kind and kind.mime:
-        return kind.mime.split("/")[0] in ("image", "video", "audio")
-
-
-def get_mime(path):
-    """Try to get mime type of the file"""
-    kind = filetype.guess(path)
-    if kind:
-        return kind.mime
-    return "unknown/unknown"
-
-
-def get_media_type(path, hint=None):
-    """Try to get media type"""
-    if re.search(match_youtube, path):
-        return "YT"
-    if "https://" in path:
-        return "URL"
-    mime = get_mime(path).split("/")
-    if hint:
-        mime = [hint, None]
-    if mime[0] == "image":
-        if mime[1] == "gif":
-            return "gif"
-        return "img"
-    if mime[0] == "video":
-        return "video"
-    if mime[0] == "audio":
-        return "audio"
-    logger.warning(f"Unsupported media format: {mime}")
-
-
-def complete_path(path, separator=True):
-    """Get possible completions for path"""
-    if not path:
-        return []
-    path = os.path.expanduser(path)
-    completions = []
-    for path in glob.glob(path + "*"):
-        if separator and path and os.path.isdir(path) and path[-1] != "/":
-            completions.append(path + "/")
-        else:
-            completions.append(path)
-    return sorted(completions)
-
-
 def play_audio(path):
     """Play audio file with simpleaudio or with pw-cat on pipewire"""
     path = os.path.expanduser(path)
@@ -933,26 +465,6 @@ def play_audio(path):
     if soundcard:
         speaker = soundcard.default_speaker()
         speaker.play(data, samplerate=samplerate)
-
-
-def get_audio_waveform(path):
-    """Get audio file waveform and length"""
-    import numpy as np
-    if not os.path.exists(path):
-        return None, None
-    import soundfile
-    with soundfile.SoundFile(path) as audio_file:
-        data = audio_file.read()
-        if data.ndim > 1:
-            data = data[:, 0]   # select only one stream
-        duration = len(data) / audio_file.samplerate
-        chunk_num = min(max(int(duration * 10), 32), 256)
-        chunk_size = int(len(data) / chunk_num)
-        reshaped = data[:len(data) - len(data) % chunk_size].reshape(-1, chunk_size)
-        rms_samples = np.sqrt(np.mean(reshaped**2, axis=1))
-        normalized = (rms_samples / rms_samples.max()) * 255
-        waveform = base64.b64encode(normalized.astype(np.uint8)).decode("utf-8")
-    return waveform, duration
 
 
 def native_open(path, mpv_path="", yt_in_mpv=True):
@@ -1218,32 +730,59 @@ class Player():
             self.play_thread.join()
 
 
-def json_array_objects(stream):
-    """Stream a json array from a file like object. Yield one parsed object at a time without loading full json into memory"""
-    # replaces ijson.items(data, "item")
-    decoder = json.JSONDecoder()
-    buf = ""
-    in_array = False
-    for chunk in iter(lambda: stream.read(65536).decode("utf-8"), ""):
-        buf += chunk
-        i = 0
-        length = len(buf)
-        while i < length:
-            ch = buf[i]
-            if not in_array:
-                if ch == "[":   # skip to [
-                    in_array = True
-                i += 1
-                continue
-            if ch == "]":
-                return
-            if ch.isspace() or ch == ",":   # skip space and comma
-                i += 1
-                continue
-            try:   # try to get object
-                obj, consumed = decoder.raw_decode(buf[i:])
-            except json.JSONDecodeError:
-                break
-            yield obj
-            i += consumed
-        buf = buf[i:]   # keep incomplete json only
+def make_round_image_pillow(input_path, output_path):
+    """Create new image with circular shape using pillow"""
+    from PIL import Image, ImageDraw
+    img = Image.open(input_path).convert("RGBA")
+    w, h = img.size
+    mask = Image.new("L", (w, h), 0)
+    draw = ImageDraw.Draw(mask)
+    draw.ellipse((0, 0, w, h), fill=255)
+    result = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    result.paste(img, mask=mask)
+    result.save(output_path, "WEBP")
+
+
+def make_round_image_imagemagick(input_path, output_path):
+    """Create new image with circular shape using imagemagick"""
+    subprocess.run([
+        "magick", input_path,
+        "(",
+            "+clone",
+            "-alpha", "transparent",
+            "-fill", "white",
+            "-draw", "circle %[fx:w/2],%[fx:h/2] %[fx:w/2],0",
+        ")",
+        "-alpha", "set",
+        "-compose", "DstIn",
+        "-composite",
+        output_path,
+    ], check=True)
+
+
+def make_round_image(image_path):
+    """
+    Convert image to round image and delete old one, if possible.
+    Use pillow if available, fallback to imagemagick if available.
+    Save image as _round and delete original, and dont re-edit same image.
+    """
+    if not image_path or not os.path.exists(image_path):
+        return None
+    if "_round" in image_path:
+        return image_path
+    if importlib.util.find_spec("PIL") is not None:
+        base, ext = os.path.splitext(image_path)
+        save_path = base + "_round" + ext
+        make_round_image_pillow(image_path, save_path)
+        os.remove(image_path)
+        return save_path
+    if shutil.which("magick"):
+        try:
+            base, ext = os.path.splitext(image_path)
+            save_path = base + "_round" + ext
+            make_round_image_imagemagick(image_path, save_path)
+            os.remove(image_path)
+            return save_path
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            pass
+    return image_path

@@ -14,7 +14,7 @@ except ImportError:
     except ImportError:
         import json
 
-from endcord import peripherals
+from endcord import peripherals, utils
 
 if sys.platform != "linux":
     import psutil
@@ -322,7 +322,7 @@ class GameDetection:
             path = old_path
 
         # load cached processes and remove outdated
-        self.cache = peripherals.load_json("detected_apps_cache.json", {})   # {proc_path: [app_id, app_name, app_path, last_seen]...}
+        self.cache = utils.load_json("detected_apps_cache.json", {})   # {proc_path: [app_id, app_name, app_path, last_seen]...}
         now = int(time.time())
         outdated = [key for key, val in self.cache.items() if now - val[3] > MAX_CACHE_AGE]
         for key in outdated:
@@ -421,7 +421,7 @@ class GameDetection:
 
             if cache_changed:
                 cache_changed = False
-                peripherals.save_json(self.cache, "detected_apps_cache.json")
+                utils.save_json(self.cache, "detected_apps_cache.json")
 
             time.sleep(GAME_DETECTION_DELAY)
 
