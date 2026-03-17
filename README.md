@@ -323,6 +323,9 @@ To prevent extension injection (malware can modify endcord config and inject ext
     - `yay -S endcord` - full version with media support, larger executable
     - `yay -S endcord-lite` - lite version without voice calls and media support
     - `-git` versions will build from source, with latest changes
+- From [GURU](https://wiki.gentoo.org/wiki/Project:GURU):
+    - `emerge --ask net-im/endcord` - built from source
+    - `emerge --ask net-im/endcord-bin` - pre-built binary
 - [Build](#building) endcord, then copy built executable to system:  
     `sudo cp dist/endcord /usr/local/bin/`
 
