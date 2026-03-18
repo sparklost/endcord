@@ -1575,6 +1575,7 @@ class ChatGenerator:
                         embed_url = trim_string(embed_url, self.trim_embed_url_size)
                     content += f"[{clean_type(embed["type"])} attachment]: {embed_url}"
                 elif embed["type"] == "rich":
+                    embed_url = embed_url.replace("\r\n", "\n")
                     content += f"[rich embed]:\n{embed_url}"
                 else:
                     if self.trim_embed_url_size:

@@ -253,6 +253,8 @@ command_bindings = {
     "11": "command_palette; type 'goto '",
     "336": "tree_select server; collapse_all_except selected",
     "337": "tree_select server prev; collapse_all_except selected",
+    "25-259": "resize_extra_window +1",
+    "25-258": "resize_extra_window -1",
 }
 
 

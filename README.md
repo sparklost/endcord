@@ -319,10 +319,13 @@ To prevent extension injection (malware can modify endcord config and inject ext
 ### Linux
 - Pre-built binaries (built with nuitka using clang) are available in releases  
     Binaries are built on Ubuntu-like distro. **Locally built binaries can be smaller, thus starts faster**.
-- From AUR:
+- Arch Linux (AUR):
     - `yay -S endcord` - full version with media support, larger executable
     - `yay -S endcord-lite` - lite version without voice calls and media support
     - `-git` versions will build from source, with latest changes
+- Gentoo Linux (GURU):
+    - `emerge --ask net-im/endcord` - full version installed from source (not built)
+    - `emerge --ask net-im/endcord-bin` - prebuilt full binary
 - [Build](#building) endcord, then copy built executable to system:  
     `sudo cp dist/endcord /usr/local/bin/`
 
@@ -344,7 +347,7 @@ Optional dependencies:
 Install [WezTerm](https://wezterm.org/) (recommended), [windows terminal](https://github.com/microsoft/terminal), [cmder](https://github.com/cmderdev/cmder), or any other modern terminal. And run exe from there. If built with experimental windowed mode, terminal is not required to use endcord.  
 WezTerm proved to introduce the least drawing issues.  
 Cmder settings: "Mouse" > check "Send mouse events to console" and "Mark/Copy" > uncheck "Intelligent mode", and set "Main console font" and "Alternative font" to same monospace font.  
-Emoji are known to work only with  WezTerm but many will fail to draw and mess-up the UI, so its best to set `emoji_as_text = True` in config.  
+Emoji are known to work only with WezTerm but many will fail to draw and mess-up the UI, so its best to set `emoji_as_text = True` in config.  
 Optional dependency for spellchecking: [aspell](https://github.com/adamyg/aspell-win32). It is expected to be installed in `C:\Program Files (x86)\`. Alongside with base aspell, dictionary must be installed, even en_US.  
 
 ### macOS

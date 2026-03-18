@@ -127,6 +127,8 @@
     `duration` can be: `4w3d5h30m10s` where `w`is weeks, `d` is days..., can be used partially and mixed: `5h1w`. Default is 7 days and infinite uses.
 - `rename_folder [name]`  
     Locally rename currently selected folder in tree. Custom names are kept in state_profile_name.json in config dir.
+- `resize_extra_window [num/-1/+1]`  
+    Resize extra window to specified number or incrementally by +/- 1. Use `extra_window_height` theme setting to persist it.
 - `collapse_all_except *[option]`  
     Collapse all servers in tree except specific `[option]`: `current` (default), `selected`, `above`, `bellow`.  
 - `tree_select *[server/channel], *next/prev`  

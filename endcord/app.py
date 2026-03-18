@@ -632,6 +632,7 @@ class Endcord:
     def reconnect(self):
         """Fetch updated data from gateway and rebuild chat after reconnecting"""
         self.add_running_task("Reconnecting", 1)
+        self.cache_deleted()
         self.reset(online=True)
         self.premium = self.gateway.get_premium()
         guilds = self.gateway.get_guilds()
@@ -2272,11 +2273,14 @@ class Endcord:
                             if binding and binding[0]:
                                 self.wait_input(forced_binding=binding[0])
                         if not binding:
-                            self.execute_command(cmd_type, cmd_args, action[1], chat_sel, tree_sel)
+                            self.execute_command(cmd_type, cmd_args, action[1], chat_sel, tree_sel, reset=False)
                         self.check_tree_format()
-                    self.assist_word = None
+                    if self.command and self.restore_input_text[1] in (None, "standard"):
+                        self.restore_input_text = (input_text, "command")
+                    if not self.command:
+                        self.assist_word = None
 
-            # media controls   # handled externally in media.py as curses is fully paused
+            # media controls   # handled externally in media.py because curses is fully paused
             # elif action >= 100:
             #     self.terminal_media.control_codes(action)
 
@@ -2680,11 +2684,11 @@ class Endcord:
         return True
 
 
-    def execute_command(self, cmd_type, cmd_args, cmd_text, chat_sel, tree_sel):
+    def execute_command(self, cmd_type, cmd_args, cmd_text, chat_sel, tree_sel, reset=True):
         """Execute custom command"""
         logger.debug(f"Executing command, type: {cmd_type}, args: {cmd_args}")
-        reset = True
-        self.restore_input_text = (None, None)
+        if reset:
+            self.restore_input_text = (None, None)
         success = False
         if cmd_type == 0:
             if cmd_args:
@@ -3768,6 +3772,9 @@ class Endcord:
                 self.extra_window_open = True
             else:
                 self.update_extra_line("Extension search failed")
+
+        elif cmd_type == 74:   # RESIZE_EXTRA_WINDOW
+            self.tui.set_extra_height(cmd_args["value"])
 
         if success is None:
             self.gateway.set_offline()

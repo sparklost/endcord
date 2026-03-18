@@ -935,4 +935,14 @@ def command_string(text):
     elif text_lower.startswith("search_extensions"):
         cmd_type = 73
 
+    # 74 - RESIZE_EXTRA_WINDOW
+    elif text_lower.startswith("resize_extra_window"):
+        cmd_type = 74
+        try:
+            num = int(text.split(" ")[1])
+            cmd_args = {"value": num}
+        except (IndexError, ValueError):
+            cmd_type = 0
+            cmd_args = {"value": 1}
+
     return cmd_type, cmd_args

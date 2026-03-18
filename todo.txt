@@ -1,5 +1,3 @@
-Add ability to resize extra window
-
 Voice channels
     add voice channels to tree
     show voice channel activity

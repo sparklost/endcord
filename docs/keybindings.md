@@ -8,6 +8,7 @@
 - `Alt+J` - Join/leave selected thread in tree
 - `Alt+I` - View channel info (selected in tree)
 - `Alt+Shift+U`- Copy selected channel (in tree) URL to clipboard
+- `Shift+Up/Down` - Select prev/next server and collapse all other servers
 
 ### input line
 - `Left/Right` - character left/right
@@ -49,6 +50,7 @@
 ### extra line
 - `Alt+<` - Previous uploaded/uploading attachment
 - `Alt+>` - Next uploaded/uploading attachment
+- `Ctrl+Y-Up/Down` - Resize extra window +/- 1
 
 ### extra window
 - `Alt+Up/Down` - navigate in extra window / member list
@@ -110,6 +112,7 @@ Some keybindings are used by terminals or OS itself, so they are by default rebo
 - Scroll up/down in all windows
 - Single click to select in all windows, in tree also: un/collapse
 - Single click on tab string to switch tabs (only if exactly `format_title_line_r = "%tabs"` in config)
+- Click on extra window title and drag it to resize it.
 
 On Windows, double click isn't working, instead use triple click.
 
