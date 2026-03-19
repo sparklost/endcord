@@ -328,6 +328,10 @@ To prevent extension injection (malware can modify endcord config and inject ext
     - `emerge --ask net-im/endcord-bin` - prebuilt full binary
 - [Build](#building) endcord, then copy built executable to system:  
     `sudo cp dist/endcord /usr/local/bin/`
+- Install script (installs binary from latest release or updates existing):
+    - `bash -c "$(curl -fsSL https://raw.githubusercontent.com/sparklost/endcord/main/tools/install.sh)"`
+    - Append ` -- --lite` to install lite instead
+    - Append ` -- --uninstall` to uninstall
 
 Optional dependencies:
 - `xclip` - Clipboard support on X11
@@ -343,7 +347,8 @@ Optional dependencies:
 
 ### Windows
 - Pre-built binaries (built with nuitka using clang) are available in releases
-- [Build](#building) endcord, standalone executable can be found in `./dist/endcord.exe`
+- [Build](#building) endcord, standalone executable can be found in `./dist/endcord.exe`  
+
 Install [WezTerm](https://wezterm.org/) (recommended), [windows terminal](https://github.com/microsoft/terminal), [cmder](https://github.com/cmderdev/cmder), or any other modern terminal. And run exe from there. If built with experimental windowed mode, terminal is not required to use endcord.  
 WezTerm proved to introduce the least drawing issues.  
 Cmder settings: "Mouse" > check "Send mouse events to console" and "Mark/Copy" > uncheck "Intelligent mode", and set "Main console font" and "Alternative font" to same monospace font.  
@@ -353,7 +358,11 @@ Optional dependency for spellchecking: [aspell](https://github.com/adamyg/aspell
 ### macOS
 - Pre-built binaries (built with nuitka using clang) are available in releases
 - [Build](#building) endcord, standalone executable can be found in `./dist/`.  
-Optional dependency, for spellchecking: [aspell](https://github.com/adamyg/aspell-win32). Can be installed with: `brew aspell`.  
+- Install script (installs binary from latest release or updates existing):
+    - `bash -c "$(curl -fsSL https://raw.githubusercontent.com/sparklost/endcord/main/tools/install.sh)"`
+    - Append ` -- --lite` to install lite instead
+    - Append ` -- --uninstall` to uninstall
+Optional dependency for spellchecking: `aspell`. Can be installed with: `brew aspell`.  
 
 
 ## Disclaimer

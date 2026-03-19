@@ -1,16 +1,16 @@
-Voice channels
-    add voice channels to tree
-    show voice channel activity
-    join call from tree
-    join call with goto
-    handle multiple speaking at the same time
-
 Voice calls
     fix opus decoding and playing audio
     start recorder thread, record, encode, encrypt, pack, send, stop when leave call, leave call on error
     pause recorder when muted
     send and receive RTCP?
     send speaking event?
+
+Voice channels
+    add voice channels to tree
+    show voice channel activity
+    join call from tree
+    join call with goto
+    handle multiple speaking at the same time
 
 after fixing https://github.com/python/cpython/issues/119138
     Add colors for status sign in selected and active dm in tree
