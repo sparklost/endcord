@@ -7357,8 +7357,9 @@ class Endcord:
                 if new_version:
                     if update:
                         status, status_text = git.install_extension(extension.EXT_SOURCE, prefer_tag=new_version, update=True)
-                        if status in (0, 3, 4) and force:
+                        if status in (0, 1, 3, 4) and force:
                             self.update_extra_line(status_text.replace("installed", "updated"))
+                            force = False   # to skip next update_extra_line
                     else:
                         extension_updates += 1
             if extension_updates:

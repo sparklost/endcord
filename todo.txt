@@ -20,7 +20,7 @@ after fixing https://github.com/python/cpython/issues/119138
     Add bg color for mentions and channels in chat
     Add status dot color to active and muted line in tree
 
-Add binding to toggle tree
+Add toggle tree binding and command
 Fix issues with wide characters in input line
 Add option to select individual message
 Add scrollbar to chat

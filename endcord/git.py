@@ -26,7 +26,7 @@ def install_extension(url, cli=False, prefer_tag=None, update=False):
     ext_path = os.path.join(ext_dir, ext_name)
     if not os.path.exists(ext_dir):
         os.makedirs(os.path.expanduser(ext_dir), exist_ok=True)
-    if os.path.exists(ext_path):
+    if not update and os.path.exists(ext_path):
         return 2, "Extension with this name is already installed"
     text = f"Installing extension to: {ext_dir}"
     if cli:
@@ -159,15 +159,16 @@ def download_gh_repo(owner, repo, save_path, tag=None):
             # unzip
             import io
             import zipfile
+            temp_dir = os.path.join(save_path, "temp")
             with zipfile.ZipFile(io.BytesIO(data)) as z:
-                z.extractall(path=save_path)
+                z.extractall(path=temp_dir)
 
             # move files to save_path
-            extracted_dir = os.path.join(save_path, os.listdir(save_path)[0])
+            extracted_dir = os.path.join(temp_dir, os.listdir(temp_dir)[0])
             if os.path.isdir(extracted_dir):
                 for item in os.listdir(extracted_dir):
                     shutil.move(os.path.join(extracted_dir, item), os.path.join(save_path, item))
-                os.rmdir(extracted_dir)
+                os.rmdir(temp_dir)
 
             return 1
 
