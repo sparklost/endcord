@@ -86,8 +86,6 @@
     Pin selected message to current channel.
 - `push_button [num/name]`  
     Push button on interactive app message. Specify either button number or button name (case-insensitive).
-- `dump_chat`  
-    Dump current chat to unique json, saved in Debug folder found inside config location.
 - `string_select [string]` / `string_select [num] [string]`  
     Select a string on interactive app message. Strings are provided in assist window. Specify `[num]` if there are multiple string selects.
 - `set_notifications ...` / `set_notifications <#[channel_id]> ...`  
@@ -153,6 +151,10 @@
     Open config directory with system file manager.
 - `show_log`  
     Show live log.
+- `dump_chat`  
+    Dump current chat to unique json, saved in `Debug` directory inside config location.
+- `dump_roles`  
+    Dump current server roles to unique json, saved in `Debug` directory inside config location.
 - `game_detection_blacklist [game_name]`  
     Toggle blacklisted state for games detected in past 7 days, with assist.
 - `set [key] = [value]` / `set [key]=[value]`  

@@ -10,7 +10,7 @@ dependencies = [
     "filetype>=1.2.0",
     "numpy>=2.4.3",
     "orjson>=3.11.7",
-    "protobuf>=7.34.0",
+    "protobuf>=7.34.1",
     "psutil>=7.2.1; sys_platform != 'linux'",
     "pycryptodome>=3.23.0",
     "pynacl>=1.6.2",
@@ -30,7 +30,7 @@ dependencies = [
 [dependency-groups]
 build = [
     "cython>=3.2.4",
-    "nuitka[onefile]>=4.0.5",
+    "nuitka[onefile]>=4.0.6",
     "pyinstaller>=6.19.0",
     "setuptools>=82.0.0",
 ]

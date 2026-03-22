@@ -1928,3 +1928,99 @@ class Discord():
         log_api_error(response.read(), response.status, "get_detectable_apps")
         connection.close()
         return None, etag
+
+
+    # BOT STUFF
+    def bot_register_command(self, command, guild_id=None, json=False):
+        """
+        Register command for this bot. This endpoint works ONLY FOR BOTS.
+        command object coresponds to this structure:
+        https://docs.discord.com/developers/interactions/application-commands#application-command-object
+        To obtain role ids for specific guild, run "dump_roles" endcord command while inside desired guild.
+        """
+        if json:
+            message_data = command
+        else:
+            message_data = json.dumps(command)
+        if guild_id:
+            url = f"/api/v9/applications/{self.my_id}/guilds/{guild_id}/commands"
+        else:
+            url = f"/api/v9/applications/{self.my_id}/commands"
+        data, status = self.request("POST", url, message_data, self.header)
+        if not status:
+            return None
+        if status == 200:
+            return True
+        log_api_error(data, status, "bot_command")
+        return False
+
+
+    def bot_update_command(self, command, command_id, guild_id=None):
+        """Update command for this bot. This endpoint works ONLY FOR BOTS."""
+        message_data = json.dumps(command)
+        if guild_id:
+            url = f"/api/v9/applications/{self.my_id}/guilds/{guild_id}/commands/{command_id}"
+        else:
+            url = f"/api/v9/applications/{self.my_id}/commands/{command_id}"
+        data, status = self.request("PATCH", url, message_data, self.header)
+        if not status:
+            return None
+        if status == 200:
+            return True
+        log_api_error(data, status, "bot_command")
+        return False
+
+
+    def bot_delete_command(self, command_id, guild_id=None):
+        """Delete command for this bot. This endpoint works ONLY FOR BOTS."""
+        message_data = None
+        if guild_id:
+            url = f"/api/v9/applications/{self.my_id}/guilds/{guild_id}/commands/{command_id}"
+        else:
+            url = f"/api/v9/applications/{self.my_id}/commands/{command_id}"
+        data, status = self.request("DELETE", url, message_data, self.header)
+        if not status:
+            return None
+        if status == 200:
+            return True
+        log_api_error(data, status, "bot_command")
+        return False
+
+
+    def bot_respond_interaction(self, interaction, interaction_id, interaction_token):
+        """Respond to interaction. This endpoint works ONLY FOR BOTS."""
+        message_data = json.dumps(interaction)
+        url = f"/api/v9/interactions/{interaction_id}/{interaction_token}/callback"
+        data, status = self.request("POST", url, message_data, self.header)
+        if not status:
+            return None
+        if status == 200:
+            return True
+        log_api_error(data, status, "bot_interaction")
+        return False
+
+
+    def bot_edit_interaction(self, interaction, interaction_token):
+        """Edit already sent interaction"""
+        message_data = json.dumps(interaction)
+        url = f"/webhooks/{self.my_id}/{interaction_token}/messages/@original"
+        data, status = self.request("PATCH", url, message_data, self.header)
+        if not status:
+            return None
+        if status == 200:
+            return True
+        log_api_error(data, status, "bot_interaction")
+        return False
+
+
+    def bot_delete_interaction(self, interaction_token):
+        """Delete already sent interaction"""
+        message_data = None
+        url = f"/webhooks/{self.my_id}/{interaction_token}/messages/@original"
+        data, status = self.request("DELETE", url, message_data, self.header)
+        if not status:
+            return None
+        if status == 200:
+            return True
+        log_api_error(data, status, "bot_interaction")
+        return False

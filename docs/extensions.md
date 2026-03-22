@@ -1,7 +1,7 @@
 ## Installing extensions
 Extensions can be installed in `Extensions` directory located in endcord config directory.  
 Installation can be done by simply git cloning extension repo into the extensions directory or by running `endcord -i [url]`.  
-There is also client command available: `install_extension [url]`. Running it without url will update all installed extensions.    
+There is also client command available: `install_extension [url]`. Running it without url will update all installed extensions.  
 Instead `url` can also be used `repo_owner/repo_name` which assumes github.  
 Extension loading can be toggled in config and is ON by default.  
 During loading process some extensions may fail to load or are invalid, check log for more info.  
@@ -155,10 +155,40 @@ Look for `__init__` in `app` class in `./endcord/app.py` to see what is ran befo
 
 
 ## Available libraries
-If endcord is built into binary, only libraries included by endcord can be used by extension.  
-This list can be quite long, so check py files for used libraries (entire stdlib should be included by build tool).  
-Run `uv tree` to see only libraries included in endcord-lite builds, and `uv tree --group media` to see libraries included in full endcord build.  
+Run `uv tree` to see only libraries included in endcord-lite builds, and `uv tree --group media` to see libraries included in full endcord build (this list doesnt show stdlib libraries, but they should all be available).  
 It is possible to add entire library to extension directory, which can be imported by extension, but this may be unstable cross-platform.  
+
+
+## Creating bots
+1. First of all, bot has to have `Bot ` prepended to its token.  
+2. It is recommended to set bot intents value in the config `capabilities` option. Default is `50364033` which allows basic chat features.  
+Refer to [this](https://docs.discord.com/developers/events/gateway#gateway-intents) for more info on intents.  
+4. Next step is to register application commands.  
+To register a command, use `app.discord.bot_register_command(command_obj, guild_id=None, json=False)` in the extension.  
+If `guild_id` is ommited then this will be global command.  
+`command_obj` is python object, but json string can be passed too, just set `json=True`.  
+`command_obj` is send as-is without any checks, refer to [this](https://docs.discord.com/developers/interactions/application-commands#application-command-object) for more info on how to write commands.  
+Command is registered only once, registering command with same name will overwrite old one.  
+To update command use `app.discord.bot_update_command(command_obj, command_id, guild_id=None)`.  
+To delete command use `app.discord.bot_delete_command(command_id, guild_id=None)`.  
+To obtain role ids for specific guild (needed for creating command permissions), run `dump_roles` endcord command while inside desired guild. Json file will be saved in "Debug" directory in endcord config location.  
+5. Handle received interactions  
+Interactions are received by gateway, and buffered. To get one by one interaction from the buffer run: `app.gateway.bot_get_interactions()`.  
+Interaction object structure can be found [here](https://docs.discord.com/developers/interactions/receiving-and-responding#interaction-object).  
+It will return either raw interaction object or `None` when buffer is empty.  
+It is recommended to poll `bot_get_interactions`.  
+If interaction will take a long time to complete (eg. doing some CPU-heavy task) then offload it to a thread, so polling loop kepps running with low latency.
+Store `id` and `token` values somewhere, because they are needed to send the response (`interaction_id` and `interaction_token` args).  
+Note that bot must respond within 3 seconds.  
+6. Respond to interaction  
+To respond, simply call `app.discord.bot_respond_interaction(response_type, response_obj, interaction_id, interaction_token)`
+Responding to interactions is documented in detail [here](https://docs.discord.food/interactions/receiving-and-responding#responding-to-an-interaction). Response object structure can be found [here](https://docs.discord.food/interactions/receiving-and-responding#interaction-callback-message-data-structure).  
+Be sure to always implement `PONG` response.  
+7. Long response
+If the response is going to take a while, then first send deferred response (`response_type=5`).  
+And then when final response is ready, edit the original interaction with `app.discord.bot_edit_interaction(response_obj, interaction_token)`.  
+Note that `interaction_token` will expire in 15 minutes.  
+Or delete it with `app.discord.bot_delete_interaction(interaction_token)`.  
 
 
 ## Checking extensions

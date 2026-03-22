@@ -945,4 +945,8 @@ def command_string(text):
             cmd_type = 0
             cmd_args = {"value": 1}
 
+    # 75 - DUMP_ROLES
+    elif text_lower.startswith("dump_roles"):
+        cmd_type = 75
+
     return cmd_type, cmd_args

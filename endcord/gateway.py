@@ -97,6 +97,7 @@ class Gateway():
         self.init_time = time.time() * 1000
         self.token = token
         self.proxy = urllib.parse.urlsplit(proxy)
+        self.bot = self.token.startswith("Bot")
         self.run = True
         self.wait = False
         self.state = 0
@@ -137,6 +138,8 @@ class Gateway():
         self.querying_members = False
         self.member_query_results = []
         self.resumable = False
+        if self.bot:
+            self.interactions_buffer = []
         threading.Thread(target=self.thread_guard, daemon=True, args=()).start()
 
 
@@ -444,9 +447,8 @@ class Gateway():
         guild_channels = []
 
         # channels
-        bot = self.my_user_data["bot"]
         for channel in guild["channels"]:
-            if channel["type"] in (0, 2, 4, 5, 15) and not bot:
+            if channel["type"] in (0, 2, 4, 5, 15) and not self.bot:
                 hidden = True   # hidden by default
             else:
                 hidden = False
@@ -1410,6 +1412,9 @@ class Gateway():
                             })
                     self.guilds_changed = True
 
+                elif self.bot and optext == "INTERACTION_CREATE":
+                    self.interactions_buffer.append(data)
+
                 elif optext == "APPLICATION_COMMAND_AUTOCOMPLETE_RESPONSE":
                     self.app_command_autocomplete_resp = response["d"]["choices"]
 
@@ -1775,7 +1780,7 @@ class Gateway():
                 },
             },
         }
-        if self.token.startswith("Bot"):
+        if self.bot:
             payload["d"].pop("capabilities")
             payload["d"]["intents"] = self.capabilities or DEFAULT_INTENTS
         self.send(payload)
@@ -1899,7 +1904,7 @@ class Gateway():
         This channel is considered to be active channel.
         """
         self.active_channel = channel_id
-        if self.my_user_data["bot"]:
+        if self.bot:
             return
         if guild_id:
             # when subscribing, add channel to list of subscribed channels
@@ -2366,3 +2371,11 @@ class Gateway():
         if len(self.call_buffer) == 0:
             return None
         return self.call_buffer.pop(0)
+
+
+    # BOT STUFF
+    def bot_get_interactions(self):
+        """Get raw interaction events. Returns 1 by 1 event or None. FOR BOTS ONLY"""
+        if not self.bot or len(self.interactions_buffer) == 0:
+            return None
+        return self.interactions_buffer.pop(0)

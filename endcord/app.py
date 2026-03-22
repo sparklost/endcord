@@ -3776,6 +3776,11 @@ class Endcord:
         elif cmd_type == 74:   # RESIZE_EXTRA_WINDOW
             self.tui.set_extra_height(cmd_args["value"])
 
+        elif cmd_type == 75 and self.active_channel["channel_id"]:   # DUMP_ROLES
+            unique_name = f"roles_dump_{self.active_channel["guild_id"]}.json"
+            debug.save_json(self.current_roles, unique_name)
+            self.update_extra_line(f"Roles saved to: {os.path.join(peripherals.log_path, "Debug")}")
+
         if success is None:
             self.gateway.set_offline()
             self.update_extra_line("Network error.")
