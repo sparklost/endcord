@@ -138,6 +138,56 @@ def img_to_term_block(img, bg_color, screen_width, screen_height, img_width, img
     return "\n".join(out_lines)
 
 
+def img_to_term_block_truecolor(img, bg_color, screen_width, screen_height, img_width, img_height):
+    """Convert image to ANSI true-color string made of half-blocks"""
+    pixels = img.load()
+
+    padding_h = (screen_height - img_height // 2) // 2
+    padding_w = (screen_width - img_width) // 2
+
+    bg = f"{ESC}[48;5;{bg_color}m"   # bg color is not in r;g;b
+    out_lines = []
+
+    # top padding
+    for _ in range(padding_h):
+        out_lines.append(bg + (" " * screen_width) + RESET)
+
+    # image rows
+    for y in range(0, img_height - 1, 2):
+        line_parts = []
+        current_fg = None
+        current_bg = None
+
+        # left padding
+        if padding_w > 0:
+            line_parts.append(bg + (" " * padding_w))
+
+        # image columns
+        for x in range(img_width):
+            top_color = pixels[x, y]
+            bot_color = pixels[x, y + 1]
+            if top_color != current_fg:
+                line_parts.append(f"{ESC}[38;2;{top_color[0]};{top_color[1]};{top_color[2]}m")
+                current_fg = top_color
+            if bot_color != current_bg:
+                line_parts.append(f"{ESC}[48;2;{bot_color[0]};{bot_color[1]};{bot_color[2]}m")
+                current_bg = bot_color
+            line_parts.append("▀")
+
+        # right padding
+        visible_len = padding_w + img_width
+        if visible_len < screen_width:
+            line_parts.append(bg + (" " * (screen_width - visible_len)))
+
+        line_parts.append(RESET)
+        out_lines.append("".join(line_parts))
+
+    # bottom padding
+    while len(out_lines) < screen_height:
+        out_lines.append(bg + (" " * screen_width) + RESET)
+
+    return "\n".join(out_lines)
+
 
 # use cython if available, ~1.7 times faster
 if importlib.util.find_spec("endcord_cython") and importlib.util.find_spec("endcord_cython.media"):
@@ -159,6 +209,7 @@ class TerminalMedia():
     def __init__(self, config, keybindings, ui=True, external=False):
         logging.getLogger("libav").setLevel(logging.ERROR)
         media_block = config["media_use_blocks"]
+        self.truecolor = config["media_truecolor"]
         self.font_ratio = config["media_font_aspect_ratio"]   # 2.25
         self.font_ratio_block = self.font_ratio / 2
         self.ascii_palette = list(config["media_ascii_palette"])   # "  ..',;:c*loexk#O0XNW"
@@ -195,6 +246,9 @@ class TerminalMedia():
             self.ui_timer = 30
         if media_block:
             self.pil_img_to_term = self.pil_img_to_term_block
+        if self.truecolor:
+            global img_to_term_block
+            img_to_term_block = img_to_term_block_truecolor
 
 
     def sigint_handler(self, _signum, _frame):
@@ -254,6 +308,7 @@ class TerminalMedia():
             string += f"\n{ESC}[48;5;{self.bg_color}m{self.ui_line}{RESET}"
         terminal_utils.draw(string)
 
+
     def pil_img_to_term_block(self, img, remove_alpha=True):
         """Convert pillow image to half-block terminal output"""
         screen_height, screen_width = terminal_utils.get_size()
@@ -278,10 +333,14 @@ class TerminalMedia():
             background.paste(img, mask=img.split()[3])
             img = background
 
-        # apply xterm256 palette
-        img_palette = Image.new("P", (16, 16))
-        img_palette.putpalette(self.xterm_256_palette)
-        img = img.quantize(palette=img_palette, dither=0)
+        if self.truecolor:
+            # ensure ts rgb
+            img = img.convert("RGB")
+        else:
+            # apply xterm256 palette
+            img_palette = Image.new("P", (16, 16))
+            img_palette.putpalette(self.xterm_256_palette)
+            img = img.quantize(palette=img_palette, dither=0)
 
         # draw
         string = img_to_term_block(

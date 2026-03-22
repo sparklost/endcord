@@ -303,10 +303,12 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
     Use dynamic name length for usernames and global_names in `format_message` and `format_reply` only. Overrides `limit_username` option and name length is limited to `chat_width - 15`.  
     If this is ON, `color_format_message` still works same as with dynamic_name_len OFF, and it will internally correct for dynamic name difference.  
     Eg.: if color format has red character set to be at index 20, and `limit_username = 10`, `format_message = "abcd %username1234X67` but dynamic name is ON, then red character will always be 5 characters after `%username`. because `20 - length("abcd ") - 10 = 5`.
-- `media_use_blocks = False`  
+- `media_use_blocks = True`  
     Whether to use "block" characters (`▀`) for drawing media instead traditional characters from media_ascii_palette.  
     This will result in clearer picture with pixel-like characters, vertical resolution will be doubled.  
     media_ascii_palette and media_saturation have no effect when this is ON.  
+- `media_truecolor = True`  
+    Use truecolor for media rendering. Works only for `media_use_blocks`.
 - `media_ascii_palette = "  ..',;:c*loexk#O0XNW"`  
     Characters used to draw in terminal. From darkest to brightest. Same character can be repeated. Number of characters is not fixed.
 - `media_saturation = 1.2`  

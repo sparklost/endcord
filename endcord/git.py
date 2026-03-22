@@ -41,7 +41,7 @@ def install_extension(url, cli=False, prefer_tag=None, update=False):
                 prefer_tag = check_for_update("0.0.0", ext_owner, ext_name)
             status = download_gh_repo(ext_owner, ext_name, ext_path, prefer_tag)
             if status == 1:
-                return 1, "Extension installed successfully. Restart is required"
+                return 1, "Extension installed successfully. Restart endcord to load it"
             if status == 2:
                 return 4, "Error occured. See log for more info"
             if status == 3:
@@ -68,7 +68,7 @@ def install_extension(url, cli=False, prefer_tag=None, update=False):
             print(result.stdout + result.stderr)
             return None, ""
         if result.returncode == 0:
-            return 1, "Extension installed successfully. Restart is required"
+            return 1, "Extension installed successfully. Restart endcord to load it"
         if "not read Username" in result.stderr:
             return 3, "Could not find this extension"
 

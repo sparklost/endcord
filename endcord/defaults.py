@@ -166,6 +166,7 @@ theme = {
     "color_chat_spoiler": [245, -1],
     "color_chat_code": [250, 233],
     "media_use_blocks": True,
+    "media_truecolor": True,
     "media_ascii_palette": "  ..',;:c*loexk#O0XNW",
     "media_saturation": 1.2,
     "media_font_aspect_ratio": 2.25,
