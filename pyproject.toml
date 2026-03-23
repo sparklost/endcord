@@ -35,7 +35,7 @@ build = [
     "setuptools>=82.0.0",
 ]
 media = [
-    "av>=16.1.0",
+    "av>=17.0.0",
     "pillow>=12.1.1",
     "pynacl>=1.6.2",
 ]

@@ -4998,9 +4998,10 @@ class Endcord:
         """Build and send reaction from provided text"""
         first = text.split(" ")[0]
         if msg_index is None:
-            for message in self.messages:
+            for num, message in enumerate(self.messages):
                 if message["id"] == self.reacting["id"]:
                     all_reactions = message["reactions"]
+                    msg_index = num
                     break
             else:
                 return
