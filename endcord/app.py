@@ -6082,6 +6082,8 @@ class Endcord:
 
     def lines_to_msg_with_remainder(self, line_index, space=False):
         """Convert line index from formatted chat to message index and remainder"""
+        if not self.chat_map:
+            return 0, 0
         i = 0
         line_index = min(line_index, len(self.chat_map) - 1)
         while i < 5:

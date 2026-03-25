@@ -1300,7 +1300,7 @@ class ChatGenerator:
     def generate_message(self, message, num, roles, channels, max_length, my_roles, member_roles, blocked, last_seen_msg, show_blocked, num_messages, next_msg):
         """Generate one message according to provided formatting"""
         if not message:   # failsafe
-            return None, None, None, None
+            return None, None, None
 
         chat = []
         chat_format = []
@@ -1335,7 +1335,7 @@ class ChatGenerator:
                 selected_color_spoiler = self.color_deleted
                 disable_formatting = True
             else:
-                return None, None, None, None
+                return None, None, None
 
         # get member role color and nick
         role_color = None
@@ -1364,7 +1364,7 @@ class ChatGenerator:
                 color_base = self.color_blocked
             else:
                 chat_map.append(None)
-                return None, None, None, None   # to not break message-to-chat conversion
+                return None, None, None   # to not break message-to-chat conversion
 
         # try:
         if next_msg:
