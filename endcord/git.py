@@ -41,6 +41,7 @@ def install_extension(url, cli=False, prefer_tag=None, update=False):
                 prefer_tag = check_for_update("0.0.0", ext_owner, ext_name)
             status = download_gh_repo(ext_owner, ext_name, ext_path, prefer_tag)
             if status == 1:
+                setup_extension(ext_path)
                 return 1, "Extension installed successfully. Restart endcord to load it"
             if status == 2:
                 return 4, "Error occured. See log for more info"
@@ -68,6 +69,7 @@ def install_extension(url, cli=False, prefer_tag=None, update=False):
             print(result.stdout + result.stderr)
             return None, ""
         if result.returncode == 0:
+            setup_extension(ext_path)
             return 1, "Extension installed successfully. Restart endcord to load it"
         if "not read Username" in result.stderr:
             return 3, "Could not find this extension"
@@ -77,6 +79,16 @@ def install_extension(url, cli=False, prefer_tag=None, update=False):
     except RuntimeError as e:
         logger.error(f"Install extension error: {e}")
     return 4, "Error occured. See log for more info"
+
+
+def setup_extension(ext_path):
+    """Setup extension dependencies"""
+    if not os.path.exists(os.path.join(ext_path, "setup.py")):
+        return
+    if not shutil.which("virtualenv"):
+        logger.warn("Could not setup extension: virtualenv is not found on system")
+        return
+    subprocess.run(["python", "setup.py"], cwd=ext_path, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 def ver_to_tuple(v):

@@ -157,6 +157,8 @@ Look for `__init__` in `app` class in `./endcord/app.py` to see what is ran befo
 ## Available libraries
 Run `uv tree` to see only libraries included in endcord-lite builds, and `uv tree --group media` to see libraries included in full endcord build (this list doesnt show stdlib libraries, but they should all be available).  
 It is possible to add entire library to extension directory, which can be imported by extension, but this may be unstable cross-platform.  
+More stable way of adding a library is by using `setup.py` script that will install specific libraries. This script is run when extension is installed.  
+See [Example dependency installer](#example-dependency-installer), it is enough to only change `LIBRARIES` tuple.  
 
 
 ## Creating bots
@@ -235,4 +237,33 @@ class Extension:
                 custom_sound=self.app.notification_path,
             )
             logger.info("You sent a Test")
+```
+
+
+## Example dependency installer
+```py
+import os
+import shutil
+import subprocess
+
+LIBRARIES = (
+    "apsw",
+    "psycopg",
+)
+
+def main():
+    """Setup environment"""
+    subprocess.run(["virtualenv", "env"], check=True)
+    subprocess.run(["./env/bin/python", "-m", "pip", "install", "--target=temp", "apsw"], check=True)
+    current_dir = os.getcwd()
+    temp_dir = os.path.join(current_dir, "temp")
+    if not os.path.exists(temp_dir):
+        return
+    for lib in LIBRARIES:
+         shutil.move(os.path.join(temp_dir, lib), os.path.join(current_dir, lib))
+    shutil.rmtree(temp_dir)
+    shutil.rmtree(os.path.join(current_dir, "env"))
+
+if __name__ == "__main__":
+    main()
 ```

@@ -453,7 +453,7 @@ Less important steps is to decrease REST API calls, which might have little to n
 - Disable `send_typing` in config - it calls REST API every 7s when typing, but it shouldn't be critical.
 
 ### What if you get banned?
-You can write to Discord TNS team: https://dis.gd/request.  
+You can write to Discord Support team: https://dis.gd/request.  
 If you did something particular with endcord that caused the ban, open an issue describing what that is. Maybe that can be prevented or other users can be warned.  
 
 ### Debug files
