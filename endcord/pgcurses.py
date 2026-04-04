@@ -11,6 +11,11 @@ import pygame
 import pygame.freetype
 from pygame._sdl2 import Window as pg_Window
 
+if sys.platform.startswith("android"):
+    sys.platform = "linux"
+if "bsd" in sys.platform:
+    sys.platform = "linux"
+
 have_tray = False
 tray_error = None
 if importlib.util.find_spec("pystray"):

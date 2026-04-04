@@ -13,6 +13,12 @@ import filetype
 
 from endcord import peripherals
 
+if sys.platform.startswith("android"):
+    sys.platform = "linux"
+if "bsd" in sys.platform:
+    sys.platform = "linux"
+
+
 logger = logging.getLogger(__name__)
 match_youtube = re.compile(r"(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)[a-zA-Z0-9_-]{11}")
 

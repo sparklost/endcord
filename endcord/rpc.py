@@ -12,6 +12,10 @@ if sys.platform == "win32":
     import pywintypes
     import win32file
     import win32pipe
+if sys.platform.startswith("android"):
+    sys.platform = "linux"
+if "bsd" in sys.platform:
+    sys.platform = "linux"
 
 
 GATEWAY_RATE_LIMIT = 5   # delay between each event that rpc server will send to discord

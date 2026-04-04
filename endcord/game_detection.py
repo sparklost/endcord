@@ -18,6 +18,10 @@ from endcord import peripherals, utils
 
 if sys.platform != "linux":
     import psutil
+if sys.platform.startswith("android"):
+    sys.platform = "linux"
+if "bsd" in sys.platform:
+    sys.platform = "linux"
 
 GAME_DETECTION_DELAY = 5
 MAX_CACHE_AGE = 604800   # 7 days

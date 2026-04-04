@@ -8,6 +8,11 @@ import threading
 import time
 import webbrowser
 
+if sys.platform.startswith("android"):
+    sys.platform = "linux"
+if "bsd" in sys.platform:
+    sys.platform = "linux"
+
 logger = logging.getLogger(__name__)
 REPO_OWNER = "sparklost"
 try:

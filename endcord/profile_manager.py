@@ -16,6 +16,10 @@ if sys.platform == "win32":
     BACKSPACE = 8
 else:
     BACKSPACE = curses.KEY_BACKSPACE
+if sys.platform.startswith("android"):
+    sys.platform = "linux"
+if "bsd" in sys.platform:
+    sys.platform = "linux"
 
 try:
     import __main__

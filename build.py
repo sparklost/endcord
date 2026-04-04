@@ -14,6 +14,11 @@ PYTHON_MAX_MINOR = 14
 PYTHON_FREETHREADED = 14
 PYTHON_LAST_SAFE = 13
 
+if sys.platform.startswith("android"):
+    sys.platform = "linux"
+if "bsd" in sys.platform:
+    sys.platform = "linux"
+
 def get_app_name():
     """Get app name from pyproject.toml"""
     if os.path.exists("pyproject.toml"):

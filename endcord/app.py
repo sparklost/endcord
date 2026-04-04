@@ -2749,7 +2749,7 @@ class Endcord:
             selected_urls = []
             urls = self.get_msg_urls_chat(msg_index)
             if urls:
-                for num in self.get_stuff_from_selected_line(chat_sel, 0):   # get url
+                for num in self.get_stuff_from_selected_line(chat_sel, 0):   # get url on this line
                     if urls[num] in embeds:
                         selected_urls.append(urls[num])
                 if len(selected_urls) == 1 or select_num:

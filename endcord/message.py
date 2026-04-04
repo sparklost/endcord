@@ -15,7 +15,6 @@ def get_newlined_value(embed, name):
         return value + "\n"
     return ""
 
-
 def generate_timestamp(timestamp, timestamp_format, unix=False):
     """Convert timestamp string to discord timestamp notation"""
     try:
@@ -57,11 +56,11 @@ def prepare_embeds(embeds, message_content):
                 for match in re.finditer(match_url, field["name"] + "\n" + field["value"]):
                     media.append(False)
         if "image" in embed and "url" in embed["image"]:
-            content += embed["image"]["url"] + "\n"
+            content = embed["image"]["url"]
             main_url = embed["image"]["url"]
             media.append(True)
         if "video" in embed and "url" in embed["video"]:
-            content += embed["video"]["url"] + "\n"
+            content = embed["video"]["url"]
             if not skip_main_url:
                 main_url = embed["video"]["url"]
             media.append(True)

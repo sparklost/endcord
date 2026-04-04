@@ -354,7 +354,7 @@ Install [WezTerm](https://wezterm.org/) (recommended), [windows terminal](https:
 WezTerm proved to introduce the least drawing issues.  
 Cmder settings: "Mouse" > check "Send mouse events to console" and "Mark/Copy" > uncheck "Intelligent mode", and set "Main console font" and "Alternative font" to same monospace font.  
 Emoji are known to work only with WezTerm but many will fail to draw and mess-up the UI, so its best to set `emoji_as_text = True` in config.  
-Optional dependency for spellchecking: [aspell](https://github.com/adamyg/aspell-win32). It is expected to be installed in `C:\Program Files (x86)\`. Alongside with base aspell, dictionary must be installed, even en_US.  
+Optional dependency for spellchecking: [aspell](https://github.com/adamyg/aspell-win32). It is expected to be installed in `C:\Program Files (x86)\`. Alongside with base aspell, dictionary must be installed, even en_US.   
 
 ### macOS
 - Pre-built binaries (built with nuitka using clang) are available in releases
@@ -365,6 +365,8 @@ Optional dependency for spellchecking: [aspell](https://github.com/adamyg/aspell
     - Append ` -- --uninstall` to uninstall
 Optional dependency for spellchecking: `aspell`. Can be installed with: `brew aspell`.  
 
+### BSD
+- [Build](#building) endcord, standalone executable can be found in `./dist/endcord`
 
 ## Disclaimer
 > [!WARNING]
@@ -402,12 +404,20 @@ To toggle [experimental windowed mode](#experimental-windowed-mode) run: `python
 3. Open terminal, cd to unzipped folder
 4. run build script: `python build.py`
 
+### BSD
+1. Install [Python](https://www.python.org/) 3.12 or later
+2. Install [uv](https://docs.astral.sh/uv/getting-started/installation/)
+3. Clone this repository, unzip it
+4. Open terminal, cd to unzipped folder
+5. Either install rust (needed to build some libraries) or run `uv remove orjson`. Rust is also needed for endcord full
+6. Run `uv run build.py` (NOT `python main.py`!)
+
 ### Nuitka
 To enable building with Nuitka, add `--nuitka` flag (takes a long time).  
 Nuitka built binaries are much more optimized and can play videos at higher framerate.  
 Optionally, add `--clang` flag to tell nuitka to compile using llvm, which might run even faster.  
 Nuitka requirements:
-- on Linux: GCC or clang and `patchelf` package
+- on Linux and BSD: GCC or clang and `patchelf` package
 - on Windows: [Visual Studio 2022](https://www.visualstudio.com/en-us/downloads/download-visual-studio-vs.aspx) or mingw (will be downloaded by nuitka)
 - on macOS install XCode via Apple Store
 

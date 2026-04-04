@@ -17,6 +17,11 @@ MACOS_UA_STRING = "Machintos; Intel Mac OS X %VER"
 WINDOWS_VER = 10.0
 MACOS_VER = 15.3
 
+if sys.platform.startswith("android"):
+    sys.platform = "linux"
+if "bsd" in sys.platform:
+    sys.platform = "linux"
+
 if sys.platform == "linux":
     operating_system = "Linux"
 elif sys.platform == "win32":
