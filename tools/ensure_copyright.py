@@ -17,7 +17,7 @@ HEADER_FULL = f"""{HEADER_LINE.strip()}
 
 """
 extensions_white = [".py"]
-extensions_black = [".pyc", "pb2.py", "wide_ranges.py", "xterm256.py", "setup.py"]
+extensions_black = [".pyc", "pb2.py", "wide_ranges.py", "xterm256.py", "setup.py", "acs.py"]
 
 
 def get_file_list():

@@ -20,3 +20,11 @@ repos:
         types: [python]
         pass_filenames: false
 
+  - repo: local
+    hooks:
+      - id: ensure-copyright
+        name: ensure-copyright
+        entry: uv run tools/ensure_copyright.py
+        language: system
+        types: [python]
+        pass_filenames: false
