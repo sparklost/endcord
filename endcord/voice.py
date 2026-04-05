@@ -325,8 +325,6 @@ class Gateway():
                 data = response["d"]
                 transition_id = data["transition_id"]
                 self.pending_transition_id = transition_id
-                if data.get("dave_protocol_version", 0) == 0:
-                    self.voice_handler.set_passthrough(True)
                 self.send_dave_ready_for_transition(transition_id)
 
             elif opcode == 22:  # DAVE_PROTOCOL_EXECUTE_TRANSITION
@@ -361,7 +359,6 @@ class Gateway():
                 commit = response[2:]
                 try:
                     self.dave_session.process_commit(commit)
-                    self.dave_session.set_passthrough_mode(True, transition_expiry=10)
                     self.send_dave_ready_for_transition(transition_id)
                 except Exception as e:
                     logger.warning(f"Invalid commit: {e}")
@@ -373,7 +370,6 @@ class Gateway():
                 welcome = response[2:]
                 try:
                     self.dave_session.process_welcome(welcome)
-                    self.dave_session.set_passthrough_mode(True, transition_expiry=10)
                 except Exception as e:
                     logger.warning(f"Invalid welcome: {e}")
                     self.send_dave_mls_invalid_commit_welcome(transition_id)
@@ -573,7 +569,7 @@ class VoiceHandler:
         self.dave_session = gateway.dave_session
         self.ssrc_to_userid = {}
         self.audio_queue = queue.Queue(maxsize=10)
-        self.passthrough = False
+        self.passthrough = False   # global passthrough for backwards compatibility without dave
         self.opus_decoder = av.codec.CodecContext.create("opus", "r")
 
 
@@ -614,7 +610,7 @@ class VoiceHandler:
 
     def execute_transition(self):
         """Stop passthrough after execute_transition"""
-        self.passthrough = False
+        pass
 
 
     def receiver_loop(self):
@@ -664,14 +660,6 @@ class VoiceHandler:
                         continue
                     payload = strip_rtp_extension(payload)
 
-                    if payload[:3] == OPUS_SILENCE:   # silence packets
-                        logger.info("SILENCE")
-                        av_packet = av.packet.Packet(payload)
-                        frames = self.opus_decoder.decode(av_packet)
-                        for frame in frames:
-                            self.audio_queue.put(frame)
-                        continue
-
                     # DAVE
                     if not self.passthrough and self.dave_session.ready:
                         user_id = self.ssrc_to_userid.get(ssrc)
@@ -687,9 +675,13 @@ class VoiceHandler:
                                 except Exception as e:
                                     logger.error(f"DAVE decryption failed: {e}")
                                     continue
+                            else:
+                                logger.info("PASSTHROUGH")
                         else:
-                            logger.debug(f"Unknown ssrc {ssrc}")
+                            logger.info(f"Unknown ssrc {ssrc}")
                             continue
+                    else:
+                        logger.info("SKIP")
 
                 except Exception as e:
                     logger.error(f"Decryption failed; mode: {self.mode}; error: {e}")
