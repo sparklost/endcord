@@ -243,9 +243,6 @@ class Gateway():
                     break
                 self.sequence = max(response.get("seq", 0), self.sequence)
 
-            # debug_events
-            # from endcord import debug
-            # debug.save_json(response, f"event_{opcode}.json", False)
             logger.info(("RECEIVE", opcode, response))
 
             if opcode == 6:
@@ -321,7 +318,7 @@ class Gateway():
                 })
                 ssrc = data.get("ssrc")
                 if ssrc and self.voice_handler:
-                    self.voice_handler.ssrc_to_userid[ssrc] = int(user_id)
+                    self.voice_handler.ssrc_to_userid[ssrc] = int(data["user_id"])
 
             # DAVE OPCODES
             elif opcode == 21:  # DAVE_PROTOCOL_PREPARE_TRANSITION
@@ -329,15 +326,12 @@ class Gateway():
                 transition_id = data["transition_id"]
                 self.pending_transition_id = transition_id
                 if data.get("dave_protocol_version", 0) == 0:
-                    # enable passthrough
-                    if self.voice_handler:
-                        self.voice_handler.set_passthrough(True)
+                    self.voice_handler.set_passthrough(True)
                 self.send_dave_ready_for_transition(transition_id)
 
             elif opcode == 22:  # DAVE_PROTOCOL_EXECUTE_TRANSITION
                 # switch to new epoch key ratchet
-                if self.voice_handler:
-                    self.voice_handler.execute_transition()
+                self.voice_handler.execute_transition()
 
             elif opcode == 24:  # DAVE_PROTOCOL_PREPARE_EPOCH
                 data = response["d"]
@@ -616,8 +610,6 @@ class VoiceHandler:
     def set_passthrough(self, enabled):
         """Set passthrugh for DAVE protocol"""
         self.passthrough = enabled
-        if self.dave_session:
-            self.dave_session.set_passthrough_mode(enabled)
 
 
     def execute_transition(self):
@@ -681,26 +673,23 @@ class VoiceHandler:
                         continue
 
                     # DAVE
-                    if self.dave_session.ready:
+                    if not self.passthrough and self.dave_session.ready:
                         user_id = self.ssrc_to_userid.get(ssrc)
                         if user_id is not None:
-                            if self.dave_session.can_passthrough(user_id):
-                                pass
-                            try:
-                                payload = self.dave_session.decrypt(
-                                    user_id,
-                                    davey.MediaType.audio,
-                                    payload,
-                                )
-                                logger.info("SUCCESS")
-                            except Exception as e:
-                                logger.error(f"DAVE decryption failed: {e}")
-                                continue
+                            if not self.dave_session.can_passthrough(user_id):
+                                try:
+                                    payload = self.dave_session.decrypt(
+                                        int(user_id),
+                                        davey.MediaType.audio,
+                                        payload,
+                                    )
+                                    logger.info("SUCCESS")
+                                except Exception as e:
+                                    logger.error(f"DAVE decryption failed: {e}")
+                                    continue
                         else:
                             logger.debug(f"Unknown ssrc {ssrc}")
                             continue
-                    elif not self.passthrough:   # session not ready and not in passthrough
-                        continue
 
                 except Exception as e:
                     logger.error(f"Decryption failed; mode: {self.mode}; error: {e}")

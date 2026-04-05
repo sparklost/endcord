@@ -1,5 +1,6 @@
 Fix DAVE implementation
 Fix opus decoding and playing audio
+Add copyright headers
 
 Voice calls
     start recorder thread, record, encode, encrypt, pack, send, stop when leave call, leave call on error
@@ -24,9 +25,7 @@ Add stats command
     message buffer size
     running time
 Add imageboards
-Add toggle tree binding and command
-Add scrollbar to chat
-Add ability to switch profile without closing
+Add toggle_tree binding and command
 
 after fixing https://github.com/python/cpython/issues/119138
     Add colors for status sign in selected and active dm in tree
@@ -36,6 +35,8 @@ after fixing https://github.com/python/cpython/issues/119138
     Add bg color for mentions and channels in chat
     Add status dot color to active and muted line in tree
 
+Add scrollbar to chat
+Add ability to switch profile without closing
 Rewrite experimental mode in not-pygame
 Fix issues with wide characters in input line
 Add option to select individual message
