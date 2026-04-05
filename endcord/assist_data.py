@@ -1,3 +1,8 @@
+# Copyright (C) 2025-2026 SparkLost
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, version 3.
+
 SEARCH_HELP_TEXT = """from:user_id
 mentions:user_id
 has:link/embed/file/video/image/sound/sticker
@@ -77,6 +82,7 @@ COMMAND_ASSISTS = (
     ("install_extension *[url] - install extension from specified git url or update all", "install_extension"),
     ("open_config_dir - open config directory with system file manager", "open_config_dir"),
     ("show_log - show live log", "show_log"),
+    ("show_stats - show current client stats", "show_stats"),
     ("dump_chat - dump current chat to unique json file", "dump_chat"),
     ("dump_roles - dump current server roles to unique json file", "dump_roles"),
     ("game_detection_blacklist [game] - toggle blacklist for games detected in past 7 days", "game_detection_blacklist"),

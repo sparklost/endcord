@@ -1,3 +1,8 @@
+# Copyright (C) 2025-2026 SparkLost
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, version 3.
+
 import base64
 import gc
 import http.client
@@ -102,6 +107,7 @@ class Gateway():
         self.wait = False
         self.state = 0
         self.heartbeat_received = True
+        self.heartbeat_sent_time = 0
         self.sequence = None
         self.resume_gateway_url = ""
         self.session_id = ""
@@ -139,9 +145,13 @@ class Gateway():
         self.member_query_results = []
         self.resumable = False
         self.consecutive_errors = 0
+        self.gateway_events_per_h = 0
+        self.gateway_msg_per_h = 0
+        self.gateway_ping_time = 0
         if self.bot:
             self.interactions_buffer = []
         threading.Thread(target=self.thread_guard, daemon=True, args=()).start()
+        threading.Thread(target=self.stats_rotaor, daemon=True, args=()).start()
 
 
     def clear_ready_vars(self):
@@ -236,6 +246,17 @@ class Gateway():
                     self.reconnect_thread = threading.Thread(target=self.reconnect, daemon=True, args=())
                     self.reconnect_thread.start()
             time.sleep(0.5)
+
+
+    def stats_rotaor(self):
+        """Rotate stats every 1h"""
+        last_rotation = int(time.time())
+        while self.run:
+            if int(time.time()) > last_rotation + 3600:
+                last_rotation = int(time.time())
+                self.gateway_events_per_h = 0
+                self.gateway_msg_per_h = 0
+            time.sleep(30)
 
 
     def connect_ws(self, resume=False):
@@ -733,6 +754,7 @@ class Gateway():
                 logger.warning(f"Receiver error: {e}")
                 self.resumable = True
                 break
+            self.gateway_events_per_h += 1
             logger.debug(f"Received: opcode={opcode}, optext={response["t"] if (response and "t" in response and response["t"] and "LIST" not in response["t"]) else 'None'}")
             # debug_events
             # if response.get("t"):
@@ -968,6 +990,7 @@ class Gateway():
                     gc.collect()
 
                 elif optext == "MESSAGE_CREATE" and "content" in response["d"]:
+                    self.gateway_msg_per_h += 1
                     message = response["d"]
                     # saving roles to cache
                     if message["channel_id"] in self.subscribed_channels and "member" in message and "roles" in message["member"]:
@@ -983,6 +1006,7 @@ class Gateway():
                             "op": "MESSAGE_CREATE_QUICK",
                             "d": (message["content"], message["id"], message["channel_id"]),   # just to set channel as unread in tree
                         })
+                        continue
                     message_done = prepare_message(message)
                     message_done.update({
                         "channel_id": message["channel_id"],
@@ -1717,6 +1741,7 @@ class Gateway():
 
             elif opcode == 11:
                 self.heartbeat_received = True
+                self.gateway_ping_time = round(time.time() - self.heartbeat_sent_time, 3)
 
         self.state = 0
         logger.debug("Receiver stopped")
@@ -1738,7 +1763,7 @@ class Gateway():
             time.sleep(0.5)
             sleep_time += 5
         heartbeat_interval_rand = int(self.heartbeat_interval * (0.8 - 0.6 * random.random()) / 1000)
-        heartbeat_sent_time = int(time.time())
+        self.heartbeat_sent_time = int(time.time())
         time_spent_event_time = int(time.time()) - 1990   # send it 10s after start, then every 30min
         while self.run and not self.wait and self.heartbeat_running:
             send_time_spent_event = not self.legacy and int(time.time()) - time_spent_event_time >= 1800
@@ -1753,7 +1778,7 @@ class Gateway():
                 })
                 logger.debug("Sent Time Spent event")
                 time_spent_event_time = int(time.time())
-            if time.time() - heartbeat_sent_time >= heartbeat_interval_rand or send_time_spent_event:
+            if time.time() - self.heartbeat_sent_time >= heartbeat_interval_rand or send_time_spent_event:
                 if QOS_HEARTBEAT and not self.legacy:
                     self.send({
                         "op": 1,
@@ -1764,7 +1789,7 @@ class Gateway():
                     })
                 else:
                     self.send({"op": 1, "d": self.sequence})
-                heartbeat_sent_time = int(time.time())
+                self.heartbeat_sent_time = int(time.time())
                 logger.debug("Sent heartbeat")
                 if not self.heartbeat_received:
                     logger.warning("Heartbeat reply not received")
@@ -2312,6 +2337,14 @@ class Gateway():
             self.guild_roles_changed = None
             return cache
         return None
+
+
+    def get_stats(self):
+        """Get gateway stats"""
+        members_count = 0
+        for guild in self.member_roles:
+            members_count += len(guild["members"])
+        return self.gateway_events_per_h, self.gateway_msg_per_h, self.gateway_ping_time, len(self.messages_buffer), members_count
 
 
     # all following "get_*" work like this:

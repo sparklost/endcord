@@ -15,15 +15,6 @@ Voice channels
     join call with goto
     handle multiple speaking at the same time
 
-Add stats command
-    gateway events per hour
-    gateway messages per hour
-    total api requests
-    api response time
-    gateway ping time
-    caches sizes (cached members, deleted messages, summaries, pfpN+MB)
-    message buffer size
-    running time
 Add imageboards
 Add toggle_tree binding and command
 

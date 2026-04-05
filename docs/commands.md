@@ -151,6 +151,8 @@
     Open config directory with system file manager.
 - `show_log`  
     Show live log.
+- `show_stats`  
+    Show current client stats.
 - `dump_chat`  
     Dump current chat to unique json, saved in `Debug` directory inside config location.
 - `dump_roles`  

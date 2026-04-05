@@ -1,4 +1,9 @@
-import curses
+i# Copyright (C) 2025-2026 SparkLost
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, version 3.
+
+mport curses
 import importlib.util
 import logging
 import re
@@ -175,17 +180,19 @@ def generate_relative_time(timestamp):
     return time_string
 
 
-def format_seconds(seconds):
-    """Convert seconds to hh:mm:ss"""
+def format_seconds(seconds, nice=False):
+    """Convert seconds to hh:mm:ss or HHh MMm SSs"""
     hours = seconds // 3600
     minutes = (seconds % 3600) // 60
     secs = seconds % 60
     parts = []
     if hours:
-        parts.append(f"{hours:02d}")
+        parts.append(f"{hours:02d}" + "h" if nice else "")
     if minutes or hours:
-        parts.append(f"{minutes:02d}")
-    parts.append(f"{secs:02d}")
+        parts.append(f"{minutes:02d}" + "m" if nice else "")
+    parts.append(f"{secs:02d}" + "s" if nice else "")
+    if nice:
+        return " ".join(parts)
     return ":".join(parts)
 
 

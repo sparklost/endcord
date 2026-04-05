@@ -1,3 +1,8 @@
+# Copyright (C) 2025-2026 SparkLost
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, version 3.
+
 import logging
 import re
 import time
@@ -948,5 +953,9 @@ def command_string(text):
     # 75 - DUMP_ROLES
     elif text_lower.startswith("dump_roles"):
         cmd_type = 75
+
+    # 76 - SHOW_STATS
+    elif text_lower.startswith("show_stats"):
+        cmd_type = 76
 
     return cmd_type, cmd_args

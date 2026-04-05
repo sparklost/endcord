@@ -1,3 +1,8 @@
+# Copyright (C) 2025-2026 SparkLost
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, version 3.
+
 import base64
 import glob
 import importlib
@@ -186,9 +191,27 @@ def save_json(data, file, compact=False, dir_path=peripherals.config_path):
             json.dump(data, f, indent=2)
 
 
-def get_file_size(path):
-    """Get file size in bytes"""
+def get_file_size(path, mb=False):
+    """Get file size in B or MB"""
+    if mb:
+        return round(os.stat(path).st_size / (1024 ** 2), 3)
     return os.stat(path).st_size
+
+
+def get_dir_size(path, mb=False):
+    """Get dir size in B or MB and file count"""
+    count = 0
+    total_size = 0
+    for root, dirs, files in os.walk(path):
+        for file in files:
+            try:
+                total_size += os.stat(os.path.join(root, file)).st_size
+                count += 1
+            except FileNotFoundError:
+                pass
+    if mb:
+        return count, round(total_size / (1024 ** 2), 3)
+    return count, total_size
 
 
 def get_is_clip(path):

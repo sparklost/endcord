@@ -1,3 +1,8 @@
+# Copyright (C) 2025-2026 SparkLost
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, version 3.
+
 import base64
 import http.client
 import logging
@@ -148,6 +153,7 @@ class Discord():
         self.connection_time = 0
         self.connection_pool = []
         self.connection_pool_lock = threading.Lock()
+        self.total_requests = 0
 
         self.my_id = self.get_my_id(exit_on_error=True)
         self.activity_token = None
@@ -212,6 +218,7 @@ class Discord():
 
     def request(self, method, path, body=None, headers=None, timeout=5, exit_on_error=False):
         """Perform discord api request; try to use existing keepalive connection, or create new one; handle threading by using connection pool; and recreate connections if server timeout them after 55 minutes"""
+        self.total_requests += 1
         entry = None
         connection = None
         now = int(time.time())
@@ -1929,6 +1936,14 @@ class Discord():
         log_api_error(response.read(), response.status, "get_detectable_apps")
         connection.close()
         return None, etag
+
+
+    def get_stats(self):
+        """Get API stats"""
+        ping_time = time.time()
+        self.get_my_id()
+        ping_time = round(time.time() - ping_time, 3)
+        return self.total_requests, ping_time
 
 
     # BOT STUFF

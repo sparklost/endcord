@@ -1,3 +1,8 @@
+# Copyright (C) 2025-2026 SparkLost
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, version 3.
+
 import curses
 import importlib.util
 import logging
@@ -59,7 +64,7 @@ RECENT_CHANNELS_LIMIT = 10
 MB = 1024 * 1024
 USER_UPLOAD_LIMITS = (10*MB, 50*MB, 500*MB, 50*MB)   # premium tier 0, 1, 2, 3 (none, classic, full, basic)
 GUILD_UPLOAD_LIMITS = (10*MB, 10*MB, 50*MB, 100*MB)   # premium tier 0, 1, 2, 3
-FORUM_COMMANDS = (1, 2, 7, 13, 14, 15, 17, 20, 22, 25, 27, 29, 30, 31, 32, 40, 42, 49, 50, 51, 52, 53, 55, 56, 57, 58, 61, 62, 66, 67, 68, 69, 70, 71, 72)
+FORUM_COMMANDS = (1, 2, 7, 13, 14, 15, 17, 20, 22, 25, 27, 29, 30, 31, 32, 40, 42, 49, 50, 51, 52, 53, 55, 56, 57, 58, 61, 62, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76)
 COLLAPSE_ALL_EXCEPT_OPTIONS = ("current", "selected", "above", "bellow")
 STANDING_TYPES = ("All Good", "Limited", "Very Limited", "At risk", "Suspended")
 
@@ -3795,6 +3800,35 @@ class Endcord:
             debug.save_json(self.current_roles, unique_name)
             self.update_extra_line(f"Roles saved to: {os.path.join(peripherals.log_path, "Debug")}")
 
+        elif cmd_type == 76:   # SHOW_STATS
+            gateway_events_per_h, gateway_msg_per_h, gateway_ping_time, messages_buffer_size, members_count = self.gateway.get_stats()
+            total_requests, api_ping_time = self.discord.get_stats()
+            deleted_msg_count = 0
+            for channel in self.deleted_cache:
+                deleted_msg_count += len(channel["messages"])
+            summaries_count = 0
+            for guild in self.summaries:
+                for channel in guild["channels"]:
+                    summaries_count += len(channel["summaries"])
+            pfps_count, pfps_size = utils.get_dir_size(os.path.expanduser(peripherals.cache_path), mb=True)
+            text = f"Run time: {formatter.format_seconds(int(time.time()) - self.start_time, nice=True)}\n"
+            text += f"Gateway events/h: {gateway_events_per_h}\n"
+            text += f"Gateway messages/h: {gateway_msg_per_h}\n"
+            text += f"Gateway ping time: {gateway_ping_time} s\n"
+            text += f"Message buffer size: {messages_buffer_size}\n"
+            text += f"Total API requests: {total_requests}\n"
+            text += f"API response time: {api_ping_time}\n"
+            text += "Caches sizes:\n"
+            text += f"  Cached members: {members_count}\n"
+            text += f"  Deleted messages: {deleted_msg_count}\n"
+            text += f"  Summaries: {summaries_count}\n"
+            text += f"  PFPs: {pfps_count} ({pfps_size} MB)\n"
+            self.stop_assist(close=False)
+            max_w = self.tui.get_dimensions()[2][1]
+            extra_title, extra_body = formatter.generate_extra_window_text("Client stats:", text, max_w)
+            self.tui.draw_extra_window(extra_title, extra_body, reset_scroll=reset)
+            self.extra_window_open = True
+
         if success is None:
             self.gateway.set_offline()
             self.update_extra_line("Network error.")
@@ -7319,7 +7353,7 @@ class Endcord:
                     if self.notifications_pfp != 1:
                         avatar_path = self.discord.get_pfp(data["user_id"], avatar_id, size=self.notifications_pfp, save_path=cache_path)
                     else:
-                        avatar_path = self.discord.get_pfp(data["user_id"], avatar_id, size=256, save_path=peripherals.cache_path)
+                        avatar_path = self.discord.get_pfp(data["user_id"], avatar_id, size=256, save_path=cache_path)
             else:
                 avatar_path = None
 
@@ -7411,6 +7445,7 @@ class Endcord:
         logger.info("Init sequence started")
         logger.info("Waiting for ready signal from gateway")
         self.my_status["client_state"] = "connecting"
+        self.start_time = int(time.time())
 
         # wait for gateway and load data from it
         while not self.gateway.get_ready():
