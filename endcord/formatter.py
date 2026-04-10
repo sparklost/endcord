@@ -3093,7 +3093,7 @@ def generate_tree(dms, guilds, threads, read_state, guild_folders, activities, c
                 })
 
         # separately sort channels in their categories
-        bare_channels = []
+        uncategorized_channels = []
         for channel in guild["channels"]:
             if channel["type"] in (0, 5, 15, 16):
                 # find this channel threads, if any
@@ -3136,17 +3136,16 @@ def generate_tree(dms, guilds, threads, read_state, guild_folders, activities, c
                         })
                         break
                 else:
-                    # top level channels can be inaccessible
                     muted_ch = channel.get("muted", False)
                     hidden_ch = channel.get("hidden", False)
                     if not channel.get("permitted", False):
                         hidden_ch = True
                     ping_guild += mentioned_ch
                     active = channel["id"] == active_channel_id
-                    bare_channels.append({
+                    uncategorized_channels.append({
                         "id": channel["id"],
                         "name": channel["name"],
-                        "position": channel["position"],
+                        "position": -1,   # uncategorized on top
                         "channels": None,
                         "muted": muted_ch,
                         "hidden": hidden_ch,
@@ -3154,7 +3153,7 @@ def generate_tree(dms, guilds, threads, read_state, guild_folders, activities, c
                         "ping": mentioned_ch,
                         "active": active,
                     })
-        categories += bare_channels
+        categories += uncategorized_channels
 
         # sort categories by position key
         categories = sorted(categories, key=lambda x: x["position"])

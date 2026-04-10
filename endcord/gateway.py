@@ -421,9 +421,8 @@ class Gateway():
                                         break
 
 
-    def process_one_channel_overrides(self, channel_overrides, guild_num, guild_message_notifications):
+    def process_one_guild_channel_overrides(self, channel_overrides, guild_num, guild_message_notifications):
         """Process channel_overrides for one guild"""
-
         # first pass to get values and process message_notifications for categories
         for channel in channel_overrides:
             for channel_num, channel_g in enumerate(self.guilds[guild_num]["channels"]):
@@ -871,7 +870,7 @@ class Gateway():
                             # opt_in_channels means: show all guild channels - when guild is joined
                             opt_in_channels = not perms.decode_flag(guild_flags, 14) or perms.decode_flag(guild_flags, 13)
                             self.guilds[guild_num]["opt_in_channels"] = opt_in_channels
-                            self.process_one_channel_overrides(guild["channel_overrides"], guild_num, guild["message_notifications"])
+                            self.process_one_guild_channel_overrides(guild["channel_overrides"], guild_num, guild["message_notifications"])
                         else:
                             for dm in guild["channel_overrides"]:
                                 for dm_num, dm_g in enumerate(self.dms):
@@ -1438,7 +1437,7 @@ class Gateway():
                             self.guilds[guild_num]["channels"][channel_num]["hidden"] = hidden
                             self.guilds[guild_num]["channels"][channel_num]["muted"] = False
                             self.guilds[guild_num]["channels"][channel_num]["message_notifications"] = 3
-                        self.process_one_channel_overrides(data["channel_overrides"], guild_num, data["message_notifications"])
+                        self.process_one_guild_channel_overrides(data["channel_overrides"], guild_num, data["message_notifications"])
                         self.process_hidden_channels()
                     else:   # dm
                         for dm_g in self.dms:
