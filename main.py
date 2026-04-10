@@ -20,7 +20,7 @@ else:
 
 from endcord import arg, config, defaults, peripherals, utils
 
-VERSION = "1.4.3"
+VERSION = "1.4.2"
 default_config_path = peripherals.config_path
 log_path = peripherals.log_path
 uses_pgcurses = hasattr(curses, "PGCURSES")
