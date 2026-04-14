@@ -7,7 +7,7 @@ Any PR will be rejected, sorry.
 ## **LLM generated code is strongly prohibited**
 If PR is suspected to have more than 5% of AI generated code, it will be closed ASAP, and the features will be "really" implemented by someone else, without any association with that PR. No exceptions.  
 So, before even thinking about putting it through a LLM, open an issue and save yourself the trouble, because others can do it for free and better.  
-
+If you think about creating a fork with LLM generated code, **STOP!** Or at least make it private. **I DO NOT** like to see my beautiful code being **DEFILED BY LLM**!
 
 ## Contributing rules
 - Don't use inheritance. It makes code even more unreadable.
