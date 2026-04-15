@@ -420,10 +420,22 @@ def native_select_files(file_filter=None, multiple=True, auto=False):
             return []
 
     elif filedialog == "mac":
-        command = f'choose file default location "{init_dir}"  with prompt "Import File"'
-        data = subprocess.run(["osascript", "-"], input=command, text=True, capture_output=True, check=False)
-        data = data.stdout.strip().split(",")
-        return data[data.find(":"):].replace(":", "/")
+        command = f"""
+        set files to choose file default location "{init_dir}" with prompt "Import File" with multiple selections allowed true
+        set out to ""
+        repeat with f in files
+            set out to out & (POSIX path of f) & linefeed
+        end repeat
+        out
+        """
+        result = subprocess.run(
+            ["osascript", "-"],
+            input=command,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        return [p for p in result.stdout.splitlines() if p]
 
     else:
         return "ERROR"
@@ -580,7 +592,7 @@ class SpellCheck():
                 self.aspell.stdin.flush()
                 result = self.aspell.stdout.readline().strip()
                 next_line = result
-                while next_line != "\n":   # read until it prints empty line
+                while next_line and next_line != "\n":   # read until it prints empty line
                     next_line = self.aspell.stdout.readline()
                 if result.startswith("*"):
                     return False
@@ -641,7 +653,7 @@ class Recorder():
         soundcard = import_soundcard()
         if soundcard:
             try:
-                mic = soundcard.default_microphone()
+                microphone = soundcard.default_microphone()
             except Exception as e:
                 logger.warning(f"No microphone found. Error: {e}")
                 self.recording = False
@@ -650,14 +662,14 @@ class Recorder():
             logger.warning("Failed connecting to sound system")
             self.recording = False
             return
-        with mic.recorder(samplerate=48000, channels=1) as rec:
+        with microphone.recorder(samplerate=48000, channels=1) as rec:
             while self.recording:
                 if timer >= 600:   # 10min limit
                     del self.audio_data
                     self.recording = False
                     break
-                data = rec.record(numframes=48000)
-                self.audio_data.append(data)
+                audio_data = rec.record(numframes=48000)
+                self.audio_data.append(audio_data)
                 timer += 1
 
 

@@ -218,7 +218,7 @@ def build_third_party_licenses(exclude=[]):
     subprocess.run(["uv", "pip", "install", "pip-licenses"], check=True)
     command = [
         "uv", "run", "pip-licenses",
-        "--ignore-packages " + " ".joind(exclude),
+        "--ignore-packages " + " ".join(exclude),
         "--format=plain-vertical",
         "--no-license-path",
         "--output-file=THIRD_PARTY_LICENSES.txt",

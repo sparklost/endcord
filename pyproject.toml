@@ -19,7 +19,7 @@ dependencies = [
     "pywin32>=311; sys_platform == 'win32'",
     "pywin32-ctypes>=0.2.3; sys_platform == 'win32'",
     "qrcode>=8.2",
-    "soundcard>=0.4.5",
+    "soundcard>=0.4.6",
     "soundfile>=0.13.1",
     "urllib3>=2.6.3",
     "websocket-client>=1.9.0",
