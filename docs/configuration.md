@@ -324,6 +324,7 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
 ### Colors and attributes
 Colors are part of the theme, configured as 2 or 3 values in a list: `[foreground, background, attribute]`  
 Foreground and background are ANSI color codes. To print all available colors with codes run: `endcord --colors`.  
+Colors can also be set as RGB like this `(0, 124, 255)`. Alternatively hex color code can be used too, make sure its in `"` quotes and is starting with `#.`  
 -1 is terminal default color (bg or fg individually). Set entire color pair to `None` to use terminal default fg and bg colors.  
 Attribute is optional string: `"b"/"bold"`, `"u"/"underline"`, `"i"/"italic"`
 Example: `[209, 234, "u"]` - 209 is foreground, 234 is background, "u" is underline.  

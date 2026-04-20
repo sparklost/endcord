@@ -19,7 +19,7 @@ def argmin(values):
 
 def closest_color(rgb):
     """
-    Find closest 8bit xterm256 color to provided rgb color.
+    Find closest 8bit xterm256 color to provided rgb tuple color.
     Return ANSI code and rgb color.
     """
     r, g, b = rgb
@@ -40,6 +40,12 @@ def int_to_rgb(int_color):
         (int_color >> 8) & 255,   # g
         int_color & 255,   # b
     )
+
+
+def hex_to_rgb(hex_str):
+    """Convert hexadecimal color strin to rgb tuple"""
+    hex_str = hex_str.lstrip("#")
+    return tuple(int(hex_str[i : i + 2], 16) for i in (0, 2, 4))
 
 
 def convert_role_colors(all_roles, guild_id=None, role_id=None, default=-1):

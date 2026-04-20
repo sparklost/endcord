@@ -1,6 +1,6 @@
 Switch default to modern theme
-Add rgb and hex color support in theme
 Fix RTP metrics
+
 Voice channels
     add voice channels to tree
     show voice channel activity

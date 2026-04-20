@@ -10,7 +10,7 @@ import sys
 from ast import literal_eval
 from configparser import ConfigParser
 
-from endcord import defaults, peripherals
+from endcord import color, defaults, peripherals
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +63,8 @@ def load_config(path, default, section="main", gen_config=False, merge=False):
             if key in list(config[section].keys()):
                 try:
                     eval_value = literal_eval(config_data_raw[key])
+                    if section == "theme":
+                        eval_value = parse_color(eval_value)
                     config_data[key] = eval_value
                 except ValueError:
                     config_data[key] = config_data_raw[key]
@@ -72,6 +74,8 @@ def load_config(path, default, section="main", gen_config=False, merge=False):
             if key.startswith("ext_") or merge:
                 try:
                     eval_value = literal_eval(value)
+                    if section == "theme":
+                        eval_value = parse_color(eval_value)
                     config_data[key] = eval_value
                 except ValueError:
                     config_data[key] = value
@@ -124,6 +128,20 @@ def merge_configs(custom_config_path, theme_path):
             theme["theme_path"] = theme_path
     config.update(theme)
     return config, gen_config, error
+
+
+def parse_color(data):
+    """Automatically parse (r, g, b) and '#123abc' color formats and convert to 8-bit ansi"""
+    if isinstance(data, list):
+        for i, value in enumerate(data):
+            data[i] = parse_color(value)
+    if isinstance(data, int):   # already ansi
+        return data
+    if isinstance(data, tuple) and len(data) == 3:   # rgb tuple
+        return color.closest_color(data)[0]
+    if isinstance(data, str) and data.startswith("#"):   # hex string
+        return color.closest_color(color.hex_to_rgb(data))[0]
+    return data
 
 
 def alt_shift(value, shift):
