@@ -59,7 +59,7 @@ elif sys.platform == "linux":
 
 # get platform specific paths
 if sys.platform == "linux":
-    path = os.environ.get("XDG_DATA_HOME", "")
+    path = os.environ.get("XDG_CONFIG_HOME", "")
     if path.strip():
         config_path = os.path.join(path, APP_NAME)
         log_path = os.path.join(path, APP_NAME)
@@ -639,6 +639,17 @@ class SpellCheck():
         return misspelled
 
 
+def get_audio_input_devices():
+    """Get all available audio input devices, physical and virtual"""
+    soundcard = import_soundcard()
+    if soundcard:
+        devices = []
+        for mic in soundcard.all_microphones():
+            devices.append(mic.name)
+        return devices
+    return []
+
+
 class Recorder():
     """Sound recorder"""
 
@@ -653,6 +664,7 @@ class Recorder():
         soundcard = import_soundcard()
         if soundcard:
             try:
+                os.environ["PULSE_LATENCY_MSEC"] = "20"
                 microphone = soundcard.default_microphone()
             except Exception as e:
                 logger.warning(f"No microphone found. Error: {e}")

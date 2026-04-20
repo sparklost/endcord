@@ -74,6 +74,7 @@ settings = {
     "custom_media_hint": False,
     "external_editor": None,
     "calls": True,
+    "call_silence_threshold": -30,
     "yt_dlp_path": "yt-dlp",
     "yt_dlp_format": 18,
     "mpv_path": "mpv",
@@ -354,4 +355,19 @@ macos_override_keybindings = {
     "tree_up": 337,   # Shift+Up
     "tree_down": 336,   # Shift+Down
     "browser": "ALT+111",   # Alt+O
+}
+
+
+state = {
+    "last_guild_id": None,
+    "last_channel_id": None,
+    "member_list": True,
+    "collapsed": [],
+    "folder_names": [],
+    "tabbed_channels": [],
+    "recent_channels": [],
+    "volume_out": 100,
+    "volume_in": 100,
+    "audio_input_device": None,
+    "games_blacklist": [],
 }

@@ -1,12 +1,6 @@
-Voice calls
-    start recorder thread, set volume, record and add to queue encode
-    dave encrypt, transport encrypt, pack, send
-    stop when leave call
-    leave call on error
-    pause recorder when muted
-    send and receive RTCP and show connection quality
-    send speaking event
-
+Switch default to modern theme
+Add rgb and hex color support in theme
+Fix RTP metrics
 Voice channels
     add voice channels to tree
     show voice channel activity
@@ -15,15 +9,7 @@ Voice channels
     handle calls in dm groups
     handle multiple speaking at the same time
 
-after fixing https://github.com/python/cpython/issues/119138
-    Add colors for status sign in selected and active dm in tree
-    Add red fg white bg color for selected and unread in tree
-    Add red fg gray bg color for active and unread in tree
-    Show inline media in chat
-    Add bg color for mentions and channels in chat
-    Add status dot color to active and muted line in tree
-
-Add colors in assist window
+Add colors and formatting in assist window
 Add scrollbar to chat
 Add ability to switch profile without closing
 Rewrite experimental mode in not-pygame
@@ -33,7 +19,15 @@ Fix per-channel member list
 Video calls
 Localization
 
+after fixing https://github.com/python/cpython/issues/119138
+    Add colors for status sign in selected and active dm in tree
+    Add red fg white bg color for selected and unread in tree
+    Add red fg gray bg color for active and unread in tree
+    Show inline media in chat
+    Add bg color for mentions and channels in chat
+    Add status dot color to active and muted line in tree
 
-Exntensions:
+Extensions:
 endcord-termux-rich
 endcord-undelete
+endcord-voice-play

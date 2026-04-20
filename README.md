@@ -16,10 +16,11 @@
 Endcord is a third-party feature rich Discord client, running entirely in terminal.  
 It is built with Python (this [doesnt mean its slow](#note-on-python-performance-misconceptions)) and ncurses library, to deliver lightweight yet feature rich experience.  
 [More screenshots](https://github.com/sparklost/endcord/blob/main/.github/screenshots.md).  
+Third party endcord forks may add features that can lead to account ban, contain malicious code, cause instability, especially if they include LLM generated/modified code, so it is strongly recommended to avoid them. Official endcord will always stay purely human project.  
 
 ## Features
 - Extremely low CPU and RAM usage (see [RAM usage](#ram-usage))
-- Voice calls (WIP)
+- Voice calls (DMs only, rest is WIP)
 - Vim-mode
 - Integrated RPC (only Rich Presence) and game detection
 - Mouse controls
@@ -372,7 +373,7 @@ Optional dependency for spellchecking: `aspell`. Can be installed with: `brew as
 > **Use endcord at your own risk!**  
 > For more info see [FAQ](#FAQ).  
 
-Third party endcord forks may add features that can lead to account ban, or contain malicious code, cause instability, especially if they include LLM generated/modified code.
+Third party endcord forks may add features that can lead to account ban, contain malicious code, cause instability, especially if they include LLM generated/modified code, so it is strongly recommended to avoid them. **Official endcord will always stay purely human project.**  
 
 
 ## Building
@@ -495,6 +496,9 @@ The client will refuse to send message in newly-created DM channels. This measur
 
 ### Messages wont send and in log it says error code 400
 In config, disable `send_x_super_properties`. These properties may be used in spam detection so disable them only if necessary, and report the issue.
+
+### Higher voice call quality
+To increase quality of the sound sent from this device, set `ENDCORD_VOICE_OPUS_MODE=audio` enviroment variable. (options: `audio`, `voip`, `lowdelay`). This will make it encode opus with 96KB/s instead default 64KB/s (variable bitrate), but use more bandwidth.
 
 ### No notification sound
 Custom notification sound can be set in config: `custom_notification_sound = /path/to/file.mp3`.

@@ -500,6 +500,24 @@ def search_tabs(tabs, query, limit=50, score_cutoff=15):
     return sorted(results, key=lambda x: x[2], reverse=True)
 
 
+def search_mics(devices, query, limit=50, score_cutoff=15):
+    """Generic search for microphones"""
+    results = []
+    worst_score = score_cutoff
+    results.append(("Auto", "voice_set_input_device " + "Auto", score_cutoff + 1))
+
+    for device in devices:
+        score = fuzzy_match_score(query, device)
+        if score < worst_score and query:
+            continue
+        heapq.heappush(results, (device, "voice_set_input_device " + device, score))
+        if len(results) > limit:
+            heapq.heappop(results)
+            worst_score = results[0][2]
+
+    return sorted(results, key=lambda x: x[2], reverse=True)
+
+
 def search_app_commands(guild_apps, guild_commands, my_apps, my_commands, depth, guild_commands_permitted, dm, assist_skip_app_command, match_command_arguments, query, limit=50, score_cutoff=15):
     """Search for app commands"""
     results = []

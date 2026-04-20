@@ -14,6 +14,8 @@ from endcord import defaults, peripherals
 
 logger = logging.getLogger(__name__)
 
+XTERM_LIKE_BINDINGS_TERMS = ("xterm", "foot")
+
 
 def save_config(path, data, section):
     """Save config section"""
@@ -159,7 +161,7 @@ def convert_keybindings_cmd(keybindings):
     """Convert keybinding codes to os-specific codes, for command bindings"""
     if sys.platform == "win32":
         shift = 320
-    elif os.environ.get("TERM", "") == "xterm":
+    elif os.environ.get("TERM", "") in XTERM_LIKE_BINDINGS_TERMS:
         shift = 64
     else:
         shift = 0

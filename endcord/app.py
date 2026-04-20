@@ -25,6 +25,7 @@ from endcord import (
     color,
     config,
     debug,
+    defaults,
     discord,
     downloader,
     formatter,
@@ -61,10 +62,11 @@ LIMIT_SUMMARIES = 5   # max number of summaries per channel
 INTERACTION_THROTTLING = 3   # delay between sending app interactions
 APP_COMMAND_AUTOCOMPLETE_DELAY = 0.3   # delay for requesting app command autocompletions after stop typing
 RECENT_CHANNELS_LIMIT = 10
+MAIN_LOOP_POLL_DELAY = 0.1   # if too small will use more cpu
 MB = 1024 * 1024
 USER_UPLOAD_LIMITS = (10*MB, 50*MB, 500*MB, 50*MB)   # premium tier 0, 1, 2, 3 (none, classic, full, basic)
 GUILD_UPLOAD_LIMITS = (10*MB, 10*MB, 50*MB, 100*MB)   # premium tier 0, 1, 2, 3
-FORUM_COMMANDS = (1, 2, 7, 13, 14, 15, 17, 20, 22, 25, 27, 29, 30, 31, 32, 40, 42, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 61, 62, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77)
+FORUM_COMMANDS = (1, 2, 7, 13, 14, 15, 17, 20, 22, 25, 27, 29, 30, 31, 32, 40, 42, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 61, 62, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 79)
 COLLAPSE_ALL_EXCEPT_OPTIONS = ("current", "selected", "above", "bellow")
 STANDING_TYPES = ("All Good", "Limited", "Very Limited", "At risk", "Suspended")
 
@@ -143,6 +145,7 @@ class Endcord:
         self.game_detection_download_delay = config["game_detection_download_delay"]
         self.vim_mode = config["vim_mode"]
         self.notifications_pfp = config["notifications_pfp"]
+        self.silence_threshold = config["call_silence_threshold"]
 
         if not self.external_editor or not shutil.which(self.external_editor):
             self.external_editor = os.environ.get("EDITOR", "nano")
@@ -270,18 +273,7 @@ class Endcord:
         self.chat.insert(0, f"Connecting to {self.config["custom_host"] or "Discord"}")
         self.gateway_state = self.gateway.get_state()
         self.chat_dim, self.tree_dim, _  = self.tui.get_dimensions()
-        self.state = {
-            "last_guild_id": None,
-            "last_channel_id": None,
-            "volume_out": 100,
-            "volume_in": 100,
-            "member_list": True,
-            "collapsed": [],
-            "folder_names": [],
-            "tabbed_channels": [],
-            "recent_channels": [],
-            "games_blacklist": [],
-        }
+        self.state = defaults.state
         self.tree = []
         self.tree_format = []
         self.tree_metadata = []
@@ -320,7 +312,6 @@ class Endcord:
         self.prev_volume_out = 100
         self.prev_volume_in = 100
         # threading.Thread(target=self.profiling_auto_exit, daemon=True).start()
-        self.discord.get_voice_regions()
 
         # init sigint handler - replaces handler from main.py
         try:
@@ -2180,7 +2171,8 @@ class Endcord:
                                 self.prev_volume_out = self.state["volume_out"]
                                 self.state["volume_out"] = 0
                             else:
-                                self.state["volume_out"] = self.prev_volume_in
+                                self.state["volume_out"] = self.prev_volume_out
+                            self.voice_gateway.set_volumes(self.state["volume_in"], self.state["volume_out"])
                             self.update_call_extra_line()
                         elif len_extra_line - 22 < mouse_x <= len_extra_line - 16:   # CLICK ON INPUT VOL
                             if self.state["volume_in"]:
@@ -2190,6 +2182,7 @@ class Endcord:
                             else:
                                 self.state["volume_in"] = self.prev_volume_in
                                 self.update_voice_mute_in_call(False)
+                            self.voice_gateway.set_volumes(self.state["volume_in"], self.state["volume_out"])
                             self.update_call_extra_line()
                         elif len_extra_line - 7 < mouse_x <= len_extra_line:   # LEAVE
                             self.leave_call()
@@ -3633,9 +3626,18 @@ class Endcord:
                 else:
                     self.view_voice_call_list(reset=True)
 
-        elif cmd_type == 55:   # SHOW_LOG
-            self.blank_chat()
-            self.view_log()
+        elif cmd_type == 55:   # VOICE_SET_INPUT_DEVICE
+            device = cmd_args["name"]
+            if device == "Auto":
+                device = None
+            if device in peripherals.get_audio_input_devices() or not device:
+                self.state["audio_input_device"] = device
+                utils.save_json(self.state, f"state_{self.profiles["selected"]}.json")
+                if self.voice_gateway:
+                    self.voice_gateway.live_mic_switch(device)
+                self.update_extra_line(f"Switched to device: {device}")
+            else:
+                self.update_extra_line(f"Specified device not found: {device}")
 
         elif cmd_type == 56:   # RENAME_FOLDER
             folder_id = self.tree_metadata[tree_sel].get("id")
@@ -3878,6 +3880,10 @@ class Endcord:
                     self.update_extra_line("Network error.")
                 else:
                     self.update_extra_line("Failed to generate invite, see log for more info")
+
+        elif cmd_type == 79:   # SHOW_LOG
+            self.blank_chat()
+            self.view_log()
 
         if success is None:
             self.gateway.set_offline()
@@ -5024,7 +5030,7 @@ class Endcord:
         self.stop_assist(close=False)
         extra_title, extra_body = formatter.generate_extra_window_call(
             self.call_participants,
-            bool(self.state["volume_in"]),
+            not(self.state["volume_in"]),
             self.tui.get_dimensions()[2][1],
         )
         self.tui.draw_extra_window(extra_title, extra_body, reset_scroll=reset)
@@ -5431,6 +5437,14 @@ class Endcord:
                     score_cutoff=self.assist_score_cutoff,
                 )
 
+            elif assist_word.lower().startswith("voice_set_input_device "):
+                self.assist_found = search.search_mics(
+                    peripherals.get_audio_input_devices(),
+                    assist_word[23:],
+                    limit=self.assist_limit,
+                    score_cutoff=self.assist_score_cutoff,
+                )
+
             elif assist_word:
                 self.assist_found = search.search_client_commands(
                     COMMAND_ASSISTS,
@@ -5547,7 +5561,7 @@ class Endcord:
             insert_string = f"<;{self.assist_found[index][1]};>"   # format: "<;ID;>"
         elif self.assist_type == 5:   # command
             if self.assist_found[index][1]:
-                if input_text.endswith(" ") and input_text not in ("set ", "string_select ", "set_notifications ", "game_detection_blacklist ", "switch_tab ", "goto "):
+                if input_text.endswith(" ") and input_text not in ("set ", "string_select ", "set_notifications ", "game_detection_blacklist ", "switch_tab ", "goto ", "collapse_all_except ", "voice_set_input_device "):
                     self.tui.instant_assist = False
                     command_type, command_args = parser.command_string(input_text)
                     self.close_extra_window()
@@ -6960,14 +6974,12 @@ class Endcord:
                 break
         else:
             return
-        if dm["is_spam"] or dm["muted"]:
+        if dm["is_spam"]:
             return
-
         if self.in_call and event["channel_id"] != self.in_call["channel_id"] and event["op"] != "CALL_DELETE":
             return
 
         event = self.execute_extensions_methods("on_call_gateway_event", event, cache=True)[0]
-
         if event["op"] == "CALL_CREATE" and not (self.in_call or self.joining_call):
             if dm["id"] not in self.incoming_calls:
                 self.incoming_calls.append(dm["id"])
@@ -7010,7 +7022,7 @@ class Endcord:
                 self.update_extra_line(permanent=True)
                 self.stop_ringing()
 
-        elif event["op"] == "STATE_UPDATE" and event["channel_id"] in self.incoming_calls:
+        elif event["op"] == "STATE_UPDATE" and self.in_call and event["channel_id"] == self.in_call["channel_id"]:
             for num, participant in enumerate(self.call_participants):
                 if participant["user_id"] == event["user_id"]:
                     if participant["name"]:
@@ -7039,7 +7051,6 @@ class Endcord:
     def process_call_voice_gateway_events(self, event):
         """Process events from voice gateway"""
         event = self.execute_extensions_methods("on_call_voice_gateway_event", event, cache=True)[0]
-
         if event["op"] == "USER_SPEAK":
             for num, participant in enumerate(self.call_participants):
                 if participant["user_id"] == event["user_id"] and participant["name"]:
@@ -7135,7 +7146,7 @@ class Endcord:
         self.gateway.request_voice_gateway(
             guild_id,
             channel_id,
-            bool(self.state["volume_in"]),
+            not(self.state["volume_in"]),
             video=False,
             preferred_regions=self.discord.get_best_voice_region(),
         )
@@ -7159,6 +7170,8 @@ class Endcord:
             self.state["volume_out"],
             self.user_agent,
             proxy=self.config["proxy"],
+            custom_mic=self.state["audio_input_device"],
+            silence=self.silence_threshold,
         )
         self.in_call = {"guild_id": guild_id, "channel_id": channel_id}
         for _ in range(100):   # wait for 10s
@@ -7226,7 +7239,6 @@ class Endcord:
             self.close_extra_window()
 
         self.gateway.request_voice_disconnect()
-
         # keep popup (will be removed on CALL_DELETE event)
         if self.in_call:
             if self.in_call and call_channel_id == self.active_channel["channel_id"]:
@@ -7257,12 +7269,15 @@ class Endcord:
 
     def update_call_extra_line(self):
         """Update extra line shown when in call, eg on call participants change"""
+        if not self.voice_gateway:
+            return
         self.permanent_extra_line = formatter.generate_extra_line_call(
             self.call_participants,
             self.state["volume_in"],
             self.state["volume_out"],
             self.tui.get_dimensions()[2][1] - self.tui.bordered,
             self.tui.bordered,
+            self.voice_gateway.get_rtt() if self.voice_gateway else 999.9,
         )
         self.update_extra_line(custom_text=self.permanent_extra_line, permanent=True)
 
@@ -7718,6 +7733,7 @@ class Endcord:
 
         self.execute_extensions_methods("on_main_start")
 
+        call_last_update = 0
         logger.info(f"Main loop started after {round((time.time() - self.init_time) * 1000, 3)} ms")
         del self.init_time
 
@@ -7842,6 +7858,11 @@ class Endcord:
                     if self.in_call:
                         if not self.voice_gateway.get_state():
                             self.leave_call()
+
+                if call_last_update >= 5 / MAIN_LOOP_POLL_DELAY:   # run every 5s
+                    self.update_call_extra_line()
+                    call_last_update = 0
+                call_last_update += 1
 
             # send new rpc activities
             if self.enable_rpc:
@@ -7973,6 +7994,7 @@ class Endcord:
                             self.state["volume_out"],
                             self.tui.get_dimensions()[2][1],
                             self.tui.bordered,
+                            self.voice_gateway.get_rtt() if self.voice_gateway else 999.9,
                         )
                     if new_permanent_extra_line and new_permanent_extra_line != self.permanent_extra_line:
                         self.update_extra_line(custom_text=new_permanent_extra_line, permanent=True)
@@ -8126,4 +8148,4 @@ class Endcord:
                 logger.fatal(f"Gateway error: \n {self.gateway.error}")
                 sys.exit(self.gateway.error + ERROR_TEXT)
 
-            time.sleep(0.1)   # some reasonable delay
+            time.sleep(MAIN_LOOP_POLL_DELAY)

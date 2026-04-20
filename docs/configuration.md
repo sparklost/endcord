@@ -134,6 +134,11 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
     Command or path to executable for launching external editor. Set to `None` to use system default.
 - `calls = True`  
     If disabled, wont be able to receive nor start calls and calls wont ring.
+- `call_silence_threshold = -30`  
+    This is silence detection threshold for sound transmitted in voice calls. Value is in dB.  
+    If system mic volume is too low, actual sound may be detected as silence, so decrease this value until voice can be heard properly.  
+    Increase it if endcord is constantly sending noise when its silence. Or decrease mic volume and increase input volume in endcord.  
+    Set to 0 to disable silence detection (sound will be constantly sent and will use more bandwidth).
 - `downloads_path = None`  
     Path to custom downloads directory. Set to `None` to use system default.
 - `notifications_pfp = True`  

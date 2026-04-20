@@ -789,9 +789,15 @@ def command_string(text):
     elif text_lower.startswith("voice_list_call"):
         cmd_type = 54
 
-    # 55 - SHOW_LOG
-    elif text_lower.startswith("show_log"):
+    # 55 - VOICE_SET_INPUT_DEVICE
+    elif text_lower.startswith("voice_set_input_device"):
         cmd_type = 55
+        name = text[23:].strip(" ")
+        if name:
+            cmd_args = {"name": name}
+        else:
+            cmd_type = 0
+            cmd_args = {"value": 1}
 
     # 56 - RENAME_FOLDER
     elif text_lower.startswith("rename_folder"):
@@ -989,5 +995,9 @@ def command_string(text):
             "max_age": max_age,
             "max_uses": max_uses,
         }
+
+    # 79 - SHOW_LOG
+    elif text_lower.startswith("show_log"):
+        cmd_type = 79
 
     return cmd_type, cmd_args

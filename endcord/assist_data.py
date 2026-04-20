@@ -72,6 +72,7 @@ COMMAND_ASSISTS = (
     ("voice_list_call - show all call participants and their states in an updated list", "voice_list_call"),
     ("voice_set_volume_input [0-100] - change volume for input devices in voice call", "voice_set_volume_input"),
     ("voice_set_volume_output [0-100] - change volume for output devices in voice call", "voice_set_volume_output"),
+    ("voice_set_input_device [name] - change sound input device", "voice_set_input_device"),
     ("generate_invite *[duration] *[limit] - generate invite to current server, default is 7 days", "generate_invite"),
     ("rename_folder [name] - locally rename currently selected folder in tree", "rename_folder"),
     ("resize_extra_window [num/-1/+1] - resize extra window", "resize_extra_window"),

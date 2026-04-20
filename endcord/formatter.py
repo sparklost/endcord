@@ -2350,11 +2350,11 @@ def generate_extra_line_ring(caller_name, max_len, bordered):
     return shortened_str + right_text
 
 
-def generate_extra_line_call(call_participants, volume_in, volume_out, max_len, bordered):
+def generate_extra_line_call(call_participants, volume_in, volume_out, max_len, bordered, rtt):
     """Generate extra line containing iformation about ongoing call"""
     max_len = max_len - bordered * 3
     left_text = "In the call: You"
-    right_text = f"[I:{(str(volume_in)+"%").center(4)} O:{(str(volume_out)+"%").center(4)}] [Leave]"
+    right_text = f"({min(rtt, 999.9):.1f}ms) [I:{(str(volume_in)+"%").center(4)} O:{(str(volume_out)+"%").center(4)}] [Leave]"
 
     for participant in call_participants:
         left_text += f", {participant["name"]}"
@@ -2947,6 +2947,7 @@ def generate_tree(dms, guilds, threads, read_state, guild_folders, activities, c
         "muted": False,
         "parent_index": None,
     })
+    dm_pings = 0
     for dm in dms:
         name = dm["name"]
         ch_read_state = read_state.get(dm["id"])
@@ -2974,6 +2975,7 @@ def generate_tree(dms, guilds, threads, read_state, guild_folders, activities, c
                     break
         mention_count = generate_count(len(ch_read_state["mentions"])) if unseen_dm else ""
         tree.append(normalize_string_with_suffix(f"{intersection} {name}", mention_count, max_width, emoji_safe=not(safe_emoji)))
+        dm_pings += len(ch_read_state["mentions"]) if unseen_dm else 0
         if muted and not active:
             code += 10
         elif active and not mentioned_dm:
@@ -2999,6 +3001,9 @@ def generate_tree(dms, guilds, threads, read_state, guild_folders, activities, c
     tree.append("END-DMS-DROP-DOWN")
     tree_format.append(1100)
     tree_metadata.append(None)
+    if dm_pings:
+        mention_count = generate_count(dm_pings)
+        tree[0] = normalize_string_with_suffix(f"{dd_pointer} Direct Messages", mention_count, max_width)
 
     # sort guilds and folders
     guilds_sorted = []
