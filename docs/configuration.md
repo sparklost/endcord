@@ -218,15 +218,15 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
     Height of extra window drawn above status line. Window title line not included.
 - `member_list_width = 20`  
     Width of member list. It won't be drawn if remaining screen width for chat is less than 32 characters.
-- `format_message = "[%timestamp] <%global_name> | %content %edited"`  
+- `format_message = "[%timestamp] <%global_name> %app%edited\n%content"`  
     Formatting for message base string. See [format_message](#format_message) for more info.
-- `format_newline = "                       %content"`  
+- `format_newline = " │  %content"`  
     Formatting for each newline string after message base. See [format_newline](#format_newline) for more info.
-- `format_reply = [REPLY] <%global_name> | ╭──🡲 [%timestamp] %content"`  
+- `format_reply = " ╭──🡲 [%timestamp] <%global_name>: %content"`  
     Formatting for replied message string. It is above message base. See [format_reply](#format_reply) for more info.
-- `format_reactions = "[REACT]                ╰──< %reactions"`  
+- `format_reactions = " ╰──⤙ %reactions"`  
     Formatting for message reactions string. It is bellow last newline string. See [format_reactions](#format_reactions) for more info.
-- `format_interaction = "                       ╭──⤙ %global_name used [%command]"`  
+- `format_interaction = " ╭──⤙ %global_name used [%command]"`  
     Formatting for bot interaction string. It is above message base. See [format_interaction](#format_interaction)
 - `format_one_reaction = "%count:%reaction"`  
     Formatting for single reaction string. Reactions string is assembled by joining these strings with `reactions_separator` in between. See [format_one_reaction](#format_one_reaction) for more info.
@@ -304,7 +304,7 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
     Characters used to draw corners in bordered mode.
 - `username_role_colors = True`  
     Allow `%username` and `%global_name` to have color of primary role.
-- `dynamic_name_len = False`  
+- `dynamic_name_len = True`  
     Use dynamic name length for usernames and global_names in `format_message` and `format_reply` only. Overrides `limit_username` option and name length is limited to `chat_width - 15`.  
     If this is ON, `color_format_message` still works same as with dynamic_name_len OFF, and it will internally correct for dynamic name difference.  
     Eg.: if color format has red character set to be at index 20, and `limit_username = 10`, `format_message = "abcd %username1234X67` but dynamic name is ON, then red character will always be 5 characters after `%username`. because `20 - length("abcd ") - 10 = 5`.
@@ -372,13 +372,13 @@ Every next list has additional `start` and `end`- indexes on a line where color 
 - `color_tree_active_mentioned = [197, 234]`
 - `color_format_message = [[-1, -1], [242, -2, 0, 0, 7], [25, -2, 0, 8, 9], [25, -2, 0, 19, 20]]`  
     Color format for message base string. Corresponding to `format_message`.
-- `color_format_newline = None`  
+- `color_format_newline = [[-1, -1], [242, -2, 0, 1, 2]]`  
     Color format for each newline string after message base. Corresponding to `format_newline`.
-- `color_format_reply = [[245, -1], [67, -2, 0, 0, 7], [25, -2, 0, 8, 9], [25, -2, 0, 19, 20], [-1, -2, 0, 21, 27]]`  
+- `color_format_reply = [[245, -1], [242, -2, 0, 1, 5], [25, -2, 0, 14, 15], [25, -2, 0, 25, 26]]`  
     Color format for replied message string. Corresponding to `format_reply`.
-- `color_format_reactions = [[245, -1], [131, -2, 0, 0, 7], [-1, -2, 0, 23, 27]]`  
+- `color_format_reactions = [[245, -1], [242, -2, 0, 1, 5]]`  
     Color format for message reactions string. Corresponding to `format_reactions`.
-- `color_format_interaction = [[245, -1], [67, -2, 0, 0, 7], [-1, -2, 0, 21, 27]]`  
+- `color_format_interaction = [[245, -1], [242, -2, 0, 1, 5]]`  
     Color format for message app interaction string. Corresponding to `format_interaction`.
 - `color_format_forum = [[-1, -1], [242, -2, 0, 0, 12], [25, -2, 0, 15, 20]]`  
     Color format for threads in forum. Corresponding to `format_forum`.

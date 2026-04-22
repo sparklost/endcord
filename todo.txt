@@ -1,6 +1,3 @@
-Switch default to modern theme
-Fix RTP metrics
-
 Voice channels
     add voice channels to tree
     show voice channel activity
@@ -8,6 +5,7 @@ Voice channels
     join call with goto
     handle calls in dm groups
     handle multiple speaking at the same time
+Fix RTP metrics
 
 Add colors and formatting in assist window
 Add scrollbar to chat

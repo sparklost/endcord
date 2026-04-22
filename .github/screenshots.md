@@ -30,3 +30,7 @@
 <b>Video in built-in media player using ASCII art:<b><br>
 <img src="./screenshots/07.png" alt="Media with ASCII art" width="800">
 </div>
+<br><br>
+<b>IRC-like theme:<b><br>
+<img src="./screenshots/08.png" alt="IRC-like theme" width="800">
+<br><br>
