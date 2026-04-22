@@ -269,17 +269,22 @@ class Gateway():
             gateway_url = self.resume_gateway_url
         else:
             gateway_url = self.gateway_url
-        self.ws = websocket.WebSocket()
-        if self.proxy.scheme:
-            self.ws.connect(
-                gateway_url + "/?v=9&encoding=json&compress=zlib-stream",
-                header=self.header,
-                proxy_type=self.proxy.scheme,
-                http_proxy_host=self.proxy.hostname,
-                http_proxy_port=self.proxy.port,
-            )
-        else:
-            self.ws.connect(gateway_url + "/?v=9&encoding=json&compress=zlib-stream", header=self.header)
+        try:
+            self.ws = websocket.WebSocket()
+            if self.proxy.scheme:
+                self.ws.connect(
+                    gateway_url + "/?v=9&encoding=json&compress=zlib-stream",
+                    header=self.header,
+                    proxy_type=self.proxy.scheme,
+                    http_proxy_host=self.proxy.hostname,
+                    http_proxy_port=self.proxy.port,
+                )
+            else:
+                self.ws.connect(gateway_url + "/?v=9&encoding=json&compress=zlib-stream", header=self.header)
+        except OSError as e:
+            return e
+        except websocket._exceptions.WebSocketBadStatusException as e:
+            return e
 
 
     def disconnect_ws(self, timeout=2, status=1000):
@@ -336,7 +341,10 @@ class Gateway():
             logger.error(f"Failed to get gateway url. Response code: {response.status}. Exiting...")
             sys.exit(f"Failed to get gateway url. Response code: {response.status}. Exiting...")
 
-        self.connect_ws()
+        error = self.connect_ws()
+        if error:
+            logger.error(f"Failed to get gateway url. Error: {error}. Exiting...")
+            sys.exit(f"Failed to get gateway url. Error: {error}. Exiting...")
         self.state = 1
         self.heartbeat_interval = int(json.loads(zlib_decompress(self.ws.recv()))["d"]["heartbeat_interval"])
         self.receiver_thread = threading.Thread(target=self.safe_function_wrapper, daemon=True, args=(self.receiver, ))
@@ -1839,9 +1847,8 @@ class Gateway():
         time.sleep(1)   # so receiver ends before opening new socket
         reset_inflator()   # otherwise decompression wont work
         self.ws = websocket.WebSocket()
-        try:
-            self.connect_ws(resume=True)
-        except websocket._exceptions.WebSocketBadStatusException:
+        error = self.connect_ws(resume=True)
+        if error:
             logger.info("Failed to resume connection")
             return 9
         _ = zlib_decompress(self.ws.recv())
@@ -1873,7 +1880,12 @@ class Gateway():
                 reset_inflator()   # otherwise decompression wont work
                 self.ready = False   # will receive new ready event
                 self.ws = websocket.WebSocket()
-                self.connect_ws()
+                error = self.connect_ws()
+                if error:
+                    logger.warning("No internet connection")
+                    self.ws.close()
+                    threading.Thread(target=self.wait_online, daemon=True, args=()).start()
+                    return
                 self.authenticate()
             self.wait = False
             # restarting threads
@@ -1885,7 +1897,7 @@ class Gateway():
                 self.heartbeat_thread.start()
             self.state = 1
             logger.info("Connection established")
-        except (websocket._exceptions.WebSocketAddressException, socket.gaierror, TimeoutError, ConnectionResetError):
+        except (socket.gaierror, TimeoutError, ConnectionResetError):
             if not self.wait:   # if not running from wait_oline
                 logger.warning("No internet connection")
                 self.ws.close()

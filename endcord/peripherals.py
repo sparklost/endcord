@@ -805,23 +805,26 @@ def make_round_image(image_path):
     Use pillow if available, fallback to imagemagick if available.
     Save image as _round and delete original, and dont re-edit same image.
     """
-    if not image_path or not os.path.exists(image_path):
-        return None
-    if "_round" in image_path:
-        return image_path
-    if importlib.util.find_spec("PIL") is not None:
-        base, ext = os.path.splitext(image_path)
-        save_path = base + "_round" + ext
-        make_round_image_pillow(image_path, save_path)
-        os.remove(image_path)
-        return save_path
-    if shutil.which("magick"):
-        try:
+    try:
+        if not image_path or not os.path.exists(image_path):
+            return None
+        if "_round" in image_path:
+            return image_path
+        if importlib.util.find_spec("PIL") is not None:
             base, ext = os.path.splitext(image_path)
             save_path = base + "_round" + ext
-            make_round_image_imagemagick(image_path, save_path)
+            make_round_image_pillow(image_path, save_path)
             os.remove(image_path)
             return save_path
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            pass
-    return image_path
+        if shutil.which("magick"):
+            try:
+                base, ext = os.path.splitext(image_path)
+                save_path = base + "_round" + ext
+                make_round_image_imagemagick(image_path, save_path)
+                os.remove(image_path)
+                return save_path
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                pass
+        return image_path
+    except FileNotFoundError:   # failsafe in case file was deleted mid-conversion
+        return None
