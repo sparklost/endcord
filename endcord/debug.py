@@ -24,13 +24,13 @@ def save_json(json_data, name, debug_path=True):
             os.makedirs(os.path.dirname(path), exist_ok=True)
     else:
         path = name
-    with open(path, "w") as f:
-        json.dump(json_data, f, indent=2)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(json_data, f, indent=2, ensure_ascii=False)
 
 
 def load_json(path):
     """Load json from any path"""
-    with open(path, "r") as f:
+    with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
     return None
 

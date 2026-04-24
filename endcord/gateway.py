@@ -36,6 +36,7 @@ from endcord.message import is_relevant_message, prepare_message
 
 DISCORD_HOST = "discord.com"
 LOCAL_MEMBER_COUNT = 50   # members per guild, CPU-RAM intensive
+LOCAL_VOICE_PRESENCE_LIMIT = 50   # per guild, slightly RAM intensive
 ZLIB_SUFFIX = b"\x00\x00\xff\xff"
 VOICE_FLAGS = 3   # CLIPS_ENABLED and ALLOW_VOICE_RECORDING
 DEFAULT_CAPABILITIES = 30717
@@ -175,6 +176,8 @@ class Gateway():
         self.app_command_autocomplete_resp = []
         self.voice_gateway_data = {}
         self.voice_gateway_data_ready = 0
+        self.voice_states = {}
+        self.should_redraw_tree = None
 
 
     def load_extensions(self, extensions):
@@ -270,7 +273,13 @@ class Gateway():
         else:
             gateway_url = self.gateway_url
         try:
-            self.ws = websocket.WebSocket()
+            if sys.platform == "darwin":
+                import certifi
+                ssl_context = ssl.create_default_context(cafile=certifi.where())
+            else:
+                ssl_context = ssl.create_default_context()
+            ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
+            self.ws = websocket.WebSocket(sslopt={"context": ssl_context})
             if self.proxy.scheme:
                 self.ws.connect(
                     gateway_url + "/?v=9&encoding=json&compress=zlib-stream",
@@ -281,9 +290,7 @@ class Gateway():
                 )
             else:
                 self.ws.connect(gateway_url + "/?v=9&encoding=json&compress=zlib-stream", header=self.header)
-        except OSError as e:
-            return e
-        except websocket._exceptions.WebSocketBadStatusException as e:
+        except (websocket._exceptions.WebSocketException, OSError) as e:
             return e
 
 
@@ -311,7 +318,11 @@ class Gateway():
                 proxy_sock = socks.socksocket()
                 proxy_sock.set_proxy(socks.SOCKS5, self.proxy.hostname, self.proxy.port)
                 proxy_sock.connect((self.host, 443))
-                ssl_context = ssl.create_default_context()
+                if sys.platform == "darwin":
+                    import certifi
+                    ssl_context = ssl.create_default_context(cafile=certifi.where())
+                else:
+                    ssl_context = ssl.create_default_context()
                 ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
                 proxy_sock = ssl_context.wrap_socket(proxy_sock, server_hostname=self.host)
                 proxy_sock.do_handshake()   # seems like its not needed
@@ -483,15 +494,16 @@ class Gateway():
 
         # channels
         for channel in guild["channels"]:
-            if channel["type"] in (0, 2, 4, 5, 15, 16) and not self.bot:
+            ch_type = channel["type"]
+            if ch_type in (0, 2, 4, 5, 15, 16) and not self.bot:
                 hidden = True   # hidden by default
             else:
                 hidden = False
             data = {
                 "id": channel["id"],
-                "type": channel["type"],
+                "type": ch_type,
                 "name": channel["name"],
-                "topic": channel.get("topic"),
+                "topic": channel.get("status") if ch_type == 2 else channel.get("topic"),
                 "parent_id": channel.get("parent_id"),
                 "position": channel["position"],
                 "permission_overwrites": channel["permission_overwrites"],
@@ -769,7 +781,7 @@ class Gateway():
             logger.debug(f"Received: opcode={opcode}, optext={response["t"] if (response and "t" in response and response["t"] and "LIST" not in response["t"]) else 'None'}")
             # debug_events
             # if response.get("t"):
-            #     debug.save_json(response, f"{response["t"]}.json", False)
+            #     debug.save_json(response, f"{int(time.time())}_{response["t"]}.json", False)
 
             # events sorted by frequency and importance
             if opcode == 0:
@@ -932,6 +944,7 @@ class Gateway():
                                 "guild_id": guild_id,
                                 "roles": roles,
                             })
+                    self.merged_users = data["users"]   # this is for ready_supplemental
                     time_log_string += f"    roles - {round((time.time() - ready_time_mid) * 1000, 3)} ms\n"
                     ready_time_mid = time.time()
                     # write debug data
@@ -996,8 +1009,36 @@ class Gateway():
                             "custom_status": custom_status,
                             "activities": activities,
                         })
+                    # get initial voice presences
+                    for num, guild in enumerate(data["guilds"]):
+                        count = 0
+                        for state in guild["voice_states"]:
+                            count += 1
+                            channel_id = state["channel_id"]
+                            user_id = state["user_id"]
+                            username = "Unknown"
+                            global_name = None
+                            nick = None
+                            try:
+                                for user in data["merged_members"][num]:
+                                    if user["user_id"] == user_id:
+                                        nick = user["nick"]
+                                        break
+                                for user in self.merged_users:
+                                    if user["id"] == user_id:
+                                        username = user["username"]
+                                        global_name = user["global_name"]
+                                        break
+                            except IndexError:
+                                continue
+                            if channel_id not in self.voice_states:
+                                self.voice_states[channel_id] = {}
+                            self.voice_states[channel_id][0] = self.voice_states[channel_id].get(0, 0) + 1
+                            if count > LOCAL_VOICE_PRESENCE_LIMIT:
+                                continue
+                            self.voice_states[channel_id][username] = (global_name, nick)   # using username as id to save ram
                     self.dm_activities_changed = True
-                    del (guild)   # this is large dict so lets save some memory
+                    del (guild, self.merged_users)   # this is large so lets save some memory
                     gc.collect()
 
                 elif optext == "MESSAGE_CREATE" and "content" in response["d"]:
@@ -1476,34 +1517,72 @@ class Gateway():
                         "d": data,
                     })
 
-                elif optext == "VOICE_STATE_UPDATE":
-                    if "session_id" not in self.voice_gateway_data and self.voice_gateway_data_ready >= 1:
-                        self.voice_gateway_data["session_id"] = data["session_id"]
-                        self.voice_gateway_data["guild_id"] = data.get("guild_id")
-                        if not self.voice_gateway_data["guild_id"]:
-                            self.voice_gateway_data["guild_id"] = data["channel_id"]   # must be channel_id in DM
-                        self.voice_gateway_data["channel_id"] = data["channel_id"]
-                        self.voice_gateway_data_ready += 1
-                    elif data["user_id"] != self.my_id:
-                        name = None
-                        if "member" in data:
-                            name = data["member"].get("nick")
-                            if not name:
-                                name = data["member"]["user"].get("global_name", data["member"]["user"]["username"])   # spacebar_fix - get
-                        self.call_buffer.append({
-                            "op": "STATE_UPDATE",
-                            "channel_id": data["channel_id"],
-                            "user_id": data["user_id"],
-                            "name": name,
-                            "muted": data["self_mute"] or data["mute"],
-                        })
-                        # this is just to get mute states, enter/leave call and speaking are sent in voice gateway
+                elif optext == "PASSIVE_UPDATE_V2":
+                    pass
 
-                elif optext == "VOICE_SERVER_UPDATE":
-                    if "endpoint" not in self.voice_gateway_data and self.voice_gateway_data_ready >= 1:
-                        self.voice_gateway_data["token"] = data["token"]
-                        self.voice_gateway_data["endpoint"] = data["endpoint"]
-                        self.voice_gateway_data_ready += 1
+                elif optext.startswith("VOICE_"):
+                    if optext == "VOICE_STATE_UPDATE":
+                        username = data["member"]["user"]["username"]
+                        channel_id = data["channel_id"]
+                        if data["user_id"] == self.my_id:
+                            if "session_id" not in self.voice_gateway_data and self.voice_gateway_data_ready >= 1:
+                                self.voice_gateway_data["session_id"] = data["session_id"]
+                                self.voice_gateway_data["guild_id"] = data.get("guild_id")
+                                if not self.voice_gateway_data["guild_id"]:
+                                    self.voice_gateway_data["guild_id"] = channel_id   # must be channel_id in DM
+                                self.voice_gateway_data["channel_id"] = data["channel_id"]
+                                self.voice_gateway_data_ready += 1
+                        else:
+                            name = None
+                            if "member" in data:
+                                name = data["member"].get("nick")
+                                if not name:
+                                    name = data["member"]["user"].get("global_name", username)   # spacebar_fix - get
+                            self.call_buffer.append({
+                                "op": "STATE_UPDATE",
+                                "channel_id": data["channel_id"],
+                                "user_id": data["user_id"],
+                                "name": name,
+                                "muted": data["self_mute"] or data["mute"],
+                            })  # this is just to get mute states, enter/leave call and speaking are sent in voice gateway
+                        # update voice channels states
+                        if data["channel_id"] not in self.voice_states:
+                            self.voice_states[channel_id] = {}
+                            if channel_id:
+                                self.voice_states[channel_id][0] = self.voice_states[channel_id].get(0, 0) + 1
+                                if len(self.voice_states) - 1 <= LOCAL_VOICE_PRESENCE_LIMIT:
+                                    global_name = data["member"]["user"].get("global_name")
+                                    nick = data["member"].get("nick")
+                                    self.voice_states[channel_id][username] = (global_name, nick)   # using username as id to save ram
+                                self.should_redraw_tree = data["guild_id"]
+                            else:
+                                for channel_id, activities in self.voice_states.items():   # search for channel and activity
+                                    if username not in activities:
+                                        continue
+                                    self.voice_states[channel_id][0] = self.voice_states[channel_id].get(0, 0) - 1
+                                    if username in self.voice_states[channel_id]:
+                                        del(self.voice_states[channel_id][username])
+                                    self.should_redraw_tree = data["guild_id"]
+
+                    elif optext == "VOICE_SERVER_UPDATE":
+                        if "endpoint" not in self.voice_gateway_data and self.voice_gateway_data_ready >= 1:
+                            self.voice_gateway_data["token"] = data["token"]
+                            self.voice_gateway_data["endpoint"] = data["endpoint"]
+                            self.voice_gateway_data_ready += 1
+
+                    elif optext == "VOICE_CHANNEL_START_TIME_UPDATE":
+                        pass   # unused for now - cant find initial start time in the api
+
+                    elif optext == "VOICE_CHANNEL_STATUS_UPDATE":
+                        guild_id = data["guild_id"]
+                        channel_id = data["id"]
+                        for num, guild in enumerate(self.guilds):
+                            if guild["guild_id"] == guild_id:
+                                for num_ch, channel in enumerate(guild["channels"]):
+                                    if channel["id"] == channel_id:
+                                        self.guilds[num]["channels"][num_ch]["topic"] = data["status"]
+                                        break
+                                break
 
                 elif optext == "CALL_CREATE":
                     # event is received even when this client creates call
@@ -2199,6 +2278,15 @@ class Gateway():
         return None
 
 
+    def get_should_redraw_tree(self):
+        """Get what guild causes tree redraw"""
+        if self.should_redraw_tree:
+            cache = self.should_redraw_tree
+            self.should_redraw_tree = None
+            return cache
+        return None
+
+
     def get_roles(self):
         """Get list of roles for all guilds with their metadata, updated only when reconnecting"""
         return self.roles
@@ -2353,6 +2441,11 @@ class Gateway():
             self.guild_roles_changed = None
             return cache
         return None
+
+
+    def get_voice_states(self):
+        """Get voice states"""
+        return self.voice_states
 
 
     def get_stats(self):

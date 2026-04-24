@@ -135,6 +135,7 @@ theme = {
     "tree_drop_down_thread": "⤙",
     "tree_drop_down_forum": "◆",
     "tree_drop_down_folder": "+",
+    "tree_drop_down_voice": "○",
     "tree_dm_status": "●",
     "border_corners": "╭╰╮╯",
     "username_role_colors": True,

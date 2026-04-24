@@ -1,10 +1,11 @@
-Voice channels
-    add voice channels to tree
-    show voice channel activity
-    join call from tree
-    join call with goto
-    handle calls in dm groups
+Fix messages disappearing
+    after send message and at the same time other it received
+Handle PASSIVE_UPDATE_V2 event
+Add voice calls in servers
+    check channel activity and join/start if possible (check if full, check perms)
     handle multiple speaking at the same time
+Add voice calls in dm groups
+Fix missing channels in tree
 Fix RTP metrics
 
 Add colors and formatting in assist window
@@ -14,7 +15,7 @@ Rewrite experimental mode in not-pygame
 Fix issues with wide characters in input line
 Add option to select individual message
 Fix per-channel member list
-Video calls
+Video, stage and stream calls
 Localization
 
 after fixing https://github.com/python/cpython/issues/119138

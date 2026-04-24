@@ -716,6 +716,11 @@ class Endcord:
             self.update_extra_line("Can't switch channel when offline.", timed=False)
             return
 
+        # select new current channel and start voice call if its voice channel
+        this_guild = self.select_current_channels(channel_id, guild_id, parent_hint)
+        if this_guild == -1:
+            return
+
         logger.debug(f"Switching channel, has_id: {bool(channel_id)}, has_guild: {bool(guild_id)}, has hint: {bool(parent_hint)}")
 
         # stop log watcher so it doesnt interfere with chat generation
@@ -757,8 +762,6 @@ class Endcord:
 
         # run extensions
         self.execute_extensions_methods("on_switch_channel_start")
-
-        this_guild = self.select_current_channels(parent_hint)
 
         # generate forum
         if self.current_channel.get("type") in (15, 16):
@@ -1090,28 +1093,31 @@ class Endcord:
         return folder_changed
 
 
-    def select_current_channels(self, parent_hint=None, refresh=False):
+    def select_current_channels(self, channel_id=None, guild_id=None, parent_hint=None, refresh=False):
         """Select current channels and current channel objects and update things related to them"""
         # update list of channels
-        guild_id = self.active_channel["guild_id"]
-        channel_id = self.active_channel["channel_id"]
+        if not channel_id:
+            guild_id = self.active_channel["guild_id"]
+            channel_id = self.active_channel["channel_id"]
 
         if refresh:
             parent_hint = self.current_channel.get("parent_id")
 
         for this_guild in self.guilds:
             if this_guild["guild_id"] == guild_id:
-                self.current_channels = this_guild["channels"]
+                current_channels = this_guild["channels"]
                 break
         else:
-            self.current_channels = []
+            current_channels = []
             this_guild = {}
 
         # update channel
-        self.current_channel = {}
-        for channel in self.current_channels:
+        current_channel = {}
+        for channel in current_channels:
             if channel["id"] == channel_id:
-                self.current_channel = channel
+                if channel["type"] == 2:   # voice channel
+                    return -1   # skip any changes
+                current_channel = channel
                 break
 
         # check threads if no channel
@@ -1123,12 +1129,14 @@ class Endcord:
                             if channel["channel_id"] == parent_hint:
                                 for thread in channel["threads"]:
                                     if thread["id"] == channel_id:
-                                        self.current_channel = thread
+                                        current_channel = thread
                                         break
                                 break
                         break
 
-        # update current guild properties
+        # update
+        self.current_channels = current_channels
+        self.current_channel = current_channel
         if this_guild:
             self.current_guild_properties = {
                 "owned": this_guild["owned"],
@@ -4926,7 +4934,8 @@ class Endcord:
         if guild:
             extra_title, extra_body = formatter.generate_extra_window_guild(channel, max_w)
         else:
-            extra_title, extra_body = formatter.generate_extra_window_channel(channel, max_w)
+            this_voice_states = self.gateway.get_voice_states().get(channel["id"], {})
+            extra_title, extra_body = formatter.generate_extra_window_channel(channel, this_voice_states, max_w, self.use_nick)
         self.tui.draw_extra_window(extra_title, extra_body)
         self.extra_window_open = True
 
@@ -6145,6 +6154,7 @@ class Endcord:
             self.activities,
             collapsed,
             self.uncollapsed_threads,
+            self.gateway.voice_states,   # faster than get_voice_states()
             self.active_channel["channel_id"],
             self.config,
             folder_names=self.state["folder_names"],
@@ -7954,6 +7964,10 @@ class Endcord:
                 self.load_dms()
                 self.compute_permissions()
                 self.select_current_channels(refresh=True)
+                self.update_tree()
+                self.update_status_line()
+            changed_guild = self.gateway.get_should_redraw_tree()
+            if changed_guild and changed_guild not in self.state["collapsed"]:
                 self.update_tree()
                 self.update_status_line()
 

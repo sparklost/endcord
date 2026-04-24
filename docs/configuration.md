@@ -298,6 +298,8 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
     A single character used to draw forum pointer in tree drop down menus.
 - `tree_drop_down_folder = "+"`  
     A single character used to draw folder pointer in tree drop down menus.
+- `tree_drop_down_voice = "○"`  
+    A single character used to draw voice channel pointer in tree drop down menus.
 - `tree_dm_status = "●"`  
     A single character prepended to DM name in tree drop down, to indicate status: online/away/dnd. Also used in member list.
 - `border_corners = "╭╰╮╯"`  

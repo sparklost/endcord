@@ -2498,8 +2498,37 @@ def generate_extra_window_profile(user_data, user_roles, presence, max_len):
     return title_line, body
 
 
-def generate_extra_window_channel(channel, max_len):
+def generate_extra_window_channel(channel, voice_states, max_len, use_nick):
     """Generate extra window title and body for channel info view"""
+    if channel["type"] == 2:   # voice channel
+        title_line = f"Voice Channel: {channel["name"]}"[:max_len]
+        body_line = ""
+        allow_voice = channel.get("allow_voice", True)
+        allow_speak = channel.get("allow_speak", True)
+        if not allow_voice:
+            body_line += "No voice permission\n"
+        elif not allow_speak:
+            body_line += "No speak permission\n"
+        if channel["topic"]:
+            body_line += f"Topic:\n{channel["topic"]}\n"
+        else:
+            body_line += "No topic.\n"
+        body_line += "\n"
+        if voice_states and len(voice_states) > 1:
+            body_line += f"{voice_states[0]} participant{"s" if voice_states[0] > 1 else ""}:\n"   # 0 is count
+            for username, value in voice_states.items():
+                if isinstance(value, int):
+                    continue
+                global_name, nick = value
+                if (nick and use_nick) or global_name:
+                    body_line += f"  {nick if nick else global_name} ({username})\n"
+                else:
+                    body_line += "  " + username
+        else:
+            body_line += "No participants."
+        body = split_long_line(body_line, max_len)
+        return title_line, body
+
     title_line = f"Channel: {channel["name"]}"[:max_len]
     body_line = ""
     no_embed = not channel.get("allow_attach", True)
@@ -2889,7 +2918,7 @@ def generate_message_notification(data, channels, roles, guild_name, convert_tim
     return title, body
 
 
-def generate_tree(dms, guilds, threads, read_state, guild_folders, activities, collapsed, uncollapsed_threads, active_channel_id, config, folder_names=[], safe_emoji=False, max_width=0):
+def generate_tree(dms, guilds, threads, read_state, guild_folders, activities, collapsed, uncollapsed_threads, voice_states, active_channel_id, config, folder_names=[], safe_emoji=False, max_width=0):
     """
     Generate channel tree according to provided formatting.
     tree_format keys:
@@ -2924,6 +2953,7 @@ def generate_tree(dms, guilds, threads, read_state, guild_folders, activities, c
     dd_thread = config["tree_drop_down_thread"]
     dd_forum = config["tree_drop_down_forum"]
     dd_folder = config["tree_drop_down_folder"]
+    voice_char = config["tree_drop_down_voice"]
     dm_status_char = config["tree_dm_status"]
     show_folders = config["tree_show_folders"]
     intersection = f"{dd_intersect}{dd_hline*2}"   # default: "|--"
@@ -3100,7 +3130,7 @@ def generate_tree(dms, guilds, threads, read_state, guild_folders, activities, c
         # separately sort channels in their categories
         uncategorized_channels = []
         for channel in guild["channels"]:
-            if channel["type"] in (0, 5, 15, 16):
+            if channel["type"] in (0, 2, 5, 15, 16):
                 # find this channel threads, if any
                 for channel_th in threads_guild:
                     if channel_th["channel_id"] == channel["id"]:
@@ -3127,7 +3157,7 @@ def generate_tree(dms, guilds, threads, read_state, guild_folders, activities, c
                         if not hidden_ch and category["hidden"] != 2:
                             category["hidden"] = False
                         active = (channel["id"] == active_channel_id)
-                        category["channels"].append({
+                        data = {
                             "id": channel["id"],
                             "name": channel["name"],
                             "position": channel["position"],
@@ -3137,8 +3167,12 @@ def generate_tree(dms, guilds, threads, read_state, guild_folders, activities, c
                             "ping": mentioned_ch,
                             "active": active,
                             "threads": threads_ch,
-                            "forum": channel["type"] in (15, 16),
-                        })
+                        }
+                        if channel["type"] in (15, 16):   # saving ram
+                            data["forum"] = True
+                        if channel["type"] == 2:
+                            data["voice"] = True
+                        category["channels"].append(data)
                         break
                 else:
                     muted_ch = channel.get("muted", False)
@@ -3236,7 +3270,7 @@ def generate_tree(dms, guilds, threads, read_state, guild_folders, activities, c
                     for channel in category_channels:
                         if not channel["hidden"]:
                             name = channel["name"]
-                            forum = channel["forum"]
+                            forum = channel.get("forum")
                             channel_threads = channel.get("threads", [])
                             channel_index = len(tree_format)
                             if safe_emoji:
@@ -3246,6 +3280,13 @@ def generate_tree(dms, guilds, threads, read_state, guild_folders, activities, c
                                 tree.append(normalize_string_with_suffix(f"{pass_by}{intersection}{dd_forum} {name}", mention_count, max_width, emoji_safe=not(safe_emoji)))
                             elif channel_threads:
                                 tree.append(normalize_string_with_suffix(f"{pass_by}{intersection}{dd_pointer} {name}", mention_count, max_width, emoji_safe=not(safe_emoji)))
+                            elif channel.get("voice"):
+                                states = voice_states.get(channel["id"])
+                                if states and len(states) > 1:
+                                    prepend = f"[{min(states[0], 99)}] "
+                                else:
+                                    prepend = ""
+                                tree.append(normalize_string_with_suffix(f"{pass_by}{intersection}{voice_char} {prepend}{name}", mention_count, max_width, emoji_safe=not(safe_emoji)))
                             else:
                                 tree.append(normalize_string_with_suffix(f"{pass_by}{intersection} {name}", mention_count, max_width, emoji_safe=not(safe_emoji)))
                             if channel_threads:

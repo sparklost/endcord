@@ -1622,7 +1622,7 @@ class TUI():
             self.extra_window_body = body_text
             if reset_scroll:
                 self.extra_index = 0
-                self.extra_selected = 0
+                self.extra_selected = 0 if self.extra_select else -1
 
             if title_txt and not self.disable_drawing:
                 h, w = self.screen.getmaxyx()
