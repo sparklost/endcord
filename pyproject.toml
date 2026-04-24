@@ -31,11 +31,11 @@ dependencies = [
 build = [
     "cython>=3.2.4",
     "nuitka[onefile]>=4.0.8",
-    "pyinstaller>=6.19.0",
+    "pyinstaller>=6.20.0",
     "setuptools>=82.0.0",
 ]
 media = [
-    "av>=17.0.0",
+    "av>=17.0.1",
     "dave-py>=0.1.2",
     "pillow>=12.2.0",
     "pynacl>=1.6.2",

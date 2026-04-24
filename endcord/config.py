@@ -32,7 +32,7 @@ def save_config(path, data, section):
         if data[key] in (True, False, None) or isinstance(data[key], (list, tuple, int, float)):
             config.set(section, key, str(data[key]))
         else:
-            config.set(section, key, f'"{str(data[key]).replace("\\", "\\\\")}"')
+            config.set(section, key, f'"{str(data[key]).replace("\\", "\\\\").replace("\n", "\\n")}"')
     with open(path, "w", encoding="utf-8") as f:
         config.write(f)
 
