@@ -331,6 +331,8 @@ class Endcord:
         """Handling Ctrl-C event"""
         if self.terminal_media:
             self.terminal_media.stop_playback()
+        if self.in_call:
+            self.leave_call()
         self.gateway.disconnect_ws()
         self.run = False
         try:
@@ -703,10 +705,7 @@ class Endcord:
 
 
     def switch_channel(self, channel_id, channel_name, guild_id, guild_name, parent_hint=None, preload=False, delay=False):
-        """
-        All that should be done when switching channel.
-        If it is DM, guild_id and guild_name should be None.
-        """
+        """All that should be done when switching channel, and also proxy to joining voice channels"""
         # dont switch to same channel
         if channel_id == self.active_channel["channel_id"]:
             return
@@ -719,6 +718,29 @@ class Endcord:
         # select new current channel and start voice call if its voice channel
         this_guild = self.select_current_channels(channel_id, guild_id, parent_hint)
         if this_guild == -1:
+            channel = {}
+            for guild in self.guilds:
+                if guild["guild_id"] == guild_id:
+                    for ch in guild["channels"]:
+                        if ch["id"] == channel_id:
+                            channel = ch
+                            break
+                    break
+            if not channel:
+                return
+            if not channel.get("allow_voice", True):   # check perms
+                self.update_extra_line("You don't have permission to connect to this voice channel.")
+                return
+            this_voice_states = self.gateway.get_voice_states().get(channel["id"], {})
+            if this_voice_states and this_voice_states[0] >= channel["user_limit"]:   # check if full
+                self.update_extra_line("This voice channel is currently full.")
+                return
+            self.start_call(
+                incoming=False,
+                guild_id=guild_id,
+                channel_id=channel_id,
+                enable_input=channel.get("allow_talk", True),
+            )
             return
 
         logger.debug(f"Switching channel, has_id: {bool(channel_id)}, has_guild: {bool(guild_id)}, has hint: {bool(parent_hint)}")
@@ -2205,7 +2227,7 @@ class Endcord:
                                     incoming_call_ch_id = self.active_channel["channel_id"]
                                 threading.Thread(target=self.start_call, daemon=True, args=(True, None, incoming_call_ch_id)).start()
                             else:
-                                self.update_extra_line("Cant join multiple calls")
+                                self.update_extra_line("Cant join multiple calls.")
                         elif len_extra_line - 8 < mouse_x <= len_extra_line:   # REJECT
                             self.stop_ringing()
                             self.most_recent_incoming_call = None
@@ -3567,9 +3589,9 @@ class Endcord:
                 if not self.active_channel["guild_id"]:
                     threading.Thread(target=self.start_call, daemon=True, args=(False, None, self.active_channel["channel_id"])).start()
                 else:
-                    self.update_extra_line("Can only start call in DM")
+                    self.update_extra_line("Can only use this command in DM.")
             else:
-                self.update_extra_line("Cant join multiple calls")
+                self.update_extra_line("Cant join multiple calls.")
 
         elif cmd_type == 49:   # VOICE_ACCEPT_CALL
             if not self.in_call:
@@ -3580,7 +3602,7 @@ class Endcord:
                         incoming_call_ch_id = self.active_channel["channel_id"]
                     threading.Thread(target=self.start_call, daemon=True, args=(True, None, incoming_call_ch_id)).start()
             else:
-                self.update_extra_line("Cant join multiple calls")
+                self.update_extra_line("Cant join multiple calls.")
 
         elif cmd_type == 50:   # VOICE_LEAVE_CALL
             self.leave_call()
@@ -4847,6 +4869,7 @@ class Endcord:
                     self.gateway.set_offline()
                     self.update_extra_line("Network error.")
                     return
+                self.viewing_user_data = user_data
             if not user_data:
                 self.update_extra_line("No profile information found.")
                 self.viewing_user_data = {"id": None, "guild_id": None}
@@ -6979,18 +7002,18 @@ class Endcord:
         """Process call related event from gateway"""
         if not self.enable_calls:
             return
-        for dm in self.dms:
-            if dm["id"] == event["channel_id"]:
-                break
-        else:
-            return
-        if dm["is_spam"]:
-            return
         if self.in_call and event["channel_id"] != self.in_call["channel_id"] and event["op"] != "CALL_DELETE":
             return
 
         event = self.execute_extensions_methods("on_call_gateway_event", event, cache=True)[0]
         if event["op"] == "CALL_CREATE" and not (self.in_call or self.joining_call):
+            for dm in self.dms:
+                if dm["id"] == event["channel_id"]:
+                    break
+            else:
+                return
+            if dm["is_spam"]:
+                return
             if dm["id"] not in self.incoming_calls:
                 self.incoming_calls.append(dm["id"])
                 self.most_recent_incoming_call = dm["id"]
@@ -7048,7 +7071,6 @@ class Endcord:
                         self.view_voice_call_list()
                     break
             else:
-                # USER_JOIN will show popup
                 self.call_participants.append({
                     "user_id": event["user_id"],
                     "name": event["name"],
@@ -7068,7 +7090,24 @@ class Endcord:
 
         elif event["op"] == "USER_JOIN":
             self.stop_ringing()
-            if self.in_call and not self.in_call["guild_id"]:
+            if self.in_call and self.in_call["guild_id"]:
+                for participant in self.call_participants:
+                    if participant["user_id"] == event["user_id"] and participant["name"]:
+                        # if user is already added by STATE_UPDATE, just show popup
+                        self.update_extra_line(f"{participant["name"]} joined the call")
+                        break
+                else:
+                    # this adds only user_id, STATE_UPDATE has to fill user data
+                    self.call_participants.append({
+                        "user_id": event["user_id"],
+                        "name": None,
+                        "muted": False,
+                        "speaking": False,
+                    })
+                    self.update_call_extra_line()
+                if self.voice_call_list_open:
+                    self.view_voice_call_list()
+            elif self.in_call:
                 for dm in self.dms:
                     if dm["id"] == self.in_call["channel_id"]:
                         for recipient in dm["recipients"]:
@@ -7094,23 +7133,6 @@ class Endcord:
                                     self.view_voice_call_list()
                                 break
                         break
-            elif self.in_call:
-                for participant in self.call_participants:
-                    if participant["user_id"] == event["user_id"] and participant["name"]:
-                        # if user is already added by STATE_UPDATE, just show popup
-                        self.update_extra_line(f"{participant["name"]} joined the call")
-                        break
-                else:
-                    # this adds only user_id, STATE_UPDATE has to fill user data
-                    self.call_participants.append({
-                        "user_id": recipient["id"],
-                        "name": None,
-                        "muted": False,
-                        "speaking": False,
-                    })
-                    self.update_call_extra_line()
-                if self.voice_call_list_open:
-                    self.view_voice_call_list()
 
         elif event["op"] == "USER_LEAVE":
             if self.in_call:
@@ -7144,7 +7166,7 @@ class Endcord:
             self.ringer = None
 
 
-    def start_call(self, incoming=False, guild_id=None, channel_id=None):
+    def start_call(self, incoming=False, guild_id=None, channel_id=None, enable_input=True):
         """Start voice call"""
         if not support_media:
             self.update_extra_line("Failed to start call: No media support.")
@@ -7176,7 +7198,7 @@ class Endcord:
         self.voice_gateway = voice.Gateway(
             voice_gateway_data,
             self.my_id,
-            self.state["volume_in"],
+            self.state["volume_in"] if enable_input else -1,   # -1 is forced mute microphone
             self.state["volume_out"],
             self.user_agent,
             proxy=self.config["proxy"],
@@ -7221,7 +7243,7 @@ class Endcord:
         self.update_call_extra_line()
 
         self.stop_ringing()
-        if not incoming:
+        if not incoming and not guild_id:
             custom_ringtone = self.config["custom_ringtone_outgoing"]
             linux_ringtone = utils.find_linux_sound(self.config["linux_ringtone_outgoing"])
             if custom_ringtone and os.path.exists(custom_ringtone):
@@ -8077,9 +8099,8 @@ class Endcord:
                     if guild["guild_id"] == self.active_channel["guild_id"]:
                         self.current_subscribed_members = guild["members"]
                         break
-                if self.active_channel["guild_id"] in changed_guilds:
-                    if self.viewing_user_data["id"]:
-                        self.view_profile(user_data=self.viewing_user_data, reset=False)
+                if self.active_channel["guild_id"] in changed_guilds and self.viewing_user_data["id"]:
+                    self.view_profile(user_data=self.viewing_user_data, reset=False)
 
             # check for new member roles
             new_member_roles, nonce = self.gateway.get_member_roles()

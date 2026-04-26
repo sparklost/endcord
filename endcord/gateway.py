@@ -511,6 +511,9 @@ class Gateway():
             }
             if channel.get("rate_limit_per_user"):
                 data["rate_limit"] = channel["rate_limit_per_user"]
+            if ch_type == 2:
+                data["user_limit"] = channel.get("user_limit", 0)   # 0 means no limit
+            # if changing "data" here also change it in CHANNEL_UPDATE event handling
             guild_channels.append(data)
         guild_roles = []
         base_permissions = 0
@@ -944,7 +947,7 @@ class Gateway():
                                 "guild_id": guild_id,
                                 "roles": roles,
                             })
-                    self.merged_users = data["users"]   # this is for ready_supplemental
+                    self.merged_users = data.get("users", [])   # this is for ready_supplemental
                     time_log_string += f"    roles - {round((time.time() - ready_time_mid) * 1000, 3)} ms\n"
                     ready_time_mid = time.time()
                     # write debug data
@@ -1036,7 +1039,7 @@ class Gateway():
                             self.voice_states[channel_id][0] = self.voice_states[channel_id].get(0, 0) + 1
                             if count > LOCAL_VOICE_PRESENCE_LIMIT:
                                 continue
-                            self.voice_states[channel_id][username] = (global_name, nick)   # using username as id to save ram
+                            self.voice_states[channel_id][user_id] = (username, global_name, nick)
                     self.dm_activities_changed = True
                     del (guild, self.merged_users)   # this is large so lets save some memory
                     gc.collect()
@@ -1518,51 +1521,98 @@ class Gateway():
                     })
 
                 elif optext == "PASSIVE_UPDATE_V2":
-                    pass
+                    # channel unread states
+                    for channel in data["updated_channels"]:
+                        channel_id = channel["id"]
+                        if channel_id in self.read_state:
+                            self.read_state[channel_id]["last_message_id"] = channel["last_message_id"]
+                            # the change goes to app.py, since self.read_state there is reference
+                    # changed voice states
+                    for user in data["updated_voice_states"]:
+                        user_id = user["user_id"]
+                        channel_id = user["channel_id"]
+                        if channel_id not in self.voice_states:
+                            self.voice_states[channel_id] = {}
+                        if channel_id and user_id not in self.voice_states[channel_id]:
+                            self.voice_states[channel_id][0] = self.voice_states[channel_id].get(0, 0) + 1
+                            if len(self.voice_states) - 1 <= LOCAL_VOICE_PRESENCE_LIMIT:
+                                for member in data["updated_members"]:
+                                    if member["user"]["id"] == user_id:
+                                        username = member["user"]["username"]
+                                        global_name = member["user"].get("global_name")
+                                        nick = member.get("nick")
+                                        break
+                                else:
+                                    username = "Unknown"
+                                    global_name = None
+                                    nick = None
+                                self.voice_states[channel_id][user_id] = (username, global_name, nick)
+                            self.should_redraw_tree = data["guild_id"]
+                    # removed voice states
+                    for user_id in data["removed_voice_states"]:
+                        for channel_id, activities in self.voice_states.items():   # search for channel and activity
+                            if user_id not in activities:
+                                continue
+                            self.voice_states[channel_id][0] = self.voice_states[channel_id].get(0, 0) - 1
+                            del(self.voice_states[channel_id][user_id])
+                            self.should_redraw_tree = data["guild_id"]
 
                 elif optext.startswith("VOICE_"):
                     if optext == "VOICE_STATE_UPDATE":
-                        username = data["member"]["user"]["username"]
+                        user_id = data["user_id"]
                         channel_id = data["channel_id"]
-                        if data["user_id"] == self.my_id:
+                        if user_id == self.my_id:
+                            username = self.my_user_data["username"]
+                            global_name = self.my_user_data.get("global_name")
+                            nick = self.my_user_data.get("nick")
                             if "session_id" not in self.voice_gateway_data and self.voice_gateway_data_ready >= 1:
                                 self.voice_gateway_data["session_id"] = data["session_id"]
                                 self.voice_gateway_data["guild_id"] = data.get("guild_id")
                                 if not self.voice_gateway_data["guild_id"]:
                                     self.voice_gateway_data["guild_id"] = channel_id   # must be channel_id in DM
-                                self.voice_gateway_data["channel_id"] = data["channel_id"]
+                                self.voice_gateway_data["channel_id"] = channel_id
                                 self.voice_gateway_data_ready += 1
                         else:
-                            name = None
                             if "member" in data:
-                                name = data["member"].get("nick")
-                                if not name:
-                                    name = data["member"]["user"].get("global_name", username)   # spacebar_fix - get
+                                username = data["member"]["user"]["username"]
+                                global_name = data["member"]["user"].get("global_name")
+                                nick = data["member"].get("nick")
+                            else:
+                                username = "Unknown"
+                                global_name = None
+                                for dm in self.dms:
+                                    for recipient in dm["recipients"]:
+                                        if recipient["id"] == user_id:
+                                            username = recipient["username"]
+                                            global_name = recipient["global_name"]
+                                            break
+                                    if username:
+                                        break
+                                nick = None
+                            name = nick if nick else global_name if global_name else username   # spacebar_fix - get
                             self.call_buffer.append({
                                 "op": "STATE_UPDATE",
-                                "channel_id": data["channel_id"],
-                                "user_id": data["user_id"],
+                                "channel_id": channel_id,
+                                "user_id": user_id,
                                 "name": name,
                                 "muted": data["self_mute"] or data["mute"],
                             })  # this is just to get mute states, enter/leave call and speaking are sent in voice gateway
                         # update voice channels states
-                        if data["channel_id"] not in self.voice_states:
-                            self.voice_states[channel_id] = {}
-                            if channel_id:
+                        if channel_id:
+                            if channel_id not in self.voice_states:
+                                self.voice_states[channel_id] = {}
+                            if user_id not in self.voice_states[channel_id]:
                                 self.voice_states[channel_id][0] = self.voice_states[channel_id].get(0, 0) + 1
                                 if len(self.voice_states) - 1 <= LOCAL_VOICE_PRESENCE_LIMIT:
-                                    global_name = data["member"]["user"].get("global_name")
-                                    nick = data["member"].get("nick")
-                                    self.voice_states[channel_id][username] = (global_name, nick)   # using username as id to save ram
-                                self.should_redraw_tree = data["guild_id"]
-                            else:
-                                for channel_id, activities in self.voice_states.items():   # search for channel and activity
-                                    if username not in activities:
-                                        continue
-                                    self.voice_states[channel_id][0] = self.voice_states[channel_id].get(0, 0) - 1
-                                    if username in self.voice_states[channel_id]:
-                                        del(self.voice_states[channel_id][username])
-                                    self.should_redraw_tree = data["guild_id"]
+                                    self.voice_states[channel_id][user_id] = (username, global_name, nick)
+                                self.should_redraw_tree = data["guild_id"] if data["guild_id"] else -1
+                        else:
+                            for channel_id, activities in self.voice_states.items():   # search for channel and activity
+                                if user_id not in activities:
+                                    continue
+                                self.voice_states[channel_id][0] = self.voice_states[channel_id].get(0, 0) - 1
+                                del(self.voice_states[channel_id][user_id])
+                                self.should_redraw_tree = data["guild_id"] if data["guild_id"] else -1
 
                     elif optext == "VOICE_SERVER_UPDATE":
                         if "endpoint" not in self.voice_gateway_data and self.voice_gateway_data_ready >= 1:
@@ -1676,9 +1726,10 @@ class Gateway():
                                 break
                         else:
                             continue
+                        ch_type = new_channel["type"]
                         ready_data = {
                             "id": new_channel["id"],
-                            "type": new_channel["type"],
+                            "type": ch_type,
                             "name": new_channel["name"],
                             "topic": new_channel.get("topic"),
                             "parent_id": new_channel.get("parent_id"),
@@ -1688,6 +1739,8 @@ class Gateway():
                         }
                         if new_channel.get("rate_limit_per_user"):
                             ready_data["rate_limit"] = new_channel["rate_limit_per_user"]
+                        if ch_type == 2:
+                            ready_data["user_limit"] = new_channel.get("user_limit", 0)   # 0 means no limit
                         self.guilds[num]["channels"][num_ch] = ready_data
                     self.guilds_changed = True
 

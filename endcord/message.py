@@ -13,13 +13,6 @@ match_discord_attachment_url = re.compile(r"https:\/\/(?:cdn|media)\.discord(?:a
 match_url = re.compile(r"https?:\/\/[\w-]+(\.[\w-])+[^\s)\]>]*")
 
 
-def get_newlined_value(embed, name):
-    """Get value from embed and add newline to it"""
-    value = embed.get(name)
-    if value:
-        return value + "\n"
-    return ""
-
 def generate_timestamp(timestamp, timestamp_format, unix=False):
     """Convert timestamp string to discord timestamp notation"""
     try:
@@ -35,51 +28,54 @@ def prepare_embeds(embeds, message_content):
     """Prepare message embeds"""
     ready_embeds = []
     for embed in embeds:
-        content = ""
+        content = []
         main_url = None
         skip_main_url = False
         media = []
         embed_type = embed.get("type", "unknown")
 
-        if "tenor.com/" not in embed.get("url", ""):
-            content += get_newlined_value(embed, "url")
-            main_url = embed.get("url")
-            skip_main_url = True
+        if "url" in embed and "tenor.com/" not in embed["url"]:
+            # dont repeat unless its discord attachment and handle x=twitter
+            if embed_type != "rich" or ".discordapp." in embed["url"] or embed["url"] not in message_content.replace("https://x.com", "https://twitter.com"):
+                content.append(embed["url"])
+                main_url = embed["url"]
+                skip_main_url = True
 
-        if "author" in embed:
-            content += get_newlined_value(embed["author"], "name")
-        content += get_newlined_value(embed, "title")
-        content += get_newlined_value(embed, "description")
+        if "author" in embed and "name" in embed["author"]:
+            content.append(embed["author"]["name"])
+        if "title" in embed:
+            content.append(embed["title"])
+        if "description" in embed:
+            content.append(embed["description"])
 
         # check for all urls in content so far and set to media = false
-        for match in re.finditer(match_url, content):
-            media.append(False)
+        for line in content:
+            media += [False] * len(re.findall(match_url, line))
 
         if "fields" in embed:
             for field in embed["fields"]:
-                content += "\n" + field["name"] + "\n" + field["value"]  + "\n"
-                for match in re.finditer(match_url, field["name"] + "\n" + field["value"]):
-                    media.append(False)
+                content.append(field["name"])
+                content.append(field["value"])
+            media += [False] * len(re.findall(match_url, field["name"] + "\n" + field["value"]))
         if "image" in embed and "url" in embed["image"]:
-            content = embed["image"]["url"]
+            content.append(embed["image"]["url"])
             main_url = embed["image"]["url"]
             media.append(True)
         if "video" in embed and "url" in embed["video"]:
-            content = embed["video"]["url"]
+            content.append(embed["video"]["url"])
             if not skip_main_url:
                 main_url = embed["video"]["url"]
             media.append(True)
-        if "footer" in embed:
-            content += get_newlined_value(embed["footer"], "text")
-            for match in re.finditer(match_url, embed["footer"].get("text")):
-                media.append(False)
+        if "footer" in embed and "text" in embed["footer"]:
+            content.append(embed["footer"]["text"])
+            media += [False] * len(re.findall(match_url, embed["footer"]["text"]))
 
-        content = content.strip("\n")
+        content = "\n".join(content)
         if content:
             if content == message_content:
                 message_content = ""
             ready_data = {
-                "type": embed_type,   # spacebar_fix - get
+                "type": embed_type,
                 "name": None,
                 "url": content,
                 "main_url": main_url,

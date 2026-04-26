@@ -1,11 +1,7 @@
 Fix messages disappearing
-    after send message and at the same time other it received
-Handle PASSIVE_UPDATE_V2 event
+    after send message at the same time other is received
 Add voice calls in servers
-    check channel activity and join/start if possible (check if full, check perms)
     handle multiple speaking at the same time
-Add voice calls in dm groups
-Fix missing channels in tree
 Fix RTP metrics
 
 Add colors and formatting in assist window

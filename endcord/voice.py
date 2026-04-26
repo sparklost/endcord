@@ -144,7 +144,8 @@ class Gateway():
         self.known_user_ids.add(str(my_id))   # fix_davey - uses int ids everywhere
         self.ssrc_cache = set()
 
-        self.volume_input = volume_input
+        self.enable_input = volume_input > 0
+        self.volume_input = volume_input if self.enable_input else 0
         self.volume_output = volume_output
         self.custom_mic = custom_mic
         self.silence_threshold = silence
@@ -661,10 +662,10 @@ class Gateway():
 
     def set_volumes(self, volume_input, volume_output):
         """Set volumes levels"""
-        self.volume_input = volume_input
+        self.volume_input = volume_input if self.enable_input else 0
         self.volume_output = volume_output
         if self.voice_handler:
-            self.voice_handler.set_volumes(volume_input, volume_output)
+            self.voice_handler.set_volumes(self.volume_input, self.volume_output)
 
 
     def live_mic_switch(self, new_mic):
@@ -738,7 +739,7 @@ class VoiceHandler:
             self.audio_thread_play.start()
 
             # start transmitter and recorder
-            if self.microphone:
+            if self.microphone and self.gateway.enable_input:
                 self.transmitter_thread = threading.Thread(target=self.transmitter_loop, daemon=True)
                 self.transmitter_thread.start()
                 self.audio_thread_rec = threading.Thread(target=self.audio_recorder, args=(48000, 2), daemon=True)

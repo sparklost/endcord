@@ -2515,17 +2515,19 @@ def generate_extra_window_channel(channel, voice_states, max_len, use_nick):
             body_line += "No topic.\n"
         body_line += "\n"
         if voice_states and len(voice_states) > 1:
-            body_line += f"{voice_states[0]} participant{"s" if voice_states[0] > 1 else ""}:\n"   # 0 is count
-            for username, value in voice_states.items():
+            limit = f"/{channel["user_limit"]}" if channel["user_limit"] else ""
+            body_line += f"{voice_states[0]}{limit} participant{"s" if voice_states[0] > 1 else ""}:\n"   # 0 is count
+            for value in voice_states.values():
                 if isinstance(value, int):
                     continue
-                global_name, nick = value
+                username, global_name, nick = value
                 if (nick and use_nick) or global_name:
                     body_line += f"  {nick if nick else global_name} ({username})\n"
                 else:
                     body_line += "  " + username
         else:
-            body_line += "No participants."
+            limit = f" ({channel["user_limit"]} max.)" if channel["user_limit"] else ""
+            body_line += "No participants." + limit
         body = split_long_line(body_line, max_len)
         return title_line, body
 
@@ -2628,10 +2630,14 @@ def generate_extra_window_search(messages, roles, channels, blocked, total_msg, 
 
             channel_name = "Unknown"
             channel_id = message["channel_id"]
+            fill_ch_name = True
             for channel in channels:
                 if channel["id"] == channel_id:
                     channel_name = channel["name"]
                     break
+            if not channels:
+                channel_name = "DM"
+                fill_ch_name = False
 
             content = ""
             if message["content"]:
@@ -2665,7 +2671,7 @@ def generate_extra_window_search(messages, roles, channels, blocked, total_msg, 
                 .replace("%username", normalize_string(message["username"], limit_username, emoji_safe=True))
                 .replace("%global_name", normalize_string(global_name, limit_username, emoji_safe=True))
                 .replace("%date", generate_timestamp(message["timestamp"], format_date, convert_timezone))
-                .replace("%channel", normalize_string(channel_name, limit_channel_name, emoji_safe=True))
+                .replace("%channel", normalize_string(channel_name, limit_channel_name, emoji_safe=True, fill=fill_ch_name))
                 .replace("%content", content)
             )
 
@@ -3004,6 +3010,10 @@ def generate_tree(dms, guilds, threads, read_state, guild_folders, activities, c
                     name = dm_status_char + " " + name
                     break
         mention_count = generate_count(len(ch_read_state["mentions"])) if unseen_dm else ""
+        if dm["type"] == 3:
+            states = voice_states.get(dm["id"])
+            if states and len(states) > 1:
+                mention_count = f"{mention_count} [{min(states[0], 99)}]"
         tree.append(normalize_string_with_suffix(f"{intersection} {name}", mention_count, max_width, emoji_safe=not(safe_emoji)))
         dm_pings += len(ch_read_state["mentions"]) if unseen_dm else 0
         if muted and not active:
@@ -3172,6 +3182,8 @@ def generate_tree(dms, guilds, threads, read_state, guild_folders, activities, c
                             data["forum"] = True
                         if channel["type"] == 2:
                             data["voice"] = True
+                            data["user_limit"] = channel["user_limit"]
+                            channel["unseen"] = False
                         category["channels"].append(data)
                         break
                 else:
@@ -3282,11 +3294,13 @@ def generate_tree(dms, guilds, threads, read_state, guild_folders, activities, c
                                 tree.append(normalize_string_with_suffix(f"{pass_by}{intersection}{dd_pointer} {name}", mention_count, max_width, emoji_safe=not(safe_emoji)))
                             elif channel.get("voice"):
                                 states = voice_states.get(channel["id"])
-                                if states and len(states) > 1:
-                                    prepend = f"[{min(states[0], 99)}] "
+                                if (states and len(states) > 1) or channel["user_limit"]:
+                                    count = min(states[0], 99) if states else 0
+                                    limit = f"/{channel["user_limit"]}" if channel["user_limit"] else ""
+                                    call_count = f"[{count}{limit}]"
                                 else:
-                                    prepend = ""
-                                tree.append(normalize_string_with_suffix(f"{pass_by}{intersection}{voice_char} {prepend}{name}", mention_count, max_width, emoji_safe=not(safe_emoji)))
+                                    call_count = ""
+                                tree.append(normalize_string_with_suffix(f"{pass_by}{intersection}{voice_char} {name}", call_count, max_width, emoji_safe=not(safe_emoji)))
                             else:
                                 tree.append(normalize_string_with_suffix(f"{pass_by}{intersection} {name}", mention_count, max_width, emoji_safe=not(safe_emoji)))
                             if channel_threads:
