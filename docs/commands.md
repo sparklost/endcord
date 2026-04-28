@@ -27,6 +27,8 @@
     View summaries of currently active channel or specified channel.
 - `copy_message`  
     Copy selected message contents to clipboard.
+- `copy_attachment`  
+    Download and copy selected attachment to clipboard. Only file reference is sent to clipboard, so if endcord is closed, file will likely be missing.  
 - `spoil`  
     Reveal one-by-one spoiler in selected message.
 - `link_channel` / `link_channel <#[channel_id]>`  

@@ -1766,6 +1766,11 @@ class Endcord:
                             self.media_thread = threading.Thread(target=self.open_media, daemon=True, args=(file_path, ))
                             self.media_thread.start()
 
+            elif action == 23:
+                self.restore_input_text = (None, None)
+                self.add_to_store(self.active_channel["channel_id"], input_text)
+                self.smart_paste()
+
             # view profile info
             elif action == 24:
                 self.restore_input_text = (input_text, "standard extra")
@@ -2408,6 +2413,14 @@ class Endcord:
 
                 elif self.downloading_file["urls"]:
                     urls = self.downloading_file["urls"]
+                    if self.downloading_file["web"] and self.downloading_file["open"]:   # both true means its "copy to clipboard"
+                        try:
+                            num = max(int(input_text) - 1, 0)
+                            if num <= len(self.downloading_file["urls"]):
+                                self.download_threads.append(threading.Thread(target=self.download_file, daemon=True, args=(urls[num], False, False, False, True)))
+                                self.download_threads[-1].start()
+                        except ValueError:
+                            pass
                     if self.downloading_file["web"]:
                         try:
                             num = max(int(input_text) - 1, 0)
@@ -2787,7 +2800,7 @@ class Endcord:
                 return
             self.go_replied(msg_index)
 
-        elif cmd_type == 4:   # DOWNLOAD
+        elif cmd_type in (4, 80):   # DOWNLOAD and COPY_ATTACHMENT
             msg_index = self.lines_to_msg(chat_sel)
             if msg_index is None:
                 return
@@ -2804,14 +2817,20 @@ class Endcord:
                         selected_urls.append(urls[num])
                 if len(selected_urls) == 1 or select_num:
                     select_num = max(min(select_num-1, len(selected_urls)-1), 0)
-                    self.download_threads.append(threading.Thread(target=self.download_file, daemon=True, args=(selected_urls[select_num], )))
+                    self.download_threads.append(threading.Thread(target=self.download_file, daemon=True, args=(
+                        selected_urls[select_num],
+                        cmd_type == 4,
+                        False,
+                        False,
+                        cmd_type == 80,
+                    )))
                     self.download_threads[-1].start()
                 else:
                     self.ignore_typing = True
                     self.downloading_file = {
                         "urls": selected_urls or urls,
-                        "web": False,
-                        "open": False,
+                        "web": True,   # both true means its "copy to clipboard"
+                        "open": True,
                     }
                     self.restore_input_text = ("SELECT", "prompt")
                     self.update_status_line()
@@ -3182,28 +3201,7 @@ class Endcord:
             self.update_extra_line(f"Account standing: {STANDING_TYPES[standing]}; Active violations: {violations}")
 
         elif cmd_type == 28:   # PASTE
-            paths = []
-            if shutil.which("xclip") or shutil.which("wl-paste"):
-                paths = peripherals.paste_clipboard_files(peripherals.temp_path)
-            elif support_media:
-                paths = peripherals.pillow_paste_image()
-            else:
-                self.update_extra_line("No media support.")
-            if isinstance(paths, str):
-                active_channel = self.active_channel["channel_id"]
-                for num, channel in enumerate(self.input_store):
-                    if channel["id"] == active_channel:
-                        input_text = self.input_store[num]["content"]
-                        input_index = self.input_store[num]["index"]
-                        self.input_store[num]["content"] = input_text[:input_index] + paths + input_text[input_index:]
-                        self.input_store[num]["index"] = input_index + len(paths)
-                        break
-            else:
-                for path in paths:
-                    self.upload_threads.append(threading.Thread(target=self.upload, daemon=True, args=(path, )))
-                    self.upload_threads[-1].start()
-                if not paths:
-                    self.update_extra_line("Image not found in clipboard.")
+            self.smart_paste()
 
         elif cmd_type == 29:   # TOGGLE_MUTE
             channel_id = cmd_args.get("channel_id")
@@ -3915,6 +3913,8 @@ class Endcord:
             self.blank_chat()
             self.view_log()
 
+        # 80 - COPY_ATTACHMENT handled together with 4 - DOWNLOAD
+
         if success is None:
             self.gateway.set_offline()
             self.update_extra_line("Network error.")
@@ -4133,6 +4133,32 @@ class Endcord:
         if channel_id:
             channel_id, channel_name, guild_id, guild_name, parent_hint = self.find_parents_from_id(channel_id)
             self.switch_channel(channel_id, channel_name, guild_id, guild_name, parent_hint=parent_hint)
+
+
+    def smart_paste(self):
+        """Smart paste that pastes text and files and adds them as attachmemnts"""
+        paths = []
+        if shutil.which("xclip") or shutil.which("wl-paste"):
+            paths = peripherals.paste_clipboard_files(peripherals.temp_path)
+        elif support_media:
+            paths = peripherals.pillow_paste_image()
+        else:
+            self.update_extra_line("No media support.")
+        if isinstance(paths, str):
+            active_channel = self.active_channel["channel_id"]
+            for num, channel in enumerate(self.input_store):
+                if channel["id"] == active_channel:
+                    input_text = self.input_store[num]["content"]
+                    input_index = self.input_store[num]["index"]
+                    self.input_store[num]["content"] = input_text[:input_index] + paths + input_text[input_index:]
+                    self.input_store[num]["index"] = input_index + len(paths)
+                    break
+        elif not self.forum:
+            for path in paths:
+                self.upload_threads.append(threading.Thread(target=self.upload, daemon=True, args=(path, )))
+                self.upload_threads[-1].start()
+            if not paths:
+                self.update_extra_line("No data found in clipboard.")
 
 
     def get_chat_last_message_id(self):
@@ -4398,7 +4424,7 @@ class Endcord:
         return True
 
 
-    def download_file(self, url, move=True, open_media=False, open_move=False):
+    def download_file(self, url, move=True, open_media=False, open_move=False, copy=False):
         """Thread that downloads and moves file to downloads dir"""
         if url.startswith("https://media.tenor.com/"):
             url = downloader.convert_tenor_gif_type(url, self.tenor_gif_type)
@@ -4459,13 +4485,17 @@ class Endcord:
             self.remove_running_task("Downloading file", 2)
             if move:
                 self.update_extra_line(f"File saved to {utils.collapseuser(self.downloads_path)}")
+            self.update_extra_line()
 
-        # open media
         if open_media:
             self.media_thread = threading.Thread(target=self.open_media, daemon=True, args=(destination, ))
             self.media_thread.start()
             if not from_cache and destination:
                 self.cached_downloads.append([orig_url, destination])
+
+        if copy:
+            peripherals.copy_file_to_clipboard(destination)
+            self.update_extra_line("File saved to clipboard")
 
 
     def upload(self, path, channel_id=None):
@@ -5964,9 +5994,9 @@ class Endcord:
         elif self.deleting:
             action["type"] = 3
         elif self.downloading_file["urls"]:
-            if self.downloading_file["web"]:
+            if self.downloading_file["web"] and not self.downloading_file["open"]:
                 action["type"] = 4
-            elif self.downloading_file["open"]:
+            elif self.downloading_file["open"] and not self.downloading_file["web"]:
                 action["type"] = 6
             else:
                 action["type"] = 5

@@ -1000,4 +1000,8 @@ def command_string(text):
     elif text_lower.startswith("show_log"):
         cmd_type = 79
 
+    # 80 - COPY_ATTACHMENT
+    elif text_lower.startswith("copy_attachment"):
+        cmd_type = 80
+
     return cmd_type, cmd_args

@@ -19,8 +19,9 @@
 - `Alt+Z` - Undo
 - `Alt+Shift+Z` - Redo
 - `Alt+A` - Select all
-- `Alt+C` - Copy selection
+- `Alt+C` - Copy selection in input line, otherwise copy selected message in the chat
 - `Alt+X` - Cut selection
+- `Ctrl+V` - Smart paste - paste text or file as attachment
 - `Ctrl+Backspace` - Delete word
 
 ### chat
@@ -32,11 +33,10 @@
 - `Ctrl+P` - Toggle reply ping when replying
 - `Ctrl+B` - Scroll back to chat bottom
 - `Ctrl+G` - Go to replied message from selected message
-- `Ctrl+W` - Download selected attachment
+- `Ctrl+L` - Download selected attachment
 - `Ctrl+U` Upload attachments
 - `Ctrl+O` * - Open selected link in browser
-- `Ctrl+L` - Copy selected message to clipboard
-- `Ctrl+V` * - View selected attachment (image, gif, video, audio) in media player
+- `Ctrl+W` * - View selected attachment (image, gif, video, audio) in media player
 - `Alt+S` - Reveal one spoiler in selected messages
 - `Ctrl+F` - Search messages in current server
 - `Alt+F` - Search gifs
@@ -45,7 +45,7 @@
 - `Alt+R` - Add reaction to selected message
 - `Alt+W` - Show reactions details for selected message
 - `Alt+N` - Show pinned messages in current channel
-- `Ctrl+Shift+V` - This is common terminal binding to paste text, better use: `paste` command
+- `Ctrl+Shift+V` - This is common terminal binding to paste text, better use: `Ctrl+V` binding for smart paste
 
 ### extra line
 - `Alt+<` - Previous uploaded/uploading attachment
@@ -168,9 +168,10 @@ Special commands available only for command-bindings are documented in [Commands
 - `u` - Undo
 - `Ctrl+R` - Redo
 - `a` - Select all
-- `y` - Copy selection
+- `y` - Copy selection in input line, otherwise copy selected message in the chat
 - `Y` - Cut selection
 - `X` - Delete word
+- `p` - Smart paste - paste text or file as attachment
 
 ### chat
 - `Enter` - Send message
@@ -178,18 +179,17 @@ Special commands available only for command-bindings are documented in [Commands
 - `r` - Reply to selected message
 - `e` - Edit selected message
 - `d` - Delete selected message
-- `p` - Toggle reply ping when replying
+- `P` - Toggle reply ping when replying
 - `B` - Scroll back to chat bottom
 - `g` - Go to replied message from selected message
 - `D` - Download selected attachment
 - `U` - Upload attachments
 - `o` - Open selected link in browser
-- `c` - Copy selected message to clipboard
 - `v` - View selected attachment (image, gif, video, audio) in media player
 - `S` - Reveal one spoiler in selected messages
 - `f` - Search messages in current server
 - `F` - Search gifs
-- `P` - View user profile (selected message)
+- `c` - View user profile (selected message)
 - `M` - Copy selected message URL to clipboard
 - `R` - Add reaction to selected message
 - `A` - Show reactions details for selected message

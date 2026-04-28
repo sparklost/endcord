@@ -7,6 +7,7 @@ import importlib.util
 import logging
 import os
 import shutil
+import struct
 import subprocess
 import sys
 import threading
@@ -231,6 +232,7 @@ def notify_remove(notification_id):
 def copy_to_clipboard(text):
     """Copy text to clipboard. Cross-platform."""
     text = str(text)
+
     if sys.platform == "linux":
         if os.getenv("WAYLAND_DISPLAY"):
             try:
@@ -254,11 +256,16 @@ def copy_to_clipboard(text):
                 proc.communicate(input=text.encode("utf-8"))
             except FileNotFoundError:
                 logger.warning("Cant copy: xclip not found on system")
+
     elif sys.platform == "win32":
         win32clipboard.OpenClipboard()
-        win32clipboard.EmptyClipboard()
-        win32clipboard.SetClipboardText(text)
+        try:
+            win32clipboard.EmptyClipboard()
+            win32clipboard.SetClipboardText(text)
+        except Exception:
+            pass
         win32clipboard.CloseClipboard()
+
     elif sys.platform == "darwin":
         proc = subprocess.Popen(
             ["pbcopy", "w"],
@@ -267,6 +274,56 @@ def copy_to_clipboard(text):
             stderr=subprocess.DEVNULL,
         )
         proc.communicate(input=text.encode("utf-8"))
+
+
+def copy_file_to_clipboard(path):
+    """Copy file from specified path to clipboard, without loading file in RAM"""
+    path = os.path.expanduser(path)
+
+    if sys.platform == "linux":
+        if os.getenv("WAYLAND_DISPLAY"):
+            try:
+                proc = subprocess.Popen(
+                    ["wl-copy", "--type", "text/uri-list"],
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+                proc.communicate(input=f"file://{path}\n".encode("utf-8"))
+            except FileNotFoundError:
+                logger.warning("Cant copy: wl-clipboard not found on system")
+        else:
+            try:
+                proc = subprocess.Popen(
+                    ["xclip", "-selection", "clipboard", "-t", "text/uri-list"],
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+                proc.communicate(input=f"file://{path}\n".encode("utf-8"))
+            except FileNotFoundError:
+                logger.warning("Cant copy: xclip not found on system")
+
+    elif sys.platform == "win32":
+        path_utf16 = path.encode("utf-16le") + b"\x00\x00"
+        header = struct.pack("<Illii", 20, 0, 0, 0, 1)   # pFiles, pt_x, pt_y, fNC, fWide (utf16)
+        data = header + path_utf16
+        win32clipboard.OpenClipboard()
+        try:
+            win32clipboard.EmptyClipboard()
+            win32clipboard.SetClipboardData(win32con.CF_HDROP, data)
+        except Exception:
+            pass
+        win32clipboard.CloseClipboard()
+
+    elif sys.platform == "darwin":
+        proc = subprocess.Popen(
+            ["pbcopy"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        proc.communicate(input=f"file://{path}".encode("utf-8"))
 
 
 def paste_clipboard_files(save_path=None):
@@ -320,7 +377,7 @@ def paste_clipboard_files(save_path=None):
                 return [line[7:] for line in data.splitlines() if line.startswith("file://")]
 
             # plain text or nothing
-            if "text/plain" in types_list:
+            if any("text/plain" in t for t in types_list):
                 proc = subprocess.Popen(
                     query_command[:] + ["text/plain"] + ([suffix] if suffix else []),
                     stdout=subprocess.PIPE,

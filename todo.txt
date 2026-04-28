@@ -6,7 +6,9 @@ Fix RTP metrics
 
 Add colors and formatting in assist window
 Add scrollbar to chat
+Add favorite gifs
 Add ability to switch profile without closing
+
 Rewrite experimental mode in not-pygame
 Fix issues with wide characters in input line
 Add option to select individual message

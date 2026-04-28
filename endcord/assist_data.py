@@ -32,6 +32,7 @@ COMMAND_ASSISTS = (
     ("mark_as_read *<#[channel_id]> - mark selected or specified channel/server/category/DM/* as read", "mark_as_read"),
     ("mark_as_unread - mark selected message as unread", "mark_as_unread"),
     ("copy_message - copy selected message text", "copy_message"),
+    ("copy_attachment - download and copy selected attachment to clipboard", "copy_attachment"),
     ("spoil - reveal one by one spoiler in selected message", "spoil"),
     ("link_channel *<#[channel_id]> - store channel link in clipboard", "link_channel"),
     ("link_message - store selected message link in clipboard", "link_message"),

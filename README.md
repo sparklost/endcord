@@ -20,7 +20,7 @@ Third party endcord forks may add features that can lead to account ban, contain
 
 ## Features
 - Extremely low CPU and RAM usage (see [RAM usage](#ram-usage))
-- Voice calls (DMs only, rest is WIP)
+- Voice calls (DM, groups and servers)
 - Vim-mode
 - Integrated RPC (only Rich Presence) and game detection
 - Mouse controls

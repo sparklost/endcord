@@ -205,8 +205,9 @@ keybindings = {
     "undo": "ALT+122",   # Alt+Z
     "redo": "ALT+90",   # Alt+Shift+Z
     "select_all": "ALT+97",   # Alt+A
-    "copy_sel": "ALT+99",   # Alt+C
-    "cut_sel": "ALT+120",   # Alt+X
+    "copy": "ALT+99",   # Alt+C
+    "cut": "ALT+120",   # Alt+X
+    "paste": 22,   # Ctrl+V
     "delete_word": 8,   # Ctrl+Backspace/Ctrl+H
     # chat
     "send_message": 10,   # Enter
@@ -218,11 +219,10 @@ keybindings = {
     "toggle_ping": 16,   # Ctrl+P
     "scroll_bottom": 2,   # Ctrl+B
     "go_replied": 7,   # Ctrl+G
-    "download": 23,   # Ctrl+W
+    "download": 12,   # Ctrl+L
     "upload": 21,   # Ctrl+U
     "browser": 15,   # Ctrl+O
-    "copy_msg": 12,   # Ctrl+L
-    "view_media": 22,   # Ctrl+V
+    "view_media": 23,   # Ctrl+W
     "spoil": "ALT+115",   # Alt+S
     "search": 6,   # Ctrl+F
     "search_gif": "ALT+102",   # Alt+F
@@ -295,8 +295,9 @@ vim_mode_bindings = {
     "select_word_left": "H",
     "select_word_right": "L",
     "select_all": "a",
-    "copy_sel": "y",
-    "cut_sel": "Y",
+    "copy": "y",
+    "cut": "Y",
+    "paste": "p",   # Ctrl+V
     "delete_word": "X",
     # chat
     "send_message": 10,   # Enter
@@ -305,18 +306,17 @@ vim_mode_bindings = {
     "reply": "r",
     "edit": "e",
     "delete": "d",
-    "toggle_ping": "p",
+    "toggle_ping": "P",
     "scroll_bottom": "B",
     "go_replied": "g",
     "download": "D",
     "upload": "U",
     "browser": "o",
-    "copy_msg": "c",
     "view_media": "v",
     "spoil": "S",
     "search": "f",
     "search_gif": "F",
-    "profile_info": "P",
+    "profile_info": "c",
     "copy_message_link": "M",
     "add_reaction": "R",
     "show_reactions": "A",

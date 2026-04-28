@@ -2703,11 +2703,13 @@ class TUI():
                 self.input_select_start = 0
                 self.input_select_end = len(self.input_buffer)
 
-            elif self.input_select_start is not None and key in self.keybindings["copy_sel"]:
-                self.store_input_selected()
-                return self.return_input_code(20)
+            elif key in self.keybindings["copy"]:
+                if self.input_select_start is not None:
+                    self.store_input_selected()
+                    return self.return_input_code(20)
+                return self.return_input_code(12)
 
-            elif self.input_select_start is not None and key in self.keybindings["cut_sel"]:
+            elif self.input_select_start is not None and key in self.keybindings["cut"]:
                 self.delete_selection()
                 self.input_select_start = None
                 self.cursor_pos = self.input_index - max(0, len(self.input_buffer) - w + 1 - self.input_line_index)
@@ -2715,6 +2717,9 @@ class TUI():
                 self.cursor_pos = min(w - 1, self.cursor_pos)
                 self.draw_input_line()
                 return self.return_input_code(20)
+
+            elif key in self.keybindings["paste"]:
+                return self.return_input_code(23)
 
             elif key == 9:   # TAB - same as CTRL+I
                 if self.enable_autocomplete:
@@ -2786,9 +2791,6 @@ class TUI():
 
             elif key in self.keybindings["cancel"]:
                 return self.return_input_code(11)
-
-            elif key in self.keybindings["copy_msg"] and not forum:
-                return self.return_input_code(12)
 
             elif key in self.keybindings["upload"] and not forum:
                 self.enable_autocomplete = True
