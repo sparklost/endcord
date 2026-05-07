@@ -154,7 +154,7 @@ class Gateway():
         if self.bot:
             self.interactions_buffer = []
         threading.Thread(target=self.thread_guard, daemon=True, args=()).start()
-        threading.Thread(target=self.stats_rotaor, daemon=True, args=()).start()
+        threading.Thread(target=self.stats_rotator, daemon=True, args=()).start()
 
 
     def clear_ready_vars(self):
@@ -253,7 +253,7 @@ class Gateway():
             time.sleep(0.5)
 
 
-    def stats_rotaor(self):
+    def stats_rotator(self):
         """Rotate stats every 1h"""
         last_rotation = int(time.time())
         while self.run:
@@ -292,6 +292,12 @@ class Gateway():
                 self.ws.connect(gateway_url + "/?v=9&encoding=json&compress=zlib-stream", header=self.header)
         except (websocket._exceptions.WebSocketException, OSError) as e:
             return e
+
+
+    def stop(self):
+        """Stop gatway"""
+        self.run = False
+        self.disconnect_ws()
 
 
     def disconnect_ws(self, timeout=2, status=1000):
@@ -2007,8 +2013,9 @@ class Gateway():
                 code = self.resume()
             if code == 9 or code is None:
                 logger.debug("Restarting connection")
-                self.ws.close(timeout=0)   # this will stop receiver
-                time.sleep(1)   # so receiver ends before opening new socket
+                if self.ws:
+                    self.ws.close(timeout=0)   # this will stop receiver
+                    time.sleep(1)   # so receiver ends before opening new socket
                 reset_inflator()   # otherwise decompression wont work
                 self.ready = False   # will receive new ready event
                 self.ws = websocket.WebSocket()

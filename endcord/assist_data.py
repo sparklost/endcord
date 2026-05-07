@@ -15,7 +15,7 @@ COMMAND_ASSISTS = (
     ("goto <#[channel_id]> - go to specified channel/server/category/DM", "goto"),
     ("view_pfp *<@[user_id]> - view specified or selected users pfp", "view_pfp"),
     ("react *[reaction] - show prompt or react to message", "react"),
-    ("status *[type] - change your status 1/online, 2/idle, 3/dnd, 4/invisible", "status"),
+    ("status *[value] - change status: 1/online, 2/idle, 3/dnd, 4/invisible", "status"),
     ("open_link *[num] - open selected link or specify index if multiple are on same line", "open_link"),
     ("copy_link *[num] - copy selected link to clipboard or specify index if multiple are on same line", "copy_link"),
     ("download *[num] - download selected attachment", "download"),

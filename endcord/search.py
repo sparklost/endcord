@@ -7,7 +7,7 @@ import heapq
 import importlib.util
 import re
 
-import emoji
+from endcord import utils
 
 COMMAND_OPT_TYPE = ("subcommand", "group", "string", "integer", "True/False", "user ID", "channel ID", "role ID", "mentionable ID", "number", "attachment")
 
@@ -277,19 +277,27 @@ def search_emojis(all_emojis, premium, guild_id, query, safe_emoji=False, limit=
 
     # standard emoji
     if len(results) < limit:
-        for key, item in emoji.EMOJI_DATA.items():
-            if item["status"] > 2:   # skip unqualified and minimally qualified emoji
-                continue
-            # emoji.EMOJI_DATA = {emoji: {"en": ":emoji_name:", "status": 2, "E": 3}...}
-            # using only qualified emojis (status: 2)
-            if safe_emoji:
-                formatted = item["en"]
+        for key, data in utils.EMOJI_DATA.items():
+            # emoji.EMOJI_DATA = {emoji: {":emoji_name:", ":alias:"}...}
+            if any((0x1F3FB <= ord(ch) <= 0x1F3FF) for ch in key):
+                continue   # skip variation emoji
+            formatted = ""
+            if not safe_emoji:
+                formatted += str(key)
+            if len(data) > 1:
+                if len(data[1]) < len(data[0]):
+                    emoji_name = data[1]
+                    formatted += " - " + emoji_name + f" ({data[0]})"
+                else:
+                    emoji_name = data[0]
+                    formatted += " - " + emoji_name + f" ({data[1]})"
             else:
-                formatted = f"{item["en"]} - {key}"
+                emoji_name = data[0]
+                formatted += " - " + data[0]
             score = fuzzy_match_score(query, formatted)
             if score < worst_score:
                 continue
-            heapq.heappush(results, (formatted, item["en"], score))
+            heapq.heappush(results, (formatted, emoji_name, score))
             if len(results) > limit:
                 heapq.heappop(results)
                 worst_score = results[0][2]

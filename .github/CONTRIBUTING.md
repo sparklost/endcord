@@ -254,7 +254,7 @@ uv run python setup.py build_ext --inplace
 
 5. Run patches and cleanups
 - run `patch_soundcard()` from build.py - **required!**
-- run `clean_emoji()` from build.py - will remove many non-standard emoji.
+- run `compress_emoji()` from build.py - will make `emoji.json` smaller.
 - run `clean_qrcode()` from build.py - will reduce binary by ~100KB.
 
 6. Get and run build command

@@ -18,8 +18,6 @@ import time
 import webbrowser
 from datetime import datetime
 
-import emoji
-
 from endcord import (
     client_properties,
     color,
@@ -262,6 +260,7 @@ class Endcord:
         if self.gateway.bot:
             global MSG_MIN
             MSG_MIN = 0
+        utils.load_emoji()
         self.colors = self.tui.init_colors(self.colors)
         self.colors_formatted = self.tui.init_colors_formatted(self.colors_formatted, self.default_msg_alt_color)
         self.tui.update_chat(self.chat, [[[self.colors[0]]]] * len(self.chat))
@@ -336,7 +335,7 @@ class Endcord:
             self.terminal_media.stop_playback()
         if self.in_call:
             self.leave_call()
-        self.gateway.disconnect_ws()
+        self.gateway.stop()
         self.run = False
         try:
             # in case curses.wrapper doesnt restore terminal
@@ -1538,7 +1537,7 @@ class Endcord:
                     self.reset_states()
                     self.editing = message["id"]
                     self.add_to_store(self.active_channel["channel_id"], input_text)
-                    self.restore_input_text = (emoji.demojize(message["content"]), "edit")
+                    self.restore_input_text = (utils.demojize(message["content"]), "edit")
                     self.update_status_line()
 
             # delete
@@ -2405,7 +2404,7 @@ class Endcord:
                     continue
 
                 if self.editing:
-                    text_to_send = emoji.emojize(input_text, language="alias", variant="emoji_type")
+                    text_to_send = utils.emojize(input_text)
                     self.put_to_message_sender(self.discord.update_message,
                         channel_id=self.active_channel["channel_id"],
                         message_id=self.editing,
@@ -2608,7 +2607,7 @@ class Endcord:
                     for match in re.finditer(formatter.match_sticker_id, input_text):
                         stickers.append(match.group()[2:-2])
                         input_text = input_text[:match.start()] + input_text[match.end():]
-                    text_to_send = emoji.emojize(input_text, language="alias", variant="emoji_type")
+                    text_to_send = utils.emojize(input_text)
                     if self.fun and ("xyzzy" in text_to_send or "XYZZY" in text_to_send):
                         self.update_extra_line("Nothing happens.")
                     if not text_to_send.strip():
@@ -3527,7 +3526,7 @@ class Endcord:
                 else:
                     self.my_status["custom_status_emoji"] = {
                         "id": None,
-                        "name": emoji.emojize(cmd_args["emoji"], language="alias", variant="emoji_type"),
+                        "name": utils.emojize(cmd_args["emoji"]),
                         "animated": False,
                     }
             else:
@@ -4944,8 +4943,8 @@ class Endcord:
         # generate and draw extra window
         extra_title, extra_body = formatter.generate_extra_window_profile(user_data, roles, selected_presence, max_w)
         if self.emoji_as_text:
-            extra_title = emoji.demojize(extra_title)
-            extra_body = [emoji.demojize(x) for x in extra_body]
+            extra_title = utils.demojize(extra_title)
+            extra_body = [utils.demojize(x) for x in extra_body]
         self.tui.draw_extra_window(extra_title, extra_body, reset_scroll=reset)
         self.extra_window_open = True
 
@@ -5201,7 +5200,7 @@ class Endcord:
                     emoji_string = selected_reaction["emoji"]
                 add_to_existing = True
         except ValueError:   # new emoji
-            emoji_string = emoji.emojize(first, language="alias")
+            emoji_string = utils.emojize(first)
 
         if emoji.is_emoji(emoji_string):   # standard emoji
             if emoji_string not in my_present_emojis:

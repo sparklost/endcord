@@ -30,7 +30,7 @@ cpdef limit_width_wch(str text, int max_width, tuple ranges):
 
     for i in range(n):
         character = ord(text[i])
-        if 32 <= character < 0x7f:
+        if 0x20 <= character < 0x7f:
             char_width = 1
         else:
             char_width = 1 + binary_search(character, ranges)
@@ -48,7 +48,7 @@ cpdef len_wch(str text, tuple ranges):
 
     for i in range(n):
         character = ord(text[i])
-        if 32 <= character < 0x7f:
+        if 0x20 <= character < 0x7f:
             total_width += 1
         else:
             total_width += 1 + binary_search(character, ranges)
@@ -64,7 +64,7 @@ cpdef Py_ssize_t split_index_wch(str text, int max_width, tuple ranges):
 
     for i in range(n):
         character = ord(text[i])
-        if 32 <= character < 0x7f:
+        if 0x20 <= character < 0x7f:
             w = 1
         else:
             w = 1 + binary_search(character, ranges)

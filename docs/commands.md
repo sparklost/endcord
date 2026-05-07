@@ -1,8 +1,9 @@
 ## Commands
 - `react` / `react [reaction]`  
     Prompt to type reaction or send provided reaction to selected message.
-- `status` / `status [type]`, types: 1 - "online", 2 - "idle", 3 - "dnd", 4 - "invisible"  
+- `status` / `status [value]`,    
     Cycle statuses, or set it by specifying its type name or index.  
+    Values: 1 - "online", 2 - "idle", 3 - "dnd", 4 - "invisible".
 - `download` / `download [num]`  
     Download selected attachment.
 - `open_link` / `open_link [num]`  

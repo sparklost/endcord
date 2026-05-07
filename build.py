@@ -322,50 +322,21 @@ def patch_soundcard():
         print(f"Nothing to patch in file {path}")
 
 
-def clean_emoji():
-    """Clean emoji dict from unused emojis and data"""
-    fprint("Cleaning emoji data")
-    changed = False
-    # find emoji file
-    if not os.path.exists(".venv"):
-        print(".venv dir not found")
-        return
-    path = find_file_in_venv("emoji", ["unicode_codes", "emoji.json"])
-
-    # clean emoji
-    with open(path, "r", encoding="utf-8") as f:
+def compress_emoji():
+    """Compress emoji dict"""
+    fprint("Compressing emoji data")
+    json_path_in = os.path.join("endcord", "emoji.json")
+    json_path_out = os.path.join("build", "emoji.json")
+    if not os.path.exists(json_path_in):
+        print("emoji.json not found")
+        return None
+    if not os.path.exists("build"):
+        os.mkdir("build")
+    with open(json_path_in, "r", encoding="utf-8") as f:
         data = json.load(f)
-    cleaned = {}
-    for key, value in data.items():
-        if value.get("status", 0) <= 2:
-            value.pop("E", None)
-            cleaned[key] = value
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(cleaned, f, ensure_ascii=False, indent=None, separators=(",", ":"))
-
-    # remove unused languages
-    pattern = os.path.join(os.path.dirname(path), "emoji_*.json")
-    for path in glob.glob(pattern):
-        changed = True
-        try:
-            os.remove(path)
-        except Exception:
-            pass
-
-    # remove example from py file
-    path = find_file_in_venv("emoji", ["unicode_codes", "data_dict.py"])
-    with open(path, "r", encoding="utf-8") as f:
-        lines = f.readlines()
-    new_lines = []
-    for line in lines:
-        if line.strip().startswith("EMOJI_DATA"):
-            break
-        new_lines.append(line)
-    with open(path, "w", encoding="utf-8") as f:
-        f.writelines(new_lines)
-
-    if not changed:
-        print("Emoji data is already cleaned")
+    with open(json_path_out, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=None, separators=(",", ":"))
+    return json_path_out
 
 
 def clean_qrcode():
@@ -560,8 +531,10 @@ def build_with_pyinstaller(onedir, nosoundcard, print_cmd=False):
         else:
             pkgname = f"{PKGNAME}-lite"
             fprint("ASCII media support is disabled")
+        emoji_path = compress_emoji()
     else:
         pkgname = PKGNAME
+        emoji_path = "endcord/emoji.json"
 
     mode = "--onedir" if onedir else "--onefile"
     hidden_imports = ["--hidden-import=uuid"]
@@ -569,10 +542,7 @@ def build_with_pyinstaller(onedir, nosoundcard, print_cmd=False):
         "--exclude-module=cython",
         "--exclude-module=zstandard",
     ]
-    package_data = [
-        "--collect-data=emoji",
-        "--collect-data=soundcard",
-    ]
+    package_data = ["--collect-data=soundcard"]
 
     # options
     if nosoundcard:
@@ -583,12 +553,15 @@ def build_with_pyinstaller(onedir, nosoundcard, print_cmd=False):
     if sys.platform == "linux":
         options = []
         hidden_imports += ["--hidden-import=soundcard.pulseaudio"]
+        add_data = [f"--add-data={emoji_path}:."]
     elif sys.platform == "win32":
         options = ["--console"]
         hidden_imports += ["--hidden-import=win32timezone"]
+        add_data = [f"--add-data={emoji_path};."]
     elif sys.platform == "darwin":
         options = []
         package_data += ["--collect-data=certifi"]
+        add_data = [f"--add-data={emoji_path}:."]
 
     # prepare command and run it
     cmd = [
@@ -597,6 +570,7 @@ def build_with_pyinstaller(onedir, nosoundcard, print_cmd=False):
         *hidden_imports,
         *exclude_imports,
         *package_data,
+        *add_data,
         *options,
         "--noconfirm",
         "--clean",
@@ -617,8 +591,8 @@ def build_with_pyinstaller(onedir, nosoundcard, print_cmd=False):
     # cleanup
     fprint("Cleaning up")
     try:
-        os.remove(f"{pkgname}.spec")
         shutil.rmtree("build")
+        os.remove(f"{pkgname}.spec")
     except FileNotFoundError:
         pass
     fprint(f"Finished building {pkgname}")
@@ -636,10 +610,11 @@ def build_with_nuitka(onedir, clang, mingw, nosoundcard, print_cmd=False, experi
 
         build_numpy_lite(clang)
         patch_soundcard()
-        clean_emoji()
+        emoji_path = compress_emoji()
         clean_qrcode()
     else:
         pkgname = PKGNAME
+        emoji_path = "endcord/emoji.json"
     full = pkgname == PKGNAME
 
     mode = "--standalone" if onedir else "--onefile"
@@ -657,10 +632,8 @@ def build_with_nuitka(onedir, clang, mingw, nosoundcard, print_cmd=False, experi
         "--nofollow-import-to=zstandard",
         "--nofollow-import-to=google._upb",
     ]
-    package_data = [
-        "--include-package-data=emoji:unicode_codes/emoji.json",
-        "--include-package-data=soundcard",
-    ]
+    package_data = ["--include-package-data=soundcard"]
+    add_data = [f"--include-data-files={emoji_path}=."]
 
     # options
     if nosoundcard:
@@ -702,6 +675,7 @@ def build_with_nuitka(onedir, clang, mingw, nosoundcard, print_cmd=False, experi
         *hidden_imports,
         *exclude_imports,
         *package_data,
+        *add_data,
         *options,
         "--remove-output",
         "--output-dir=dist",
@@ -722,7 +696,6 @@ def build_with_nuitka(onedir, clang, mingw, nosoundcard, print_cmd=False, experi
     # cleanup
     fprint("Cleaning up")
     try:
-        os.remove(f"{pkgname}.spec")
         shutil.rmtree("build")
     except FileNotFoundError:
         pass

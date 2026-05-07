@@ -26,6 +26,8 @@ if "bsd" in sys.platform:
 
 logger = logging.getLogger(__name__)
 match_youtube = re.compile(r"(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)[a-zA-Z0-9_-]{11}")
+match_emoji = re.compile(r"(?<!\\):[^:\s]+:")
+EMOJI_DATA = {}   # delayed load for faster startup
 
 
 def ensure_terminal():
@@ -324,3 +326,112 @@ def json_array_objects(stream):
             yield obj
             i += consumed
         buf = buf[i:]   # keep incomplete json only
+
+
+def get_base_path():
+    """Get resource path"""
+    if hasattr(sys, "_MEIPASS"):   # pyinstaller onefile
+        return sys._MEIPASS
+    if "__compiled__" in globals():
+        return os.path.dirname(sys.executable)   # nuitka
+    if getattr(sys, "frozen", False):
+        return os.path.dirname(sys.executable)   # onedir
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+def load_emoji(path="emoji.json"):
+    """Load global emoji data"""
+    global EMOJI_DATA
+    path = os.path.join(get_base_path(), *path.split("/"))
+    if not os.path.exists(path):
+        logger.info(path)
+        return
+    with open(path, "r") as f:
+        EMOJI_DATA = json.load(f)
+
+
+def emojize(text):
+    """Convert all emoji shortcodes in given string to actual emoji"""
+    if not text:
+        return text
+
+    def replace_emoji(match):
+        name = match.group()
+        for emoji, data in EMOJI_DATA.items():
+            if name in data:
+                break
+        else:
+            return name
+        # remove existing variation selector and force emoji
+        if emoji[-1] == 0xFE0E or emoji[-1] == 0xFE0F:
+            return emoji[0:-1] + 0xFE0F
+        return emoji
+
+    return re.sub(match_emoji, replace_emoji, text)
+
+
+SKIN_TONES = {0x1F3FB, 0x1F3FC, 0x1F3FD, 0x1F3FE, 0x1F3FF}
+
+
+def next_emoji_cluster(text, i):
+    """Get emoji cluster after specific index"""
+    ch = text[i]
+    cluster = [ch]
+    i += 1
+
+    if 0x1F1E6 <= ord(ch) <= 0x1F1FF:   # flags
+        if i < len(text) and 0x1F1E6 <= ord(text[i]) <= 0x1F1FF:
+            cluster.append(text[i])
+            i += 1
+        return "".join(cluster), i
+
+    while i < len(text):
+        ch = text[i]
+        if ord(ch) == 0xFE0E or ord(ch) == 0xFE0F:   # variation selectors for for text/emoji
+            cluster.append(ch)
+            i += 1
+            continue
+        if ord(ch) in SKIN_TONES:   # skin tone
+            cluster.append(ch)
+            i += 1
+            continue
+        if ch == "\u20E3":   # keycap sequence
+            cluster.append(ch)
+            i += 1
+            continue
+        if ch == "\u200D" and i + 1 < len(text):  # zwj sequence
+            cluster.append(ch)
+            cluster.append(text[i + 1])
+            i += 2
+            continue
+        break
+
+    return "".join(cluster), i
+
+
+def demojize(text):
+    """Convert all emojis in given string to their shortcodes"""
+    result = []
+    i = 0
+    while i < len(text):
+        ch = text[i]
+        if 0x20 <= ord(ch) < 0x7F:
+            result.append(ch)
+            i += 1
+            continue
+        cluster, i = next_emoji_cluster(text, i)
+        if ord(cluster[-1]) == 0xFE0E or ord(cluster[-1]) == 0xFE0F:
+            cluster = cluster[0:-1]   # remove variation selector for for text/emoji
+        emoji = EMOJI_DATA.get(cluster)
+        if emoji:
+            result.append(min(emoji, key=len))
+        else:
+            result.append(cluster)
+    return "".join(result)
+
+
+def is_emoji(character):
+    """Check if given character is emoji"""
+    if not character:
+        return False
+    return character in EMOJI_DATA

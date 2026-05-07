@@ -15,8 +15,9 @@ from urllib.parse import urlencode, urlparse
 from endcord import peripherals
 
 logger = logging.getLogger(__name__)
+APP_NAME = "endcord" 
 HEADER = {
-    "User-Agent": peripherals.APP_NAME + "/" + peripherals.VERSION,   # required by github
+    "User-Agent": APP_NAME + "/" + peripherals.VERSION,   # required by github
     "Accept": "application/vnd.github+json",
 }
 

@@ -9,38 +9,41 @@ import socket
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 
-utc_date = datetime.now(timezone.utc).strftime("%Y-%m-%d, %H:%M:%S") + " UTC"
-header = f"""# {utc_date}
+UTC_DATE = datetime.now(timezone.utc).strftime("%Y-%m-%d, %H:%M:%S") + " UTC"
+HEADER = f"""# {UTC_DATE}
 # Generated from:
 # http://www.unicode.org/Public/latest/ucd/extracted/DerivedGeneralCategory.txt
 # http://www.unicode.org/Public/latest/ucd/EastAsianWidth.txt
 """
 
 
-def http_get_with_redirect(host, path):
+def http_get_with_redirect(host, path, header=None):
     """Download data while handling up to 2 redirects"""
     redirects = 0
 
     while redirects < 2:
         try:
             conn = http.client.HTTPSConnection(host, timeout=30)
-            conn.request("GET", path)
+            if header:
+                conn.request("GET", path, headers=header)
+            else:
+                conn.request("GET", path)
             response = conn.getresponse()
         except (socket.gaierror, TimeoutError, ConnectionResetError) as e:
             print(f"Error: {e}")
-            return []
+            return ""
 
         if response.status == 200:
             data = response.read().decode("utf-8", errors="replace")
             conn.close()
-            return data.splitlines()
+            return data
 
         # redirects
         if response.status in (301, 302, 303, 307, 308):
             location = response.getheader("Location")
             if not location:
                 print("Error: Redirect without lcation")
-                return []
+                return ""
             redirects += 1
             conn.close()
             parsed = urlparse(location)
@@ -50,8 +53,8 @@ def http_get_with_redirect(host, path):
                 path = parsed.path
             continue
         print(f"HTTP error {response.status} for {host}{path}")
-        return []
-    return []
+        return ""
+    return ""
 
 
 def parse_line(line):
@@ -123,15 +126,15 @@ def merge_codepoints_to_ranges(values):
     return ranges
 
 
-def update_wide_ranged():
+def generate_wide_ranged():
     """Download latest unicode data and build list of ranges of wide characters as python file"""
     # download lists
     print("Downloading unicode lists")
-    list_general_raw = http_get_with_redirect("www.unicode.org", "/Public/latest/ucd/extracted/DerivedGeneralCategory.txt")
+    list_general_raw = http_get_with_redirect("www.unicode.org", "/Public/latest/ucd/extracted/DerivedGeneralCategory.txt").splitlines()
     if not list_general_raw:
         print("Failed downloading unicode lists")
         return
-    list_east_raw = http_get_with_redirect("www.unicode.org", "/Public/latest/ucd/EastAsianWidth.txt")
+    list_east_raw = http_get_with_redirect("www.unicode.org", "/Public/latest/ucd/EastAsianWidth.txt").splitlines()
     if not list_east_raw:
         print("Failed downloading unicode lists")
         return
@@ -177,7 +180,7 @@ def update_wide_ranged():
     # build py file
     path = os.path.expanduser("./endcord/wide_ranges.py")
     with open(path, "w") as f:
-        f.write(header)
+        f.write(HEADER)
         f.write("\n")
         f.write("WIDE_RANGES = (\n")
         for line in ranges:
@@ -188,4 +191,4 @@ def update_wide_ranged():
 
 
 if __name__ == "__main__":
-    update_wide_ranged()
+    generate_wide_ranged()

@@ -11,8 +11,7 @@ import time
 from datetime import UTC, datetime
 from itertools import chain
 
-import emoji
-
+from endcord import utils
 from endcord.wide_ranges import WIDE_RANGES
 
 logger = logging.getLogger(__name__)
@@ -99,7 +98,7 @@ def demojize(text):
     """Safely demojize string"""
     if not text:
         return text
-    return emoji.demojize(text)
+    return utils.demojize(text)
 
 
 def demojize_message(message):
@@ -248,7 +247,7 @@ def move_by_indexes(indexes, *ranges_lists):
 
 def emoji_name(emoji_char):
     """Return emoji name from its Unicode"""
-    return emoji.demojize(emoji_char).replace(":", "")
+    return utils.demojize(emoji_char).replace(":", "")
 
 
 def replace_emoji_string(line):
@@ -283,7 +282,7 @@ def limit_width_wch(text, max_width):
     total_width = 0
     for i, ch in enumerate(text):
         character = ord(ch)
-        if 32 <= character < 0x7f:
+        if 0x20 <= character < 0x7f:
             char_width = 1
         else:
             char_width = 1 + binary_search(character, WIDE_RANGES)
@@ -298,7 +297,7 @@ def len_wch(text):
     total_width = 0
     for ch in text:
         character = ord(ch)
-        if 32 <= character < 0x7f:
+        if 0x20 <= character < 0x7f:
             total_width += 1
         else:
             total_width += 1 + binary_search(character, WIDE_RANGES)
@@ -310,7 +309,7 @@ def split_index_wch(text, max_width):
     width = 0
     for i, ch in enumerate(text):
         character = ord(ch)
-        if 32 <= character < 0x7f:
+        if 0x20 <= character < 0x7f:
             w = 1
         else:
             w = 1 + binary_search(character, WIDE_RANGES)
@@ -1458,7 +1457,7 @@ class ChatGenerator:
                 if ref_message["content"]:
                     content = ref_message["content"]
                     if self.emoji_as_text:
-                        content = emoji.demojize(content)
+                        content = utils.demojize(content)
                     content, _ = replace_escaped_md(content)
                     content = replace_spoilers(content)
                     content, _ = replace_discord_emoji(content)
@@ -1564,7 +1563,7 @@ class ChatGenerator:
         if message["content"]:
             content = message["content"]
             if self.emoji_as_text:
-                content = emoji.demojize(content)
+                content = utils.demojize(content)
             content, emoji_ranges = replace_discord_emoji(content)
             content, mention_ranges = replace_mentions(content, message["mentions"], emoji_ranges, global_name=self.use_global_name, use_nick=self.use_nick)
             content, role_ranges = replace_roles(content, roles, emoji_ranges, mention_ranges)
@@ -2646,7 +2645,7 @@ def generate_extra_window_search(messages, roles, channels, blocked, total_msg, 
             if message["content"]:
                 content = message["content"]
                 if emoji_as_text:
-                    content = emoji.demojize(content)
+                    content = utils.demojize(content)
                 content = replace_spoilers(content)
                 content, _ = replace_discord_emoji(content)
                 content, _ = replace_mentions(content, message["mentions"], global_name=use_global_name, use_nick=use_nick)
@@ -2995,7 +2994,7 @@ def generate_tree(dms, guilds, threads, read_state, guild_folders, activities, c
         muted = dm.get("muted", False)
         active = (dm["id"] == active_channel_id)
         if safe_emoji:
-            name = replace_emoji_string(emoji.demojize(name))
+            name = replace_emoji_string(utils.demojize(name))
         code = 300
         # get dm status
         if len(dm["recipients"]) == 1:
@@ -3215,7 +3214,7 @@ def generate_tree(dms, guilds, threads, read_state, guild_folders, activities, c
         # add guild to the tree
         name = guild["name"]
         if safe_emoji:
-            name = replace_emoji_string(emoji.demojize(name))
+            name = replace_emoji_string(utils.demojize(name))
         mention_count = generate_count(ping_guild)
         tree.append(normalize_string_with_suffix(f"{dd_pointer} {name}", mention_count, max_width, emoji_safe=not(safe_emoji)))
         code = 101
@@ -3259,7 +3258,7 @@ def generate_tree(dms, guilds, threads, read_state, guild_folders, activities, c
                     # add to the tree
                     name = category["name"]
                     if safe_emoji:
-                        name = replace_emoji_string(emoji.demojize(name))
+                        name = replace_emoji_string(utils.demojize(name))
                     mention_count = generate_count(category["ping"])
                     tree.append(normalize_string_with_suffix(f"{intersection}{dd_pointer} {name}", mention_count, max_width, emoji_safe=not(safe_emoji)))
                     code = 201
@@ -3289,7 +3288,7 @@ def generate_tree(dms, guilds, threads, read_state, guild_folders, activities, c
                             channel_threads = channel.get("threads", [])
                             channel_index = len(tree_format)
                             if safe_emoji:
-                                name = replace_emoji_string(emoji.demojize(name))
+                                name = replace_emoji_string(utils.demojize(name))
                             mention_count = generate_count(channel["ping"])
                             if forum:
                                 tree.append(normalize_string_with_suffix(f"{pass_by}{intersection}{dd_forum} {name}", mention_count, max_width, emoji_safe=not(safe_emoji)))
@@ -3344,7 +3343,7 @@ def generate_tree(dms, guilds, threads, read_state, guild_folders, activities, c
                                 unseen = is_unseen(ch_read_state)
                                 mentioned = unseen and ch_read_state["mentions"]
                                 if safe_emoji:
-                                    name = replace_emoji_string(emoji.demojize(name))
+                                    name = replace_emoji_string(utils.demojize(name))
                                 tree.append(f"{pass_by}{pass_by}{intersection_thread} {name}")
                                 code = 400
                                 if (thread["muted"] or not joined) and not active:
@@ -3376,7 +3375,7 @@ def generate_tree(dms, guilds, threads, read_state, guild_folders, activities, c
                 else:
                     name = category["name"]
                     if safe_emoji:
-                        name = replace_emoji_string(emoji.demojize(name))
+                        name = replace_emoji_string(utils.demojize(name))
                     mention_count = generate_count(category["ping"])
                     tree.append(normalize_string_with_suffix(f"{intersection} {name}", mention_count, max_width, emoji_safe=not(safe_emoji)))
                     code = 300
