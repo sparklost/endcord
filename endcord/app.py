@@ -1877,6 +1877,7 @@ class Endcord:
                     self.stop_assist(close=False)
                     self.tui.draw_extra_window(extra_title, extra_body)
                     self.extra_window_open = True
+                    self.tui.set_vim_insert(True)
                 else:
                     self.close_extra_window()
                     self.reset_states()
@@ -8164,7 +8165,7 @@ class Endcord:
                     self.get_forum_chunk()
 
             # check for message search chunks
-            if self.search and self.extra_indexes:
+            if isinstance(self.search, tuple) and self.extra_indexes:
                 extra_selected = self.tui.get_extra_selected()
                 if extra_selected >= len(self.extra_body) - 2 and not self.search_end:
                     self.extend_search()
