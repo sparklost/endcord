@@ -692,7 +692,9 @@ class TUI():
         """Resume curses and enable drawing, capturing terminal"""
         with self.lock:
             curses.reset_prog_mode()
-            curses.curs_set(0)
+            # vim mode uses the real terminal cursor (DECSCUSR shape) so
+            # restore curs_set(1) here too — mirrors __init__.
+            curses.curs_set(1 if self.vim_mode else 0)
             curses.flushinp()
             self.screen.refresh()
             self.disable_drawing = False
