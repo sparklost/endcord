@@ -547,44 +547,61 @@ class TUI():
             return
 
         h, w = self.screen.getmaxyx()
+        # outer_offset = where the input box's `│` lives (at outer_offset-1).
+        # inner_offset = where status/title/prompt start (= outer_offset-1).
+        tree_hidden = self.tree_width <= 0
+        outer_offset = 2 if tree_hidden else (self.tree_width + 3)
+        inner_offset = 1 if tree_hidden else (self.tree_width + 2)
+        chat_offset = outer_offset
+        # Force at least 1-col prompt padding so the cursor lands AFTER
+        # the input-border `│` (otherwise empty prompt puts cursor on the border).
+        prompt_pad = max(len(self.prompt), 1)
         chat_hwyx = (
             h - 4 - self.have_title,
-            w - (self.tree_width + 4) - bool(self.member_list),
+            w - chat_offset - 1 - bool(self.member_list),
             self.have_title,
-            self.tree_width + 3,
+            chat_offset,
         )
-        win_prompt_input_line = (1, w - self.tree_width - 4, h - 2, self.tree_width + 3)
-        tree_hwyx = (h - self.have_title_tree - 1, self.tree_width, self.have_title, 1)
+        win_prompt_input_line = (1, w - outer_offset - 1, h - 2, outer_offset)
+        tree_hwyx = (h - self.have_title_tree - 1, max(self.tree_width, 1), self.have_title, 1)
 
         # re-init areas
         if not redraw_only:
-            prompt_hwyx = (1, len(self.prompt), h - 2, self.tree_width + 2)
+            prompt_hwyx = (1, prompt_pad, h - 2, inner_offset)
             input_line_hwyx = (
                 1,
-                w - (self.tree_width + 1) - len(self.prompt) - 2,
+                w - inner_offset - prompt_pad - 1,
                 h - 2,
-                self.tree_width + len(self.prompt) + 2,
+                inner_offset + prompt_pad,
             )
-            status_line_hwyx = (1, w - (self.tree_width + 2), h - 3, self.tree_width + 2)
+            status_line_hwyx = (1, w - inner_offset, h - 3, inner_offset)
             self.win_chat = self.screen.derwin(*chat_hwyx)
             self.win_prompt = self.screen.derwin(*prompt_hwyx)
             self.win_input_line = self.screen.derwin(*input_line_hwyx)
             self.win_status_line = self.screen.derwin(*status_line_hwyx)
-            self.win_tree = self.screen.derwin(*tree_hwyx)
+            if not tree_hidden:
+                self.win_tree = self.screen.derwin(*tree_hwyx)
+            else:
+                self.win_tree = None
             if self.have_title:
-                title_line_hwyx = (1, w - (self.tree_width + 2) - bool(self.win_member_list) * (self.member_list_width + 1), 0, self.tree_width + 2)
+                title_line_hwyx = (1, w - inner_offset - bool(self.win_member_list) * (self.member_list_width + 1), 0, inner_offset)
                 self.win_title_line = self.screen.derwin(*title_line_hwyx)
                 self.title_hw = self.win_title_line.getmaxyx()
-            if self.have_title_tree:
+            if self.have_title_tree and not tree_hidden:
                 tree_title_line_hwyx = (1, self.tree_width + 2, 0, 0)
                 self.win_title_tree = self.screen.derwin(*tree_title_line_hwyx)
                 self.tree_title_hw = self.win_title_tree.getmaxyx()
+            elif tree_hidden:
+                self.win_title_tree = None
             self.screen_hw = self.screen.getmaxyx()
             self.chat_hw = self.win_chat.getmaxyx()
             self.prompt_hw = self.win_prompt.getmaxyx()
             self.input_hw = self.win_input_line.getmaxyx()
             self.status_hw = self.win_status_line.getmaxyx()
-            self.tree_hw = self.win_tree.getmaxyx()
+            if self.win_tree is not None:
+                self.tree_hw = self.win_tree.getmaxyx()
+            else:
+                self.tree_hw = (0, 0)
             self.win_extra_line = None
             self.win_extra_window = None
             self.win_member_list = None
@@ -597,11 +614,12 @@ class TUI():
         self.update_prompt(self.prompt)
         self.spellcheck()
         self.draw_input_line()
-        self.draw_border(tree_hwyx, top=not(self.have_title_tree) or self.tree_width < 10)
-        self.draw_tree()
+        if not tree_hidden:
+            self.draw_border(tree_hwyx, top=not(self.have_title_tree) or self.tree_width < 10)
+            self.draw_tree()
         if self.have_title:
             self.draw_title_line()
-        if self.have_title_tree:
+        if self.have_title_tree and not tree_hidden:
             self.draw_title_tree()
         self.draw_extra_line(self.extra_line_text)
         self.draw_extra_window(self.extra_window_title, self.extra_window_body, select=self.extra_select, reset_scroll=False)
@@ -636,11 +654,14 @@ class TUI():
             common_h = h - 3 - self.have_title - 2*self.bordered
         else:
             common_h = h - 2 - self.have_title - 2*self.bordered
+        tree_hidden = self.tree_width <= 0
+        chat_left = 2 if tree_hidden else (self.tree_width + 2 * self.bordered + 1)
+        chat_w = w - chat_left - self.bordered - bool(self.member_list) * (self.member_list_width + 1)
         chat_hwyx = (
             common_h,
-            w - (self.tree_width + 3 * self.bordered + 1) - bool(self.member_list) * (self.member_list_width + 1),
+            chat_w,
             self.have_title,
-            self.tree_width + 2 * self.bordered + 1,
+            chat_left,
         )
         self.win_chat = self.screen.derwin(*chat_hwyx)
         self.chat_hw = self.win_chat.getmaxyx()
@@ -688,9 +709,10 @@ class TUI():
     def get_dimensions(self):
         """Return current dimensions for screen objects"""
         status_line = self.win_status_line.getmaxyx()
+        tree_dim = tuple(self.win_tree.getmaxyx()) if self.win_tree is not None else (0, 0)
         return (
             tuple(self.win_chat.getmaxyx()),
-            tuple(self.win_tree.getmaxyx()),
+            tree_dim,
             (status_line[0], status_line[1] - 2*self.bordered),
         )
 
@@ -882,12 +904,17 @@ class TUI():
     def set_tree_width(self, value):
         """Chang tree width, does not redraw, if value is negative it will toggle state"""
         if value < 0:
-            if self.tree_width == 1:
+            if self.tree_width == 0:
                 self.tree_width = self.tree_width_conf
             else:
-                self.tree_width = 1
+                self.tree_width = 0
         else:
             self.tree_width = value
+        # Clear the screen so stale tree-content cells (the `─` drop-down
+        # glyphs etc. that were drawn before the toggle) don't bleed into
+        # the chat when toggling off. Without this, the underlying cells
+        # are never overwritten because the chat window starts further right.
+        self.screen.clear()
         self.resize()
 
 
@@ -1226,7 +1253,7 @@ class TUI():
                 title_txt_r = title_txt_r[:w - 2*self.bordered]
             title_txt_l = self.title_txt_l
 
-            if self.tree_width < 10:   # merge title tree with left title
+            if 0 < self.tree_width < 10:   # merge title tree with left title
                 if self.bordered:
                     title_tree_txt = replace_spaces_dash(trim_with_dash(self.title_tree_txt[:self.tree_width_conf]))
                     title_tree_txt = title_tree_txt + "─" * (self.tree_width_conf - len(title_tree_txt) - 2) + "─"
@@ -1438,6 +1465,8 @@ class TUI():
 
     def draw_tree(self):
         """Draw channel tree"""
+        if self.win_tree is None:
+            return
         if self.tree_width < 10:
             self.draw_tree_mini()
             return
@@ -1566,7 +1595,7 @@ class TUI():
             text = f">>> {mentions} MENTIONS >>>".center(h)
             color = curses.color_pair(8)
         else:
-            text = ">>> TREE >>>".center(h)
+            text = " " * h
             color = curses.color_pair(3)
 
         try:
@@ -1584,14 +1613,17 @@ class TUI():
         with self.lock:
             h, w = self.screen.getmaxyx()
             del (self.win_prompt, self.win_input_line)
+            tree_hidden = self.tree_width <= 0
+            inner_off = 1 if tree_hidden else (self.tree_width + 2*self.bordered + 1)
+            prompt_pad = max(len(self.prompt), 1)
             input_line_hwyx = (
                 1,
-                w - (self.tree_width + self.bordered + 1) - len(self.prompt) - 2*self.bordered,
+                w - inner_off - prompt_pad - 1,
                 h - 1 - self.bordered,
-                self.tree_width + len(self.prompt) + 2*self.bordered + 1)
+                inner_off + prompt_pad)
             self.win_input_line = self.screen.derwin(*input_line_hwyx)
             self.input_hw = self.win_input_line.getmaxyx()
-            prompt_hwyx = (1, len(self.prompt), h - 1 - self.bordered, self.tree_width + 2*self.bordered + 1)
+            prompt_hwyx = (1, prompt_pad, h - 1 - self.bordered, inner_off)
             self.win_prompt = self.screen.derwin(*prompt_hwyx)
             self.win_prompt.insstr(0, 0, self.prompt, curses.color_pair(13) | self.attrib_map[13])
             self.win_prompt.noutrefresh()
@@ -1612,8 +1644,10 @@ class TUI():
             self.extra_line_text = text
             if text and not self.disable_drawing:
                 h, w = self.screen.getmaxyx()
+                tree_hidden = self.tree_width <= 0
+                el_off = 1 if tree_hidden else (self.tree_width + self.bordered + 1)
                 if not self.win_extra_line:
-                    extra_line_hwyx = (1, w - (self.tree_width + self.bordered + 1), h - self.bordered - 3, self.tree_width + self.bordered + 1)
+                    extra_line_hwyx = (1, w - el_off, h - self.bordered - 3, el_off)
                     self.win_extra_line = self.screen.derwin(*extra_line_hwyx)
                     del self.win_chat
                     self.init_chat()
@@ -1630,7 +1664,7 @@ class TUI():
                     self.draw_member_list(self.member_list, self.member_list_format, force=True)
                     if self.bordered:
                         self.draw_status_line()
-                w = w - (self.tree_width + self.bordered + 1)
+                w = w - el_off
                 if self.bordered:
                     text = "─" + trim_with_dash(text, dash=False)
                     line_text = self.corner_ul + text + "─" * (w - len(text) - 2) + self.corner_ur
@@ -1689,11 +1723,18 @@ class TUI():
                 if not self.win_extra_window:
                     del self.win_chat
                     self.win_extra_line = None
+                    tree_hidden = self.tree_width <= 0
+                    # When tree hidden, align with input box left border at
+                    # col 1: ew_inner=2 puts extra_window's `│` at col 1
+                    # (after draw_border's x-1). ew_outer=3 keeps the right
+                    # corner at col w-1.
+                    ew_inner = 2 if tree_hidden else (self.tree_width + 2*self.bordered + 1)
+                    ew_outer = 3 if tree_hidden else (self.tree_width + 3*self.bordered + 1)
                     extra_window_hwyx = (
                         self.extra_window_h + 1,
-                        w - (self.tree_width + 3*self.bordered + 1),
+                        w - ew_outer,
                         h - 3 - self.extra_window_h - self.bordered,
-                        self.tree_width + 2*self.bordered + 1,
+                        ew_inner,
                     )
                     self.win_extra_window = self.screen.derwin(*extra_window_hwyx)
                     self.init_chat()
@@ -1801,7 +1842,8 @@ class TUI():
                     if self.bordered:
                         self.draw_border(member_list_hwyx)
                         if self.have_title:
-                            title_line_hwyx = (1, w - (self.tree_width + 2) - bool(self.win_member_list) * (self.member_list_width + 1), 0, self.tree_width + 2)
+                            tl_off = 1 if self.tree_width <= 0 else (self.tree_width + 2)
+                            title_line_hwyx = (1, w - tl_off - bool(self.win_member_list) * (self.member_list_width + 1), 0, tl_off)
                             self.win_title_line = self.screen.derwin(*title_line_hwyx)
                             self.title_hw = self.win_title_line.getmaxyx()
                             self.draw_title_line()
@@ -1873,7 +1915,8 @@ class TUI():
                 h, w = self.screen.getmaxyx()
                 self.init_chat()
                 if self.bordered and self.have_title:
-                    title_line_hwyx = (1, w - (self.tree_width + 2) - bool(self.win_member_list) * (self.member_list_width + 1), 0, self.tree_width + 2)
+                    tl_off = 1 if self.tree_width <= 0 else (self.tree_width + 2)
+                    title_line_hwyx = (1, w - tl_off - bool(self.win_member_list) * (self.member_list_width + 1), 0, tl_off)
                     self.win_title_line = self.screen.derwin(*title_line_hwyx)
                     self.title_hw = self.win_title_line.getmaxyx()
                     self.draw_title_line()
@@ -2899,6 +2942,21 @@ class TUI():
             elif key in self.keybindings["view_media"] and self.chat_selected != -1:
                 return self.return_input_code(17)
 
+            elif key in self.keybindings["chat_msg_up"]:
+                return self.return_input_code(50)
+
+            elif key in self.keybindings["chat_msg_down"]:
+                return self.return_input_code(51)
+
+            elif key in self.keybindings["jump_next_media"]:
+                return self.return_input_code(52)
+
+            elif key in self.keybindings["jump_prev_media"]:
+                return self.return_input_code(53)
+
+            elif key in self.keybindings["jump_last_channel"]:
+                return self.return_input_code(54)
+
             elif key in self.keybindings["spoil"] and self.chat_selected != -1 and not forum:
                 return self.return_input_code(18)
 
@@ -3009,6 +3067,8 @@ class TUI():
 
     def mouse_in_window(self, x, y, window, around=False):
         """Check if mouse is inside specified window"""
+        if window is None:
+            return False
         win_y, win_x = window.getbegyx()
         win_h, win_w = window.getmaxyx()
         if around:

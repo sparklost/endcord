@@ -1578,6 +1578,96 @@ class Endcord:
                     continue
                 self.go_replied(msg_index)
 
+            # chat_msg_up / chat_msg_down: jump message-by-message.
+            # self.messages is newest-first (insert(0, ...)), so visually-up
+            # (older) means a HIGHER index, visually-down (newer) means lower.
+            elif (action == 50 or action == 51) and self.messages:
+                self.restore_input_text = (input_text, "standard")
+                # If selection is hidden (-1), use top-of-viewport so we
+                # don't jump from the bottom of the chat.
+                ref_line = chat_sel if chat_sel >= 0 else self.tui.chat_index + 3
+                cur = self.lines_to_msg(ref_line)
+                if cur is None:
+                    continue
+                target = cur + (1 if action == 50 else -1)
+                if 0 <= target < len(self.messages):
+                    self.tui.set_selected(self.msg_to_lines(target, smart=True))
+
+            # jump_next_media / jump_prev_media. "next" = newer (visually
+            # down, lower index); "prev" = older (visually up, higher index).
+            # When walking older direction, fetch additional chunks from
+            # the server if the current buffer is exhausted (up to 4
+            # extra chunks, ≈100 more messages).
+            elif (action == 52 or action == 53) and self.messages:
+                self.restore_input_text = (input_text, "standard")
+                ref_line = chat_sel if chat_sel >= 0 else self.tui.chat_index + 3
+                cur_idx = self.lines_to_msg(ref_line)
+                if cur_idx is None:
+                    continue
+                direction = -1 if action == 52 else 1
+                cur_id = self.messages[cur_idx]["id"]
+                found_idx = None
+                for _ in range(5):
+                    # Re-locate current msg by id; trimming may have shifted indices.
+                    cur_idx = next((i for i, m in enumerate(self.messages) if m["id"] == cur_id), None)
+                    if cur_idx is None:
+                        break
+                    start = cur_idx + direction
+                    end = -1 if direction == -1 else len(self.messages)
+                    for i in range(start, end, direction):
+                        m = self.messages[i]
+                        if m.get("embeds") or m.get("stickers"):
+                            found_idx = i
+                            break
+                    if found_idx is not None:
+                        break
+                    # No match in current buffer; fetch older chunk if walking
+                    # backward in time. Newer direction has nothing to fetch
+                    # (gateway delivers new messages as they arrive).
+                    if direction == 1 and not self.chat_end:
+                        self.get_chat_chunk(past=True, scroll=False)
+                    else:
+                        break
+                if found_idx is not None:
+                    # Land on the line containing the URL/embed if there is
+                    # one, so `v` works without an extra step. Fall back to
+                    # the message header.
+                    target_line = None
+                    for li, lm in enumerate(self.chat_map):
+                        if lm and lm[0] == found_idx and lm[5] and lm[5][0]:
+                            target_line = li
+                            break
+                    if target_line is None:
+                        target_line = self.msg_to_lines(found_idx, smart=True)
+                    self.tui.set_selected(target_line)
+                else:
+                    self.update_extra_line("No more media in this direction.", timed=True)
+
+            # action 54: jump to previous (last visited) channel
+            elif action == 54:
+                self.restore_input_text = (input_text, "standard")
+                recent = self.state.get("recent_channels", []) if self.state else []
+                if len(recent) < 2:
+                    self.update_extra_line("No previous channel.", timed=True)
+                else:
+                    prev_id = recent[-2]
+                    channel_id, channel_name, guild_id, guild_name, parent_hint = self.find_parents_from_id(prev_id)
+                    if channel_id is None:
+                        self.update_extra_line("Previous channel unavailable.", timed=True)
+                    else:
+                        if guild_id is not None:
+                            self.open_guild(guild_id, select=True, open_only=True)
+                            category_tree_pos = self.tree_pos_from_id(parent_hint)
+                            if category_tree_pos:
+                                self.tui.toggle_category(category_tree_pos, only_open=True)
+                            channel_tree_pos = self.tree_pos_from_id(channel_id)
+                            if channel_tree_pos:
+                                self.tui.tree_select(channel_tree_pos)
+                        else:
+                            self.open_guild(0, select=True, open_only=True)
+                            self.tui.tree_select(self.tree_pos_from_id(channel_id))
+                        self.switch_channel(channel_id, channel_name, guild_id, guild_name, parent_hint=parent_hint)
+
             # download file
             elif action == 9:
                 self.restore_input_text = (input_text, "standard")
@@ -1646,6 +1736,10 @@ class Endcord:
                     for num in self.get_stuff_from_selected_line(chat_sel, 0):   # get url
                         if urls[num] in embeds:
                             selected_urls.append(urls[num])
+                    if not selected_urls:
+                        # cursor isn't on a URL line of this message; use
+                        # all embeds so v works from anywhere in the message
+                        selected_urls = embeds
                 else:
                     selected_urls = embeds
                 if len(selected_urls) == 1:

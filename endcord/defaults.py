@@ -214,6 +214,11 @@ keybindings = {
     "send_message": 10,   # Enter
     "chat_up": 259,   # Up
     "chat_down": 258,   # Down
+    "chat_msg_up": 275,   # F11 — overridden by vim mode K
+    "chat_msg_down": 276,   # F12 — overridden by vim mode J
+    "jump_next_media": 277,   # F13 — overridden by vim mode ]m
+    "jump_prev_media": 278,   # F14 — overridden by vim mode [m
+    "jump_last_channel": 279,   # F15 — overridden by vim mode Ctrl+O
     "reply": 18,   # Ctrl+R
     "edit": 5,   # Ctrl+E
     "delete": 4,   # Ctrl+D
@@ -276,8 +281,13 @@ vim_mode_bindings = {
     # special
     "insert_mode": "i",
     # tree
-    "tree_up": "K",
-    "tree_down": "J",
+    "tree_up": 259,   # Up
+    "tree_down": 258,   # Down
+    "chat_msg_up": "K",
+    "chat_msg_down": "J",
+    "jump_next_media": 4,    # Ctrl+D
+    "jump_prev_media": 21,   # Ctrl+U
+    "jump_last_channel": 15,   # Ctrl+O
     "tree_select": " ",
     "tree_collapse_threads": "W",
     "tree_join_thread": "O",
@@ -311,7 +321,7 @@ vim_mode_bindings = {
     "scroll_bottom": "B",
     "go_replied": "g",
     "download": "D",
-    "upload": "U",
+    "upload": 1,   # Ctrl+A (a for attach)
     "browser": "o",
     "view_media": "v",
     "spoil": "S",
