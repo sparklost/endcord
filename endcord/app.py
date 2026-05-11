@@ -8394,7 +8394,10 @@ class Endcord:
                             # still have to do this when scrolled far up, only to handle message delete/edit/react/poll
                             self.process_msg_events_active_channel(new_message, latest_chat=False)
                     # handle unseen and mentions
-                    if not this_channel or (this_channel and (self.new_unreads or self.ping_this_channel or self.tui.disable_drawing or self.tui.is_window_open())):
+                    # NB: is_window_open() is a stub that always returns True
+                    # outside pgcurses mode, so gate it on uses_pgcurses —
+                    # otherwise it short-circuits notification_in_active=False.
+                    if not this_channel or (this_channel and (self.new_unreads or self.ping_this_channel or self.tui.disable_drawing or (uses_pgcurses and self.tui.is_window_open()))):
                         self.process_msg_events_other_channels(new_message, avatar_id)
                     # remove ghost pings
                     self.process_msg_events_ghost_ping(new_message)
