@@ -8397,7 +8397,10 @@ class Endcord:
                     # NB: is_window_open() is a stub that always returns True
                     # outside pgcurses mode, so gate it on uses_pgcurses —
                     # otherwise it short-circuits notification_in_active=False.
-                    if not this_channel or (this_channel and (self.new_unreads or self.ping_this_channel or self.tui.disable_drawing or (uses_pgcurses and self.tui.is_window_open()))):
+                    # tui.terminal_focused is driven by CSI 1004 focus events;
+                    # when False, the user isn't looking at endcord and should
+                    # still get a notification even for the active channel.
+                    if not this_channel or (this_channel and (not self.tui.terminal_focused or self.new_unreads or self.ping_this_channel or self.tui.disable_drawing or (uses_pgcurses and self.tui.is_window_open()))):
                         self.process_msg_events_other_channels(new_message, avatar_id)
                     # remove ghost pings
                     self.process_msg_events_ghost_ping(new_message)

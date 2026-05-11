@@ -210,6 +210,7 @@ class TUI():
         curses.mousemask(curses.ALL_MOUSE_EVENTS)
         curses.mouseinterval(0)
         sys.stdout.write("\033[?2004h")   # enable bracketed paste mode
+        sys.stdout.write("\033[?1004h")   # enable terminal focus reporting
         sys.stdout.flush()
         screen.clear()
         self.last_free_id = 1   # last free color pair id
@@ -342,6 +343,11 @@ class TUI():
         self.cursor_on = True
         self.enable_autocomplete = False
         self.bracket_paste = False
+        # Terminal focus state, fed by parsing CSI focus-in/-out sequences
+        # (ESC [ I / ESC [ O, requires `\e[?1004h` enabled above).
+        # Default True so we don't suppress before the first focus event
+        # lands; the terminal sends the right state on the next change.
+        self.terminal_focused = True
         self.spelling_range = [0, 0]
         self.misspelled = []
         self.delta_store = []
@@ -1595,28 +1601,44 @@ class TUI():
             self.pfp_renderer.place(user_id, avatar_id, row, chat_x)
         # Inline image attachments — per-image (cols, rows) come from
         # app-side measurement so the thumbnail keeps its source aspect.
+        # We also scan beyond chat_index+chat_h so a tall image whose
+        # header has scrolled just above the viewport can still render
+        # its bottom slice (otherwise the reserved blank rows show as
+        # whitespace at the top of the chat).
         if self.image_lines:
-            for i in range(self.chat_index, min(self.chat_index + chat_h, len(self.image_lines))):
+            scan_end = min(self.chat_index + chat_h + pfp_mod.ATTACHMENT_MAX_ROWS, len(self.image_lines))
+            for i in range(self.chat_index, scan_end):
                 entry = self.image_lines[i]
                 if not entry:
                     continue
                 col_off, url, image_cols, image_rows = entry
-                row = chat_y + chat_h - 1 - (i - self.chat_index)
-                if row < chat_y:
-                    continue
+                row_natural = chat_y + chat_h - 1 - (i - self.chat_index)
+                crop_top = 0
+                if row_natural < chat_y:
+                    # Image header is above the viewport. Anchor the
+                    # placement to chat_y and crop the corresponding
+                    # number of rows off the top of the image source.
+                    crop_top = chat_y - row_natural
+                    if crop_top >= image_rows:
+                        continue
+                    row = chat_y
+                else:
+                    row = row_natural
                 # Safety net: if scrolled such that the reserved blanks
-                # have been clipped, shrink rows (and cols proportionally)
-                # so the thumbnail still fits.
+                # have been clipped at the bottom, shrink rows so the
+                # thumbnail still fits inside the chat region.
                 available_rows = chat_y + chat_h - row
                 if available_rows < 1:
                     continue
-                rows_to_use = min(image_rows, available_rows)
+                rows_to_use = min(image_rows - crop_top, available_rows)
                 cols_to_use = max(1, image_cols * rows_to_use // image_rows)
                 abs_col = chat_x + col_off
                 if abs_col < chat_x or abs_col >= chat_x + self.chat_hw[1]:
                     continue
                 self.pfp_renderer.place_attachment(
-                    url, row, abs_col, cols=cols_to_use, rows=rows_to_use,
+                    url, row, abs_col,
+                    cols=cols_to_use, rows=rows_to_use,
+                    crop_top_cells=crop_top, full_rows=image_rows,
                 )
         # Inline custom emoji — placed at their in-line column for each
         # visible line.
@@ -2726,6 +2748,12 @@ class TUI():
                     self.bracket_paste = False
                     self.spellcheck()
                     self.draw_input_line()
+                    continue
+                elif sequence == [27, 91, 73, -1]:   # ESC [ I — focus in
+                    self.terminal_focused = True
+                    continue
+                elif sequence == [27, 91, 79, -1]:   # ESC [ O — focus out
+                    self.terminal_focused = False
                     continue
                 elif sequence[-1] == -1 and sequence[-2] == 27:
                     # holding escape key

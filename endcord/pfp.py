@@ -188,6 +188,10 @@ class PfpRenderer:
         self.cell_aspect = detected or CELL_ASPECT
         self.pfp_cols, self.pfp_rows = best_square(2, self.cell_aspect)
         self.emoji_cols, self.emoji_rows = best_square(1, self.cell_aspect)
+        # url -> (source_width_px, source_height_px), populated by
+        # measure_attachment. Used for source-region crops when an image
+        # is only partially on-screen.
+        self._attach_px = {}
         logger.info(
             f"pfp cell_aspect={self.cell_aspect:.3f} "
             f"(detected={detected is not None}) "
@@ -407,6 +411,8 @@ class PfpRenderer:
         else:
             rows = max_rows
             cols = max(1, round(rows * ratio))
+        # Stash source-pixel dims for partial-render crops below.
+        self._attach_px[url] = (sw, sh)
         return cols, rows
 
     def _ensure_attachment_transmitted(self, url):
@@ -433,8 +439,19 @@ class PfpRenderer:
         finally:
             self._fetching.discard(key)
 
-    def place_attachment(self, url, row, col, cols=ATTACHMENT_MAX_COLS, rows=ATTACHMENT_MAX_ROWS):
-        """Place an attachment thumbnail at (row, col)."""
+    def place_attachment(self, url, row, col, cols=ATTACHMENT_MAX_COLS, rows=ATTACHMENT_MAX_ROWS,
+                         crop_top_cells=0, full_rows=None):
+        """Place an attachment thumbnail at (row, col).
+
+        If `crop_top_cells > 0`, render only the bottom slice of the image
+        (the top `crop_top_cells × cell_h` source pixels are skipped). The
+        slice is displayed in `rows` cells starting at `row`, so callers
+        should pass the visible-only row count as `rows` and the image's
+        full row count as `full_rows`. Used when the image header is
+        off-screen above the chat region but its reserved row band is
+        still visible — without it, the reserve cells show as empty
+        whitespace at the top of the chat.
+        """
         if not self.enabled or not url:
             return
         kid = self._ensure_attachment_transmitted(url)
@@ -444,9 +461,19 @@ class PfpRenderer:
             pid = self._next_placement_id
             self._next_placement_id += 1
         cup = f"\x1b[{row + 1};{col + 1}H".encode("ascii")
-        place = (
-            f"\x1b_Ga=p,i={kid},p={pid},c={cols},r={rows},C=1,q=2\x1b\\"
-        ).encode("ascii")
+        if crop_top_cells > 0 and full_rows and url in self._attach_px:
+            sw, sh = self._attach_px[url]
+            # Crop the top of the source image proportionally. Y/h are in
+            # source pixels; r is the cell count we're rendering into.
+            y_off = max(0, min(sh - 1, int(crop_top_cells * sh / full_rows)))
+            h_src = max(1, sh - y_off)
+            controls = (
+                f"a=p,i={kid},p={pid},c={cols},r={rows},Y={y_off},H={h_src},"
+                f"W={sw},X=0,C=1,q=2"
+            )
+        else:
+            controls = f"a=p,i={kid},p={pid},c={cols},r={rows},C=1,q=2"
+        place = (f"\x1b_G{controls}\x1b\\").encode("ascii")
         _send(cup + place)
         self._placed.add(kid)
 
