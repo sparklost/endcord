@@ -922,6 +922,10 @@ class TUI():
         # the chat when toggling off. Without this, the underlying cells
         # are never overwritten because the chat window starts further right.
         self.screen.clear()
+        # Some terminals drop Kitty image storage when the screen clears,
+        # so tell the renderer to re-transmit on next placement.
+        if self.pfp_renderer is not None:
+            self.pfp_renderer.invalidate_transmissions()
         self.resize()
 
 

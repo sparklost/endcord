@@ -26,8 +26,11 @@ try:
 except ImportError:
     HAVE_PIL = False
 
-# Width/height in terminal cells. 2x2 fits the header + first content row.
-PFP_COLS = 2
+# Width/height in terminal cells. Terminal cells are typically ~2x taller
+# than wide, so cols:rows = 2:1 keeps the rendered avatar roughly square.
+# 4 cols × 2 rows = a comfortable, readable size; spans the header row +
+# the first content row.
+PFP_COLS = 4
 PFP_ROWS = 2
 # Pixel size to ask Discord for. Anything >= cell-pixels * dimensions works.
 PFP_SIZE_PX = 64
@@ -173,9 +176,22 @@ class PfpRenderer:
         if not self.enabled or not self._placed:
             return
         for pid in self._placed:
-            # a=d: delete. d=I: by image id. i=<id>. q=2: silent.
+            # a=d: delete. d=I: placements only, keep image data.
             _send(b"\x1b_Ga=d,d=I,i=" + str(pid).encode("ascii") + b",q=2\x1b\\")
         self._placed.clear()
+
+
+    def invalidate_transmissions(self):
+        """Forget which images have been sent to the terminal.
+
+        Call this after anything that drops Kitty's image storage (e.g.
+        the full-screen clear we issue on tree toggle). Forces the next
+        place() to re-transmit the image bytes.
+        """
+        with self._lock:
+            self._transmitted.clear()
+            self._placed.clear()
+            self._next_id = KITTY_ID_BASE
 
     def place(self, user_id, avatar_id, row, col):
         """Place this user's avatar at terminal cell (row, col).

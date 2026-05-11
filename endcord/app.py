@@ -274,10 +274,10 @@ class Endcord:
         self.tui.update_chat(self.chat, [[[self.colors[0]]]] * len(self.chat))
         self.tui.update_status_line(" CONNECTING")
         self.my_id = None   # will be taken from gateway in main()
-        # If we're going to draw inline avatars, reserve 3 leading cols
-        # on every chat line so the 2-cell avatar doesn't cover text.
+        # If we're going to draw inline avatars, reserve 5 leading cols on
+        # every chat line so the 4-cell avatar + 1 space gap don't cover text.
         if self.pfp_renderer.enabled:
-            pad = "   "
+            pad = "     "
             self.config["format_message"] = pad + self.config["format_message"].replace("\n", "\n" + pad)
             self.config["format_newline"] = pad + self.config["format_newline"]
             self.config["format_reply"] = pad + self.config["format_reply"]
