@@ -313,8 +313,11 @@ class TUI():
         # Inline-PFP state. Wired up later via set_pfp_renderer().
         # pfp_lines: parallel to chat_buffer. None for non-header lines,
         # (user_id, avatar_id) for lines where we want to draw an avatar.
+        # _pfp_dirty: set by draw_chat, cleared by screen_update after it
+        # has re-placed the avatars (which must happen AFTER doupdate).
         self.pfp_renderer = None
         self.pfp_lines = []
+        self._pfp_dirty = False
         self.tree = []
         self.tree_format = []
         self.tree_clean_len = 0
@@ -474,6 +477,12 @@ class TUI():
                         pass
                     shape_byte = b"\033[6 q" if self.insert_mode else b"\033[2 q"
                 curses.doupdate()
+                # Place inline avatars AFTER doupdate so any terminal-level
+                # screen clears curses just issued (clearok / \e[2J) don't
+                # wipe the Kitty images.
+                if self._pfp_dirty:
+                    self.place_inline_pfps()
+                    self._pfp_dirty = False
                 if shape_byte is not None:
                     try:
                         os.write(1, shape_byte)
@@ -1440,9 +1449,13 @@ class TUI():
                     self.default_color,
                 )
                 self.win_chat.noutrefresh()
-                self.place_inline_pfps()
                 if not norefresh:
                     self.need_update.set()
+                # Flag the screen_update thread to (re)place avatars after
+                # the next doupdate — doing it before doupdate means a
+                # terminal clear (from screen.clear / clearok) wipes the
+                # Kitty images right after they've been placed.
+                self._pfp_dirty = True
             except curses.error:
                 # exception will happen when window is resized to smaller w dimensions
                 self.resize()
@@ -1499,7 +1512,9 @@ class TUI():
             row = chat_y + chat_h - 1 - (i - self.chat_index)
             if row < chat_y:
                 continue
-            self.pfp_renderer.place(user_id, avatar_id, row, chat_x)
+            # +1 col puts a small gutter between the chat's left border
+            # `│` and the avatar.
+            self.pfp_renderer.place(user_id, avatar_id, row, chat_x + 1)
 
 
     def clear_chat_wide(self, wait=True):

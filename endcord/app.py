@@ -274,10 +274,10 @@ class Endcord:
         self.tui.update_chat(self.chat, [[[self.colors[0]]]] * len(self.chat))
         self.tui.update_status_line(" CONNECTING")
         self.my_id = None   # will be taken from gateway in main()
-        # If we're going to draw inline avatars, reserve 5 leading cols on
-        # every chat line so the 4-cell avatar + 1 space gap don't cover text.
+        # If we're going to draw inline avatars, reserve 7 leading cols on
+        # every chat line: 1 gutter + 5-cell avatar + 1 space gap.
         if self.pfp_renderer.enabled:
-            pad = "     "
+            pad = "       "
             self.config["format_message"] = pad + self.config["format_message"].replace("\n", "\n" + pad)
             self.config["format_newline"] = pad + self.config["format_newline"]
             self.config["format_reply"] = pad + self.config["format_reply"]
@@ -6392,6 +6392,11 @@ class Endcord:
         chat_map[line] is a 7-tuple; index 0 = msg_num, index 4 = the
         timestamp range (only set on header lines). We treat "has
         timestamp range" as "is the avatar row".
+
+        To match Discord-style "message grouping", we only emit an
+        avatar on the *first* message of an author streak — i.e. when
+        the immediately-older message (self.messages[msg_num+1], since
+        the list is newest-first) is from a different user.
         """
         out = []
         for line in self.chat_map:
@@ -6399,7 +6404,15 @@ class Endcord:
                 msg_num = line[0]
                 if 0 <= msg_num < len(self.messages):
                     msg = self.messages[msg_num]
-                    out.append((msg.get("user_id"), msg.get("avatar")))
+                    older = (
+                        self.messages[msg_num + 1]
+                        if msg_num + 1 < len(self.messages)
+                        else None
+                    )
+                    if older and older.get("user_id") == msg.get("user_id"):
+                        out.append(None)
+                    else:
+                        out.append((msg.get("user_id"), msg.get("avatar")))
                     continue
             out.append(None)
         return out

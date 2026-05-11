@@ -26,11 +26,11 @@ try:
 except ImportError:
     HAVE_PIL = False
 
-# Width/height in terminal cells. Terminal cells are typically ~2x taller
-# than wide, so cols:rows = 2:1 keeps the rendered avatar roughly square.
-# 4 cols × 2 rows = a comfortable, readable size; spans the header row +
-# the first content row.
-PFP_COLS = 4
+# Width/height in terminal cells. Terminal cells are typically taller
+# than wide (~1:2.5 in many Kitty configs), so cols:rows ratio is ~2.5:1
+# to keep the rendered avatar roughly square. 5 cols × 2 rows spans
+# the header row + first content row at most font sizes.
+PFP_COLS = 5
 PFP_ROWS = 2
 # Pixel size to ask Discord for. Anything >= cell-pixels * dimensions works.
 PFP_SIZE_PX = 64
@@ -104,8 +104,13 @@ class PfpRenderer:
         self._fetching = set()
         # next free Kitty image id
         self._next_id = KITTY_ID_BASE
-        # placement ids currently on screen, so we can clear them
+        # image ids that have at least one placement currently on screen.
+        # We delete by image id (kills all placements for that image)
+        # so we don't need to track individual placement ids.
         self._placed = set()
+        # Monotonic placement-id counter — every place() gets a unique
+        # placement_id so two avatars from the same author don't collide.
+        self._next_placement_id = 1
         self._lock = threading.Lock()
 
     def _alloc_id(self, avatar_id):
@@ -172,12 +177,16 @@ class PfpRenderer:
             self._fetching.discard(avatar_id)
 
     def clear_placements(self):
-        """Remove all current avatar placements from the terminal."""
+        """Remove all current avatar placements from the terminal.
+
+        Uses lowercase d=i which deletes placements but preserves the
+        image data in Kitty's storage, so we don't have to re-transmit
+        the bytes on the next placement.
+        """
         if not self.enabled or not self._placed:
             return
-        for pid in self._placed:
-            # a=d: delete. d=I: placements only, keep image data.
-            _send(b"\x1b_Ga=d,d=I,i=" + str(pid).encode("ascii") + b",q=2\x1b\\")
+        for kid in self._placed:
+            _send(b"\x1b_Ga=d,d=i,i=" + str(kid).encode("ascii") + b",q=2\x1b\\")
         self._placed.clear()
 
 
@@ -199,17 +208,22 @@ class PfpRenderer:
         Uses Kitty's a=p with C=1 (don't move cursor) so we can write
         the placement without disturbing curses' notion of cursor pos.
         Position is set via the standard CUP escape before the place.
+
+        Each call gets a fresh placement_id so multiple messages from
+        the same author render side-by-side instead of the later one
+        moving the earlier placement.
         """
         if not self.enabled or not avatar_id:
             return
         kid = self._ensure_transmitted(user_id, avatar_id)
         if kid is None:
             return
-        # Move cursor (1-indexed in CUP), then place. C=1 keeps the
-        # cursor on the same cell after placement so curses isn't lost.
+        with self._lock:
+            pid = self._next_placement_id
+            self._next_placement_id += 1
         cup = f"\x1b[{row + 1};{col + 1}H".encode("ascii")
         place = (
-            f"\x1b_Ga=p,i={kid},p={kid},c={PFP_COLS},r={PFP_ROWS},C=1,q=2\x1b\\"
+            f"\x1b_Ga=p,i={kid},p={pid},c={PFP_COLS},r={PFP_ROWS},C=1,q=2\x1b\\"
         ).encode("ascii")
         _send(cup + place)
         self._placed.add(kid)
