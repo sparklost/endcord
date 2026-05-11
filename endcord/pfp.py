@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 # Pillow is optional - if not present, inline PFPs are disabled.
 try:
-    from PIL import Image
+    from PIL import Image, ImageDraw
     HAVE_PIL = True
 except ImportError:
     HAVE_PIL = False
@@ -136,6 +136,38 @@ def best_square(rows, cell_aspect):
     return best[1], rows
 
 
+def _apply_circular_mask(im):
+    """Return an RGBA copy of `im` with a circular alpha mask applied.
+    Pixels outside the inscribed circle become transparent so the
+    Kitty renderer composites the chat bg through the corners — i.e.
+    Discord-style round avatars.
+
+    Anti-aliases via a 4x super-sampled mask so the edge doesn't look
+    jagged at our small placement sizes (we transmit at PFP_SIZE_PX
+    and Kitty stretches to ~5 cells wide).
+    """
+    if not HAVE_PIL:
+        return im
+    w, h = im.size
+    if w <= 0 or h <= 0:
+        return im
+    scale = 4
+    mask = Image.new("L", (w * scale, h * scale), 0)
+    ImageDraw.Draw(mask).ellipse(
+        (0, 0, w * scale - 1, h * scale - 1), fill=255,
+    )
+    mask = mask.resize((w, h), Image.LANCZOS)
+    out = im.copy()
+    if "A" in out.getbands():
+        # Intersect the existing alpha with the circle so an avatar
+        # that's already partially transparent keeps its holes.
+        from PIL import ImageChops
+        out.putalpha(ImageChops.multiply(out.getchannel("A"), mask))
+    else:
+        out.putalpha(mask)
+    return out
+
+
 def _chunk_payload(data, controls):
     """Build the Kitty protocol APC sequence(s).
 
@@ -213,7 +245,9 @@ class PfpRenderer:
 
         Downloads + converts if needed. Returns None on failure.
         """
-        png_name = f"pfp_{avatar_id}.png"
+        # `pfp_round_` prefix busts the pre-round cache; old pfp_<id>.png
+        # files become harmless leftovers.
+        png_name = f"pfp_round_{avatar_id}.png"
         png_path = os.path.join(os.path.expanduser(self.cache_path), png_name)
         if os.path.isfile(png_path):
             return png_path
@@ -228,6 +262,7 @@ class PfpRenderer:
                 im = im.convert("RGBA").resize(
                     (PFP_SIZE_PX, PFP_SIZE_PX), Image.LANCZOS,
                 )
+                im = _apply_circular_mask(im)
                 im.save(png_path, format="PNG")
         except Exception as e:
             logger.debug(f"pfp convert failed for {avatar_id}: {e}")
