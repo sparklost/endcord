@@ -62,6 +62,7 @@ settings = {
     "game_detection_download_delay": 7,
     "downloads_path": None,
     "notifications_pfp": True,
+    "inline_pfp": False,   # render inline avatars in chat (Kitty-only)
     "linux_notification_sound": "message",
     "custom_notification_sound": None,
     "linux_ringtone_incoming": "phone-incoming-call",

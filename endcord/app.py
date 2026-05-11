@@ -33,6 +33,7 @@ from endcord import (
     parser,
     peripherals,
     perms,
+    pfp as pfp_mod,
     rpc,
     search,
     tui,
@@ -252,6 +253,13 @@ class Endcord:
         threading.Thread(target=self.gateway.connect, daemon=True).start()
         self.downloader = downloader.Downloader(config["proxy"])
         self.tui = tui.TUI(self.screen, self.config, keybindings, command_bindings)
+        # Inline avatars in chat (Kitty-only; defaults off — set
+        # inline_pfp = True in config.ini to enable).
+        self.pfp_renderer = pfp_mod.PfpRenderer(
+            peripherals.cache_path, self.discord,
+            enabled=bool(config.get("inline_pfp", False)),
+        )
+        self.tui.set_pfp_renderer(self.pfp_renderer)
         if self.fun:
             today = (time.localtime().tm_mon, time.localtime().tm_mday)
             self.fun = 2 if (10, 25) <= today <= (11, 8) else self.fun
@@ -266,6 +274,15 @@ class Endcord:
         self.tui.update_chat(self.chat, [[[self.colors[0]]]] * len(self.chat))
         self.tui.update_status_line(" CONNECTING")
         self.my_id = None   # will be taken from gateway in main()
+        # If we're going to draw inline avatars, reserve 3 leading cols
+        # on every chat line so the 2-cell avatar doesn't cover text.
+        if self.pfp_renderer.enabled:
+            pad = "   "
+            self.config["format_message"] = pad + self.config["format_message"].replace("\n", "\n" + pad)
+            self.config["format_newline"] = pad + self.config["format_newline"]
+            self.config["format_reply"] = pad + self.config["format_reply"]
+            self.config["format_reactions"] = pad + self.config["format_reactions"]
+            self.config["format_interaction"] = pad + self.config["format_interaction"]
         self.formatter = formatter.ChatGenerator(self.config, self.colors, self.colors_formatted, self.my_id)
         self.premium = None    # same
         self.my_user_data = None    # same
@@ -5965,6 +5982,7 @@ class Endcord:
             change_type=change_type,
         )
         self.tui.set_wide(self.chat_map)
+        self.tui.set_pfp_lines(self._build_pfp_lines())
 
         if keep_selected:
             selected_msg = selected_msg + change_amount
@@ -6365,6 +6383,26 @@ class Endcord:
                     elif second_digit == 3:
                         tray_state = 1   # unread
             self.tui.set_tray_icon(tray_state)
+
+
+    def _build_pfp_lines(self):
+        """Return a list parallel to chat_buffer where each header line is
+        tagged with (user_id, avatar_id). Other lines are None.
+
+        chat_map[line] is a 7-tuple; index 0 = msg_num, index 4 = the
+        timestamp range (only set on header lines). We treat "has
+        timestamp range" as "is the avatar row".
+        """
+        out = []
+        for line in self.chat_map:
+            if line and line[0] is not None and line[4]:
+                msg_num = line[0]
+                if 0 <= msg_num < len(self.messages):
+                    msg = self.messages[msg_num]
+                    out.append((msg.get("user_id"), msg.get("avatar")))
+                    continue
+            out.append(None)
+        return out
 
 
     def lines_to_msg(self, line_index, space=False):
@@ -7945,7 +7983,9 @@ class Endcord:
                     new_message = self.execute_extensions_methods("on_message_event", new_message, cache=True)[0]
                     new_message_channel_id = new_message["d"]["channel_id"]
                     this_channel = (new_message_channel_id == self.active_channel["channel_id"])
-                    avatar_id = new_message["d"].pop("avatar", None)
+                    # Keep "avatar" on the message dict (use get instead of
+                    # pop) so the inline-PFP renderer can find it later.
+                    avatar_id = new_message["d"].get("avatar", None)
                     if this_channel and self.get_chat_last_message_id() == self.last_message_id:   # if its scrolled far up, this channel bot is cached
                         self.process_msg_events_active_channel(new_message)
                     # handle cached channels

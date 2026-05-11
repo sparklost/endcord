@@ -12,7 +12,7 @@ import sys
 import threading
 import time
 
-from endcord import acs, peripherals, utils
+from endcord import acs, peripherals, pfp as pfp_mod, utils
 
 logger = logging.getLogger(__name__)
 uses_pgcurses = hasattr(curses, "PGCURSES")
@@ -310,6 +310,11 @@ class TUI():
         self.chat_buffer = []
         self.chat_format = []
         self.wide_map = []
+        # Inline-PFP state. Wired up later via set_pfp_renderer().
+        # pfp_lines: parallel to chat_buffer. None for non-header lines,
+        # (user_id, avatar_id) for lines where we want to draw an avatar.
+        self.pfp_renderer = None
+        self.pfp_lines = []
         self.tree = []
         self.tree_format = []
         self.tree_clean_len = 0
@@ -1431,6 +1436,7 @@ class TUI():
                     self.default_color,
                 )
                 self.win_chat.noutrefresh()
+                self.place_inline_pfps()
                 if not norefresh:
                     self.need_update.set()
             except curses.error:
@@ -1444,6 +1450,52 @@ class TUI():
         for num, line in enumerate(chat_map):
             if line and line[6]:
                 self.wide_map.append(num + 1)
+
+
+    def set_pfp_renderer(self, renderer):
+        """Install a PfpRenderer; called once during app startup."""
+        self.pfp_renderer = renderer
+
+
+    def set_pfp_lines(self, pfp_lines):
+        """Update the per-line PFP map (parallel to chat_buffer).
+
+        Each entry is None or a tuple (user_id, avatar_id) — when not None
+        the line is a message header that should get an avatar.
+        """
+        self.pfp_lines = pfp_lines
+
+
+    def place_inline_pfps(self):
+        """Render avatars for currently visible header lines.
+
+        Called from draw_chat after curses has produced its output, so
+        Kitty placements layer on top of the cell content. The chat
+        formatter is responsible for leaving leading whitespace in
+        header / newline rows so avatars don't cover text.
+        """
+        if not self.pfp_renderer or not self.pfp_renderer.enabled:
+            return
+        if not self.pfp_lines or self.disable_drawing:
+            return
+        self.pfp_renderer.clear_placements()
+        chat_y, chat_x = self.win_chat.getbegyx()
+        chat_h = self.chat_hw[0]
+        # draw_chat renders bottom-up: chat_buffer[chat_index] -> bottom row.
+        # So visible buffer line i is at screen row (chat_y + chat_h - 1 -
+        # (i - chat_index)). Skip the row of avatars that would overflow
+        # past the top.
+        for i in range(self.chat_index, min(self.chat_index + chat_h, len(self.pfp_lines))):
+            entry = self.pfp_lines[i]
+            if not entry:
+                continue
+            user_id, avatar_id = entry
+            if not avatar_id:
+                continue
+            row = chat_y + chat_h - 1 - (i - self.chat_index)
+            if row < chat_y:
+                continue
+            self.pfp_renderer.place(user_id, avatar_id, row, chat_x)
 
 
     def clear_chat_wide(self, wait=True):
