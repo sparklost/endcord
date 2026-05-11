@@ -3024,6 +3024,11 @@ class TUI():
 
             elif self.vim_mode and key in self.keybindings.get("insert_mode", ()):
                 self.insert_mode = True
+                # Reset chat selection to bottom on entering INSERT so
+                # subsequent commands like Ctrl+U (jump_prev_media) start
+                # from the newest message instead of a stale off-screen pick.
+                if self.chat_selected != -1:
+                    self.set_selected(-1)
                 return self.return_input_code(28)
 
             # terminal reserved keys: CTRL+ C, I, J, M, Q, S, Z
