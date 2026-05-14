@@ -27,7 +27,7 @@ try:
     logger.info(APP_NAME)
 except (AttributeError, NameError):
     APP_NAME = "endcord"
-VERSION = "1.4.2"
+VERSION = "1.5.0"
 NO_NOTIFY_SOUND_DE = ("kde", "plasma")   # linux desktops without notification sound
 
 # platform specific code
@@ -388,7 +388,7 @@ def paste_clipboard_files(save_path=None):
                         stderr=subprocess.DEVNULL,
                     )
                     return proc.communicate()[0].decode().strip("\n")
-                return []
+            return []
 
         except FileNotFoundError:
             logger.warning("Cant paste: wl-clipboard or xclip not found on system")

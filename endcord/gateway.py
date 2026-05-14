@@ -979,14 +979,15 @@ class Gateway():
                                 if activity["type"] == 4:
                                     custom_status = activity.get("state", "")
                                 elif activity["type"] in (0, 2):
-                                    assets = activity.get("assets", {})
+                                    # assets = activity.get("assets", {})
                                     activities.append({
                                         "type": activity["type"],
                                         "name": activity["name"],
                                         "state": activity.get("state"),
                                         "details": activity.get("details"),
-                                        "small_text": assets.get("small_text"),
-                                        "large_text": assets.get("large_text"),
+                                        # "small_text": assets.get("small_text"),
+                                        # "large_text": assets.get("large_text"),
+                                        "start": int(activity["timestamps"].get("start", 0)/1000) if "timestamps" in activity else None,
                                     })
                             self.dm_activities.append({
                                 "id": user["user_id"],
@@ -1003,14 +1004,15 @@ class Gateway():
                             if activity["type"] == 4:
                                 custom_status = activity.get("state")
                             elif activity["type"] in (0, 2):
-                                assets = activity.get("assets", {})
+                                # assets = activity.get("assets", {})
                                 activities.append({
                                     "type": activity["type"],
                                     "name": activity["name"],
                                     "state": activity.get("state"),
                                     "details": activity.get("details"),
-                                    "small_text": assets.get("small_text"),
-                                    "large_text": assets.get("large_text"),
+                                    # "small_text": assets.get("small_text"),
+                                    # "large_text": assets.get("large_text"),
+                                    "start": int(activity["timestamps"].get("start", 0)/1000) if "timestamps" in activity else None,
                                 })
                         self.dm_activities.append({
                             "id": user["user_id"],
@@ -1062,7 +1064,9 @@ class Gateway():
                             nick=message["member"].get("nick"),
                             nonce=message["channel_id"],
                         )
-                    if not is_relevant_message(optext, message, self.active_channel, self.channel_cache, self.guilds, self.my_id, self.my_roles) and not self.execute_extensions_method_first("on_message_event_is_irrelevant", message, optext, cache=True):
+                    if not is_relevant_message(optext, message, self.active_channel, self.channel_cache, self.guilds, self.my_id, self.my_roles):# and not self.execute_extensions_method_first("on_message_event_is_irrelevant", message, optext, cache=True):
+                        if message["author"]["id"] == self.my_id:   # dont process my messages from other clients 
+                            continue
                         self.messages_buffer.append({
                             "op": "MESSAGE_CREATE_QUICK",
                             "d": (message["content"], message["id"], message["channel_id"]),   # just to set channel as unread in tree
@@ -1254,14 +1258,15 @@ class Gateway():
                                     #     if activity["type"] == 4:
                                     #         custom_status = activity.get("state", "")
                                     #     elif activity["type"] in (0, 2):
-                                    #         assets = activity.get("assets", {})
+                                    #         # assets = activity.get("assets", {})
                                     #         activities.append({
                                     #             "type": activity["type"],
                                     #             "name": activity["name"],
                                     #             "state": activity.get("state"),
                                     #             "details": activity.get("details"),
-                                    #             "small_text": assets.get("small_text"),
-                                    #             "large_text": assets.get("large_text"),
+                                    #             # "small_text": assets.get("small_text"),
+                                    #             # "large_text": assets.get("large_text"),
+                                    #             "start": int(activity["timestamps"].get("start", 0)/1000) if "timestamps" in activity else None,
                                     #         })
                                     members_sync.append({
                                         "id": member_data["user"]["id"],
@@ -1299,14 +1304,15 @@ class Gateway():
                                     if activity["type"] == 4:
                                         custom_status = activity.get("state", "")
                                     elif activity["type"] in (0, 2):
-                                        assets = activity.get("assets", {})
+                                        # assets = activity.get("assets", {})
                                         activities.append({
                                             "type": activity["type"],
                                             "name": activity["name"],
                                             "state": activity.get("state"),
                                             "details": activity.get("details"),
-                                            "small_text": assets.get("small_text"),
-                                            "large_text": assets.get("large_text"),
+                                            # "small_text": assets.get("small_text"),
+                                            # "large_text": assets.get("large_text"),
+                                            "start": int(activity["timestamps"].get("start", 0)/1000) if "timestamps" in activity else None,
                                         })
                                 member_id = member_data["user"]["id"]
                                 ready_data = {
@@ -1347,19 +1353,20 @@ class Gateway():
                         if activity["type"] == 4:
                             custom_status = activity.get("state")
                         elif activity["type"] in (0, 2):
-                            if "assets" in activity:
-                                small_text =  activity["assets"].get("small_text")
-                                large_text =  activity["assets"].get("large_text")
-                            else:
-                                small_text = None
-                                large_text = None
+                            # if "assets" in activity:
+                            #     small_text =  activity["assets"].get("small_text")
+                            #     large_text =  activity["assets"].get("large_text")
+                            # else:
+                            #     small_text = None
+                            #     large_text = None
                             activities.append({
                                 "type": activity["type"],
                                 "name": activity["name"],
                                 "state": activity.get( "state"),
                                 "details": activity.get("details"),
-                                "small_text": small_text,
-                                "large_text": large_text,
+                                # "small_text": small_text,
+                                # "large_text": large_text,
+                                "start": int(activity["timestamps"].get("start", 0)/1000) if "timestamps" in activity else None,
                             })
                     # select what list of activities to update
                     if "guild_id" in data:
@@ -1853,19 +1860,20 @@ class Gateway():
                     activities = []
                     for activity in data[0]["activities"]:
                         if activity["type"] in (0, 2):
-                            if "assets" in activity:
-                                small_text = activity["assets"].get("small_text")
-                                large_text = activity["assets"].get("large_text")
-                            else:
-                                small_text = None
-                                large_text = None
+                            # if "assets" in activity:
+                            #     small_text = activity["assets"].get("small_text")
+                            #     large_text = activity["assets"].get("large_text")
+                            # else:
+                            #     small_text = None
+                            #     large_text = None
                             activities.append({
                                 "type": activity["type"],
                                 "name": activity["name"],
                                 "state": activity.get("state", ""),
                                 "details": activity.get("details", ""),
-                                "small_text": small_text,
-                                "large_text": large_text,
+                                # "small_text": small_text,
+                                # "large_text": large_text,
+                                "start": int(activity["timestamps"].get("start", 0)/1000) if "timestamps" in activity else None,
                             })
                     self.my_status = {
                         "activities": activities,

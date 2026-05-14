@@ -1,36 +1,14 @@
-endcord-image-emoji
-    on_generate_assist
-        same as for chat
-    extra_worker
-        collect first N emoji and download
-        new cache for rel_positions
-        same cache for images
-        trigger redraw
-        merge cleanup
-    on_extra_window_draw
-        same draw as for chat
-    on_extra_window_remove
-        remove all
-
-
-Add internal option to add placeholder for image in chat
-    get thumb in message object (caan it be png?)
-    add vertical area to chat_format (placeholder_images is vertical space)
-    handle double-click on thumb
-
 endcord-image-inline
-    check kitty support
-    set app and formatter placeholder_images
-    download and cache thumb
-    start worker
-    calculate position on currently visible chat
-    update dimensions in chat_format
-    draw thumb to specified positins
-
+endcord-image-emoji
 
 Fix sent audio is delayed and low quality
 Fix receiver audio mixer
 Add transmmitter audio mixer
+
+Add pasting long text as embed
+Add paste_as_file command
+Add spoiler to inline media (double click to spoil, next to open)
+
 
 Add colors and formatting in assist window
 Add favorite gifs

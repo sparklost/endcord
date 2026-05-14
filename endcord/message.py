@@ -30,6 +30,8 @@ def prepare_embeds(embeds, message_content):
     for embed in embeds:
         content = []
         main_url = None
+        proxy_url = None
+        hw = None
         skip_main_url = False
         media = []
         embed_type = embed.get("type", "unknown")
@@ -60,15 +62,22 @@ def prepare_embeds(embeds, message_content):
         if "image" in embed and "url" in embed["image"]:
             content.append(embed["image"]["url"])
             main_url = embed["image"]["url"]
+            proxy_url = embed["image"]["proxy_url"]
+            hw = (embed["image"]["height"], embed["image"]["width"])
             media.append(True)
         if "video" in embed and "url" in embed["video"]:
             content.append(embed["video"]["url"])
             if not skip_main_url:
                 main_url = embed["video"]["url"]
+            proxy_url = embed["video"]["proxy_url"]
+            hw = (embed["video"]["height"], embed["video"]["width"])
             media.append(True)
         if "footer" in embed and "text" in embed["footer"]:
             content.append(embed["footer"]["text"])
             media += [False] * len(re.findall(match_url, embed["footer"]["text"]))
+        if "thumbnail" in embed:
+            proxy_url = embed["thumbnail"]["proxy_url"]
+            hw = (embed["thumbnail"]["height"], embed["thumbnail"]["width"])
 
         content = "\n".join(content)
         if content:
@@ -79,6 +88,8 @@ def prepare_embeds(embeds, message_content):
                 "name": None,
                 "url": content,
                 "main_url": main_url,
+                "proxy_url": proxy_url,
+                "hw": hw,
             }
             if embed_type == "rich":
                 ready_data["media"] = media
@@ -202,6 +213,8 @@ def prepare_message(message):
             "type": attachment.get("content_type", "unknown"),
             "name": attachment["filename"],
             "url": attachment["url"],
+            "proxy_url": attachment.get("proxy_url"),
+            "hw": (attachment["height"], attachment["width"]),
         })   # keep attachments in same place as embeds (attachments have no "main_url")
     message, embeds = content_to_attachment(message, embeds)
     # mentions
@@ -683,6 +696,10 @@ def is_relevant_message(op, message, current_channel_id, channel_cache, guilds, 
 
     # next part only for message_create
     if op != "MESSAGE_CREATE":
+        return False
+
+    # if its my message from other device
+    if message["author"]["id"] == my_id:
         return False
 
     # skip muted and check message_notifications for this channel

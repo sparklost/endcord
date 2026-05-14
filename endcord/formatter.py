@@ -192,13 +192,14 @@ def format_seconds(seconds, nice=False):
     secs = seconds % 60
     parts = []
     if hours:
-        parts.append(f"{hours:02d}" + "h" if nice else "")
+        parts.append(f"{hours:02d}" + ("h" if nice else ""))
     if minutes or hours:
-        parts.append(f"{minutes:02d}" + "m" if nice else "")
-    parts.append(f"{secs:02d}" + "s" if nice else "")
+        parts.append(f"{minutes:02d}" + ("m" if nice else ""))
+    parts.append(f"{secs:02d}" + ("s" if nice else ""))
     if nice:
         return " ".join(parts)
     return ":".join(parts)
+
 
 
 def generate_discord_timestamp(timestamp, discord_format, timezone=True):
@@ -1048,8 +1049,9 @@ class ChatGenerator:
         self.trim_embed_url_size = max(config["trim_embed_url_size"], 20)
         self.dynamic_name_len = config["dynamic_name_len"]
         self.limit_chat_buffer = config["limit_chat_buffer"]
+        self.font_aspect_ratio = config["media_font_aspect_ratio"]
         self.placeholder_emoji = "  " if placeholder_emoji else None
-        self.placeholder_images = placeholder_images
+        self.placeholder_images = config["inline_media_height"]+1 if placeholder_images else None
 
         # load colors
         self.color_default = [colors[0]]
@@ -1168,7 +1170,7 @@ class ChatGenerator:
         chat = [one_message_line, ...]
         chat_format = [[[default_color_id], [color_id, start, end], ...], ...]
         chat_map = [(msg_num, username:(st, end), is_reply, reactions:((st, end, emji_id), ...), date:(st, end), ranges, is_wide), ...]
-            ranges = (url:(st, end, index), spoiler:(st, end, index), emoji:(st, end, id), mentions:(st, end, id), channels:(st, end, id))
+            ranges = (url:(st, end, index), spoiler:(st, end, index), emoji:(st, end, id), mentions:(st, end, id), channels:(st, end, id), images:(y, x, h, w))
         change_id hints that only one specific message got changed, change_type hints type of that change: 1 - append, 2 - delete, 3 - edit.
         """
         # with self.chat_lock:   # enable if threads collide which is very unlikely
@@ -1534,7 +1536,7 @@ class ChatGenerator:
             else:
                 chat_format.append(shift_formats(self.color_reply, self.pre_name_len_reply, wide_shift))
             shift_ranges_all(pre_content_len, emoji_ranges)
-            this_line_ranges = (None, None, emoji_ranges, None, None)
+            this_line_ranges = (None, None, emoji_ranges, None, None, None)
             chat_map.append((num, None, True, None, None, this_line_ranges, bool(wide)))
 
         # bot interaction
@@ -1614,7 +1616,8 @@ class ChatGenerator:
             mention_ranges = []
             channel_ranges = []
             timestamp_ranges = []
-        for embed in message["embeds"]:
+        image_locations = []
+        for num_e, embed in enumerate(message["embeds"]):
             embed_url = embed["url"]
             if embed_url and not embed.get("hidden") and embed_url not in content:
                 if content:
@@ -1630,20 +1633,29 @@ class ChatGenerator:
                     if self.trim_embed_url_size:
                         embed_url = trim_string(embed_url, self.trim_embed_url_size)
                     content += f"[{clean_type(embed["type"])} embed]: {embed_url}"
+                if self.placeholder_images and embed["proxy_url"] and embed["hw"]:
+                    h = embed["hw"][0] / self.font_aspect_ratio
+                    w = embed["hw"][1]
+                    scale = min(self.placeholder_images / h, (max_length - self.newline_len) / w)
+                    h = int(h * scale)
+                    w = int(w * scale)
+                    # content += "\n" * (h + 1)
+                    content += ("\n" + "#" * w) * h
+                    image_locations.append((h, w))
         for sticker in message["stickers"]:
             sticker_type = sticker["format_type"]
             if content:
                 content += "\n"
             if sticker_type == 1:
-                content += f"[png sticker] (can be opened): {sticker["name"]}"
+                content += f"[png sticker]: {sticker["name"]}"
             elif sticker_type == 2:
-                content += f"[apng sticker] (can be opened): {sticker["name"]}"
+                content += f"[apng sticker]: {sticker["name"]}"
             elif sticker_type == 3:
-                content += f"[lottie sticker] (cannot be opened): {sticker["name"]}"
+                content += f"[lottie sticker]: {sticker["name"]}"
             else:
-                content += f"[gif sticker] (can be opened): {sticker["name"]}"
+                content += f"[gif sticker]: {sticker["name"]}"
         if "bot" in message:
-            app_string = self.app_string_format.replace("%app", "App - Epemeral" if message["bot"] == 2 else "App")
+            app_string = self.app_string_format.replace("%app", "App - Ephemeral" if message["bot"] == 2 else "App")
         elif "webhook" in message:
             app_string = self.app_string_format.replace("%app", "Webhook")
         else:
@@ -1811,7 +1823,7 @@ class ChatGenerator:
         emoji_this_line = ranges_multiline_one_line(emoji_ranges, newline_index+1, 0, quote)
         mentions_this_line = ranges_multiline_one_line(mention_ranges, newline_index+1, 0, quote)
         channels_this_line = ranges_multiline_one_line(channel_ranges, newline_index+1, 0, quote)
-        this_line_ranges = (urls_this_line, spoilers_this_line, emoji_this_line, mentions_this_line, channels_this_line)
+        this_line_ranges = (urls_this_line, spoilers_this_line, emoji_this_line, mentions_this_line, channels_this_line, None)
         chat_map.append((num, (self.pre_name_len, end_name), False, None, (0, 0) if group else self.timestamp_range, this_line_ranges, bool(wide)))
 
         # formatting
@@ -1956,7 +1968,7 @@ class ChatGenerator:
             emoji_this_line = ranges_multiline_one_line(emoji_ranges, len_new_line, self.newline_len, quote)
             mentions_this_line = ranges_multiline_one_line(mention_ranges, len_new_line, self.newline_len, quote)
             channels_this_line = ranges_multiline_one_line(channel_ranges, len_new_line, self.newline_len, quote)
-            this_line_ranges = (urls_this_line, spoilers_this_line, emoji_this_line, mentions_this_line, channels_this_line)
+            this_line_ranges = (urls_this_line, spoilers_this_line, emoji_this_line, mentions_this_line, channels_this_line, [])
             chat_map.append((num, None, None, None, None, this_line_ranges, bool(wide)))
 
             # formatting
@@ -1985,6 +1997,18 @@ class ChatGenerator:
                     format_line.append([*self.color_chat_edited, len_new_line - self.len_edited, len_new_line])
                 chat_format.append(format_line)
             line_num += 1
+
+        # update image_locations y and add them to ranges in chat_map for this message base line
+        start_y = len(chat_map) - (sum(h[0] + 1 for h in image_locations)) + 1
+        for num_e, image_location in enumerate(image_locations):   # y is relative to message base line
+            for idx_rel in range(image_location[0]):
+                idx = start_y + idx_rel
+                chat_map[idx][5][5].append(self.newline_len)   # start_x
+                chat_map[idx][5][5].append(image_location[1])   # width
+                chat_map[idx][5][5].append(num_e)   # embed index
+                if idx_rel == 0:
+                    chat_map[idx][5][5].append(image_location[1])   # height
+            start_y += image_location[0] + 1
 
         # reactions
         if message["reactions"]:
@@ -2053,8 +2077,8 @@ def generate_status_line(my_user_data, my_status, unseen, typing, active_channel
         %name
         %state
         %details
-        %small_text
-        %large_text
+        # %small_text
+        # %large_text
     length of the %typing string can be limited with limit_typing
     use_nick will make it use nick instead username whenever possible.
     """
@@ -2091,8 +2115,8 @@ def generate_status_line(my_user_data, my_status, unseen, typing, active_channel
         if my_status["activities"]:
             state = my_status["activities"][0]["state"][:limit_typing]
             details = my_status["activities"][0]["details"][:limit_typing]
-            sm_txt = my_status["activities"][0]["small_text"]
-            lg_txt = my_status["activities"][0]["large_text"]
+            # sm_txt = my_status["activities"][0]["small_text"]
+            # lg_txt = my_status["activities"][0]["large_text"]
             activiy_type = my_status["activities"][0]["type"]
             if activiy_type == 0:
                 verb = "Playing"
@@ -2110,8 +2134,8 @@ def generate_status_line(my_user_data, my_status, unseen, typing, active_channel
                 .replace("%name", my_status["activities"][0]["name"])
                 .replace("%state", state or "")
                 .replace("%details", details or "")
-                .replace("%small_text", sm_txt or "")
-                .replace("%large_text", lg_txt or "")
+                # .replace("%small_text", sm_txt or "")
+                # .replace("%large_text", lg_txt or "")
             )
             if fun:
                 rich = rich.replace("Metal", "🤘 Metal").replace("metal", "🤘 metal")
@@ -2536,16 +2560,17 @@ def generate_extra_window_profile(user_data, user_roles, presence, max_len):
             elif activity_type == 5:
                 action = "Competing in"
             if activity["state"]:
-                state = f" - {activity["state"]}"
+                state = f"{activity["state"]}"
             else:
                 state = ""
-            body_line += f"{action} {activity["name"]}{state}\n"
+            duration = f"({format_seconds(int(time.time() - activity["start"]))})" if activity["start"] else ""
+            body_line += f"{action} {activity["name"]} {duration}\n{state}\n"
             if activity["details"]:
                 body_line += f"{activity["details"]}\n"
-            if activity["small_text"]:
-                body_line += f"{activity["small_text"]}\n"
-            if activity["large_text"]:
-                body_line += f"{activity["large_text"]}\n"
+            # if activity["small_text"]:
+            #     body_line += f"{activity["small_text"]}\n"
+            # if activity["large_text"]:
+            #     body_line += f"{activity["large_text"]}\n"
             body_line += "\n"
 
     if roles_string:

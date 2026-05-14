@@ -148,8 +148,11 @@ class Endcord:
         self.vim_mode = config["vim_mode"]
         self.notifications_pfp = config["notifications_pfp"]
         self.silence_threshold = config["call_silence_threshold"]
-        self.placeholder_emoji = False
-        self.placeholder_images = False
+        self.inline_media = False   # config["inline_media"]
+        self.inline_media_height = config["inline_media_height"]
+        self.inline_media_download_height = config["inline_media_download_height"]
+        self.placeholder_emoji = False   # for extensions
+        self.placeholder_images = self.inline_media   # keeping this separated so extension can toggle it
 
         if not self.external_editor or not shutil.which(self.external_editor):
             self.external_editor = os.environ.get("EDITOR", "nano")
@@ -2149,6 +2152,11 @@ class Endcord:
                                     if item[0] <= mouse_x < item[1]:
                                         clicked_type = 9
                                         clicked_id = item[2]
+                            elif ranges[5]:   # embed images
+                                item = ranges[5]
+                                if item[0] <= mouse_x < item[1] + item[0]:
+                                    clicked_type = 10
+                                    clicked_id = item[2]
                             if ranges[1]:   # spoiler (owerwries previous)
                                 for num, item in enumerate(ranges[1]):
                                     if item[0] <= mouse_x < item[1]:
@@ -2216,6 +2224,13 @@ class Endcord:
                                 self.switch_channel(channel_id, guild_id, parent_hint=parent_hint)
                                 if message_id:
                                     self.go_to_message(message_id)
+                        elif clicked_type == 10:   # embed image
+                            url = self.messages[msg_index]["embeds"][clicked_id]["url"]
+                            if support_media and shutil.which(self.config["yt_dlp_path"]) and shutil.which(self.config["mpv_path"]):
+                                self.download_threads.append(threading.Thread(target=self.download_file, daemon=True, args=(url, False, True)))
+                                self.download_threads[-1].start()
+                            else:
+                                webbrowser.open(url, new=0, autoraise=True)
 
             # single click on extra line
             elif action == 48:

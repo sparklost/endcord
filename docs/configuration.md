@@ -68,6 +68,8 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
     Whether to keep deleted messages in the chat, with different color, or remove them.
 - `limit_cache_deleted = 30`  
     Limit number of cached deleted messages per channel.
+- `max_thumb_cache_age = 14`  
+    How long to keep cached thumbs for inline images, in days. Set `0` to clear on each new run.  
 - `tree_show_folders = True`  
     Whether to show or hide server folders in tree.
 - `wrap_around = True`  
@@ -103,6 +105,12 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
     Whether to mute video in media player or not. If true, will not initialize audio at all.
 - `media_cap_fps = 30`  
     Maximum framerate when playing videos.
+- `inline_media = False`  
+    Draw inline images in chat. Requires media support (not endcord-lite). Currently does nothing.
+- `inline_media_height = 10`  
+    Height of DISPLAYED image in chat. In number of characters.
+- `inline_media_download_size = 256`  
+    Height of DOWNLOADED image thumb for chat inline media. In pixels.
 - `rpc_external = True`  
     Whether to use external resources for Rich Presence (like custom pictures).
 - `emoji_as_text = False`  
@@ -468,8 +476,8 @@ Note: everything after `%content` may be pushed to newline.
 - `%name` - name of the rich presence app
 - `%state` - rich presence state
 - `%details` - rich presence details
-- `%small_text` - rich presence small text
-- `%large_text` - rich presence large text
+- `%small_text` - rich presence small text (disabled)
+- `%large_text` - rich presence large text (disabled)
 
 ### format_tabs
 - `%num` - number of the tab

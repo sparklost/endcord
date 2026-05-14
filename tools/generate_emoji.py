@@ -17,7 +17,7 @@ HEADER = f"""# {UTC_DATE}
 """
 SKIP_VARIATIONS = False
 APP_NAME = "endcord"
-VERSION = "1.4.2"
+VERSION = "1.5.0"
 HTTP_HEADER = {
     "User-Agent": APP_NAME + "/" + VERSION,   # required by github
     "Accept": "application/vnd.github+json",
