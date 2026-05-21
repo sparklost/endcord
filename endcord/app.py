@@ -4315,6 +4315,7 @@ class Endcord:
             for path in paths:
                 self.upload_threads.append(threading.Thread(target=self.upload, daemon=True, args=(path, )))
                 self.upload_threads[-1].start()
+            return
         active_channel = self.active_channel["channel_id"]
         for num, channel in enumerate(self.input_store):
             if channel["id"] == active_channel:

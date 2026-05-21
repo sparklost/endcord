@@ -108,6 +108,7 @@ Some keybindings are used by terminals or OS itself, so they are by default rebo
 - User mention - view profile of mentioned user
 - Channel - go to that channel
 - Custom discord emoji - view that emoji in media player
+- Inline image embed - open / play media
 
 ### Other
 - Scroll up/down in all windows
