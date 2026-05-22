@@ -109,7 +109,7 @@ def demojize_message(message):
     if message["referenced_message"]:
         referenced = message["referenced_message"]
         referenced["content"] = demojize(referenced["content"])
-        referenced["username"] = demojize(referenced["username"])
+        referenced["username"] = demojize(referenced.get("username"))
         referenced["global_name"] = demojize(referenced.get("global_name"))
     for embed in message["embeds"]:
         if embed["type"] == "rich":
@@ -2034,7 +2034,7 @@ class ChatGenerator:
                 if self.placeholder_emoji and reaction["emoji_id"]:
                     emoji_str = self.placeholder_emoji
                 elif self.emoji_as_text and not reaction["emoji_id"]:
-                    emoji_str = emoji_name(emoji_str)
+                    emoji_str = emoji_name(reaction["emoji"])
                 else:
                     emoji_str = reaction["emoji"]
                 my_reaction = ""
@@ -2709,7 +2709,7 @@ def generate_extra_window_search(messages, roles, channels, blocked, total_msg, 
     use_global_name = "%global_name" in format_message
 
     if pinned:
-        title_line = f"Pinned_messages ({total_msg}):"
+        title_line = f"Pinned messages ({total_msg}):"
     else:
         title_line = f"Search results: {total_msg} messages"
 
@@ -2858,7 +2858,7 @@ def generate_extra_window_assist(found, assist_type, max_len, placeholder_emoji=
         title_line = "Unknown"
     for item in found:
         if placeholder_emoji and assist_type == 3 and item[1].startswith("<:"):
-            body.append(f"   - {item[0]}"[:max_len])
+            body.append(f"    - {item[0]}"[:max_len])
         else:
             body.append(f"{prefix}{item[0]}"[:max_len])
     if not body:
@@ -3030,7 +3030,7 @@ def generate_message_notification(data, channels, roles, guild_name, convert_tim
     return title, body
 
 
-def generate_tree(dms, guilds, threads, read_state, guild_folders, activities, collapsed, uncollapsed_threads, voice_states, active_channel_id, config, folder_names=[], safe_emoji=False, max_width=0):
+def generate_tree(dms, guilds, threads, read_state, guild_folders, activities, collapsed, voice_states, active_channel_id, config, folder_names=[], safe_emoji=False, max_width=0):
     """
     Generate channel tree according to provided formatting.
     tree_format keys:
@@ -3068,6 +3068,7 @@ def generate_tree(dms, guilds, threads, read_state, guild_folders, activities, c
     voice_char = config["tree_drop_down_voice"]
     dm_status_char = config["tree_dm_status"]
     show_folders = config["tree_show_folders"]
+    uncollapse_threads = config["remember_collapsed_channels"]
     intersection = f"{dd_intersect}{dd_hline*2}"   # default: "|--"
     pass_by = f"{dd_vline}  "   # default: "|  "
     intersection_end = f"{dd_corner}{dd_hline*2}"   # default: "\\--"
@@ -3423,7 +3424,7 @@ def generate_tree(dms, guilds, threads, read_state, guild_folders, activities, c
                                 code += 20
                             elif channel["unseen"]:
                                 code += 30
-                            if channel_threads and (channel["id"] in uncollapsed_threads):
+                            if channel_threads and uncollapse_threads and (channel["id"] in collapsed):
                                 code += 1
                             tree_format.append(code)
                             tree_metadata.append({

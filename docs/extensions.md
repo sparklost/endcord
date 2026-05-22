@@ -97,6 +97,7 @@ Method names can be searched in `./endcord/app.py` code to see where they are ex
 - `init_bindings` - in load_extensions in tui.py, executed right after initializing all extensions in app.py
 - `on_binding` - at the end of common_keybindings in tui.py, executed only if there are no default bindings matched
 - `on_wait_input` - at the end of wait_input in app.py, executed only if there are no default action codes matched
+- `on_force_redraw` - at the end of force_redraw in tui.py
 - `on_gateway_event` - at the start of loop in receiver in gateway.py, arguments: event_data
 - `on_message_event_is_irrelevant` - in gateway.py near `elif optext == "MESSAGE_CREATE"` decides if these events are relevant and should be further processed. Has **raw** message event and event optext at input and is expected to return `True` if message is relevant (doesn't override already relevant messages).
 

@@ -133,6 +133,8 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
     Download discord default stickers and add them to sticker search. Disable to save some RAM.
 - `only_one_open_server = False`  
     Force only one open server at a time in tree. When one is opened other is closed, excluding DMs.
+- `remember_collapsed_channels = False`  
+    Wether to persist collapsed state for forums and channels with threads.
 - `assist_skip_app_command = False`  
     Skip assist for app_name when typing app command. Instead, show all app commands and insert app_name with
   selected command.

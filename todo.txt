@@ -1,16 +1,8 @@
+endcord-image-inline
+    Fix thread unsafe when send message ? or typing ?
+    Fix some emoji from tree is messing kitty images
 endcord-image-emoji
-    on_generate_assist
-        same as for chat
-    extra_worker
-        collect first N emoji and download
-        new cache for rel_positions
-        same cache for images
-        trigger redraw
-        merge cleanup
-    on_extra_window_draw
-        same draw as for chat
-    on_extra_window_remove
-        remove all
+    test thread unsafe when send message ? or typing ?
 
 Add inline media drawing
     add inline_media_handler

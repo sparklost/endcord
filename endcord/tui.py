@@ -644,6 +644,7 @@ class TUI():
             self.screen.noutrefresh()   # ??? needed only with windows-curses
             self.need_update.set()
         self.resize()
+        self.execute_extensions_methods("on_force_redraw")
 
 
     def init_chat(self):
@@ -1700,17 +1701,18 @@ class TUI():
                 h = self.win_extra_window.getmaxyx()[0]
                 y = 0
                 for num, line in enumerate(body_text):
-                    y = max(num - self.extra_index, 0)
+                    y = num - self.extra_index
                     if y + 1 >= h:
                         break
-                    if y >= 0:
-                        try:
-                            if num == self.extra_selected:
-                                self.win_extra_window.insstr(y + 1, 0, line + " " * (w - len(line)) + "\n", curses.color_pair(11) | self.attrib_map[11])
-                            else:
-                                self.win_extra_window.insstr(y + 1, 0, line + " " * (w - len(line)) + "\n", curses.color_pair(21) | self.attrib_map[21])
-                        except curses.error:   # some error with emojis
-                            pass
+                    if y < 0:
+                        continue
+                    try:
+                        if num == self.extra_selected:
+                            self.win_extra_window.insstr(y + 1, 0, line + " " * (w - len(line)) + "\n", curses.color_pair(11) | self.attrib_map[11])
+                        else:
+                            self.win_extra_window.insstr(y + 1, 0, line + " " * (w - len(line)) + "\n", curses.color_pair(21) | self.attrib_map[21])
+                    except curses.error:   # some error with emojis
+                        pass
 
                 y += 2
                 while y < h:

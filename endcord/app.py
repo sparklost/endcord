@@ -2127,7 +2127,10 @@ class Endcord:
             # show pinned
             elif action == 43:
                 self.restore_input_text = (input_text, "standard extra")
-                self.view_pinned()
+                if self.extra_window_open and self.tui.extra_window_title.startswith("Pinned messages"):   # dirty hack
+                    self.close_extra_window()
+                else:
+                    self.view_pinned()
 
             # search gif
             elif action == 44:
@@ -5199,7 +5202,7 @@ class Endcord:
         """Get, format and show pinned messages in this channel"""
         # cache
         for channel in self.pinned:
-            if channel["id"] == self.active_channel["channel_id"]:
+            if channel["channel_id"] == self.active_channel["channel_id"]:
                 pinned = channel["messages"]
                 break
         else:
@@ -6400,7 +6403,6 @@ class Endcord:
             self.guild_folders,
             self.activities,
             collapsed,
-            self.uncollapsed_threads,
             self.gateway.voice_states,   # faster than get_voice_states()
             self.active_channel["channel_id"],
             self.config,
@@ -6852,7 +6854,9 @@ class Endcord:
                 if code < 300 and (code % 10) == 0:   # guild/category
                     collapsed.append(self.tree_metadata[num]["id"])
                 elif 499 < code < 700 and (code % 10) == 1:   # channel (with threads) and forum
-                    self.uncollapsed_threads.append(self.tree_metadata[num]["id"])
+                    obj_id = self.tree_metadata[num]["id"]
+                    self.uncollapsed_threads.append(obj_id)
+                    collapsed.append(obj_id)
             if self.state["collapsed"] != collapsed:
                 self.state["collapsed"] = collapsed
                 utils.save_json(self.state, f"state_{self.profiles["selected"]}.json")

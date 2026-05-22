@@ -60,6 +60,7 @@ settings = {
     "save_summaries": True,
     "default_stickers": True,
     "only_one_open_server": False,
+    "remember_collapsed_channels": False,
     "assist": True,
     "assist_skip_app_command": False,
     "assist_limit": 50,
