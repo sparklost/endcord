@@ -2985,7 +2985,7 @@ class TUI():
             return None
         if bstate & curses.BUTTON1_PRESSED:
             chat_y, chat_x = self.win_chat.getbegyx()
-            if x == chat_x + self.chat_hw[1] and y > chat_y and y < chat_y + self.chat_hw[0]:
+            if self.have_scrollbar and x == chat_x + self.chat_hw[1] and y > chat_y and y < chat_y + self.chat_hw[0]:
                 self.drag_scrollbar()
                 return
             new_click = (time.time(), x, y)

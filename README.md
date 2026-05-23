@@ -32,7 +32,7 @@ Third party endcord forks may add features that can lead to account ban, contain
 - Select message and: reply, edit, delete, go to replied, react, vote in a poll...
 - Member list (toggleable)
 - Search messages
-- Client commands with history, custom commands can be bound to key
+- Many more features as [client commands](#client-side-commands) with history, custom commands can be bound to key
 - App commands and some interactions
 - View user profile
 - Channel tree (toggleable)
@@ -209,7 +209,9 @@ If this account reacted to the message, that reaction will have `*` prepended to
 Stop recording, close extra window, stop replying, everything else.
 
 ### Client-side commands
-Press `Ctrl+/` to switch to command mode. Command mode has its own assist but can also trigger regular assist. [Commands list](docs/commands.md).
+Press `Ctrl+/` to switch to command mode. Command mode has its own assist but can also trigger regular assist.  
+Last 10 commands can be cycled with `Arrow Up/Down` bindings while in command mode.  
+[Commands list](docs/commands.md).  
 
 ### App commands
 App commands assist is initiated by typing `/` at the start of input line.  

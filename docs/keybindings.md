@@ -115,6 +115,7 @@ Some keybindings are used by terminals or OS itself, so they are by default rebo
 - Click to select in all windows, in tree also: un/collapse
 - Click on tab string to switch tabs (only if exactly `format_title_line_r = "%tabs"` in config)
 - Click on extra window title and drag it to resize it
+- Click on scrollbar to move it there, or drag it
 - Click on tree border to toggle minimized tree state
 - Click on buttons in call UI, click on input/output volume values to toggle mute each
 
