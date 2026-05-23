@@ -891,6 +891,8 @@ class TUI():
 
     def set_extra_height(self, value):
         """Set extra window height to number or +1/-1"""
+        if value < 3:
+            return
         h, _ = self.screen_hw
         if value == 1:
             self.extra_window_h += 1
@@ -2975,23 +2977,28 @@ class TUI():
 
     def mouse_events(self, key):
         """Handle mouse events on terminal screen"""
-        if key == curses.KEY_MOUSE:
-            try:
-                _, x, y, _, bstate = curses.getmouse()
-            except curses.error:
-                return None
-            if bstate & curses.BUTTON1_PRESSED:
-                new_click = (time.time(), x, y)
-                if new_click[0] - self.first_click[0] < 0.5 and new_click[1:] == self.first_click[1:]:
-                    self.first_click = (0, 0, 0)
-                    return self.mouse_double_click(x, y)
-                self.first_click = new_click
-                return self.mouse_single_click(x, y)
-            if bstate & BUTTON4_PRESSED:
-                self.mouse_scroll(x, y, True)
-            elif bstate & BUTTON5_PRESSED:
-                self.mouse_scroll(x, y, False)
+        if key != curses.KEY_MOUSE:
             return None
+        try:
+            _, x, y, _, bstate = curses.getmouse()
+        except curses.error:
+            return None
+        if bstate & curses.BUTTON1_PRESSED:
+            chat_y, chat_x = self.win_chat.getbegyx()
+            if x == chat_x + self.chat_hw[1] and y > chat_y and y < chat_y + self.chat_hw[0]:
+                self.drag_scrollbar()
+                return
+            new_click = (time.time(), x, y)
+            if new_click[0] - self.first_click[0] < 0.5 and new_click[1:] == self.first_click[1:]:
+                self.first_click = (0, 0, 0)
+                return self.mouse_double_click(x, y)
+            self.first_click = new_click
+            return self.mouse_single_click(x, y)
+        if bstate & BUTTON4_PRESSED:
+            self.mouse_scroll(x, y, True)
+        elif bstate & BUTTON5_PRESSED:
+            self.mouse_scroll(x, y, False)
+        return None
 
 
     def mouse_in_window(self, x, y, window, around=False):
@@ -3169,17 +3176,86 @@ class TUI():
                     continue
                 _, _, y, _, bstate = curses.getmouse()
                 if y != prev_y:
-                    if prev_y:
-                        h = self.screen_hw[0] - 2 - 2*self.bordered - y
-                        if h >= 3:
-                            self.set_extra_height(h)
+                    h = self.screen_hw[0] - 2 - 2*self.bordered - y
+                    self.set_extra_height(h)
                     prev_y = y
                 if bstate & curses.BUTTON1_RELEASED or (bstate & curses.BUTTON1_PRESSED and not first):
                     break
-                first = True
+                first = False
         except curses.error:
             return
         finally:   # restore old state
             sys.stdout.write("\033[?1003l")
             sys.stdout.flush()
             curses.mousemask(curses.ALL_MOUSE_EVENTS)
+
+
+    def drag_scrollbar(self):
+        """Handle dragging scrollbar with mouse until mouse is released"""
+        curses.mousemask(curses.ALL_MOUSE_EVENTS | curses.REPORT_MOUSE_POSITION)
+        sys.stdout.write("\033[?1003h")   # enable mouse movement reporting
+        sys.stdout.flush()
+        prev_y = None
+        first_y = None
+        first = True
+        on_thumb = False
+        y = None
+        y_in_thumb = None
+        try:
+            while self.run:
+                key = self.screen.getch()
+                if key != curses.KEY_MOUSE:
+                    continue
+                _, _, y, _, bstate = curses.getmouse()
+                if first:
+                    rel_y = y - self.win_chat.getbegyx()[0]
+                    y_in_thumb, on_thumb = self.calculate_y_in_thumb(rel_y)
+                    first_y = y
+                    if not on_thumb:
+                        break
+                if y != prev_y:
+                    if not first:
+                        rel_y = y - self.win_chat.getbegyx()[0]
+                        self.move_scrollbar(rel_y, y_in_thumb)
+                    prev_y = y
+                if bstate & curses.BUTTON1_RELEASED or (bstate & curses.BUTTON1_PRESSED and not first):
+                    break
+                first = False
+            if y is not None and first_y == y and not on_thumb:
+                rel_y = y - self.win_chat.getbegyx()[0]
+                self.move_scrollbar(rel_y, y_in_thumb)
+        except curses.error:
+            return
+        finally:   # restore old state
+            sys.stdout.write("\033[?1003l")
+            sys.stdout.flush()
+            curses.mousemask(curses.ALL_MOUSE_EVENTS)
+
+
+    def calculate_y_in_thumb(self, rel_y):
+        """Calculate where on thumb is clicked"""
+        total_lines = len(self.chat_buffer)
+        chat_h = self.chat_hw[0]
+        if total_lines < chat_h:
+            return None
+        thumb_size = max(2, chat_h * chat_h // total_lines)
+        max_pos = chat_h - thumb_size
+        max_index = total_lines - chat_h
+        thumb_pos = max(0, min(max_pos, max_pos - int(self.chat_index * max_pos / max_index)))
+        if thumb_pos <= rel_y < thumb_pos + thumb_size:
+            return rel_y - thumb_pos, True
+        return thumb_size // 2, False
+
+
+    def move_scrollbar(self, rel_y, y_in_thumb):
+        """Move scrollbar to specified position"""
+        total_lines = len(self.chat_buffer)
+        chat_h = self.chat_hw[0]
+        if total_lines < chat_h:
+            return
+        thumb_size = max(2, chat_h * chat_h // total_lines)
+        max_pos = chat_h - thumb_size
+        max_index = total_lines - chat_h
+        new_thumb_pos = max(0, min(max_pos, rel_y - y_in_thumb))
+        self.chat_index = int((max_pos - new_thumb_pos) * max_index / max_pos)
+        self.draw_chat()

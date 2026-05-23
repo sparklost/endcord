@@ -1,9 +1,3 @@
-Add ability to click and drag scrollbar
-    detect click in tui
-    detect drag in tui
-    send it to app
-    app scrolls
-
 Add inline media drawing
     add inline_media_handler
         load and resize image with pillow
