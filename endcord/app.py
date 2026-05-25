@@ -526,10 +526,54 @@ class Endcord:
                             self.message_send_queue.get_nowait()
                         except queue.Empty:
                             break
+                elif success is False and func == self.discord.send_message:
+                    # API rejected the send — show what Discord said and
+                    # mark the pending bubble as failed so it doesn't sit
+                    # there looking like it was delivered.
+                    err = self.discord.last_send_error or {}
+                    self.discord.last_send_error = None
+                    code = err.get("error_code")
+                    status = err.get("status")
+                    label = {
+                        50035: "invalid form (too long? bad mention?)",
+                        50007: "cannot send to this user",
+                        50013: "missing permissions",
+                        20009: "explicit content blocked",
+                        40005: "request entity too large",
+                    }.get(code, f"code {code}" if code else f"HTTP {status}")
+                    self.update_extra_line(
+                        f"Send failed: {label}", timed=True,
+                    )
+                    self._mark_pending_failed(err.get("nonce"))
             except Exception:
                 pass
             finally:
                 self.message_send_queue.task_done()
+
+
+    def _mark_pending_failed(self, nonce):
+        """Tag the pending message with the given nonce as failed so the
+        renderer can colour it distinctly (rather than leaving it stuck
+        looking like it was delivered)."""
+        if not nonce:
+            return
+        for msg in self.messages:
+            if msg.get("nonce") == nonce or msg.get("id") == nonce:
+                # The formatter treats `"pending" in message` (key
+                # existence, not value) as "still sending" — so we must
+                # `del`, not assign False, to drop the pending style.
+                msg.pop("pending", None)
+                # Prefix the content with a visible marker. Reusing the
+                # deleted-style colour would also work; this gives a
+                # clear text indication regardless of theme.
+                content = msg.get("content") or ""
+                if not content.startswith("[SEND FAILED] "):
+                    msg["content"] = "[SEND FAILED] " + content
+                break
+        try:
+            self.update_chat(scroll=False)
+        except Exception:
+            pass
 
 
     def put_to_message_sender(self, func, *args, **kwargs):
@@ -2794,6 +2838,20 @@ class Endcord:
                     if self.fun and ("xyzzy" in text_to_send or "XYZZY" in text_to_send):
                         self.update_extra_line("Nothing happens.")
                     if not text_to_send.strip():
+                        continue
+                    # Pre-flight: Discord rejects messages > 2000 chars with
+                    # HTTP 400 / error code 50035. Surface this synchronously
+                    # in the extra line and refuse to send so the pending
+                    # message isn't left stuck forever in the chat buffer.
+                    # (Nitro Basic raises to 4000; if you have it, bump
+                    # DISCORD_MSG_MAX_LEN — we don't auto-detect.)
+                    DISCORD_MSG_MAX_LEN = 2000
+                    if len(text_to_send) > DISCORD_MSG_MAX_LEN:
+                        self.update_extra_line(
+                            f"Message too long: {len(text_to_send)} chars "
+                            f"(limit {DISCORD_MSG_MAX_LEN}). Not sent.",
+                            timed=True,
+                        )
                         continue
                     nonce = discord.generate_nonce()
                     self.put_to_message_sender(self.discord.send_message,
