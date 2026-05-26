@@ -7,7 +7,6 @@ import curses
 import importlib.util
 import logging
 import os
-import shutil
 import signal
 import sys
 import threading
@@ -170,7 +169,7 @@ def main(args):
         if hasattr(app, "target_profile"):
             cmd = utils.get_executable()
             cmd = utils.remove_args(cmd, "-a", "--manager", "-p", "--profile")
-            os.execv(cmd[0], cmd + ["--profile", app.target_profile])
+            os.execvp(cmd[0], cmd + ["--profile", app.target_profile])
     except curses.error as e:
         if str(e) != "endwin() returned ERR":
             logger.error(traceback.format_exc())

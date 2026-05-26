@@ -58,6 +58,8 @@ def receive_data_linux(connection):
     except struct.error as e:
         logger.error(e)
         return None, None
+    except ConnectionResetError:
+        return None, None
 
 
 def send_data_linux(connection, op, data):

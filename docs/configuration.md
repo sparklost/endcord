@@ -248,6 +248,8 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
     Formatting for replied message string. It is above message base. See [format_reply](#format_reply) for more info.
 - `format_reactions = " ╰──⤙ %reactions"`  
     Formatting for message reactions string. It is bellow last newline string. See [format_reactions](#format_reactions) for more info.
+- `format_reactions_newline = "      %reactions"`  
+    Formatting for each next reactions string. Uses same [format_reactions](#format_reactions).
 - `format_interaction = " ╭──⤙ %global_name used [%command]"`  
     Formatting for bot interaction string. It is above message base. See [format_interaction](#format_interaction)
 - `format_one_reaction = "[]%count:%reaction]"`  
@@ -328,6 +330,8 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
     A single character prepended to DM name in tree drop down, to indicate status: online/away/dnd. Also used in member list.
 - `border_corners = "╭╰╮╯"`  
     Characters used to draw corners in bordered mode.
+- `smart_chat_lines = True`  
+    Wether to extend lines in chat, left of reactions, in grouped messages only. Will use `tree_drop_down_intersect` and `tree_drop_down_vline`.
 - `username_role_colors = True`  
     Allow `%username` and `%global_name` to have color of primary role.
 - `dynamic_name_len = True`  
@@ -413,7 +417,7 @@ Every next list has additional `start` and `end`- indexes on a line where color 
 - `color_format_reply = [[245, -1], [242, -2, 0, 1, 5], [25, -2, 0, 14, 15], [25, -2, 0, 25, 26]]`  
     Color format for replied message string. Corresponding to `format_reply`.
 - `color_format_reactions = [[245, -1], [242, -2, 0, 1, 5]]`  
-    Color format for message reactions string. Corresponding to `format_reactions`.
+    Color format for message reactions string. Corresponding to `format_reactions` and `format_reactions_newline`.
 - `color_format_interaction = [[245, -1], [242, -2, 0, 1, 5]]`  
     Color format for message app interaction string. Corresponding to `format_interaction`.
 - `color_format_forum = [[-1, -1], [242, -2, 0, 0, 12], [25, -2, 0, 15, 20]]`  

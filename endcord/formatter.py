@@ -1030,6 +1030,7 @@ class ChatGenerator:
         self.format_reply = config["format_reply"]
         self.format_interaction = config["format_interaction"]
         self.format_reactions = config["format_reactions"]
+        self.format_reactions_newline = config["format_reactions_newline"]
         self.format_one_reaction = config["format_one_reaction"]
         self.format_timestamp = config["format_timestamp"]
         self.edited_string = config["edited_string"]
@@ -1049,6 +1050,11 @@ class ChatGenerator:
         self.trim_embed_url_size = max(config["trim_embed_url_size"], 20)
         self.dynamic_name_len = config["dynamic_name_len"]
         self.limit_chat_buffer = config["limit_chat_buffer"]
+        self.smart_chat_lines = config["smart_chat_lines"] and self.message_grouping
+        if self.smart_chat_lines:
+            self.tree_drop_down_intersect = config["tree_drop_down_intersect"]
+            self.tree_drop_down_vline = config["tree_drop_down_vline"]
+            self.spaces_before_text = len(self.format_reactions) - len(self.format_reactions.lstrip(" "))
         self.font_ratio = font_ratio
         self.dpw = dpw   # "dots" per character width
         self.placeholder_emoji = "  " if placeholder_emoji else None
@@ -1198,6 +1204,7 @@ class ChatGenerator:
                     show_blocked,
                     num_messages,
                     messages[1] if num_messages > 1 else None,
+                    self.chat,
                 )
                 self.insert_data_into(self.chat, message_chat, 0)
                 self.insert_data_into(self.chat_format, message_format, 0)
@@ -1225,6 +1232,7 @@ class ChatGenerator:
                         show_blocked,
                         num_messages,
                         messages[message_index+1] if num_messages > message_index+1 else None,
+                        self.chat,
                     )
                     self.insert_data_into(self.chat, message_chat, line_index)
                     self.insert_data_into(self.chat_format, message_format, line_index)
@@ -1252,6 +1260,7 @@ class ChatGenerator:
                     show_blocked,
                     num_messages,
                     messages[message_index+1] if num_messages > message_index+1 else None,
+                    self.chat,
                 )
                 self.insert_data_into(self.chat, message_chat, line_index)
                 self.insert_data_into(self.chat_format, message_format, line_index)
@@ -1277,6 +1286,7 @@ class ChatGenerator:
                 show_blocked,
                 num_messages,
                 messages[message_index+1] if num_messages > message_index+1 else None,
+                self.chat,
             )
             if not message_chat:
                 continue
@@ -1337,7 +1347,7 @@ class ChatGenerator:
         return remove_lines[0]
 
 
-    def generate_message(self, message, num, roles, channels, max_length, my_roles, member_roles, blocked, last_seen_msg, show_blocked, num_messages, next_msg):
+    def generate_message(self, message, num, roles, channels, max_length, my_roles, member_roles, blocked, last_seen_msg, show_blocked, num_messages, next_msg, full_chat):
         """Generate one message according to provided formatting"""
         if not message:   # failsafe
             return None, None, None
@@ -2045,24 +2055,48 @@ class ChatGenerator:
                     .replace("%reaction", emoji_str)
                     .replace("%count", f"{my_reaction}{reaction["count"]}"),
                 )
-            reactions_line = lazy_replace(self.format_reactions, "%timestamp", lambda: generate_timestamp(message["timestamp"], self.format_timestamp, self.convert_timezone))
-            reactions_line = reactions_line.replace("%reactions", self.reactions_separator.join(reactions))
-            reactions_line, wide_shift = normalize_string_count(reactions_line, max_length, dots=True, fill=True)
-            chat.append(reactions_line)
-            if disable_formatting:
-                chat_format.append([color_base])
-            elif mentioned:
-                chat_format.append(self.color_mention_reactions)
-            else:
-                chat_format.append(self.color_reactions)
-            reactions_map = []
-            offset = 0
-            for num_r, reaction in enumerate(reactions):
-                wide = not self.emoji_as_text and len(message["reactions"][num_r]["emoji"]) == 1   # emoji reaction will be one character
-                emoji_id = message["reactions"][num_r]["emoji_id"]
-                reactions_map.append([self.pre_reactions_len + offset+1, self.pre_reactions_len + len(reaction) + wide + offset, emoji_id])
-                offset += len(self.reactions_separator) + len(reaction) + wide
-            chat_map.append((num, None, False, reactions_map, None, None, bool(wide)))
+            first_reaction_line = True
+            extend_lines = self.smart_chat_lines and (full_chat[-1] if full_chat else "").lstrip(" ").startswith(self.tree_drop_down_intersect)
+            reaction_index = 0
+            while reactions:
+                reactions_this = [reactions[0]]
+                reaction_string = reactions.pop(0)
+                reaction = reactions[0] if reactions else ""
+                if first_reaction_line:
+                    reactions_line = lazy_replace(self.format_reactions, "%timestamp", lambda: generate_timestamp(message["timestamp"], self.format_timestamp, self.convert_timezone))
+                else:
+                    reactions_line = lazy_replace(self.format_reactions_newline, "%timestamp", lambda: generate_timestamp(message["timestamp"], self.format_timestamp, self.convert_timezone))
+                len_base = len(reactions_line.replace("%reactions", ""))
+                while reactions and len_base + len(reaction_string) + len(reaction) < max_length:
+                    reaction = reactions.pop(0)
+                    reaction_string += self.reactions_separator + reaction
+                    reactions_this.append(reaction)
+                    reaction = reactions[0] if reactions else ""
+                reactions_line = reactions_line.replace("%reactions", reaction_string)
+                reactions_line, wide_shift = normalize_string_count(reactions_line, max_length, dots=True, fill=True)
+                if extend_lines:
+                    selected = self.tree_drop_down_intersect if first_reaction_line else self.tree_drop_down_vline
+                    reactions_line = " " * self.spaces_before_text + selected + reactions_line[1+self.spaces_before_text:]
+                chat.append(reactions_line)
+                if disable_formatting:
+                    chat_format.append([color_base])
+                elif mentioned:
+                    chat_format.append(self.color_mention_reactions)
+                else:
+                    chat_format.append(self.color_reactions)
+                reactions_map = []
+                offset = 0
+                for num_r, reaction in enumerate(reactions_this):
+                    idx = reaction_index + num_r
+                    wide = not self.emoji_as_text and len(message["reactions"][idx]["emoji"]) == 1   # emoji reaction will be one character
+                    emoji_id = message["reactions"][idx]["emoji_id"]
+                    if not emoji_id:
+                        emoji_id = message["reactions"][idx]["emoji"]
+                    reactions_map.append([self.pre_reactions_len + offset+1, self.pre_reactions_len + offset + len(reaction) + wide, emoji_id])
+                    offset += len(self.reactions_separator) + len(reaction) + wide
+                chat_map.append((num, None, False, reactions_map, None, None, bool(wide)))
+                first_reaction_line = False
+                reaction_index += len(reactions_this)
 
         return chat, chat_format, chat_map
 

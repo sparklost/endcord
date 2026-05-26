@@ -2255,10 +2255,10 @@ class Endcord:
                         elif chat_line_map[2] == 1:
                             clicked_type = 3   # replied line
                         elif chat_line_map[3]:
-                            for num, reaction in enumerate(chat_line_map[3]):
+                            for reaction in chat_line_map[3]:
                                 if reaction[0] < mouse_x <= reaction[1]:
                                     clicked_type = 4   # reaction
-                                    clicked_id = num
+                                    clicked_id = reaction[2]
                                     break
                         elif chat_line_map[4] and chat_line_map[4][0] < mouse_x < chat_line_map[4][1]:
                             clicked_type = 1   # message timestamp
@@ -2313,7 +2313,7 @@ class Endcord:
                         elif clicked_type == 3:   # go to replied
                             self.go_replied(msg_index)
                         elif clicked_type == 4 and clicked_id is not None:   # add/remove reaction
-                            self.build_reaction(str(clicked_id + 1), msg_index=msg_index)
+                            self.build_reaction(clicked_id, msg_index=msg_index)
                         elif clicked_type == 5:   # url
                             urls = self.get_msg_urls_chat(msg_index)
                             content_urls = []
@@ -5408,7 +5408,9 @@ class Endcord:
                     my_present_emojis.append(reaction["emoji"])
         add_to_existing = False
 
-        try:  # existing emoji index
+        # existing emoji index or emoji_id
+        valid = False
+        try:
             num = max(int(first) - 1, 0)
             if num < len(all_reactions) and num >= 0:
                 # get reaction from existing emoji
@@ -5418,10 +5420,18 @@ class Endcord:
                 else:
                     emoji_string = selected_reaction["emoji"]
                 add_to_existing = True
-        except ValueError:   # new emoji
+                valid = True   # skip validation if emoji is existing in this message
+            else:   # its not index but its emoji_id
+                for reaction in all_reactions:
+                    if reaction["emoji_id"] == first:
+                        emoji_string = f"<:{reaction["emoji"]}:{reaction["emoji_id"]}>"
+                        valid = True
+                        break
+        except (ValueError, IndexError):   # new emoji
             emoji_string = utils.emojize(first)
 
-        if utils.is_emoji(emoji_string):   # standard emoji
+        # standard emoji
+        if utils.is_emoji(emoji_string):
             if emoji_string not in my_present_emojis:
                 if len(all_reactions) < 20 or add_to_existing:
                     success = self.discord.send_reaction(
@@ -5438,7 +5448,8 @@ class Endcord:
                     emoji_string,
                 )
 
-        else:   # discord emoji
+        # discord emoji
+        else:
             match = re.match(match_emoji, emoji_string)
             if match:
                 emoji_name = match.group(1)
@@ -5446,20 +5457,24 @@ class Endcord:
                 if emoji_id not in my_present_ids:
                     if len(all_reactions) < 20 or add_to_existing:
                         # validate discord emoji before adding it
-                        valid = False
-                        guild_emojis = []
-                        if self.premium:
-                            for guild in self.gateway.get_emojis():
-                                guild_emojis += guild["emojis"]
-                        else:
-                            for guild in self.gateway.get_emojis():
-                                if guild["guild_id"] == self.active_channel["guild_id"]:
-                                    guild_emojis += guild["emojis"]
+                        if not valid:
+                            if self.premium:
+                                for guild in self.gateway.get_emojis():
+                                    for guild_emoji in guild["emojis"]:
+                                        if guild_emoji["id"] == emoji_id:
+                                            valid = True
+                                            break
+                                    if valid:
+                                        break
+                            else:
+                                for guild in self.gateway.get_emojis():
+                                    if guild["guild_id"] != self.active_channel["guild_id"]:
+                                        continue
+                                    for guild_emoji in guild["emojis"]:
+                                        if guild_emoji["id"] == emoji_id:
+                                            valid = True
+                                            break
                                     break
-                        for guild_emoji in guild_emojis:
-                            if guild_emoji["id"] == emoji_id:
-                                valid = True
-                                break
                         if valid:
                             success = self.discord.send_reaction(
                                 self.active_channel["channel_id"],
@@ -5474,6 +5489,7 @@ class Endcord:
                         self.messages[msg_index]["id"],
                         f"{emoji_name}:{emoji_id}",
                     )
+
         if success is None:
             self.gateway.set_offline()
             self.update_extra_line("Network error")
