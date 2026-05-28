@@ -1661,8 +1661,13 @@ class TUI():
             return
         # DECSC save cursor (\e7), DECRC restore (\e8). Doing this here
         # rather than per-placement keeps the wire output compact.
+        # Also hide the cursor (\e[?25l) across the CUP burst — vim mode
+        # uses the real terminal cursor, and without this the user sees
+        # it flickering through each placement target on every chat
+        # redraw (very noticeable after upstream added the scrollbar
+        # which triggers extra draw_chat calls per j/k step).
         try:
-            os.write(sys.stdout.fileno(), b"\x1b7")
+            os.write(sys.stdout.fileno(), b"\x1b7\x1b[?25l")
         except OSError:
             pass
         self.pfp_renderer.clear_placements()
@@ -1744,7 +1749,8 @@ class TUI():
                         continue
                     self.pfp_renderer.place_emoji(emoji_id, row, abs_col)
         try:
-            os.write(sys.stdout.fileno(), b"\x1b8")
+            # Show cursor again, then DECRC restore position+attrs.
+            os.write(sys.stdout.fileno(), b"\x1b[?25h\x1b8")
         except OSError:
             pass
 
