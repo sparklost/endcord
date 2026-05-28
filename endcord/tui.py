@@ -1762,8 +1762,11 @@ class TUI():
                         continue
                     self.pfp_renderer.place_emoji(emoji_id, row, abs_col)
         try:
-            # Show cursor again, then DECRC restore position+attrs.
-            os.write(sys.stdout.fileno(), b"\x1b[?25h\x1b8")
+            # DECRC restore position+attrs FIRST (cursor still hidden),
+            # then re-show the cursor. Doing it in the other order
+            # flashes the cursor at the last CUP target in the chat
+            # region between the show and the restore.
+            os.write(sys.stdout.fileno(), b"\x1b8\x1b[?25h")
         except OSError:
             pass
 
