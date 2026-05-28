@@ -520,6 +520,8 @@ class TUI():
 
     def screen_update(self):
         """Thread that updates drawn content on physical screen"""
+        last_shape_byte = None
+        last_insert_mode = None
         while self.run:
             self.need_update.wait()
             # here must be delay, otherwise output gets messed up
@@ -527,7 +529,13 @@ class TUI():
                 time.sleep(self.screen_update_delay)
                 shape_byte = None
                 if self.vim_mode and hasattr(self, "input_hw") and self.win_input_line is not None:
-                    self.draw_input_border()
+                    # The border only changes when insert mode flips —
+                    # redrawing it on every iteration cycles the cells
+                    # adjacent to the cursor and causes a visible
+                    # flicker on rapid chat navigation.
+                    if self.insert_mode != last_insert_mode:
+                        self.draw_input_border()
+                        last_insert_mode = self.insert_mode
                     try:
                         self.screen.noutrefresh()
                         # setsyx forces the doupdate cursor regardless of
@@ -544,9 +552,14 @@ class TUI():
                 if self._pfp_dirty:
                     self.place_inline_pfps()
                     self._pfp_dirty = False
-                if shape_byte is not None:
+                # Only re-send DECSCUSR when the cursor shape actually
+                # changes. Sending it on every tick (every screen_update_delay
+                # ms) makes some terminals re-paint the cursor each time,
+                # producing input-cursor flicker on rapid j/k navigation.
+                if shape_byte is not None and shape_byte != last_shape_byte:
                     try:
                         os.write(1, shape_byte)
+                        last_shape_byte = shape_byte
                     except OSError:
                         pass
                 self.need_update.clear()
