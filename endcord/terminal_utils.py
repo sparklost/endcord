@@ -124,6 +124,16 @@ def draw(lines):
         pass
 
 
+def draw_over_curses(text, y, x):
+    """Draw lines on screen already used by curses, and restore cursor position"""
+    sys.stdout.write("\x1b[s")  # save cursor
+    for i, line in enumerate(text.split("\n")):
+        sys.stdout.write(f"\x1b[{y + i + 1};{x + 1}H")
+        sys.stdout.write(line)
+    sys.stdout.write("\x1b[u")  # restore cursor
+    sys.stdout.flush()
+
+
 def read_key():
     """Blocking read key, return key code like curses.getch(), alt sequences are not handled"""
     fd = sys.stdin.fileno()

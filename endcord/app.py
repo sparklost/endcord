@@ -4,7 +4,6 @@
 # the Free Software Foundation, version 3.
 
 import curses
-import glob
 import importlib.util
 import logging
 import os
@@ -154,10 +153,7 @@ class Endcord:
         self.notifications_pfp = config["notifications_pfp"]
         self.silence_threshold = config["call_silence_threshold"]
         self.font_ratio = config["media_font_aspect_ratio"]
-        self.inline_media = False   # config["inline_media"] and support_media
-        self.inline_media_quality = config["inline_media_quality"]
-        if self.inline_media_quality not in ("lossless", "low", "high"):
-            self.inline_media_quality = "low"
+        self.inline_media = config["inline_media"] and support_media
         self.placeholder_emoji = False   # for extensions
         self.placeholder_images = self.inline_media   # keeping this separated so extension can toggle it
 
@@ -224,8 +220,6 @@ class Endcord:
         self.tabs_names = []
         self.last_summary_save = time.time() - SUMMARY_SAVE_INTERVAL - 1
         self.new_version = None
-        if self.inline_media:
-            self.image_cache = {}
 
         # get client properties
         if config["client_properties"].lower() == "anonymous":
@@ -270,6 +264,10 @@ class Endcord:
         threading.Thread(target=self.gateway.connect, daemon=True).start()
         self.downloader = downloader.Downloader(config["proxy"])
         self.tui = tui.TUI(self.screen, self.config, keybindings, command_bindings)
+        if self.inline_media:
+            from endcord import media_inline
+            self.inline_media_drawer = media_inline.InlineMedia(self.discord, self.tui, self.config)
+            self.tui.load_inline_media(self.inline_media_drawer)
         if self.fun:
             today = (time.localtime().tm_mon, time.localtime().tm_mday)
             self.fun = 2 if (10, 25) <= today <= (11, 8) else self.fun
@@ -609,85 +607,6 @@ class Endcord:
                 self.send_desktop_message_notification(message, avatar_id)
             finally:
                 self.notify_queue.task_done()
-
-
-    def inline_media_handler(self):
-        """Thread that waits for chat content changes, downloads thumbs and triggers inline media drawing"""
-        image_cache_path = os.path.expanduser(os.path.join(peripherals.cache_path, "images"))
-        use_blocks = self.config["media_use_blocks"]
-        while self.run:
-            self.chat_update.wait()
-            self.chat_update.clear()
-            visible = []
-            image_cache = {}
-            force_draw = False
-
-            for rel_y, line_map in enumerate(self.chat_map):
-                if not line_map:
-                    continue
-                if not line_map[5]:
-                    continue
-                img_pos = line_map[5][5]
-                if not img_pos or len(img_pos) < 4:
-                    continue
-                rel_x, w, embed_idx, h, = img_pos
-
-                # get message and image info
-                try:
-                    message = self.messages[line_map[0]]
-                    message_id = message["id"]
-                    embed = message["embeds"][embed_idx]
-                    img_url = embed["proxy_url"]
-                    img_h, img_w = embed["hw"]
-                    scale = min(h * (1 + use_blocks) * 2 / img_h, w * 2 / img_w, 1)
-                    img_w = int(img_w * scale)
-                    img_h = int(img_h * scale)
-                    image_id = f"{message_id}_{embed_idx}"
-                except IndexError:
-                    continue
-
-                # download and cache (disk and ram)
-                if image_id not in self.image_cache:
-                    img_format = "webp" if support_media else "png"
-                    img_quality = "lossless" if support_media and "//media." in img_url else self.inline_media_quality
-                    if img_url.endswith("&"):
-                        img_url += "="
-                    if "?" not in img_url:
-                        img_url += "?"
-
-                    # reuse larger cached image or delete smaller
-                    for path in glob.glob(os.path.join(image_cache_path, f"{image_id}_*")):
-                        try:
-                            filename = os.path.splitext(os.path.basename(path))[0]
-                            _, _, new_w, new_h = filename.split(".")[0].split("_")
-                            if int(new_w) >= img_w:
-                                img_w = int(new_w)
-                                img_h = int(new_h)
-                                break
-                            else:
-                                os.remove(path)
-                                break   # assuming only one can exist
-                        except Exception:
-                            pass
-
-                    # download
-                    img_url = f"{img_url}&format={img_format}&quality={img_quality}&width={img_w}&height={img_h}"
-                    img_name = f"{image_id}_{img_w}_{img_h}.{img_format}"
-                    image_path = self.discord.get_file(img_url, image_cache_path, file_name=img_name, cache=True)
-                    image_cache[image_id] = (image_path, rel_y, rel_x)
-                    force_draw = True
-                visible.append(image_id)
-
-            # delete cache
-            for key, data in image_cache.items():
-                self.image_cache[key] = data
-            to_delete = [k for k in self.image_cache if k not in visible]
-            for image_id in to_delete:
-                self.image_cache.pop(image_id)
-
-            if image_cache != self.image_cache or force_draw:
-                self.image_cache = image_cache
-                # self.on_chat_draw(force=True)
 
 
     def reset(self, online=False):
@@ -6112,6 +6031,8 @@ class Endcord:
             self.tui.set_selected(-1, scroll=scroll, draw=False)   # return to bottom
 
         self.chat_update.set()
+        if self.inline_media:
+            self.inline_media_drawer.update(self.chat_map, self.messages)
         self.execute_extensions_methods("on_chat_update", self.chat, self.chat_format, self.chat_map, cache=True)
         self.tui.update_chat(self.chat, self.chat_format)
 
@@ -8047,13 +7968,6 @@ class Endcord:
         threading.Thread(target=self.message_sender, daemon=True).start()
         threading.Thread(target=self.notification_sender, daemon=True).start()
         threading.Thread(target=self.extra_line_remover, daemon=True).start()
-        if self.inline_media:
-            threading.Thread(target=self.inline_media_handler, daemon=True).start()
-            threading.Thread(target=utils.delete_old_files, daemon=True, args=(   # might delay startup
-                os.path.join(peripherals.cache_path, "images"),
-                self.config["max_thumb_cache_age"],
-                True,
-            )).start()
 
         # start RPC server
         if self.enable_rpc:

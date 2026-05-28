@@ -153,14 +153,12 @@ def img_to_term_block(img, bg_color, screen_width, screen_height, img_width, img
     # bottom padding
     while len(out_lines) < screen_height:
         out_lines.append(bg + (" " * screen_width) + RESET)
-
     return "\n".join(out_lines)
 
 
 def img_to_term_block_truecolor(img, bg_color, screen_width, screen_height, img_width, img_height):
     """Convert image to ANSI true-color string made of half-blocks"""
     pixels = img.load()
-
     padding_h = (screen_height - img_height // 2) // 2
     padding_w = (screen_width - img_width) // 2
 
@@ -231,7 +229,6 @@ class TerminalMedia():
 
     def __init__(self, config, keybindings, ui=True, external=False, volume=100, font_ratio=2.25):
         logging.getLogger("libav").setLevel(logging.ERROR)
-        media_block = config["media_use_blocks"]
         self.truecolor = config["media_truecolor"]
         self.font_ratio = font_ratio   # 2.25
         self.font_ratio_block = self.font_ratio / 2
@@ -270,7 +267,7 @@ class TerminalMedia():
             self.ui_timer = 0
         else:
             self.ui_timer = 30
-        if media_block:
+        if config["media_use_blocks"]:
             self.pil_img_to_term = self.pil_img_to_term_block
         if self.truecolor:   # select drawing algorithm
             self.img_to_term_block = img_to_term_block_truecolor
@@ -745,6 +742,7 @@ class TerminalMedia():
     def show_ui(self):
         """Show UI after its been hidden"""
         self.ui_timer = 0
+        self.ui_line = self.build_ui_string()
         if self.img:
             self.pil_img_to_term(self.img, remove_alpha=False)
 

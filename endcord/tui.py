@@ -363,6 +363,7 @@ class TUI():
         self.wrap_around_disable = False
         self.pressed_num_key = None
         self.insert_mode = not self.vim_mode   # leave it true to enable input
+        self.inline_media_drawer = None
 
         # lock for thread-safe drawing with curses
         self.lock = threading.RLock()
@@ -400,6 +401,11 @@ class TUI():
                 elif len(split_binding) > 2:
                     logger.warn(f"Invalid keybinding: {binding}")
                 self.chainable.append(split_binding[0])
+
+
+    def load_inline_media(self, inline_media_drawer):
+        """Pass inline media drawer reference from app to tui"""
+        self.inline_media_drawer = inline_media_drawer
 
 
     def load_extensions(self, extensions):
@@ -652,6 +658,8 @@ class TUI():
             self.screen.noutrefresh()   # ??? needed only with windows-curses
             self.need_update.set()
         self.resize()
+        if self.inline_media_drawer:
+            self.inline_media_drawer.force_redraw()
         self.execute_extensions_methods("on_force_redraw")
 
 
@@ -1382,6 +1390,8 @@ class TUI():
 
     def draw_chat(self, norefresh=False):
         """Draw chat with applied color formatting"""
+        if self.inline_media_drawer:
+            self.inline_media_drawer.clear_images()
         with self.lock:
             try:
                 draw_chat(
@@ -1403,6 +1413,8 @@ class TUI():
                 self.resize()
         if self.have_scrollbar:
             self.draw_scrollbar()
+        if self.inline_media_drawer:
+            self.inline_media_drawer.draw_images()
         self.execute_extensions_methods("on_chat_draw", cache=True)
 
 
@@ -1425,14 +1437,13 @@ class TUI():
             max_index = total_lines - h
             thumb_pos = max(0, min(max_pos, max_pos - int(self.chat_index * max_pos / max_index)))
 
-        # draw thumb and border
-        self.screen.vline(y, abs_x, curses.ACS_VLINE, h, curses.color_pair(self.default_color))
-        if thumb_size > 0:
-            for rel_y in range(thumb_size):
-                 self.screen.addch(y + rel_y + thumb_pos, abs_x, self.scrollbar_char, curses.color_pair(self.default_color))
-
-        # draw corners
         try:
+            # draw thumb and border
+            self.screen.vline(y, abs_x, curses.ACS_VLINE, h, curses.color_pair(self.default_color))
+            if thumb_size > 0:
+                for rel_y in range(thumb_size):
+                     self.screen.addch(y + rel_y + thumb_pos, abs_x, self.scrollbar_char, curses.color_pair(self.default_color))
+            # draw corners
             self.screen.addstr(y - 1, abs_x, self.corner_ur, curses.color_pair(self.default_color))
             # it errors when drawing in bottom-right cell, but still draws it
             self.screen.addstr(y + h, abs_x, self.corner_dr, curses.color_pair(self.default_color))

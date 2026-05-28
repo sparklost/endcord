@@ -1,21 +1,8 @@
-Add inline media drawing
-    add inline_media_handler
-        load and resize image with pillow
-        build image data - convert to characters
-        cache image data in image_cache and limit ram usage
-    add dummy draw inline image
-        trigger drawing on chat change
-        calculate position on currently visible chat
-        cut visible portion of image
-    add draw_over_curses to terminal utils
-        can i print truecolor image directly to stdout for this ???
-        always have to: first clear image, draw chat, draw image
-        add before_chat_draw to extension api
-        add undraw_over_curses to terminal utils
-
+Fix selected line removing inline image
+Fix inline image scrolling with tree
 Add colors and formatting in assist window
 Add favorite gifs
-Add spoiler to inline media (double click to spoil, next to open)
+Add spoiler to inline media (double click to spoil, next to open) and extensions
 Update screenshots
 
 Fix sent audio is delayed and low quality
@@ -25,7 +12,7 @@ Add transmmitter audio mixer
 Add custom python package management through build.py
 Add --norust option to build script
 Add --minimal option to build script (rempves numpy orjson soundcard)
-Remove ruff
+Remove ruff and uv
 
 Fix RTP metrics
 Fix issues with wide characters in input line
