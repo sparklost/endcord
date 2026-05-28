@@ -518,6 +518,33 @@ class TUI():
         self.need_update.set()
 
 
+    def _set_leaveok_on_passive_windows(self):
+        """Tell curses that writes to these windows should NOT track the
+        cursor position. With leaveok(True), `doupdate` leaves the
+        terminal cursor wherever the input-line refresh put it — so
+        chat / tree / status / title redraws don't physically move the
+        real cursor through their cells.
+
+        Must be called after every derwin() since the new sub-window
+        defaults to leaveok=False.
+        """
+        for win in (
+            getattr(self, "win_chat", None),
+            getattr(self, "win_tree", None),
+            getattr(self, "win_status_line", None),
+            getattr(self, "win_title_line", None),
+            getattr(self, "win_title_tree", None),
+            getattr(self, "win_member_list", None),
+            getattr(self, "win_extra_line", None),
+            getattr(self, "win_extra_window", None),
+        ):
+            if win is not None:
+                try:
+                    win.leaveok(True)
+                except curses.error:
+                    pass
+
+
     def screen_update(self):
         """Thread that updates drawn content on physical screen"""
         last_shape_byte = None
@@ -529,10 +556,7 @@ class TUI():
                 time.sleep(self.screen_update_delay)
                 shape_byte = None
                 if self.vim_mode and hasattr(self, "input_hw") and self.win_input_line is not None:
-                    # The border only changes when insert mode flips —
-                    # redrawing it on every iteration cycles the cells
-                    # adjacent to the cursor and causes a visible
-                    # flicker on rapid chat navigation.
+                    # The border only changes when insert mode flips.
                     if self.insert_mode != last_insert_mode:
                         self.draw_input_border()
                         last_insert_mode = self.insert_mode
@@ -553,9 +577,7 @@ class TUI():
                     self.place_inline_pfps()
                     self._pfp_dirty = False
                 # Only re-send DECSCUSR when the cursor shape actually
-                # changes. Sending it on every tick (every screen_update_delay
-                # ms) makes some terminals re-paint the cursor each time,
-                # producing input-cursor flicker on rapid j/k navigation.
+                # changes. Every-tick spam re-paints the cursor.
                 if shape_byte is not None and shape_byte != last_shape_byte:
                     try:
                         os.write(1, shape_byte)
@@ -605,6 +627,8 @@ class TUI():
             self.win_extra_line = None
             self.win_extra_window = None
             self.win_member_list = None
+
+        self._set_leaveok_on_passive_windows()
 
         # redraw
         with self.lock:
@@ -694,6 +718,8 @@ class TUI():
             self.win_extra_window = None
             self.win_member_list = None
 
+        self._set_leaveok_on_passive_windows()
+
         # redraw
         self.input_border_hwyx = win_prompt_input_line
         self.draw_status_line()
@@ -759,6 +785,7 @@ class TUI():
         )
         self.win_chat = self.screen.derwin(*chat_hwyx)
         self.chat_hw = self.win_chat.getmaxyx()
+        self._set_leaveok_on_passive_windows()
         if self.bordered:
             self.draw_border(chat_hwyx, top=not(self.have_title), right=not(self.draw_scrollbar))
             self.screen.noutrefresh()
@@ -1976,6 +2003,7 @@ class TUI():
                 if not self.win_extra_line:
                     extra_line_hwyx = (1, w - el_off, h - self.bordered - 3, el_off)
                     self.win_extra_line = self.screen.derwin(*extra_line_hwyx)
+                    self._set_leaveok_on_passive_windows()
                     del self.win_chat
                     self.init_chat()
                     self.draw_chat(norefresh=True)
@@ -2064,6 +2092,7 @@ class TUI():
                         ew_inner,
                     )
                     self.win_extra_window = self.screen.derwin(*extra_window_hwyx)
+                    self._set_leaveok_on_passive_windows()
                     self.init_chat()
                     if not self.member_list:
                         self.draw_chat(norefresh=True)
@@ -2169,6 +2198,7 @@ class TUI():
                         w - self.member_list_width,
                     )
                     self.win_member_list = self.screen.derwin(*member_list_hwyx)
+                    self._set_leaveok_on_passive_windows()
                     if self.bordered:
                         self.draw_border(member_list_hwyx)
                         if self.have_title:
