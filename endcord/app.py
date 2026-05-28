@@ -6826,13 +6826,29 @@ class Endcord:
         is the exact region the image will occupy.
         """
         from endcord import pfp as pfp_mod  # local to avoid import cycle
-        self._image_geom = {}
+        # `_image_geom` is keyed by (message_id, url) — NOT (msg_num, url)
+        # — because msg_num shifts on every prepended message, and the
+        # formatter does incremental updates so old "[image" markers
+        # aren't re-emitted to chat[] (we blanked them on first sight).
+        # message_id is stable across appends/edits.
+        if not hasattr(self, "_image_geom"):
+            self._image_geom = {}
         if not self.chat_map:
             return
         image_types_short = ("image", "png", "jpg", "jpeg", "gif", "webp")
 
-        # msg_num -> list of (line_idx, url) for image attachment lines
-        msg_image_lines = {}
+        # Drop entries whose message is no longer in the buffer (it
+        # scrolled out, got deleted, or the buffer trim cut it).
+        live_ids = {m.get("id") for m in self.messages if m.get("id")}
+        self._image_geom = {
+            k: v for k, v in self._image_geom.items() if k[0] in live_ids
+        }
+
+        # Find NEW "[image attachment]:" lines (only re-emitted for new
+        # messages by the formatter's incremental path) and populate
+        # geometry for them. We don't need to re-walk OLD image lines —
+        # their _image_geom entries are already preserved above.
+        msg_image_lines = {}   # msg_num -> [line_idx, ...]
         for i, line in enumerate(self.chat_map):
             if not line or line[0] is None:
                 continue
@@ -6845,11 +6861,15 @@ class Endcord:
                 continue
             msg_image_lines.setdefault(msg_num, []).append(i)
 
-        # Pair image lines with the message's image embeds (in order),
-        # measure each, and remember dimensions for later use.
+        # Pair image lines with the message's image embeds (in order)
+        # and reserve blank lines for ones we haven't seen before.
+        # Existing entries already have their reserve rows in
+        # chat_buffer from a prior pass — re-inserting would stack
+        # extra blank lines on every redraw.
         plan = []   # (line_idx, url, cols, rows)
         for msg_num, line_indices in msg_image_lines.items():
             msg = self.messages[msg_num]
+            mid = msg.get("id")
             image_urls = []
             for embed in msg.get("embeds", []) or []:
                 url = embed.get("url")
@@ -6859,11 +6879,14 @@ class Endcord:
                 if etype.startswith("image/") or etype in image_types_short:
                     image_urls.append(url)
             for line_idx, url in zip(line_indices, image_urls):
+                if (mid, url) in self._image_geom:
+                    # Already measured + reserved; nothing to do.
+                    continue
                 dims = self.pfp_renderer.measure_attachment(url)
                 if not dims:
                     continue
                 cols, rows = dims
-                self._image_geom[(msg_num, url)] = (cols, rows)
+                self._image_geom[(mid, url)] = (cols, rows)
                 plan.append((line_idx, url, cols, rows))
 
         if not plan:
@@ -6927,15 +6950,16 @@ class Endcord:
                 if not (0 <= line_idx < len(self.chat)):
                     continue
                 buf = self.chat[line_idx]
-                # Blank from "[image" through the end of the line so
-                # neither the label, the URL, nor the trim ellipsis
-                # ("...") trails the thumbnail.
+                # Hide the "[image attachment]: <url>" text by setting
+                # the line's format to default (no URL underline, no
+                # mention colour). DO NOT blank the text content — the
+                # "[image" marker has to stay in chat[] so subsequent
+                # passes can find this line again. The formatter does
+                # incremental updates and never re-emits old image
+                # markers, so blanking them would lose the only signal
+                # we have for re-placing the image on the next render.
                 img_pos = buf.find("[image")
                 if img_pos >= 0:
-                    self.chat[line_idx] = buf[:img_pos] + " " * (len(buf) - img_pos)
-                    # Strip any URL-underline / mention colours that
-                    # were on the original text, otherwise they show
-                    # as a faint line through the thumbnail.
                     if 0 <= line_idx < len(self.chat_format):
                         self.chat_format[line_idx] = [
                             getattr(self.formatter, "color_default", 1),
@@ -6947,7 +6971,8 @@ class Endcord:
                         line_map[5][0] if (line_map[5] and len(line_map[5]) > 0) else []
                     )
                     col = url_ranges[0][0] if url_ranges else 0
-                geom = getattr(self, "_image_geom", {}).get((msg_num, url))
+                mid = msg.get("id")
+                geom = getattr(self, "_image_geom", {}).get((mid, url))
                 if not geom:
                     continue
                 out[line_idx] = (col, url, geom[0], geom[1])
