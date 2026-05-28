@@ -1,7 +1,7 @@
 ## Keybindings
 \* - Rebound keybinding on some OS, see [OS specific keybindings](#os-specific-keybindings)
 
-### tree
+### Tree
 - `Ctrl+Up/Down` * - Navigating channel tree
 - `Ctrl+Space` * - Expand selected categories and servers or enter selected channel
 - `Alt+H` - Un/collapse channel with threads in tree
@@ -10,7 +10,7 @@
 - `Alt+Shift+U`- Copy selected channel (in tree) URL to clipboard
 - `Shift+Up/Down` - Select prev/next server and collapse all other servers
 
-### input line
+### Input line
 - `Left/Right` - character left/right
 - `Ctrl+Left/Right` - word left/right
 - `Shift+Left/Right` - select left/right
@@ -24,7 +24,7 @@
 - `Ctrl+V` - Smart paste - paste text or file as attachment
 - `Ctrl+Backspace` - Delete word
 
-### chat
+### Chat
 - `Enter` - Send message
 - `Arrow-Up/Down` - Navigating messages
 - `Ctrl+R` - Reply to selected message
@@ -47,17 +47,17 @@
 - `Alt+N` - Show pinned messages in current channel
 - `Ctrl+Shift+V` - This is common terminal binding to paste text, better use: `Ctrl+V` binding for smart paste
 
-### extra line
+### Extra line
 - `Alt+<` - Previous uploaded/uploading attachment
 - `Alt+>` - Next uploaded/uploading attachment
 - `Ctrl+Y-Up/Down` - Resize extra window +/- 1
 
-### extra window
+### Extra window
 - `Alt+Up/Down` - navigate in extra window / member list
 - `Alt+Enter` - select in extra window / member list
 - `Alt+V` - Preview selected file in upload assist or when searching gif
 
-### other
+### Other
 - `Ctrl+/` * - Open command palette
 - `Ctrl+X` - Cancel all downloads and uploads
 - `Alt+D` - Cycle user status (online/away/DnD/invisible)
@@ -71,7 +71,7 @@
 - `Enter` - Open selected post in forum
 - `Escape` - Close assist, exit command mode, cancel...
 
-### media player controls
+### Media player controls
 - `escape` - quit
 - `Space` - pause
 - `Left/Right` - seek
@@ -108,12 +108,14 @@ Some keybindings are used by terminals or OS itself, so they are by default rebo
 - User mention - view profile of mentioned user
 - Channel - go to that channel
 - Custom discord emoji - view that emoji in media player
+- Inline image embed - open / play media
 
 ### Other
 - Scroll up/down in all windows
 - Click to select in all windows, in tree also: un/collapse
 - Click on tab string to switch tabs (only if exactly `format_title_line_r = "%tabs"` in config)
 - Click on extra window title and drag it to resize it
+- Click on scrollbar to move it there, or drag it
 - Click on tree border to toggle minimized tree state
 - Click on buttons in call UI, click on input/output volume values to toggle mute each
 

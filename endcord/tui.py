@@ -273,6 +273,8 @@ class TUI():
         self.corner_ur = config["border_corners"][2]
         self.corner_dl = config["border_corners"][1]
         self.corner_dr = config["border_corners"][3]
+        self.have_scrollbar = config["draw_scrollbar"] and self.bordered
+        self.scrollbar_char = config["scrollbar_character"]
         self.hline = config["tree_drop_down_hline"]
         self.tab_spaces = int(config["tab_spaces"])
         self.vim_mode = config["vim_mode"]
@@ -439,6 +441,46 @@ class TUI():
         self.init_chainable()
 
 
+    def execute_extensions_methods(self, method_name, *args, cache=False):
+        """Execute specific method for each extension if extension has this method, and chain them"""
+        if not self.extensions:
+            return args
+
+        # try to load from cache (improves performance with many extensions)
+        if cache:
+            for extension_point in self.extension_cache:
+                data = args
+                if extension_point[0] == method_name:
+                    for method in extension_point[1]:
+                        result = method(*data)
+                        if result is not None:
+                            if not isinstance(result, tuple):
+                                result = (result, )
+                            data = result
+                    if data is not None:
+                        return data
+                    return args
+
+        # try to load method from extensions and add to cache
+        methods = []
+        data = args
+        for extension in self.extensions:
+            method = getattr(extension, method_name, None)
+            if callable(method):
+                if cache:
+                    methods.append(method)
+                result = method(*data)
+                if result is not None:
+                    if not isinstance(result, tuple):
+                        result = (result, )
+                    data = result
+        if cache:
+            self.extension_cache.append((method_name, methods))
+        if data is not None:
+            return data
+        return args
+
+
     def execute_extensions_method_first(self, method_name, *args, cache=False):
         """Execute specific method for each extension if extension has this method, without chaining, stop on first run extension"""
         if not self.extensions:
@@ -470,9 +512,15 @@ class TUI():
         return result
 
 
+    def stop(self):
+        """Stop all threads"""
+        self.run = False
+        self.need_update.set()
+
+
     def screen_update(self):
         """Thread that updates drawn content on physical screen"""
-        while True:
+        while self.run:
             self.need_update.wait()
             # here must be delay, otherwise output gets messed up
             with self.lock:
@@ -637,7 +685,7 @@ class TUI():
         self.input_border_hwyx = win_prompt_input_line
         self.draw_status_line()
         self.draw_input_border()
-        self.draw_border(chat_hwyx, top=not(self.have_title))
+        self.draw_border(chat_hwyx, top=not(self.have_title), right=not(self.draw_scrollbar))
         self.update_prompt(self.prompt)
         self.spellcheck()
         self.draw_input_line()
@@ -675,6 +723,7 @@ class TUI():
             self.screen.noutrefresh()   # ??? needed only with windows-curses
             self.need_update.set()
         self.resize()
+        self.execute_extensions_methods("on_force_redraw")
 
 
     def init_chat(self):
@@ -698,7 +747,7 @@ class TUI():
         self.win_chat = self.screen.derwin(*chat_hwyx)
         self.chat_hw = self.win_chat.getmaxyx()
         if self.bordered:
-            self.draw_border(chat_hwyx, top=not(self.have_title))
+            self.draw_border(chat_hwyx, top=not(self.have_title), right=not(self.draw_scrollbar))
             self.screen.noutrefresh()
         return common_h
 
@@ -826,8 +875,10 @@ class TUI():
                     self.input_buffer[self.assist_start-1] in ASSIST_TRIGGERS
                 ):
                     assist_type = ASSIST_TRIGGERS.index(self.input_buffer[self.assist_start-1]) + 1
-                    if self.assist_start != 1 and (self.input_buffer[self.assist_start-2] not in (" ", "\n") or self.input_buffer[self.assist_start] in (" ", "\n")):
+                    if self.assist_start != 1 and (self.input_buffer[self.assist_start-2] not in (" ", "\n", "+") or self.input_buffer[self.assist_start] in (" ", "\n")):
                         # skip trigger if no space before it
+                        if self.instant_assist:
+                            return self.input_buffer, 5
                         return None, None
                     # Skip if char right after the trigger isn't alnum/underscore:
                     # avoids opening the picker for ASCII smileys like :), :(,
@@ -841,6 +892,7 @@ class TUI():
                 self.assist_start = -1
                 return None, 100
             if self.assist_start > self.input_index:
+                self.assist_start = -1
                 return None, 100
         if self.enable_autocomplete and self.input_buffer:
             return self.input_buffer, 7
@@ -929,6 +981,8 @@ class TUI():
 
     def set_extra_height(self, value):
         """Set extra window height to number or +1/-1"""
+        if value < 3:
+            return
         h, _ = self.screen_hw
         if value == 1:
             self.extra_window_h += 1
@@ -1517,6 +1571,43 @@ class TUI():
             except curses.error:
                 # exception will happen when window is resized to smaller w dimensions
                 self.resize()
+        if self.have_scrollbar:
+            self.draw_scrollbar()
+        self.execute_extensions_methods("on_chat_draw", cache=True)
+
+
+    def draw_scrollbar(self):
+        """Draw scrollbar at the right side of the chat"""
+        if not self.have_scrollbar:
+            return
+        h, w = self.chat_hw
+        y, x = self.win_chat.getbegyx()
+        abs_x = x + w
+        total_lines = len(self.chat_buffer)
+
+        # clculate thumb size and pos
+        if total_lines <= h:
+            thumb_size = 0
+            thumb_pos = 0
+        else:
+            thumb_size = max(2, h * h // total_lines)
+            max_pos = h - thumb_size
+            max_index = total_lines - h
+            thumb_pos = max(0, min(max_pos, max_pos - int(self.chat_index * max_pos / max_index)))
+
+        # draw thumb and border
+        self.screen.vline(y, abs_x, curses.ACS_VLINE, h, curses.color_pair(self.default_color))
+        if thumb_size > 0:
+            for rel_y in range(thumb_size):
+                 self.screen.addch(y + rel_y + thumb_pos, abs_x, self.scrollbar_char, curses.color_pair(self.default_color))
+
+        # draw corners
+        try:
+            self.screen.addstr(y - 1, abs_x, self.corner_ur, curses.color_pair(self.default_color))
+            # it errors when drawing in bottom-right cell, but still draws it
+            self.screen.addstr(y + h, abs_x, self.corner_dr, curses.color_pair(self.default_color))
+        except curses.error:
+            pass
 
 
     def set_wide(self, chat_map):
@@ -1971,17 +2062,18 @@ class TUI():
                 h = self.win_extra_window.getmaxyx()[0]
                 y = 0
                 for num, line in enumerate(body_text):
-                    y = max(num - self.extra_index, 0)
+                    y = num - self.extra_index
                     if y + 1 >= h:
                         break
-                    if y >= 0:
-                        try:
-                            if num == self.extra_selected:
-                                self.win_extra_window.insstr(y + 1, 0, line + " " * (w - len(line)) + "\n", curses.color_pair(11) | self.attrib_map[11])
-                            else:
-                                self.win_extra_window.insstr(y + 1, 0, line + " " * (w - len(line)) + "\n", curses.color_pair(21) | self.attrib_map[21])
-                        except curses.error:   # some error with emojis
-                            pass
+                    if y < 0:
+                        continue
+                    try:
+                        if num == self.extra_selected:
+                            self.win_extra_window.insstr(y + 1, 0, line + " " * (w - len(line)) + "\n", curses.color_pair(11) | self.attrib_map[11])
+                        else:
+                            self.win_extra_window.insstr(y + 1, 0, line + " " * (w - len(line)) + "\n", curses.color_pair(21) | self.attrib_map[21])
+                    except curses.error:   # some error with emojis
+                        pass
 
                 y += 2
                 while y < h:
@@ -1990,6 +2082,7 @@ class TUI():
                 self.draw_chat(norefresh=True)
                 self.win_extra_window.noutrefresh()
                 self.need_update.set()
+        self.execute_extensions_methods("on_extra_window_draw", cache=False)
 
 
     def remove_extra_window(self):
@@ -2021,6 +2114,7 @@ class TUI():
                 self.draw_extra_line(self.extra_line_text)
                 self.draw_member_list(self.member_list, self.member_list_format, force=True)
                 self.draw_chat()
+        self.execute_extensions_methods("on_extra_window_remove")
 
 
     def draw_member_list(self, member_list, member_list_format, force=False, reset=False, clean=True):
@@ -3281,23 +3375,28 @@ class TUI():
 
     def mouse_events(self, key):
         """Handle mouse events on terminal screen"""
-        if key == curses.KEY_MOUSE:
-            try:
-                _, x, y, _, bstate = curses.getmouse()
-            except curses.error:
-                return None
-            if bstate & curses.BUTTON1_PRESSED:
-                new_click = (time.time(), x, y)
-                if new_click[0] - self.first_click[0] < 0.5 and new_click[1:] == self.first_click[1:]:
-                    self.first_click = (0, 0, 0)
-                    return self.mouse_double_click(x, y)
-                self.first_click = new_click
-                return self.mouse_single_click(x, y)
-            if bstate & BUTTON4_PRESSED:
-                self.mouse_scroll(x, y, True)
-            elif bstate & BUTTON5_PRESSED:
-                self.mouse_scroll(x, y, False)
+        if key != curses.KEY_MOUSE:
             return None
+        try:
+            _, x, y, _, bstate = curses.getmouse()
+        except curses.error:
+            return None
+        if bstate & curses.BUTTON1_PRESSED:
+            chat_y, chat_x = self.win_chat.getbegyx()
+            if self.have_scrollbar and x == chat_x + self.chat_hw[1] and y > chat_y and y < chat_y + self.chat_hw[0]:
+                self.drag_scrollbar()
+                return
+            new_click = (time.time(), x, y)
+            if new_click[0] - self.first_click[0] < 0.5 and new_click[1:] == self.first_click[1:]:
+                self.first_click = (0, 0, 0)
+                return self.mouse_double_click(x, y)
+            self.first_click = new_click
+            return self.mouse_single_click(x, y)
+        if bstate & BUTTON4_PRESSED:
+            self.mouse_scroll(x, y, True)
+        elif bstate & BUTTON5_PRESSED:
+            self.mouse_scroll(x, y, False)
+        return None
 
 
     def mouse_in_window(self, x, y, window, around=False):
@@ -3477,17 +3576,86 @@ class TUI():
                     continue
                 _, _, y, _, bstate = curses.getmouse()
                 if y != prev_y:
-                    if prev_y:
-                        h = self.screen_hw[0] - 2 - 2*self.bordered - y
-                        if h >= 3:
-                            self.set_extra_height(h)
+                    h = self.screen_hw[0] - 2 - 2*self.bordered - y
+                    self.set_extra_height(h)
                     prev_y = y
                 if bstate & curses.BUTTON1_RELEASED or (bstate & curses.BUTTON1_PRESSED and not first):
                     break
-                first = True
+                first = False
         except curses.error:
             return
         finally:   # restore old state
             sys.stdout.write("\033[?1003l")
             sys.stdout.flush()
             curses.mousemask(curses.ALL_MOUSE_EVENTS)
+
+
+    def drag_scrollbar(self):
+        """Handle dragging scrollbar with mouse until mouse is released"""
+        curses.mousemask(curses.ALL_MOUSE_EVENTS | curses.REPORT_MOUSE_POSITION)
+        sys.stdout.write("\033[?1003h")   # enable mouse movement reporting
+        sys.stdout.flush()
+        prev_y = None
+        first_y = None
+        first = True
+        on_thumb = False
+        y = None
+        y_in_thumb = None
+        try:
+            while self.run:
+                key = self.screen.getch()
+                if key != curses.KEY_MOUSE:
+                    continue
+                _, _, y, _, bstate = curses.getmouse()
+                if first:
+                    rel_y = y - self.win_chat.getbegyx()[0]
+                    y_in_thumb, on_thumb = self.calculate_y_in_thumb(rel_y)
+                    first_y = y
+                    if not on_thumb:
+                        break
+                if y != prev_y:
+                    if not first:
+                        rel_y = y - self.win_chat.getbegyx()[0]
+                        self.move_scrollbar(rel_y, y_in_thumb)
+                    prev_y = y
+                if bstate & curses.BUTTON1_RELEASED or (bstate & curses.BUTTON1_PRESSED and not first):
+                    break
+                first = False
+            if y is not None and first_y == y and not on_thumb:
+                rel_y = y - self.win_chat.getbegyx()[0]
+                self.move_scrollbar(rel_y, y_in_thumb)
+        except curses.error:
+            return
+        finally:   # restore old state
+            sys.stdout.write("\033[?1003l")
+            sys.stdout.flush()
+            curses.mousemask(curses.ALL_MOUSE_EVENTS)
+
+
+    def calculate_y_in_thumb(self, rel_y):
+        """Calculate where on thumb is clicked"""
+        total_lines = len(self.chat_buffer)
+        chat_h = self.chat_hw[0]
+        if total_lines < chat_h:
+            return None
+        thumb_size = max(2, chat_h * chat_h // total_lines)
+        max_pos = chat_h - thumb_size
+        max_index = total_lines - chat_h
+        thumb_pos = max(0, min(max_pos, max_pos - int(self.chat_index * max_pos / max_index)))
+        if thumb_pos <= rel_y < thumb_pos + thumb_size:
+            return rel_y - thumb_pos, True
+        return thumb_size // 2, False
+
+
+    def move_scrollbar(self, rel_y, y_in_thumb):
+        """Move scrollbar to specified position"""
+        total_lines = len(self.chat_buffer)
+        chat_h = self.chat_hw[0]
+        if total_lines < chat_h:
+            return
+        thumb_size = max(2, chat_h * chat_h // total_lines)
+        max_pos = chat_h - thumb_size
+        max_index = total_lines - chat_h
+        new_thumb_pos = max(0, min(max_pos, rel_y - y_in_thumb))
+        self.chat_index = int((max_pos - new_thumb_pos) * max_index / max_pos)
+        self.draw_chat()

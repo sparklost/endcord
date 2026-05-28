@@ -229,11 +229,11 @@ else:
 class TerminalMedia():
     """Methods for showing and playing media in terminal"""
 
-    def __init__(self, config, keybindings, ui=True, external=False, volume=100):
+    def __init__(self, config, keybindings, ui=True, external=False, volume=100, font_ratio=2.25):
         logging.getLogger("libav").setLevel(logging.ERROR)
         media_block = config["media_use_blocks"]
         self.truecolor = config["media_truecolor"]
-        self.font_ratio = config["media_font_aspect_ratio"]   # 2.25
+        self.font_ratio = font_ratio   # 2.25
         self.font_ratio_block = self.font_ratio / 2
         self.ascii_palette = list(config["media_ascii_palette"])   # "  ..',;:c*loexk#O0XNW"
         self.saturation = config["media_saturation"]   # 1.2

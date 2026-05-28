@@ -1263,7 +1263,7 @@ class VoiceHandler:
         if self.playing:
             self.playing = False
             try:   # empty queue
-                while True:
+                while self.run:
                     self.audio_queue_in.get_nowait()
             except queue.Empty:
                 pass

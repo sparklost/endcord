@@ -33,7 +33,7 @@ match_d_emoji = re.compile(r"<(a?):([a-zA-Z0-9_]+):(\d+)>")
 match_mention = re.compile(r"<@(\d+)>")
 match_role = re.compile(r"<@&(\d+)>")
 match_channel = re.compile(r"<#([\d\/]+)>")
-match_timestamp = re.compile(r"<t:(\d+)(:[tTdDfFR])?>")
+match_timestamp = re.compile(r"<t:(\d+)(:[tTdDfFsSR])?>")
 match_escaped_md = re.compile(r"\\(?=[^a-zA-Z\d\s])")
 match_md_spoiler = re.compile(r"(?<!\\)\|\|.+?\|\|")
 match_md_code_snippet = re.compile(r"(?<!`|\\)`[^`]+`")
@@ -53,7 +53,7 @@ match_md_all = re.compile(
     """,
     re.VERBOSE,
 )
-
+MARKER = "\uEE42"  # character from private use area
 
 def ceil(x):
     """To avoid importing math.ceil"""
@@ -109,7 +109,7 @@ def demojize_message(message):
     if message["referenced_message"]:
         referenced = message["referenced_message"]
         referenced["content"] = demojize(referenced["content"])
-        referenced["username"] = demojize(referenced["username"])
+        referenced["username"] = demojize(referenced.get("username"))
         referenced["global_name"] = demojize(referenced.get("global_name"))
     for embed in message["embeds"]:
         if embed["type"] == "rich":
@@ -192,13 +192,14 @@ def format_seconds(seconds, nice=False):
     secs = seconds % 60
     parts = []
     if hours:
-        parts.append(f"{hours:02d}" + "h" if nice else "")
+        parts.append(f"{hours:02d}" + ("h" if nice else ""))
     if minutes or hours:
-        parts.append(f"{minutes:02d}" + "m" if nice else "")
-    parts.append(f"{secs:02d}" + "s" if nice else "")
+        parts.append(f"{minutes:02d}" + ("m" if nice else ""))
+    parts.append(f"{secs:02d}" + ("s" if nice else ""))
     if nice:
         return " ".join(parts)
     return ":".join(parts)
+
 
 
 def generate_discord_timestamp(timestamp, discord_format, timezone=True):
@@ -218,7 +219,11 @@ def generate_discord_timestamp(timestamp, discord_format, timezone=True):
         format_string = "%d %b %Y"
     elif discord_format == "F":
         format_string = "%A, %d %b %Y %H:%M"
-    else:
+    elif discord_format == "s":
+        format_string = "d/%m/%Y %H:%M"
+    elif discord_format == "S":
+        format_string = "d/%m/%Y %H:%M:%S"
+    else:   # "f"
         format_string = "%d %b %Y %H:%M"
     return datetime.strftime(time_obj, format_string)
 
@@ -460,7 +465,7 @@ def shift_formats(formats, index, diff, skip=1):
     return new_formats
 
 
-def replace_discord_emoji(text, *ranges_lists):
+def replace_discord_emoji(text, placeholder=None, *ranges_lists):
     """
     Transform emoji strings into nicer looking ones:
     `some text <:emoji_name:emoji_id> more text` --> `some text :emoji_name: more text`
@@ -472,7 +477,10 @@ def replace_discord_emoji(text, *ranges_lists):
     for match in re.finditer(match_d_emoji, text):
         start, end = match.span()
         result.append(text[last_pos:start])
-        new_text = f":{match.group(2)}:"
+        if placeholder:
+            new_text = placeholder
+        else:
+            new_text = f":{match.group(2)}:"
         result.append(new_text)
 
         new_start = start + offset
@@ -1014,13 +1022,15 @@ def format_poll(poll):
 class ChatGenerator:
     """Chat generator class"""
 
-    def __init__(self, config, colors, colors_formatted, my_id):
+    def __init__(self, config, colors, colors_formatted, my_id, placeholder_emoji, placeholder_images, font_ratio=2.25, dpw=1):
         # load from config
         self.format_message = config["format_message"]
+        self.format_message_grouped = config["format_message_grouped"]
         self.format_newline = config["format_newline"]
         self.format_reply = config["format_reply"]
         self.format_interaction = config["format_interaction"]
         self.format_reactions = config["format_reactions"]
+        self.format_reactions_newline = config["format_reactions_newline"]
         self.format_one_reaction = config["format_one_reaction"]
         self.format_timestamp = config["format_timestamp"]
         self.edited_string = config["edited_string"]
@@ -1035,10 +1045,20 @@ class ChatGenerator:
         self.format_date = config["format_date"]
         self.emoji_as_text = config["emoji_as_text"]
         self.message_spacing = config["message_spacing"]
+        self.message_grouping = config["message_grouping"]
         self.quote_character = config["quote_character"]
         self.trim_embed_url_size = max(config["trim_embed_url_size"], 20)
         self.dynamic_name_len = config["dynamic_name_len"]
         self.limit_chat_buffer = config["limit_chat_buffer"]
+        self.smart_chat_lines = config["smart_chat_lines"] and self.message_grouping
+        if self.smart_chat_lines:
+            self.tree_drop_down_intersect = config["tree_drop_down_intersect"]
+            self.tree_drop_down_vline = config["tree_drop_down_vline"]
+            self.spaces_before_text = len(self.format_reactions) - len(self.format_reactions.lstrip(" "))
+        self.font_ratio = font_ratio
+        self.dpw = dpw   # "dots" per character width
+        self.placeholder_emoji = "  " if placeholder_emoji else None
+        self.placeholder_images = (config["inline_media_height"]) if placeholder_images else None
 
         # load colors
         self.color_default = [colors[0]]
@@ -1048,24 +1068,26 @@ class ChatGenerator:
         self.color_separator = [colors[5]]
         self.color_code = colors[6]
         self.color_standout = colors[7]
-        self.color_chat_edited = colors_formatted[5][0]
-        self.color_mention_chat_edited = colors_formatted[14][0]
-        self.color_chat_url = colors_formatted[6][0][0]
-        self.color_mention_chat_url = colors_formatted[15][0][0]
-        self.color_spoiler = colors_formatted[7][0][0]
-        self.color_mention_spoiler = colors_formatted[16][0][0]
+        self.color_chat_edited = colors_formatted[6][0]
+        self.color_chat_url = colors_formatted[7][0][0]
+        self.color_spoiler = colors_formatted[8][0][0]
+        self.color_mention_chat_edited = colors_formatted[16][0]
+        self.color_mention_chat_url = colors_formatted[17][0][0]
+        self.color_mention_spoiler = colors_formatted[18][0][0]
 
         # load formatted colors: [[id], [id, start, end]...]
         self.color_message = colors_formatted[0]
-        self.color_newline = colors_formatted[1]
-        self.color_reply = colors_formatted[2]
-        self.color_reactions = colors_formatted[3]
-        self.color_interaction = colors_formatted[4]
-        self.color_mention_message = colors_formatted[9]
-        self.color_mention_newline = colors_formatted[10]
-        self.color_mention_reply = colors_formatted[11]
-        self.color_mention_reactions = colors_formatted[12]
-        self.color_mention_interaction = colors_formatted[13]
+        self.color_message_grouped = colors_formatted[1]
+        self.color_newline = colors_formatted[2]
+        self.color_reply = colors_formatted[3]
+        self.color_reactions = colors_formatted[4]
+        self.color_interaction = colors_formatted[5]
+        self.color_mention_message = colors_formatted[10]
+        self.color_mention_message_grouped = colors_formatted[11]
+        self.color_mention_newline = colors_formatted[12]
+        self.color_mention_reply = colors_formatted[13]
+        self.color_mention_reactions = colors_formatted[14]
+        self.color_mention_interaction = colors_formatted[15]
 
         # other
         self.use_global_name = "%global_name" in self.format_message
@@ -1106,7 +1128,7 @@ class ChatGenerator:
             .replace("%timestamp", self.placeholder_timestamp)
             .replace("%content", ""),
             )
-        self.pre_reaction_len = len(
+        self.pre_reactions_len = len(
             self.format_reactions
             .replace("%timestamp", self.placeholder_timestamp)
             .replace("%reactions", ""),
@@ -1154,8 +1176,8 @@ class ChatGenerator:
             format_reactions (reactions added to main message)
         chat = [one_message_line, ...]
         chat_format = [[[default_color_id], [color_id, start, end], ...], ...]
-        chat_map = [(msg_num, username:(st, end), is_reply, reactions:((st, end), ...), date:(st, end), ranges), ...]
-            ranges = (url:(st, end, index), spoiler:(st, end, index), emoji:(st, end, id), mentions:(st, end, id), channels:(st, end, id))
+        chat_map = [(msg_num, username:(st, end), is_reply, reactions:((st, end, emji_id), ...), date:(st, end), ranges, is_wide), ...]
+            ranges = (url:(st, end, index), spoiler:(st, end, index), emoji:(st, end, id), mentions:(st, end, id), channels:(st, end, id), images:(y, x, h, w))
         change_id hints that only one specific message got changed, change_type hints type of that change: 1 - append, 2 - delete, 3 - edit.
         """
         # with self.chat_lock:   # enable if threads collide which is very unlikely
@@ -1182,6 +1204,7 @@ class ChatGenerator:
                     show_blocked,
                     num_messages,
                     messages[1] if num_messages > 1 else None,
+                    self.chat,
                 )
                 self.insert_data_into(self.chat, message_chat, 0)
                 self.insert_data_into(self.chat_format, message_format, 0)
@@ -1209,6 +1232,7 @@ class ChatGenerator:
                         show_blocked,
                         num_messages,
                         messages[message_index+1] if num_messages > message_index+1 else None,
+                        self.chat,
                     )
                     self.insert_data_into(self.chat, message_chat, line_index)
                     self.insert_data_into(self.chat_format, message_format, line_index)
@@ -1236,6 +1260,7 @@ class ChatGenerator:
                     show_blocked,
                     num_messages,
                     messages[message_index+1] if num_messages > message_index+1 else None,
+                    self.chat,
                 )
                 self.insert_data_into(self.chat, message_chat, line_index)
                 self.insert_data_into(self.chat_format, message_format, line_index)
@@ -1261,6 +1286,7 @@ class ChatGenerator:
                 show_blocked,
                 num_messages,
                 messages[message_index+1] if num_messages > message_index+1 else None,
+                self.chat,
             )
             if not message_chat:
                 continue
@@ -1321,7 +1347,7 @@ class ChatGenerator:
         return remove_lines[0]
 
 
-    def generate_message(self, message, num, roles, channels, max_length, my_roles, member_roles, blocked, last_seen_msg, show_blocked, num_messages, next_msg):
+    def generate_message(self, message, num, roles, channels, max_length, my_roles, member_roles, blocked, last_seen_msg, show_blocked, num_messages, next_msg, full_chat):
         """Generate one message according to provided formatting"""
         if not message:   # failsafe
             return None, None, None
@@ -1390,6 +1416,7 @@ class ChatGenerator:
                 chat_map.append(None)
                 return None, None, None   # to not break message-to-chat conversion
 
+        group = False
         if next_msg:
             # unread message separator
             if not self.have_unseen_messages_line and self.date_separator and last_seen_msg and (num == num_messages-1 or (int(next_msg["id"]) <= int(last_seen_msg))):
@@ -1430,11 +1457,14 @@ class ChatGenerator:
                     chat_format.append([color_base])
                     chat_map.append(None)
 
-            # empty separator between messages not from same sender of after period of time
-            elif self.message_spacing and (message["user_id"] != next_msg["user_id"] or unix_from_snowflake(message["id"]) - unix_from_snowflake(next_msg["id"]) > SPLIT_AFTER_TIME):
+            # empty separator between messages not from same sender of after period of time and if message has reply or interaction
+            elif message["referenced_message"] or message["interaction"] or (self.message_spacing and (message["user_id"] != next_msg["user_id"] or unix_from_snowflake(message["id"]) - unix_from_snowflake(next_msg["id"]) > SPLIT_AFTER_TIME)):
+                group = False
                 chat.append(" " * max_length)
                 chat_format.append([color_base])
                 chat_map.append(None)
+            else:
+                group = self.message_grouping
 
         # replied message line
         if message["referenced_message"]:
@@ -1454,18 +1484,19 @@ class ChatGenerator:
                 global_name = get_global_name(ref_message, self.use_nick)
                 reply_embeds = ref_message["embeds"].copy()
                 content = ""
+                emoji_ranges = []
                 if ref_message["content"]:
                     content = ref_message["content"]
                     if self.emoji_as_text:
                         content = utils.demojize(content)
                     content, _ = replace_escaped_md(content)
                     content = replace_spoilers(content)
-                    content, _ = replace_discord_emoji(content)
                     content, _ = replace_mentions(content, ref_message["mentions"], global_name=self.use_global_name, use_nick=self.use_nick)
                     content, _ = replace_roles(content, roles)
                     content = replace_discord_url(content)
                     content, _ = replace_channels(content, channels)
                     content, _ = replace_timestamps(content, self.convert_timezone)
+                    content, emoji_ranges = replace_discord_emoji(content, self.placeholder_emoji)
                 if reply_embeds:
                     for embed in reply_embeds:
                         embed_url = embed["url"]
@@ -1485,6 +1516,7 @@ class ChatGenerator:
                 reply_line = lazy_replace(self.format_reply, "%username", lambda: normalize_string(ref_message["username"], self.dyn_limit_username, emoji_safe=False, fill=not(self.dynamic_name_len)))
                 reply_line, wide_shift = lazy_replace_args(reply_line, "%global_name", lambda: normalize_string_count(global_name, self.dyn_limit_username, fill=not(self.dynamic_name_len)))
                 reply_line = lazy_replace(reply_line, "%timestamp", lambda: generate_timestamp(ref_message["timestamp"], self.format_timestamp, self.convert_timezone))
+                pre_content_len = len(reply_line.split("%content")[0])
                 reply_line = lazy_replace(reply_line, "%content", lambda: content.replace("\r", " ").replace("\n", " "))
                 wide_shift = -wide_shift
             else:
@@ -1494,6 +1526,8 @@ class ChatGenerator:
                 reply_line = reply_line.replace("%timestamp", self.placeholder_timestamp)
                 reply_line = lazy_replace(reply_line, "%content", lambda: ref_message["content"].replace("\r", "").replace("\n", ""))
                 wide_shift = 0
+                emoji_ranges = []
+                pre_content_len = 0
             reply_line, wide = normalize_string_count(reply_line, max_length, dots=True)
             if self.dynamic_name_len:
                 if self.dynamic_name_len == 1:
@@ -1512,7 +1546,9 @@ class ChatGenerator:
                 chat_format.append(shift_formats(self.color_reply, self.pre_name_len_reply, name_len - self.limit_username))
             else:
                 chat_format.append(shift_formats(self.color_reply, self.pre_name_len_reply, wide_shift))
-            chat_map.append((num, None, True, None, None, None, bool(wide)))
+            shift_ranges_all(pre_content_len, emoji_ranges)
+            this_line_ranges = (None, None, emoji_ranges, None, None, None)
+            chat_map.append((num, None, True, None, None, this_line_ranges, bool(wide)))
 
         # bot interaction
         elif message["interaction"]:
@@ -1536,7 +1572,18 @@ class ChatGenerator:
 
         # main message
         global_name = get_global_name(message, self.use_nick) if self.use_global_name else ""
-        if self.dynamic_name_len:
+        if "bot" in message:
+            app_string = self.app_string_format.replace("%app", "App - Ephemeral" if message["bot"] == 2 else "App")
+        elif "webhook" in message:
+            app_string = self.app_string_format.replace("%app", "Webhook")
+        else:
+            app_string = None
+        if group:
+            placeholder_message = self.format_message_grouped.replace("%timestamp", self.placeholder_timestamp).replace("%edited", "").split("%content")[0]
+            pre_content_len = len(placeholder_message)
+            name_len = 0
+            end_name = 0
+        elif self.dynamic_name_len:
             if self.dynamic_name_len == 1:
                 name_len = len(message["username"][:self.dyn_limit_username])
             else:
@@ -1547,14 +1594,14 @@ class ChatGenerator:
                 .replace("%global_name", " " * name_len)
                 .replace("%timestamp", self.placeholder_timestamp)
                 .replace("%edited", "")
-                .replace("%app", "")
+                .replace("%app", app_string if app_string else "")
             ).split("%content")[0]
-            pre_content_len = self.default_pre_content_len = len(placeholder_message)
+            pre_content_len = len(placeholder_message)
         else:
             pre_content_len = self.default_pre_content_len
             name_len = self.limit_username
             end_name = self.end_name
-        if self.edited_before_content and edited:
+        if self.edited_before_content and edited and not group:
             pre_content_len += self.len_edited
         quote = False
         content = ""
@@ -1564,7 +1611,7 @@ class ChatGenerator:
             content = message["content"]
             if self.emoji_as_text:
                 content = utils.demojize(content)
-            content, emoji_ranges = replace_discord_emoji(content)
+            content, emoji_ranges = replace_discord_emoji(content, self.placeholder_emoji)
             content, mention_ranges = replace_mentions(content, message["mentions"], emoji_ranges, global_name=self.use_global_name, use_nick=self.use_nick)
             content, role_ranges = replace_roles(content, roles, emoji_ranges, mention_ranges)
             mention_ranges += role_ranges
@@ -1586,7 +1633,8 @@ class ChatGenerator:
             mention_ranges = []
             channel_ranges = []
             timestamp_ranges = []
-        for embed in message["embeds"]:
+        image_locations = []
+        for num_e, embed in enumerate(message["embeds"]):
             embed_url = embed["url"]
             if embed_url and not embed.get("hidden") and embed_url not in content:
                 if content:
@@ -1600,27 +1648,39 @@ class ChatGenerator:
                     content += f"[rich embed]:\n{embed_url}"
                 else:
                     if self.trim_embed_url_size:
-                        embed_url = trim_string(embed_url, self.trim_embed_url_size)
+                        if embed["main_url"] == embed_url:
+                            embed_url = trim_string(embed_url, self.trim_embed_url_size)
                     content += f"[{clean_type(embed["type"])} embed]: {embed_url}"
+                if self.placeholder_images and embed.get("proxy_url") and embed["hw"]:
+                    h = embed["hw"][0] / self.font_ratio
+                    w = embed["hw"][1]
+                    smallest_h = h / self.dpw
+                    smallest_w = w / self.dpw
+                    scale = min(min(self.placeholder_images, smallest_h) / h, min(max_length - 1 - self.newline_len, smallest_w) / w, 1)
+                    h = round(h * scale)
+                    w = round(w * scale) - 1
+                    content += f"\n<{MARKER}:{num_e}>" + "\n " * (h - 1)
+                    # content += f"\n<{MARKER}:{num_e}>" + ("\n" + "#" * w) * (h - 1)
+                    image_locations.append((h, w))
         for sticker in message["stickers"]:
             sticker_type = sticker["format_type"]
             if content:
                 content += "\n"
             if sticker_type == 1:
-                content += f"[png sticker] (can be opened): {sticker["name"]}"
+                content += f"[png sticker]: {sticker["name"]}"
             elif sticker_type == 2:
-                content += f"[apng sticker] (can be opened): {sticker["name"]}"
+                content += f"[apng sticker]: {sticker["name"]}"
             elif sticker_type == 3:
-                content += f"[lottie sticker] (cannot be opened): {sticker["name"]}"
+                content += f"[lottie sticker]: {sticker["name"]}"
             else:
-                content += f"[gif sticker] (can be opened): {sticker["name"]}"
-        if "bot" in message:
-            app_string = self.app_string_format.replace("%app", "App - Epemeral" if message["bot"] == 2 else "App")
-        elif "webhook" in message:
-            app_string = self.app_string_format.replace("%app", "Webhook")
-        else:
-            app_string = None
-        message_line = lazy_replace(self.format_message, "%username", lambda: normalize_string(message["username"], self.dyn_limit_username, emoji_safe=False, fill=not(self.dynamic_name_len)))
+                content += f"[gif sticker]: {sticker["name"]}"
+        message_line = lazy_replace(
+            self.format_message_grouped if group else self.format_message,
+            "%username",
+            lambda: normalize_string(message["username"],
+            self.dyn_limit_username, emoji_safe=False,
+            fill=not(self.dynamic_name_len)),
+        )
         message_line, wide_shift = lazy_replace_args(message_line, "%global_name", lambda: normalize_string_count(global_name, self.dyn_limit_username, fill=not(self.dynamic_name_len)))
         message_line = lazy_replace(message_line, "%timestamp", lambda: generate_timestamp(message["timestamp"], self.format_timestamp, self.convert_timezone))
         message_line = message_line.replace("%edited", self.edited_string if edited else "")
@@ -1674,7 +1734,7 @@ class ChatGenerator:
             )
 
         # find all markdown and correct format indexes
-        message_line, md_format, md_indexes = format_md_all(message_line, self.default_pre_content_len, chain(code_snippets, code_blocks, urls))
+        message_line, md_format, md_indexes = format_md_all(message_line, pre_content_len, chain(code_snippets, code_blocks, urls))
         if md_indexes:
             move_by_indexes(
                 md_indexes,
@@ -1777,15 +1837,18 @@ class ChatGenerator:
         emoji_this_line = ranges_multiline_one_line(emoji_ranges, newline_index+1, 0, quote)
         mentions_this_line = ranges_multiline_one_line(mention_ranges, newline_index+1, 0, quote)
         channels_this_line = ranges_multiline_one_line(channel_ranges, newline_index+1, 0, quote)
-        this_line_ranges = (urls_this_line, spoilers_this_line, emoji_this_line, mentions_this_line, channels_this_line)
-        chat_map.append((num, (self.pre_name_len, end_name), False, None, self.timestamp_range, this_line_ranges, bool(wide)))
+        this_line_ranges = (urls_this_line, spoilers_this_line, emoji_this_line, mentions_this_line, channels_this_line, None)
+        chat_map.append((num, (self.pre_name_len, end_name), False, None, (0, 0) if group else self.timestamp_range, this_line_ranges, bool(wide)))
 
         # formatting
         len_message_line = len(message_line)
         if disable_formatting:
             chat_format.append([color_base])
         elif mentioned:
-            format_line = self.color_mention_message[:]
+            if group:
+                format_line = self.color_mention_message_grouped[:]
+            else:
+                format_line = self.color_mention_message[:]
             if self.dynamic_name_len:
                 format_line = shift_formats(format_line, self.pre_name_len+1, name_len - self.limit_username)
             else:
@@ -1799,13 +1862,16 @@ class ChatGenerator:
             if alt_role_color:
                 format_line.append([alt_role_color, self.pre_name_len + bool(wide_shift), end_name])
             if edited:
-                if self.edited_before_content:
+                if self.edited_before_content and not group:
                     format_line.append([*self.color_mention_chat_edited, self.pre_edited_len + (name_len - self.limit_username), self.pre_edited_len + (name_len - self.limit_username) + self.len_edited])
                 elif edited and not next_line:
                     format_line.append(self.color_mention_chat_edited + [len_message_line - self.len_edited, len_message_line])
             chat_format.append(format_line)
         else:
-            format_line = self.color_message[:]
+            if group:
+                format_line = self.color_message_grouped[:]
+            else:
+                format_line = self.color_message[:]
             if self.dynamic_name_len:
                 format_line = shift_formats(format_line, self.pre_name_len+1, name_len - self.limit_username)
             else:
@@ -1819,7 +1885,7 @@ class ChatGenerator:
             if role_color:
                 format_line.append([role_color, self.pre_name_len + bool(wide_shift), end_name])
             if edited:
-                if self.edited_before_content:
+                if self.edited_before_content and not group:
                     format_line.append([*self.color_chat_edited, self.pre_edited_len + (name_len - self.limit_username), self.pre_edited_len + (name_len - self.limit_username) + self.len_edited])
                 elif edited and not next_line:
                     format_line.append([*self.color_chat_edited, len_message_line - self.len_edited, len_message_line])
@@ -1916,7 +1982,7 @@ class ChatGenerator:
             emoji_this_line = ranges_multiline_one_line(emoji_ranges, len_new_line, self.newline_len, quote)
             mentions_this_line = ranges_multiline_one_line(mention_ranges, len_new_line, self.newline_len, quote)
             channels_this_line = ranges_multiline_one_line(channel_ranges, len_new_line, self.newline_len, quote)
-            this_line_ranges = (urls_this_line, spoilers_this_line, emoji_this_line, mentions_this_line, channels_this_line)
+            this_line_ranges = (urls_this_line, spoilers_this_line, emoji_this_line, mentions_this_line, channels_this_line, [])
             chat_map.append((num, None, None, None, None, this_line_ranges, bool(wide)))
 
             # formatting
@@ -1930,7 +1996,7 @@ class ChatGenerator:
                 format_line += format_multiline_one_line(standout_ranges, len_new_line, self.newline_len, self.color_standout, this_quote)
                 format_line += code_block_format
                 format_line += format_spoilers
-                if edited and not next_line and not self.edited_before_content:
+                if edited and not next_line and not (self.edited_before_content and not group):
                     format_line.append(self.color_mention_chat_edited + [len_new_line - self.len_edited, len_new_line])
                 chat_format.append(format_line)
             else:
@@ -1941,18 +2007,46 @@ class ChatGenerator:
                 format_line += format_multiline_one_line(standout_ranges, len_new_line, self.newline_len, self.color_standout, this_quote)
                 format_line += code_block_format
                 format_line += format_spoilers
-                if edited and not next_line and not self.edited_before_content:
+                if edited and not next_line and not (self.edited_before_content and not group):
                     format_line.append([*self.color_chat_edited, len_new_line - self.len_edited, len_new_line])
                 chat_format.append(format_line)
             line_num += 1
 
+        # update image_locations y and add them to ranges in chat_map for this message base line
+        start_y = len(chat_map) + 1
+        len_images = len(image_locations)
+        for idx_i, image_location in enumerate(reversed(image_locations)):   # y is relative to message base line
+            num_i = len_images - idx_i - 1
+            start_y -= image_location[0] + 1
+            # search for marker on this line and above
+            marker = f"<{MARKER}:{num_i}>"
+            shift = 0
+            while chat[start_y-shift][self.newline_len:] != marker:
+                shift += 1
+                if start_y - shift < 0:
+                    break
+            if start_y - shift < 0:
+                continue
+            chat[start_y-shift] = chat[start_y-shift][:self.newline_len] + " "
+            for idx_rel in range(image_location[0]):
+                idx = start_y - shift + idx_rel
+                chat_map[idx][5][5].append(self.newline_len)   # start_x
+                chat_map[idx][5][5].append(image_location[1])   # width
+                chat_map[idx][5][5].append(num_i)   # embed index
+                if idx_rel == 0:
+                    chat_map[idx][5][5].append(image_location[0])   # height
+
         # reactions
         if message["reactions"]:
             reactions = []
+            emoji_ranges = []
             for reaction in message["reactions"]:
-                emoji_str = reaction["emoji"]
-                if self.emoji_as_text:
-                    emoji_str = emoji_name(emoji_str)
+                if self.placeholder_emoji and reaction["emoji_id"]:
+                    emoji_str = self.placeholder_emoji
+                elif self.emoji_as_text and not reaction["emoji_id"]:
+                    emoji_str = emoji_name(reaction["emoji"])
+                else:
+                    emoji_str = reaction["emoji"]
                 my_reaction = ""
                 if reaction["me"]:
                     my_reaction = "*"
@@ -1961,23 +2055,48 @@ class ChatGenerator:
                     .replace("%reaction", emoji_str)
                     .replace("%count", f"{my_reaction}{reaction["count"]}"),
                 )
-            reactions_line = lazy_replace(self.format_reactions, "%timestamp", lambda: generate_timestamp(message["timestamp"], self.format_timestamp, self.convert_timezone))
-            reactions_line = reactions_line.replace("%reactions", self.reactions_separator.join(reactions))
-            reactions_line, wide_shift = normalize_string_count(reactions_line, max_length, dots=True, fill=True)
-            chat.append(reactions_line)
-            if disable_formatting:
-                chat_format.append([color_base])
-            elif mentioned:
-                chat_format.append(self.color_mention_reactions)
-            else:
-                chat_format.append(self.color_reactions)
-            reactions_map = []
-            offset = 0
-            for num_r, reaction in enumerate(reactions):
-                wide = not self.emoji_as_text and len(message["reactions"][num_r]["emoji"]) == 1   # emoji reaction will be one character
-                reactions_map.append([self.pre_reaction_len + offset, self.pre_reaction_len + len(reaction) + wide + offset])
-                offset += len(self.reactions_separator) + len(reaction) + wide
-            chat_map.append((num, None, False, reactions_map, None, None, bool(wide)))
+            first_reaction_line = True
+            extend_lines = self.smart_chat_lines and (full_chat[-1] if full_chat else "").lstrip(" ").startswith(self.tree_drop_down_intersect)
+            reaction_index = 0
+            while reactions:
+                reactions_this = [reactions[0]]
+                reaction_string = reactions.pop(0)
+                reaction = reactions[0] if reactions else ""
+                if first_reaction_line:
+                    reactions_line = lazy_replace(self.format_reactions, "%timestamp", lambda: generate_timestamp(message["timestamp"], self.format_timestamp, self.convert_timezone))
+                else:
+                    reactions_line = lazy_replace(self.format_reactions_newline, "%timestamp", lambda: generate_timestamp(message["timestamp"], self.format_timestamp, self.convert_timezone))
+                len_base = len(reactions_line.replace("%reactions", ""))
+                while reactions and len_base + len(reaction_string) + len(reaction) < max_length:
+                    reaction = reactions.pop(0)
+                    reaction_string += self.reactions_separator + reaction
+                    reactions_this.append(reaction)
+                    reaction = reactions[0] if reactions else ""
+                reactions_line = reactions_line.replace("%reactions", reaction_string)
+                reactions_line, wide_shift = normalize_string_count(reactions_line, max_length, dots=True, fill=True)
+                if extend_lines:
+                    selected = self.tree_drop_down_intersect if first_reaction_line else self.tree_drop_down_vline
+                    reactions_line = " " * self.spaces_before_text + selected + reactions_line[1+self.spaces_before_text:]
+                chat.append(reactions_line)
+                if disable_formatting:
+                    chat_format.append([color_base])
+                elif mentioned:
+                    chat_format.append(self.color_mention_reactions)
+                else:
+                    chat_format.append(self.color_reactions)
+                reactions_map = []
+                offset = 0
+                for num_r, reaction in enumerate(reactions_this):
+                    idx = reaction_index + num_r
+                    wide = not self.emoji_as_text and len(message["reactions"][idx]["emoji"]) == 1   # emoji reaction will be one character
+                    emoji_id = message["reactions"][idx]["emoji_id"]
+                    if not emoji_id:
+                        emoji_id = message["reactions"][idx]["emoji"]
+                    reactions_map.append([self.pre_reactions_len + offset+1, self.pre_reactions_len + offset + len(reaction) + wide, emoji_id])
+                    offset += len(self.reactions_separator) + len(reaction) + wide
+                chat_map.append((num, None, False, reactions_map, None, None, bool(wide)))
+                first_reaction_line = False
+                reaction_index += len(reactions_this)
 
         return chat, chat_format, chat_map
 
@@ -2008,8 +2127,8 @@ def generate_status_line(my_user_data, my_status, unseen, typing, active_channel
         %name
         %state
         %details
-        %small_text
-        %large_text
+        # %small_text
+        # %large_text
     length of the %typing string can be limited with limit_typing
     use_nick will make it use nick instead username whenever possible.
     """
@@ -2046,8 +2165,8 @@ def generate_status_line(my_user_data, my_status, unseen, typing, active_channel
         if my_status["activities"]:
             state = my_status["activities"][0]["state"][:limit_typing]
             details = my_status["activities"][0]["details"][:limit_typing]
-            sm_txt = my_status["activities"][0]["small_text"]
-            lg_txt = my_status["activities"][0]["large_text"]
+            # sm_txt = my_status["activities"][0]["small_text"]
+            # lg_txt = my_status["activities"][0]["large_text"]
             activiy_type = my_status["activities"][0]["type"]
             if activiy_type == 0:
                 verb = "Playing"
@@ -2065,8 +2184,8 @@ def generate_status_line(my_user_data, my_status, unseen, typing, active_channel
                 .replace("%name", my_status["activities"][0]["name"])
                 .replace("%state", state or "")
                 .replace("%details", details or "")
-                .replace("%small_text", sm_txt or "")
-                .replace("%large_text", lg_txt or "")
+                # .replace("%small_text", sm_txt or "")
+                # .replace("%large_text", lg_txt or "")
             )
             if fun:
                 rich = rich.replace("Metal", "🤘 Metal").replace("metal", "🤘 metal")
@@ -2293,6 +2412,18 @@ def generate_custom_prompt(text, format_prompt, limit_prompt=15):
     return prompt
 
 
+def generate_timestamp_assist(value, prefix):
+    """Generate assist for insert_timestamp command"""
+    return (
+        (generate_discord_timestamp(value, "t"), prefix + "<t:" + str(value) + ":t>"),
+        (generate_discord_timestamp(value, "f"), prefix + "<t:" + str(value) + ":f>"),
+        (generate_discord_timestamp(value, "F"), prefix + "<t:" + str(value) + ":F>"),
+        (generate_discord_timestamp(value, "D"), prefix + "<t:" + str(value) + ":D>"),
+        (generate_discord_timestamp(value, "S"), prefix + "<t:" + str(value) + ":S>"),
+        (generate_discord_timestamp(value, "R"), prefix + "<t:" + str(value) + ":R>"),
+    )
+
+
 def generate_log(log, colors, max_width):
     """Generate log lines shown in chat area"""
     chat = []
@@ -2444,7 +2575,7 @@ def generate_extra_window_profile(user_data, user_roles, presence, max_len):
         custom = ""
         if presence.get("custom_status_emoji"):
             status_emoji = presence["custom_status_emoji"]["name"]
-            if not emoji.is_emoji(status_emoji):
+            if not utils.is_emoji(status_emoji):
                 status_emoji = f":{status_emoji}:"
             custom += f"{status_emoji} "
         if presence["custom_status"]:
@@ -2479,16 +2610,17 @@ def generate_extra_window_profile(user_data, user_roles, presence, max_len):
             elif activity_type == 5:
                 action = "Competing in"
             if activity["state"]:
-                state = f" - {activity["state"]}"
+                state = f"{activity["state"]}"
             else:
                 state = ""
-            body_line += f"{action} {activity["name"]}{state}\n"
+            duration = f"({format_seconds(int(time.time() - activity["start"]))})" if activity["start"] else ""
+            body_line += f"{action} {activity["name"]} {duration}\n{state}\n"
             if activity["details"]:
                 body_line += f"{activity["details"]}\n"
-            if activity["small_text"]:
-                body_line += f"{activity["small_text"]}\n"
-            if activity["large_text"]:
-                body_line += f"{activity["large_text"]}\n"
+            # if activity["small_text"]:
+            #     body_line += f"{activity["small_text"]}\n"
+            # if activity["large_text"]:
+            #     body_line += f"{activity["large_text"]}\n"
             body_line += "\n"
 
     if roles_string:
@@ -2611,7 +2743,7 @@ def generate_extra_window_search(messages, roles, channels, blocked, total_msg, 
     use_global_name = "%global_name" in format_message
 
     if pinned:
-        title_line = f"Pinned_messages ({total_msg}):"
+        title_line = f"Pinned messages ({total_msg}):"
     else:
         title_line = f"Search results: {total_msg} messages"
 
@@ -2720,7 +2852,10 @@ def generate_extra_window_search_ext(extensions, max_len):
     body = []
 
     for extension in extensions:
-        body.append(normalize_string(extension[1] +  " - " + str(extension[2]), max_len, emoji_safe=True, dots=True, fill=False))
+        official = " (official)" if extension[3] else ""
+        description = str(extension[2]).replace("An extension for endcord discord TUI client, that ", "")
+        description = description.capitalize()
+        body.append(normalize_string(extension[1] + official +  " - " + description, max_len, emoji_safe=True, dots=True, fill=False))
 
     return title_line, body
 
@@ -2732,7 +2867,7 @@ def generate_extra_window_text(title_text, body_text, max_len):
     return title_line, body
 
 
-def generate_extra_window_assist(found, assist_type, max_len):
+def generate_extra_window_assist(found, assist_type, max_len, placeholder_emoji=False):
     """Generate extra window title and body for assist"""
     body = []
     prefix = ""
@@ -2756,7 +2891,10 @@ def generate_extra_window_assist(found, assist_type, max_len):
     else:
         title_line = "Unknown"
     for item in found:
-        body.append(f"{prefix}{item[0]}"[:max_len])
+        if placeholder_emoji and assist_type == 3 and item[1].startswith("<:"):
+            body.append(f"    - {item[0]}"[:max_len])
+        else:
+            body.append(f"{prefix}{item[0]}"[:max_len])
     if not body:
         body = ["No matches"]
     return title_line[:max_len], body
@@ -2793,7 +2931,7 @@ def generate_forum(threads, blocked, max_length, colors, colors_formatted, confi
     forum_thread_format = config["format_forum"]
     forum_format_timestamp = config["format_forum_timestamp"]
     color_blocked = [colors[2]]
-    color_format_forum = colors_formatted[8]   # 17 is unused
+    color_format_forum = colors_formatted[9]   # 19 is unused
     blocked_mode = config["blocked_mode"]
     limit_thread_name = config["limit_thread_name"]
     convert_timezone = config["convert_timezone"]
@@ -2926,7 +3064,7 @@ def generate_message_notification(data, channels, roles, guild_name, convert_tim
     return title, body
 
 
-def generate_tree(dms, guilds, threads, read_state, guild_folders, activities, collapsed, uncollapsed_threads, voice_states, active_channel_id, config, folder_names=[], safe_emoji=False, max_width=0):
+def generate_tree(dms, guilds, threads, read_state, guild_folders, activities, collapsed, voice_states, active_channel_id, config, folder_names=[], safe_emoji=False, max_width=0):
     """
     Generate channel tree according to provided formatting.
     tree_format keys:
@@ -2964,6 +3102,7 @@ def generate_tree(dms, guilds, threads, read_state, guild_folders, activities, c
     voice_char = config["tree_drop_down_voice"]
     dm_status_char = config["tree_dm_status"]
     show_folders = config["tree_show_folders"]
+    uncollapse_threads = config["remember_collapsed_channels"]
     intersection = f"{dd_intersect}{dd_hline*2}"   # default: "|--"
     pass_by = f"{dd_vline}  "   # default: "|  "
     intersection_end = f"{dd_corner}{dd_hline*2}"   # default: "\\--"
@@ -3319,12 +3458,12 @@ def generate_tree(dms, guilds, threads, read_state, guild_folders, activities, c
                                 code += 20
                             elif channel["unseen"]:
                                 code += 30
-                            if channel_threads and (channel["id"] in uncollapsed_threads):
+                            if channel_threads and uncollapse_threads and (channel["id"] in collapsed):
                                 code += 1
                             tree_format.append(code)
                             tree_metadata.append({
                                 "id": channel["id"],
-                                "type": 15 if forum else 0,
+                                "type": 15 if forum else 2 if channel.get("voice") else 0,
                                 "name": channel["name"],
                                 "muted": channel["muted"],
                                 "parent_index": category_index,

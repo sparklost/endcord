@@ -76,24 +76,29 @@ Arguments are chained between extensions having same named method, extensions ar
 Method names can be searched in `./endcord/app.py` code to see where they are executed.  
 
 ### List of extension access points names and their locations in endcord code:
-- `__init__` - on end of app class init
+- `__init__` - at the end of app class init
 - `on_main_start` - just before main loop starts
 - `on_main_loop` - first in main loop
 - `on_message_event` - in main loop, when message event is received, before event is processed; has event at input and output; only "relevant" messages are passed here
 - `on_switch_channel_start` - near start of switch_channel, after self.active_channel is updated
 - `on_switch_channel_end` - near end of switch_channel, before UI is updated
 - `on_reconnect` - near end of reconnect, before UI is updated
-- `on_resize` - in main loop, when screen geometry change is detected, before all other resize actions and after self.chat_dim is updated
 - `on_escape_key` - near end escape key handling in wait_input
-- `on_start_call` - on end of start_call
-- `on_leave_call` - on end of leave_call
+- `on_chat_update` - at the end of update_chat in app.py, but before chat is updated in tui.py, arguments: chat, chat_format, chat_map
+- `on_chat_draw` - at the end of draw_chat method in tui.py
+- `on_assist` - near the end of assist() in app.py, just before drawing it in tui, arguments: assist_data, assist_type
+- `on_extra_window_draw` - at the end of draw_extra_window() in tui.py
+- `on_extra_window_remove` - at the end of remove_extra_window() in tui.py
+- `on_start_call` - at the end of start_call
+- `on_leave_call` - at the end of leave_call
 - `on_call_gateway_event` - in process_call_voice_gateway_events, before event is processed, has event at input and output
 - `on_call_voice_gateway_event` - in process_call_voice_gateway_events, before event is processed, has event at input and output
 - `on_execute_command` - at the start of execute_command, ran only of there are no matched builtin commands
 - `init_bindings` - in load_extensions in tui.py, executed right after initializing all extensions in app.py
 - `on_binding` - at the end of common_keybindings in tui.py, executed only if there are no default bindings matched
 - `on_wait_input` - at the end of wait_input in app.py, executed only if there are no default action codes matched
-- `on_gateway_event` - at the start of loop in receiver in gateway.py, event data is passed as argument
+- `on_force_redraw` - at the end of force_redraw in tui.py
+- `on_gateway_event` - at the start of loop in receiver in gateway.py, arguments: event_data
 - `on_message_event_is_irrelevant` - in gateway.py near `elif optext == "MESSAGE_CREATE"` decides if these events are relevant and should be further processed. Has **raw** message event and event optext at input and is expected to return `True` if message is relevant (doesn't override already relevant messages).
 
 ## Adding a command

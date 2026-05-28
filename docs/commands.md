@@ -30,9 +30,9 @@
     Download and copy selected attachment to clipboard. Only file reference is sent to clipboard, so if endcord is closed, file will likely be missing.  
 - `spoil`  
     Reveal one-by-one spoiler in selected message.
-- `link_channel` / `link_channel <#[channel_id]>`  
+- `copy_channel_link` / `copy_channel_link <#[channel_id]>`  
     Copy link of selected channel in tree to clipboard, or from provided channel id.
-- `link_message`  
+- `copy_message_link`  
     Copy link of selected message to clipboard,
 - `cancel *[download/1/uploa/2/attachment/3]`  
     Cancel all downloads and/or uploads. Can use `cancel 1` or `cancel download`... Use just `cancel` to cancel both downloads and uploads.
@@ -84,7 +84,8 @@
 - `mark_as_unread`  
     Mark selected message as unread.
 - `insert_timestamp [time]`  
-    Insert timestamp in input line, `[time]` can be of formats: `YYYY-MM-DD-HH-mm`, `YYYY-MM-DD`, `HH:mm`, `HH:mm:SS`.
+    Insert timestamp in input line, `[time]/[timestamp]` can be of formats: `YYYY-MM-DD-HH-mm`, `YYYY-MM-DD`, `HH:mm`, `HH:mm:SS` or a timestamp from assist.  
+    Assist will accept time formats similar to `@time`. Eg.: `tomorrow 2PM`, `2 days ago 03:42 AM`, `in 2 w`...
 - `vote [num]`  
     If selected message is ongoing poll, vote for specified answer index.
 - `pin_message`  
@@ -123,6 +124,8 @@
     Silence incoming call or cancel outgoing call.
 - `voice_list_call`  
     Show all call participants and their states in an updated list. Must be in the call to use this.
+- `voice_open_chat`  
+    Open voice call chat for selected voice channel. If none is selected then open for currently active voice call.  
 - `voice_set_volume_input`  
     Change volume for input devices in voice call. Set to 0 to mute. Value can be `0-200%`, above 100 is boost. Persisted across sessions.  
     `+` and `-` can be prepended to value so it will increment it - useful for binding this command to a key.  
@@ -131,6 +134,8 @@
     `+` and `-` can be prepended to value so it will increment it - useful for binding this command to a key.  
 - `voice_set_input_device [name]`  
     Set input device from provided list of devices. Selection is persisted across sessions. If device is unavailable, default one will be selected automatically.
+- `send_as_file`  
+    Upload currently typed text as txt file attachment.
 - `generate_invite *[duration] *[limit]`  
     Generate invite to current server with custom expiration `duration` and uses `limit`. Set to 0 for infinite. Invite URL will be copied to clipboard.
     `duration` can be: `4w3d5h30m10s` where `w`is weeks, `d` is days..., can be used partially and mixed: `5h1w`. Default is 7 days and infinite uses.
@@ -151,6 +156,8 @@
     Everything after these flags is considered as message content.  
 - `redraw`  
     Redraw UI if it ever gets messed up.
+- `switch_profile [name/number]`  
+    Switch to different local profile, as available in profile manager. Profiles will be shown in assist. Current session will be ended and new one will be initialized. Log will be cleaned because this completely restarts endcord.
 - `check_for_updates *open`  
     Check endcord and extensions for updates and optionally open github release for new endcord version.
 - `search_extensions`  

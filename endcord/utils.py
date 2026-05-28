@@ -13,6 +13,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 
 import filetype
 
@@ -28,6 +29,13 @@ logger = logging.getLogger(__name__)
 match_youtube = re.compile(r"(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)[a-zA-Z0-9_-]{11}")
 match_emoji = re.compile(r"(?<!\\):[^:\s]+:")
 EMOJI_DATA = {}   # delayed load for faster startup
+
+
+def get_executable():
+    """Get executable path and arguments for current run"""
+    if "__compiled__" in globals() or getattr(sys, "frozen", False):   # built with nuitka or pyinstaller
+        return [os.path.abspath(sys.argv[0]), *sys.argv[1:]]
+    return [sys.executable, *sys.argv]
 
 
 def ensure_terminal():
@@ -66,14 +74,10 @@ def ensure_terminal():
         print("No terminal emulator found.", file=sys.stderr)
         sys.exit(1)
 
-    if "__compiled__" in globals() or getattr(sys, "frozen", False):   # built with nuitka or pyinstaller
-        cmd = [os.path.abspath(sys.argv[0])] + sys.argv[1:]
-    else:
-        cmd = [sys.executable] + sys.argv
     if terminal in ("gnome-terminal", "kgx"):
-        subprocess.Popen([terminal, "--"] + cmd)
+        subprocess.Popen([terminal, "--"] + get_executable())
     else:
-        subprocess.Popen([terminal, "-e"] + cmd)
+        subprocess.Popen([terminal, "-e"] + get_executable())
     sys.exit(0)
 
 
@@ -112,6 +116,22 @@ def detect_runtime():
     if getattr(sys, "frozen", False):
         return "unknown"
     return "source"
+
+
+def remove_args(cmd, *args):
+    """Remove args and their values from command list"""
+    result = []
+    skip = False
+    for i, arg in enumerate(cmd):
+        if skip:
+            skip = False
+            continue
+        if arg in args:
+            if i + 1 < len(cmd) and not cmd[i + 1].startswith("-"):
+                skip = True
+            continue
+        result.append(arg)
+    return result
 
 
 def get_extensions(path):
@@ -176,7 +196,7 @@ def load_json(file, default=None, dir_path=peripherals.config_path, create=False
             save_json(default, file, dir_path=dir_path)
         return default
     try:
-        with open(path, "r") as f:
+        with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
             if default:
                 for key, value in default.items():
@@ -191,7 +211,7 @@ def save_json(data, file, compact=False, dir_path=peripherals.config_path):
     if not os.path.exists(dir_path):
         os.makedirs(os.path.expanduser(dir_path), exist_ok=True)
     path = os.path.expanduser(os.path.join(dir_path, file))
-    with open(path, "w") as f:
+    with open(path, "w", encoding="utf-8") as f:
         if compact:
             json.dump(data, f, indent=None, separators=(",", ":"))
         else:
@@ -328,6 +348,24 @@ def json_array_objects(stream):
         buf = buf[i:]   # keep incomplete json only
 
 
+def delete_old_files(directory, days, accessed=False):
+    """Delete files accessed/created older than N days"""
+    directory = os.path.expanduser(directory)
+    if not os.path.exists(directory):
+        return
+    cutoff = time.time() - (days * 86400)
+    for name in os.listdir(directory):
+        path = os.path.join(directory, name)
+        if not os.path.isfile(path):
+            continue
+        try:
+            file_time = os.path.getatime(path) if accessed else os.path.getctime(path)
+            if file_time < cutoff:
+                os.remove(path)
+        except OSError:
+            pass
+
+
 def get_base_path():
     """Get resource path"""
     if hasattr(sys, "_MEIPASS"):   # pyinstaller onefile
@@ -344,9 +382,8 @@ def load_emoji(path="emoji.json"):
     global EMOJI_DATA
     path = os.path.join(get_base_path(), *path.split("/"))
     if not os.path.exists(path):
-        logger.info(path)
         return
-    with open(path, "r") as f:
+    with open(path, "r", encoding="utf-8") as f:
         EMOJI_DATA = json.load(f)
 
 
@@ -368,6 +405,19 @@ def emojize(text):
         return emoji
 
     return re.sub(match_emoji, replace_emoji, text)
+
+
+def is_potential_emoji(cluster):
+    """Check if any character in the cluster is emoji"""
+    for character in cluster:
+        ch = ord(character)
+        return (
+            (0x1F300 <= ch <= 0x1F9FF) or
+            (0x2600 <= ch <= 0x27BF) or
+            (0x2300 <= ch <= 0x23FF) or
+            (0x2B00 <= ch <= 0x2BFF)
+        )
+    return False
 
 
 SKIN_TONES = {0x1F3FB, 0x1F3FC, 0x1F3FD, 0x1F3FE, 0x1F3FF}
@@ -409,7 +459,7 @@ def next_emoji_cluster(text, i):
     return "".join(cluster), i
 
 
-def demojize(text):
+def demojize(text, safe=False):
     """Convert all emojis in given string to their shortcodes"""
     result = []
     i = 0
@@ -425,6 +475,8 @@ def demojize(text):
         emoji = EMOJI_DATA.get(cluster)
         if emoji:
             result.append(min(emoji, key=len))
+        elif safe and is_potential_emoji(cluster):
+            result.append("▒")
         else:
             result.append(cluster)
     return "".join(result)

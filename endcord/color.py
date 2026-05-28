@@ -130,16 +130,17 @@ def extract_colors(config):
 def extract_colors_formatted(config):
     """Extract complex formatted colors from config"""
     return (   # DO NOT CHANGE ORDER
-        check_color_formatted(config["color_format_message"]),   # 0 9
-        check_color_formatted(config["color_format_newline"]),   # 1 10
-        check_color_formatted(config["color_format_reply"]),   # 2 11
-        check_color_formatted(config["color_format_reactions"]),   # 3 12
-        check_color_formatted(config["color_format_interaction"]),   # 4 13
+        check_color_formatted(config["color_format_message"]),   # 0 10
+        check_color_formatted(config["color_format_message_grouped"]),   # 1 11
+        check_color_formatted(config["color_format_newline"]),   # 2 12
+        check_color_formatted(config["color_format_reply"]),   # 3 13
+        check_color_formatted(config["color_format_reactions"]),   # 4 14
+        check_color_formatted(config["color_format_interaction"]),   # 5 15
         # not complex but is here so it can be initialized for alt bg color
-        [check_color(config["color_chat_edited"])],   # 5 14
-        [check_color(config["color_chat_url"])],   # 6 15
-        [check_color(config["color_chat_spoiler"])],   # 7 16
-        check_color_formatted(config["color_format_forum"]),   # 8 17
+        [check_color(config["color_chat_edited"])],   # 6 16
+        [check_color(config["color_chat_url"])],   # 7 17
+        [check_color(config["color_chat_spoiler"])],   # 8 18
+        check_color_formatted(config["color_format_forum"]),   # 9 19
     )
 
 

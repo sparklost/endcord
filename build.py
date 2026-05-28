@@ -4,7 +4,6 @@
 # the Free Software Foundation, version 3.
 
 import argparse
-import glob
 import importlib.metadata
 import importlib.util
 import json
@@ -207,7 +206,7 @@ def force_ujson():
     """Remove orjson and force installing ujson instead. WARNING: this modifies pyproject.toml"""
     try:
         subprocess.run(["uv", "remove", "orjson"], check=True, stderr=subprocess.DEVNULL)
-        fprint("Switching orjson -> ujson   !! pyproject.toml is modified !!")
+        fprint("Switching orjson -> ujson   !! pyproject.toml is modified !!", color_code="\033[1;31m")
         subprocess.run(["uv", "add", "ujson"], check=True)
     except subprocess.CalledProcessError:
         pass
@@ -532,6 +531,7 @@ def build_with_pyinstaller(onedir, nosoundcard, print_cmd=False):
             pkgname = f"{PKGNAME}-lite"
             fprint("ASCII media support is disabled")
         emoji_path = compress_emoji()
+        clean_qrcode()
     else:
         pkgname = PKGNAME
         emoji_path = "endcord/emoji.json"

@@ -12,6 +12,7 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.parse
 import webbrowser
 
 if sys.platform.startswith("android"):
@@ -27,7 +28,7 @@ try:
     logger.info(APP_NAME)
 except (AttributeError, NameError):
     APP_NAME = "endcord"
-VERSION = "1.4.2"
+VERSION = "1.5.0"
 NO_NOTIFY_SOUND_DE = ("kde", "plasma")   # linux desktops without notification sound
 
 # platform specific code
@@ -292,7 +293,7 @@ def copy_file_to_clipboard(path):
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                 )
-                proc.communicate(input=f"file://{path}\n".encode("utf-8"))
+                proc.communicate(input=f"file://{urllib.parse.quote(path)}\n".encode("utf-8"))
             except FileNotFoundError:
                 logger.warning("Cant copy: wl-clipboard not found on system")
         else:
@@ -303,7 +304,7 @@ def copy_file_to_clipboard(path):
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                 )
-                proc.communicate(input=f"file://{path}\n".encode("utf-8"))
+                proc.communicate(input=f"file://{urllib.parse.quote(path)}\n".encode("utf-8"))
             except FileNotFoundError:
                 logger.warning("Cant copy: xclip not found on system")
 
@@ -326,7 +327,7 @@ def copy_file_to_clipboard(path):
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
-        proc.communicate(input=f"file://{path}".encode("utf-8"))
+        proc.communicate(input=f"file://{urllib.parse.quote(path)}".encode("utf-8"))
 
 
 def paste_clipboard_files(save_path=None):
@@ -376,7 +377,7 @@ def paste_clipboard_files(save_path=None):
                     stdout=subprocess.PIPE,
                     stderr=subprocess.DEVNULL,
                 )
-                data = proc.communicate()[0].decode().strip("\n")
+                data = urllib.parse.unquote(proc.communicate()[0].decode().strip("\n"))
                 return [line[7:] for line in data.splitlines() if line.startswith("file://")]
 
             # plain text or nothing
@@ -388,7 +389,7 @@ def paste_clipboard_files(save_path=None):
                         stderr=subprocess.DEVNULL,
                     )
                     return proc.communicate()[0].decode().strip("\n")
-                return []
+            return []
 
         except FileNotFoundError:
             logger.warning("Cant paste: wl-clipboard or xclip not found on system")

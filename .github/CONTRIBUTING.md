@@ -219,7 +219,7 @@ Gateway returns error code 4000 if event "update presence" (opcode 3) is sent.
 ## Build steps for package maintainers
 1. setup dependencies  
 - Any python virtual environment manager can be used that can read dependencies from pyproject.toml, here uv is used by default.  
-- Only python versions 3.12-3.13 can currently build binaries.  
+- Only python versions 3.12-3.14 can currently build binaries.  
 - `uv sync --all-groups` - full endcord  
     Will install all dependencies from pyproject.toml under `dependencies`, `build`, and `media`.  
 - `uv sync --group build` - endcord-lite  

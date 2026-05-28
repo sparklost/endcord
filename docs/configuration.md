@@ -68,6 +68,8 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
     Whether to keep deleted messages in the chat, with different color, or remove them.
 - `limit_cache_deleted = 30`  
     Limit number of cached deleted messages per channel.
+- `max_thumb_cache_age = 14`  
+    How long to keep cached thumbs for inline images, in days. Set `0` to clear on each new run.  
 - `tree_show_folders = True`  
     Whether to show or hide server folders in tree.
 - `wrap_around = True`  
@@ -78,6 +80,8 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
     How many lines are scrolled at once when scrolling with mouse.
 - `mouse_scroll_selection = False`  
     Scroll selection instead content, disables mouse_scroll_sensitivity.  
+- `draw_scrollbar = True`  
+    Wether to draw scrollbar at the right side of the chat.
 - `screen_update_delay = 0.01`  
     Delay in seconds before screen is updated. Limited to min 0.01.  
     Too low value will cause visual "glitches". Increasing value will add latency between performed action and visual feedback.
@@ -103,12 +107,23 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
     Whether to mute video in media player or not. If true, will not initialize audio at all.
 - `media_cap_fps = 30`  
     Maximum framerate when playing videos.
+- `media_font_aspect_ratio = None`  
+    Font height/width ratio is automatically queried from terminal. But it may fail, in that case default `2.25` value is used.  
+    If pictures appear wider or narower change this to value = `char_w / char_h`, eg. `18 / 8 = 2.25`.
+- `inline_media = False`  
+    Draw inline images in chat. Requires media support (not endcord-lite). Currently does nothing.
+- `inline_media_height = 14`  
+    Height of DISPLAYED image in chat. In number of characters.
+- `inline_media_quality = "low"`  
+    Quality of downloaded image thumb for chat inline media. Has no effect in endcord-lite. Possible options are: `lossless`, `high`, `'low`.
 - `rpc_external = True`  
     Whether to use external resources for Rich Presence (like custom pictures).
 - `emoji_as_text = False`  
     Will convert emoji characters to their names. Enable if emoji are not supported by terminal.
 - `message_spacing = True`  
     Will add one line space between messages not belonging to same user.
+- `message_grouping = True`  
+    Will replace `format_message` with `format_message_grouped` (same with color format) if consecutive messages are belonging to the same user in short period of time.
 - `native_media_player = False`  
     Use system native media player instead in-terminal ASCII art.
 - `native_file_dialog = "Auto"`  
@@ -120,6 +135,8 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
     Download discord default stickers and add them to sticker search. Disable to save some RAM.
 - `only_one_open_server = False`  
     Force only one open server at a time in tree. When one is opened other is closed, excluding DMs.
+- `remember_collapsed_channels = False`  
+    Wether to persist collapsed state for forums and channels with threads.
 - `assist_skip_app_command = False`  
     Skip assist for app_name when typing app command. Instead, show all app commands and insert app_name with
   selected command.
@@ -159,7 +176,9 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
 - `custom_ringtone_outgoing = None`  
     Path to audio file played when there is outgoing call. Set to `None` to disable. The file will be played in loop.
 - `custom_media_player = None`  
-    Custom script, command, or path to executable that will be used to play media. File path will be passed as first argument. Do not use custom arguments, instead write bash wrapper script that will pass file to specific command. If paired with `custom_media_hint`, the script can be made to decide between multiple media player based on media type.
+    Custom script, command, or path to executable that will be used to play media. Dont forget to make it executable. Can also run `bash path/to/file.sh`.  
+    Prebuilt script already exists [here](https://github.com/sparklost/endcord/blob/main/tools/endcord-custom-media.sh), configuration instructions are in the script.  
+    File path will be passed as first argument. Do not use custom arguments, instead write bash wrapper script that will pass file to specific command. If paired with `custom_media_hint`, the script can be made to decide between multiple media player based on media type.
 - `custom_media_blacklist = None`  
     List of media types to be ignored for custom media player and will be played in endcord builtin or with native media player. Available options: `"img"`, `"gif"`, `"video"`, `"audio"`, `"URL"`, `"YT"`. Example to allow only images and gifs: `["img", "gif"]`.
 - `custom_media_terminal = False`  
@@ -221,15 +240,19 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
     Width of member list. It won't be drawn if remaining screen width for chat is less than 32 characters.
 - `format_message = "[%timestamp] <%global_name> %app%edited\n%content"`  
     Formatting for message base string. See [format_message](#format_message) for more info.
+- `format_message_grouped = " ├  %content %edited"`  
+    Formatting for message base string when this message is belonging to the same user as previous, in short period of time. See [format_message_grouped](#format_message_grouped) for more info.
 - `format_newline = " │  %content"`  
     Formatting for each newline string after message base. See [format_newline](#format_newline) for more info.
 - `format_reply = " ╭──🡲 [%timestamp] <%global_name>: %content"`  
     Formatting for replied message string. It is above message base. See [format_reply](#format_reply) for more info.
 - `format_reactions = " ╰──⤙ %reactions"`  
     Formatting for message reactions string. It is bellow last newline string. See [format_reactions](#format_reactions) for more info.
+- `format_reactions_newline = "      %reactions"`  
+    Formatting for each next reactions string. Uses same [format_reactions](#format_reactions).
 - `format_interaction = " ╭──⤙ %global_name used [%command]"`  
     Formatting for bot interaction string. It is above message base. See [format_interaction](#format_interaction)
-- `format_one_reaction = "%count:%reaction"`  
+- `format_one_reaction = "[]%count:%reaction]"`  
     Formatting for single reaction string. Reactions string is assembled by joining these strings with `reactions_separator` in between. See [format_one_reaction](#format_one_reaction) for more info.
 - `format_timestamp = "%H:%M"`  
     Format for timestamps in messages. Same as [datetime format codes](https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes)
@@ -261,7 +284,9 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
     A string that replaces `%app` in the message format when the message is sent from app or webhook.
 - `quote_character = "║"`  
     A character that is prepended to each line of single or multiline quote.
-- `reactions_separator = "; "`  
+- `scrollbar_character = "┃"`  
+    A character used to draw scrollbar on the right side of the chat.
+- `reactions_separator = " "`  
     A string placed between two reactions.
 - `tabs_separator = " | "`  
     A string placed between two tabs.
@@ -305,6 +330,8 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
     A single character prepended to DM name in tree drop down, to indicate status: online/away/dnd. Also used in member list.
 - `border_corners = "╭╰╮╯"`  
     Characters used to draw corners in bordered mode.
+- `smart_chat_lines = True`  
+    Wether to extend lines in chat, left of reactions, in grouped messages only. Will use `tree_drop_down_intersect` and `tree_drop_down_vline`.
 - `username_role_colors = True`  
     Allow `%username` and `%global_name` to have color of primary role.
 - `dynamic_name_len = True`  
@@ -321,8 +348,6 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
     Characters used to draw in terminal. From darkest to brightest. Same character can be repeated. Number of characters is not fixed.
 - `media_saturation = 1.2`  
     Saturation correction applied to image in order to make colors more visible. Adjust if changing `ascii_palette` or media_color_bg.
-- `media_font_aspect_ratio = 2.25`  
-    Font height/width ratio. Change only if picture dimensions ratio is wrong in terminal.
 
 ### Colors and attributes
 Colors are part of the theme, configured as 2 or 3 values in a list: `[foreground, background, attribute]`  
@@ -349,6 +374,16 @@ Every next list has additional `start` and `end`- indexes on a line where color 
     Color for selected line in the chat.
 - `color_chat_separator = [242, -1, "i"]`  
     Color for date separator line in the chat.
+- `color_chat_standout = [153, 234]`  
+    Color for chat elements that should standout, like `@mentons`, `#channels`, timestamps, custom emoji.
+- `color_chat_edited = [241, -1]`  
+    Color for `edited_string`.
+- `color_chat_url = [153, -1, "u"]`  
+    Color for urls in message content and embeds.
+- `color_chat_spoiler = [245, -1]`  
+    Color for spoilers in message.
+- `color_chat_code = [250, 233]`  
+    Color for code snippets and blocks.
 - `color_status_line = [233, 255]`  
     Color for status line.
 - `color_extra_line = [233, 245]`  
@@ -375,26 +410,18 @@ Every next list has additional `start` and `end`- indexes on a line where color 
 - `color_tree_active_mentioned = [197, 234]`
 - `color_format_message = [[-1, -1], [242, -2, 0, 0, 7], [25, -2, 0, 8, 9], [25, -2, 0, 19, 20]]`  
     Color format for message base string. Corresponding to `format_message`.
+- `color_format_message_grouped = [[-1, -1], [242, -2, 0, 1, 2]]`  
+    Color format for message base string when this message is belonging to the same user as previous, in short period of time.
 - `color_format_newline = [[-1, -1], [242, -2, 0, 1, 2]]`  
     Color format for each newline string after message base. Corresponding to `format_newline`.
 - `color_format_reply = [[245, -1], [242, -2, 0, 1, 5], [25, -2, 0, 14, 15], [25, -2, 0, 25, 26]]`  
     Color format for replied message string. Corresponding to `format_reply`.
 - `color_format_reactions = [[245, -1], [242, -2, 0, 1, 5]]`  
-    Color format for message reactions string. Corresponding to `format_reactions`.
+    Color format for message reactions string. Corresponding to `format_reactions` and `format_reactions_newline`.
 - `color_format_interaction = [[245, -1], [242, -2, 0, 1, 5]]`  
     Color format for message app interaction string. Corresponding to `format_interaction`.
 - `color_format_forum = [[-1, -1], [242, -2, 0, 0, 12], [25, -2, 0, 15, 20]]`  
     Color format for threads in forum. Corresponding to `format_forum`.
-- `color_chat_standout = [153, 234]`  
-    Color for chat elements that should standout, like `@mentons`, `#channels`, timestamps, custom emoji.
-- `color_chat_edited = [241, -1]`  
-    Color for `edited_string`.
-- `color_chat_url = [153, -1, "u"]`  
-    Color for urls in message content and embeds.
-- `color_chat_spoiler = [245, -1]`  
-    Color for spoilers in message.
-- `color_chat_code = [250, 233]`  
-    Color for code snippets and blocks.
 - `media_color_bg = -1`  
     Single color value for background color when showing media.
 - `media_bar_ch = "━"`  
@@ -408,6 +435,11 @@ Every next list has additional `start` and `end`- indexes on a line where color 
 - `%edited` - replaced with `edited_string`  
 - `%app` - replaced with `app_string` if this message is sent by app or webhook
 Note: everything after `%content` may be pushed to newline.
+
+### format_message_grouped
+- `%content` - this is remainder of previous line
+- `%timestamp` - formatted with `format_timestamp`
+- `%edited` - replaced with `edited_string`, can be placed only after `% content`
 
 ### format_newline
 - `%content` - this is remainder of previous line
@@ -457,8 +489,8 @@ Note: everything after `%content` may be pushed to newline.
 - `%name` - name of the rich presence app
 - `%state` - rich presence state
 - `%details` - rich presence details
-- `%small_text` - rich presence small text
-- `%large_text` - rich presence large text
+- `%small_text` - rich presence small text (disabled)
+- `%large_text` - rich presence large text (disabled)
 
 ### format_tabs
 - `%num` - number of the tab

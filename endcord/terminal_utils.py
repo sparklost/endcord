@@ -241,3 +241,44 @@ if sys.platform == "win32":
     leave_tui = leave_tui_win
     read_key = read_key_win
     esc_detector = esc_detector_win
+
+
+def query_terminal(query, timeout=0.1, read_bytes=1024):
+    """Query terminal with specific sequence, wait for response and return decoded response bytes"""
+    if sys.platform == "win32":
+        return None
+    stdin_fd = sys.stdin.fileno()
+    old_term = termios.tcgetattr(stdin_fd)
+    old_flags = fcntl.fcntl(stdin_fd, fcntl.F_GETFL)
+    response = b""
+    try:
+        tty.setraw(stdin_fd)
+        fcntl.fcntl(stdin_fd, fcntl.F_SETFL, old_flags | os.O_NONBLOCK)
+        os.write(stdin_fd, query)
+        while timeout > 0:
+            try:
+                response = os.read(stdin_fd, read_bytes)
+                if response:
+                    break
+            except BlockingIOError:
+                pass
+            timeout -= 0.01
+            time.sleep(0.01)
+    finally:
+        termios.tcsetattr(stdin_fd, termios.TCSADRAIN, old_term)
+        fcntl.fcntl(stdin_fd, fcntl.F_SETFL, old_flags)
+    return response.decode()
+
+
+def get_font_size():
+    """Query font size from terminal"""
+    response = query_terminal(b"\033[14t")
+    if not response:
+        return None, None
+    parts = response.lstrip("\033[").rstrip("t").split(";")
+    if len(parts) != 3:
+        return None, None
+    cols, rows = os.get_terminal_size()
+    height = int(parts[1]) // rows
+    width = int(parts[2]) // cols
+    return width, height

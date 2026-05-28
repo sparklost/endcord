@@ -24,29 +24,38 @@ def generate_timestamp(timestamp, timestamp_format, unix=False):
     return f"<t:{int(time_obj.timestamp())}:{timestamp_format}>"
 
 
+def quote(text):
+    """Prepend '> ' to text and to each newline"""
+    return f"> {text.replace("\n", "\n> ")}"
+
+
 def prepare_embeds(embeds, message_content):
     """Prepare message embeds"""
     ready_embeds = []
     for embed in embeds:
         content = []
         main_url = None
+        proxy_url = None
+        hw = None
         skip_main_url = False
         media = []
         embed_type = embed.get("type", "unknown")
 
         if "url" in embed and "tenor.com/" not in embed["url"] and "giphy.com/" not in embed["url"]:
-            # dont repeat unless its discord attachment and handle x=twitter
-            if embed_type != "rich" or ".discordapp." in embed["url"] or embed["url"] not in message_content.replace("https://x.com", "https://twitter.com"):
+            # dont repeat unless its not discord attachment and handle x=twitter
+            if (embed_type != "rich" and ".discordapp." not in embed["url"]) or embed["url"] not in message_content.replace("https://x.com", "https://twitter.com"):
                 content.append(embed["url"])
                 main_url = embed["url"]
                 skip_main_url = True
 
         if "author" in embed and "name" in embed["author"] and "giphy.com/" not in embed["url"]:
-            content.append(embed["author"]["name"])
+            name = embed["author"]["name"]
+            if name not in embed.get("title", "") and name not in embed.get("description", ""):
+                content.append(quote(name))
         if "title" in embed:
-            content.append(embed["title"])
-        if "description" in embed:
-            content.append(embed["description"])
+            content.append(quote(embed["title"]))
+        if "description" in embed and (not main_url or "youtube." not in main_url):   # skip long descriptions for yt
+            content.append(quote(embed["description"]))
 
         # check for all urls in content so far and set to media = false
         for line in content:
@@ -54,22 +63,31 @@ def prepare_embeds(embeds, message_content):
 
         if "fields" in embed:
             for field in embed["fields"]:
-                content.append(field["name"])
-                content.append(field["value"])
+                content.append(quote(field["name"]))
+                content.append(quote(field["value"]))
             media += [False] * len(re.findall(match_url, field["name"] + "\n" + field["value"]))
+        if "thumbnail" in embed:
+            proxy_url = embed["thumbnail"]["proxy_url"]
+            hw = (embed["thumbnail"]["height"], embed["thumbnail"]["width"])
         if "image" in embed and "url" in embed["image"]:
             content.append(embed["image"]["url"])
             main_url = embed["image"]["url"]
+            if not proxy_url and "proxy_url" in embed["image"]:
+                proxy_url = embed["image"]["proxy_url"]
+                hw = (embed["image"]["height"], embed["image"]["width"])
             media.append(True)
         if "video" in embed and "url" in embed["video"]:
-            content.append(embed["video"]["url"])
+            if "youtube." not in embed["video"]["url"]:
+                content.append(embed["video"]["url"])
             if not skip_main_url:
                 main_url = embed["video"]["url"]
+            if not proxy_url and "proxy_url" in embed["video"]:
+                proxy_url = embed["video"]["proxy_url"]
+                hw = (embed["video"]["height"], embed["video"]["width"])
             media.append(True)
         if "footer" in embed and "text" in embed["footer"]:
-            content.append(embed["footer"]["text"])
+            content.append(quote(embed["footer"]["text"]))
             media += [False] * len(re.findall(match_url, embed["footer"]["text"]))
-
         content = "\n".join(content)
         if content:
             if content == message_content:
@@ -79,6 +97,8 @@ def prepare_embeds(embeds, message_content):
                 "name": None,
                 "url": content,
                 "main_url": main_url,
+                "proxy_url": proxy_url,
+                "hw": hw,
             }
             if embed_type == "rich":
                 ready_data["media"] = media
@@ -91,13 +111,11 @@ def content_to_attachment(message, embeds):
     """Convert attachment url in message content into real attachment"""
     content = message["content"]
     if any(x in content for x in DISCORDAPP_CDN_ATTACHMENTS):
-
         matches = []
         def collect(m):
             matches.append((m.group(0), m.group(1)))
             return ""
         message["content"] = match_discord_attachment_url.sub(collect, content)
-
         for attachment in matches:
             for embed in embeds:
                 if embed["url"].split("?")[0] == attachment[0].split("?")[0]:   # query url part usually changes
@@ -108,7 +126,6 @@ def content_to_attachment(message, embeds):
                     "url": attachment[0],
                     "name": attachment[1],
                 })
-
     return message, embeds
 
 
@@ -202,6 +219,8 @@ def prepare_message(message):
             "type": attachment.get("content_type", "unknown"),
             "name": attachment["filename"],
             "url": attachment["url"],
+            "proxy_url": attachment.get("proxy_url"),
+            "hw": (attachment["height"], attachment["width"]) if "height" in attachment else None,
         })   # keep attachments in same place as embeds (attachments have no "main_url")
     message, embeds = content_to_attachment(message, embeds)
     # mentions
@@ -683,6 +702,10 @@ def is_relevant_message(op, message, current_channel_id, channel_cache, guilds, 
 
     # next part only for message_create
     if op != "MESSAGE_CREATE":
+        return False
+
+    # if its my message from other device
+    if message["author"]["id"] == my_id:
         return False
 
     # skip muted and check message_notifications for this channel

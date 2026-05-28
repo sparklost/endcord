@@ -6,6 +6,7 @@
 import heapq
 import importlib.util
 import re
+from itertools import chain
 
 from endcord import utils
 
@@ -263,6 +264,7 @@ def search_emojis(all_emojis, premium, guild_id, query, safe_emoji=False, limit=
         else:
             emojis = []
 
+    # discord emoji
     for guild in emojis:
         guild_name = guild["guild_name"]
         for guild_emoji in guild["emojis"]:
@@ -278,7 +280,7 @@ def search_emojis(all_emojis, premium, guild_id, query, safe_emoji=False, limit=
     # standard emoji
     if len(results) < limit:
         for key, data in utils.EMOJI_DATA.items():
-            # emoji.EMOJI_DATA = {emoji: {":emoji_name:", ":alias:"}...}
+            # utils.EMOJI_DATA = {emoji: {":emoji_name:", ":alias:"}...}
             if any((0x1F3FB <= ord(ch) <= 0x1F3FF) for ch in key):
                 continue   # skip variation emoji
             formatted = ""
@@ -509,7 +511,7 @@ def search_tabs(tabs, query, limit=50, score_cutoff=15):
 
 
 def search_mics(devices, query, limit=50, score_cutoff=15):
-    """Generic search for microphones"""
+    """Search for microphones"""
     results = []
     worst_score = score_cutoff
     results.append(("Auto", "voice_set_input_device " + "Auto", score_cutoff + fuzzy_match_score(query, "Auto") + 0.1))
@@ -524,6 +526,28 @@ def search_mics(devices, query, limit=50, score_cutoff=15):
             worst_score = results[0][2]
 
     results.append(("OFF", "voice_set_input_device " + "OFF", score_cutoff + fuzzy_match_score(query, "OFF") + 0.1))
+    return sorted(results, key=lambda x: x[2], reverse=True)
+
+
+def search_profiles(profiles, query, limit=50, score_cutoff=15):
+    """Search for profiles"""
+    results = []
+    worst_score = score_cutoff
+    keyring_len = len(profiles["keyring"])
+
+    for num, profile in enumerate(chain(profiles["keyring"], profiles["plaintext"])):
+        score = fuzzy_match_score(query, profile["name"])
+        if not query:
+            score = score_cutoff
+        elif score < worst_score and query:
+            continue
+        keyring = "keyring" if num < keyring_len else "plaintext"
+        active = "[Active]" if profile["name"] == profiles["selected"] else ""
+        heapq.heappush(results, (f"{profile["name"]} - ({keyring}) {active}", "switch_profile " + profile["name"], score))
+        if len(results) > limit:
+            heapq.heappop(results)
+            worst_score = results[0][2]
+
     return sorted(results, key=lambda x: x[2], reverse=True)
 
 

@@ -10,12 +10,12 @@ import os
 import shutil
 import socket
 import subprocess
-from urllib.parse import urlencode, urlparse
+import urllib.parse
 
 from endcord import peripherals
 
 logger = logging.getLogger(__name__)
-APP_NAME = "endcord" 
+APP_NAME = "endcord"
 HEADER = {
     "User-Agent": APP_NAME + "/" + peripherals.VERSION,   # required by github
     "Accept": "application/vnd.github+json",
@@ -124,9 +124,9 @@ def check_for_update(current_version, owner, repo):
     return None
 
 
-def search_gh_repos(topic, num=30, page=1):
+def search_gh_repos(topic, num=30, page=1, official_maintainer=peripherals.REPO_OWNER):
     """Search github repositories"""
-    query = urlencode({
+    query =  urllib.parse.urlencode({
         "q": f"topic:{topic}",
         "per_page": num,
         "page": page,
@@ -146,7 +146,7 @@ def search_gh_repos(topic, num=30, page=1):
             repo_name = item["name"]
             description = item["description"] or "No description"
             owner = item["owner"]["login"]
-            repos.append((owner, repo_name, description))
+            repos.append((owner, repo_name, description, owner==official_maintainer))
         return repos
     connection.close()
     logger.error(f"Failed searching for repos: {topic}, page: {page}, http error code: {response.status}")
@@ -197,7 +197,7 @@ def download_gh_repo(owner, repo, save_path, tag=None):
                 return []
             redirects += 1
             connection.close()
-            parsed = urlparse(location)
+            parsed =  urllib.parse.urlparse(location)
             if parsed.netloc:
                 host = parsed.netloc
             if parsed.path:

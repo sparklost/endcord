@@ -287,15 +287,22 @@ class GameDetection:
         self.app = app
         self.discord = discord
         self.run = True
+        self.stop_event = threading.Event()
         self.changed = False
         self.cache = []
         self.activities = []
         self.blacklist = blacklist
         self.download_delay = download_delay * 86400
-        threading.Thread(target=self.main, daemon=True, args=()).start()
+        threading.Thread(target=self.game_detector, daemon=True, args=()).start()
 
 
-    def main(self):
+    def stop(self):
+        """Stop game_detector thread"""
+        self.run = False
+        self.stop_event.set()
+
+
+    def game_detector(self):
         """
         Main thread that:
         - checks and downloads detetcable applications list on startup
@@ -356,7 +363,7 @@ class GameDetection:
         logger.info("Game detection service started")
         cache_changed = True   # to save updated times
         _get_user_processes_diff = get_user_processes_diff
-        while self.run:
+        while self.run and not self.stop_event.wait(GAME_DETECTION_DELAY):
             try:
                 added, removed = _get_user_processes_diff()
             except BaseException as e:
@@ -431,8 +438,6 @@ class GameDetection:
             if cache_changed:
                 cache_changed = False
                 utils.save_json(self.cache, "detected_apps_cache.json")
-
-            time.sleep(GAME_DETECTION_DELAY)
 
 
     def get_activities(self):

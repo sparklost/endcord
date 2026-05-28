@@ -36,6 +36,7 @@ DYN_DISCORD_CDN_HOST = "media.discordapp.net"
 DISCORD_EPOCH = 1420070400
 MAX_CONNECTION_POOL = 10
 MAX_CONNECTION_AGE = 55 * 30  # discord closes keepalive connection after ?? min
+CONNECTION_TIMEOUT = 2   # default value
 SEARCH_PARAMS = ("content", "channel_id", "author_id", "mentions", "has", "max_id", "min_id", "pinned", "offset")
 SEARCH_HAS_OPTS = ("link", "embed", "poll", "file", "video", "image", "sound", "sticker", "forward")
 PING_OPTIONS = ["all", "mentions", "nothing", "default"]   # must be list
@@ -190,7 +191,7 @@ class Discord():
         return None
 
 
-    def get_connection(self, host, port, timeout=10):
+    def get_connection(self, host, port, timeout=CONNECTION_TIMEOUT):
         """Get connection object and handle proxying"""
         if sys.platform == "darwin":
             import certifi
@@ -219,7 +220,7 @@ class Discord():
         return connection
 
 
-    def request(self, method, path, body=None, headers=None, timeout=5, exit_on_error=False):
+    def request(self, method, path, body=None, headers=None, timeout=CONNECTION_TIMEOUT, exit_on_error=False):
         """Perform discord api request; try to use existing keepalive connection, or create new one; handle threading by using connection pool; and recreate connections if server timeout them after 55 minutes"""
         self.total_requests += 1
         entry = None
@@ -703,20 +704,34 @@ class Discord():
         return False
 
 
-    def get_file(self, url, save_path):
+    def get_file(self, url, save_path, file_name=None, cache=False):
         """Download file from discord with proper header"""
         message_data = None
         url_object = urllib.parse.urlsplit(url)
-        filename = os.path.basename(url_object.path)
+
+        save_path = os.path.expanduser(save_path)
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
+        if file_name and cache:
+            destination = os.path.join(save_path, file_name)
+            if os.path.exists(destination):
+                return destination
+        if not file_name:
+            file_name = os.path.basename(url_object.path)
+
         connection = self.get_connection(url_object.netloc, 443)
         connection.request("GET", url_object.path + "?" + url_object.query, message_data, self.header)
         response = connection.getresponse()
+        if response.status != 200:
+            return None
+
         extension = response.getheader("Content-Type").split("/")[-1].replace("jpeg", "jpg")
-        destination = os.path.join(save_path, filename)
+        destination = os.path.join(save_path, file_name)
         if os.path.splitext(destination)[-1] == "":
             destination = destination + "." + extension
         with open(destination, mode="wb") as file:
             file.write(response.read())
+            return destination
 
 
     def send_message(self, channel_id, message_content, reply_id=None, reply_channel_id=None, reply_guild_id=None, reply_ping=True, attachments=None, stickers=None, nonce=None):
@@ -1737,14 +1752,16 @@ class Discord():
         return False
 
 
-    def get_emoji(self, emoji_id, size=None):
+    def get_emoji(self, emoji_id, size=None, img_type="webp", cache=peripherals.temp_path):
         """Download image for specified custom emoji"""
-        destination = os.path.join(os.path.expanduser(peripherals.temp_path), f"{emoji_id}.webp")
+        destination = os.path.join(os.path.expanduser(cache), f"{emoji_id}.{img_type}")
+        if not os.path.exists(os.path.dirname(destination)):
+            os.makedirs(os.path.dirname(destination))
         if os.path.exists(destination):
             return destination
 
         message_data = None
-        url = f"/emojis/{emoji_id}.webp"
+        url = f"/emojis/{emoji_id}.{img_type}"
         if size:
             url = url + f"?size={size}"
         header = {
