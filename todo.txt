@@ -1,10 +1,12 @@
-Add favorite and recently used emoji in emoji assist
-Fix selected line removing inline image
-Fix inline image scrolling with tree
-Add colors and formatting in assist window
+Add command to favorite emoji (to state)
+Add command to favorite gif (to state)
+
 Add spoiler to inline media (double click to spoil, next to open) and extensions
+Add colors and formatting in assist window
 Update screenshots
 
+Fix selected line removing inline image
+Fix inline image scrolling with tree
 Fix sent audio is delayed and low quality
 Fix receiver audio mixer
 Add transmmitter audio mixer

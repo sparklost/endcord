@@ -25,7 +25,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x13user_frecency.proto\x12\x18\x65ndcord.user_frecency.v1\"\xdb\x02\n\x0cUserFrecency\x12O\n\rfavorite_gifs\x18\x02 \x01(\x0b\x32\x33.endcord.user_frecency.v1.UserFrecency.FavoriteGIFsH\x00\x88\x01\x01\x1a)\n\x0b\x46\x61voriteGIF\x12\x0b\n\x03src\x18\x02 \x01(\t\x12\r\n\x05order\x18\x05 \x01(\r\x1a\xbc\x01\n\x0c\x46\x61voriteGIFs\x12K\n\x04gifs\x18\x01 \x03(\x0b\x32=.endcord.user_frecency.v1.UserFrecency.FavoriteGIFs.GifsEntry\x1a_\n\tGifsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x41\n\x05value\x18\x02 \x01(\x0b\x32\x32.endcord.user_frecency.v1.UserFrecency.FavoriteGIF:\x02\x38\x01\x42\x10\n\x0e_favorite_gifsb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x13user_frecency.proto\x12\x18\x65ndcord.user_frecency.v1\"\xea\x03\n\x0cUserFrecency\x12O\n\rfavorite_gifs\x18\x02 \x01(\x0b\x32\x33.endcord.user_frecency.v1.UserFrecency.FavoriteGIFsH\x00\x88\x01\x01\x12S\n\x0f\x66\x61vorite_emojis\x18\x05 \x01(\x0b\x32\x35.endcord.user_frecency.v1.UserFrecency.FavoriteEmojisH\x01\x88\x01\x01\x1a)\n\x0b\x46\x61voriteGIF\x12\x0b\n\x03src\x18\x02 \x01(\t\x12\r\n\x05order\x18\x05 \x01(\r\x1a\xbc\x01\n\x0c\x46\x61voriteGIFs\x12K\n\x04gifs\x18\x01 \x03(\x0b\x32=.endcord.user_frecency.v1.UserFrecency.FavoriteGIFs.GifsEntry\x1a_\n\tGifsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x41\n\x05value\x18\x02 \x01(\x0b\x32\x32.endcord.user_frecency.v1.UserFrecency.FavoriteGIF:\x02\x38\x01\x1a$\n\x0e\x46\x61voriteEmojis\x12\x12\n\x06\x65mojis\x18\x01 \x03(\tB\x02\x10\x00\x42\x10\n\x0e_favorite_gifsB\x12\n\x10_favorite_emojisb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -34,12 +34,16 @@ if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
   _globals["_USERFRECENCY_FAVORITEGIFS_GIFSENTRY"]._loaded_options = None
   _globals["_USERFRECENCY_FAVORITEGIFS_GIFSENTRY"]._serialized_options = b"8\001"
+  _globals["_USERFRECENCY_FAVORITEEMOJIS"].fields_by_name["emojis"]._loaded_options = None
+  _globals["_USERFRECENCY_FAVORITEEMOJIS"].fields_by_name["emojis"]._serialized_options = b"\020\000"
   _globals["_USERFRECENCY"]._serialized_start=50
-  _globals["_USERFRECENCY"]._serialized_end=397
-  _globals["_USERFRECENCY_FAVORITEGIF"]._serialized_start=147
-  _globals["_USERFRECENCY_FAVORITEGIF"]._serialized_end=188
-  _globals["_USERFRECENCY_FAVORITEGIFS"]._serialized_start=191
-  _globals["_USERFRECENCY_FAVORITEGIFS"]._serialized_end=379
-  _globals["_USERFRECENCY_FAVORITEGIFS_GIFSENTRY"]._serialized_start=284
-  _globals["_USERFRECENCY_FAVORITEGIFS_GIFSENTRY"]._serialized_end=379
+  _globals["_USERFRECENCY"]._serialized_end=540
+  _globals["_USERFRECENCY_FAVORITEGIF"]._serialized_start=232
+  _globals["_USERFRECENCY_FAVORITEGIF"]._serialized_end=273
+  _globals["_USERFRECENCY_FAVORITEGIFS"]._serialized_start=276
+  _globals["_USERFRECENCY_FAVORITEGIFS"]._serialized_end=464
+  _globals["_USERFRECENCY_FAVORITEGIFS_GIFSENTRY"]._serialized_start=369
+  _globals["_USERFRECENCY_FAVORITEGIFS_GIFSENTRY"]._serialized_end=464
+  _globals["_USERFRECENCY_FAVORITEEMOJIS"]._serialized_start=466
+  _globals["_USERFRECENCY_FAVORITEEMOJIS"]._serialized_end=502
 # @@protoc_insertion_point(module_scope)

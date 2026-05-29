@@ -248,12 +248,12 @@ def search_usernames_roles(roles, query_results, guild_id, gateway, query, prese
     return sorted(results, key=lambda x: x[2], reverse=True)
 
 
-def search_emojis(all_emojis, premium, guild_id, query, safe_emoji=False, limit=50, score_cutoff=15):
+def search_emojis(all_emojis, favorite_emojis, premium, guild_id, query, safe_emoji=False, limit=50, score_cutoff=15):
     """Search for emoji"""
     results = []
     worst_score = score_cutoff
 
-    # guild emoji
+    # select discord emojis
     if premium:
         emojis = all_emojis
     else:
@@ -263,6 +263,53 @@ def search_emojis(all_emojis, premium, guild_id, query, safe_emoji=False, limit=
                 break
         else:
             emojis = []
+
+    # favorites
+    for emoji_name in favorite_emojis:
+        try:
+            int(emoji_name)   # if success its discord emoji id
+            for guild in emojis:
+                guild_name = guild["guild_name"]
+                for guild_emoji in guild["emojis"]:
+                    if guild_emoji["id"] == emoji_name:
+                        break
+                else:
+                    continue
+                formatted = f"{guild_emoji["name"]} ({guild_name})"
+                if query.startswith("**"):
+                    score = 1000 + fuzzy_match_score(query[2:].strip(), formatted)
+                else:
+                    score = fuzzy_match_score(query, formatted)
+                if score < worst_score:
+                    continue
+                heapq.heappush(results, (formatted, f"<:{guild_emoji["name"]}:{guild_emoji["id"]}>", score + 1000))
+        except ValueError:
+            emoji_string = f":{emoji_name}:"
+            for emoji, data in utils.EMOJI_DATA.items():
+                if emoji_string in data:
+                    break
+            else:
+                continue
+            formatted = "** "
+            if not safe_emoji:
+                formatted += emoji
+            if len(data) > 1:
+                if len(data[1]) < len(data[0]):
+                    formatted += f" - {data[1]} ({data[0]})"
+                else:
+                    formatted += f" - {data[0]} ({data[1]})"
+            else:
+                formatted += " - " + data[0]
+            if query.startswith("**"):
+                score = 1000 + fuzzy_match_score(query[2:].strip(), formatted)
+            else:
+                score = fuzzy_match_score(query, formatted) * 2
+            if score < worst_score:
+                continue
+            heapq.heappush(results, (formatted, emoji_string, score + 1000))
+
+    if query.startswith("**"):
+        return sorted(results, key=lambda x: x[2], reverse=True)
 
     # discord emoji
     for guild in emojis:
@@ -289,10 +336,10 @@ def search_emojis(all_emojis, premium, guild_id, query, safe_emoji=False, limit=
             if len(data) > 1:
                 if len(data[1]) < len(data[0]):
                     emoji_name = data[1]
-                    formatted += " - " + emoji_name + f" ({data[0]})"
+                    formatted += f" - {emoji_name} ({data[0]})"
                 else:
                     emoji_name = data[0]
-                    formatted += " - " + emoji_name + f" ({data[1]})"
+                    formatted += f" - {emoji_name} ({data[1]})"
             else:
                 emoji_name = data[0]
                 formatted += " - " + data[0]

@@ -5540,6 +5540,7 @@ class Endcord:
         elif assist_type == 3:   # emoji
             self.assist_found = search.search_emojis(
                 self.gateway.get_emojis(),
+                self.discord.get_settings_proto(2)["favoriteEmojis"].get("emojis", []),
                 self.premium,
                 self.active_channel["guild_id"],
                 assist_word,
@@ -5676,7 +5677,7 @@ class Endcord:
 
             elif assist_word.lower().startswith("gif "):
                 self.assist_found = search.search_gif(
-                    self.discord.get_settings_proto(2)["favoriteGifs"]["gifs"],
+                    self.discord.get_settings_proto(2)["favoriteGifs"].get("gifs", []),
                     assist_word[4:],
                     limit=self.assist_limit,
                     score_cutoff=self.assist_score_cutoff,
@@ -5736,7 +5737,7 @@ class Endcord:
 
         elif assist_type == 8:   # gif search
             self.assist_found = search.search_gif(
-                self.search_results if self.search_results else self.discord.get_settings_proto(2)["favoriteGifs"]["gifs"],
+                self.search_results if self.search_results else self.discord.get_settings_proto(2)["favoriteGifs"].get("gifs", []),
                 assist_word,
                 limit=self.assist_limit,
                 score_cutoff=self.assist_score_cutoff,

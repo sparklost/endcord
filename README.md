@@ -27,6 +27,7 @@ Third party endcord forks may add features that can lead to account ban, contain
 - Kitty protocol images (through extensions: [1](https://github.com/sparklost/endcord-image-emoji), [[2](https://github.com/sparklost/endcord-inline-image)])
 - Login with email, 2fa, QR code, or paste token
 - Desktop notifications
+- Inline images (pixelated/ascii-art/[kitty-protocol](https://github.com/sparklost/endcord-inline-image))
 - View images, gifs, videos, audio, stickers and YouTube with ASCII art or in external app
 - Download/upload attachments
 - Select message and: reply, edit, delete, go to replied, react, vote in a poll...
@@ -196,7 +197,7 @@ Press `Esc` to stop assist. Re-type trigger to start it again.
 Navigation: `Alt+Up/Down` - Go up/down, `Alt+Enter` or `Enter` - insert selected item.  
 When inserted in input line, item will usually be shown as `<some_numbers>` - that is intended - do not alter it.  
 Stickers and emoji are sorted into packs, and will be shown as `pack name - emoji/sticker name`, and search is performed on that string.  
-Sticker will also be added to message text and removed when sending.  
+Emoji assist has special feature: type `:**` to search all favorited emojis.  
 
 ### Adding/Removing reactions
 To start reaction assist, press `Alt+E`.  

@@ -17,11 +17,11 @@ message UserFrecency {
   // }
 
   // emoji
-  // message FavoriteEmojis {
-  //   repeated string emojis = 1 [packed = false];
-  // }
+  message FavoriteEmojis {
+    repeated string emojis = 1 [packed = false];
+  }
 
   optional FavoriteGIFs favorite_gifs = 2;
   // optional FavoriteStickers favorite_stickers = 3;
-  // optional FavoriteEmojis favorite_emojis = 5;
+  optional FavoriteEmojis favorite_emojis = 5;
 }
