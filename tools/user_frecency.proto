@@ -1,0 +1,27 @@
+syntax = "proto3";
+package endcord.user_frecency.v1;
+
+message UserFrecency {
+  // gifs
+  message FavoriteGIF {
+    string src = 2;   // dict key is tenor url, this is gif file url
+    uint32 order = 5;
+  }
+  message FavoriteGIFs {
+    map<string, FavoriteGIF> gifs = 1;
+  }
+
+  // stickers
+  // message FavoriteStickers {
+  //   repeated fixed64 sticker_ids = 1;
+  // }
+
+  // emoji
+  // message FavoriteEmojis {
+  //   repeated string emojis = 1 [packed = false];
+  // }
+
+  optional FavoriteGIFs favorite_gifs = 2;
+  // optional FavoriteStickers favorite_stickers = 3;
+  // optional FavoriteEmojis favorite_emojis = 5;
+}

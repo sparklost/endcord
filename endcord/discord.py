@@ -27,7 +27,7 @@ except ImportError:
 import socks
 from google.protobuf.json_format import MessageToDict, ParseDict
 
-from endcord import peripherals, user_settings_pb2, utils
+from endcord import peripherals, user_frecency_pb2, user_settings_pb2, utils
 from endcord.message import prepare_messages
 
 DISCORD_HOST = "discord.com"
@@ -581,7 +581,7 @@ class Discord():
         """
         Get account settings:
         num=1 - General user settings
-        num=2 - Frecency and favorites storage for various things - unsupported
+        num=2 - frecency and favorites storage for various things
         """
         if self.protos[num-1]:
             return self.protos[num-1]
@@ -595,7 +595,7 @@ class Discord():
             if num == 1:
                 decoded = user_settings_pb2.UserSettings.FromString(base64.b64decode(data))
             elif num == 2:
-                return {}   # unsupported
+                decoded = user_frecency_pb2.UserFrecency.FromString(base64.b64decode(data))
             else:
                 return {}
             self.protos[num-1] = MessageToDict(decoded)
@@ -608,7 +608,7 @@ class Discord():
         """
         Patch account settings
         num=1 - General user settings
-        num=2 - Frecency and favorites storage for various things"""
+        num=2 - frecency and favorites storage for various things"""
         if not self.protos[num-1]:
             self.get_settings_proto(num)
         self.protos[num-1].update(data)
@@ -1478,11 +1478,11 @@ class Discord():
             data = json.loads(data)
             gifs = []
             for gif in data:
-                gifs.append({
-                    "url": gif["url"],
-                    "webm": gif["src"],
-                    "gif": gif["gif_src"],
-                })
+                gifs.append((
+                    gif["url"],
+                    gif["gif_src"],
+                    # gif["src"],
+                ))
             return gifs
         log_api_error(data, status, "search_gifs")
         return []

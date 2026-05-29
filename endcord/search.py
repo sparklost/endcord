@@ -472,7 +472,7 @@ def search_client_commands(commands, query, limit=50, score_cutoff=15):
 
 
 def search_games(games, blacklist, query, limit=50, score_cutoff=15):
-    """Search for settings"""
+    """Search for games in game detection"""
     results = []
     worst_score = score_cutoff
 
@@ -544,6 +544,40 @@ def search_profiles(profiles, query, limit=50, score_cutoff=15):
         keyring = "keyring" if num < keyring_len else "plaintext"
         active = "[Active]" if profile["name"] == profiles["selected"] else ""
         heapq.heappush(results, (f"{profile["name"]} - ({keyring}) {active}", "switch_profile " + profile["name"], score))
+        if len(results) > limit:
+            heapq.heappop(results)
+            worst_score = results[0][2]
+
+    return sorted(results, key=lambda x: x[2], reverse=True)
+
+
+def search_gif(gifs, query, limit=50, score_cutoff=15, fav=True, cmd=True):
+    """Search for gifs"""
+    results = []
+    worst_score = score_cutoff
+    if query:
+        results.append(("Search: " + query, ("gif " if cmd else "") + query, 1000, None))
+
+    if not fav and gifs and len(gifs[0]) > 2:
+        return []
+    iterable = gifs if not fav else gifs.items()
+    for url, data in iterable:
+        formatted = " ".join(url.split("/")[-1].split("-")[:-1])
+        if fav:
+            preview = data["src"]
+            order = data["order"]
+        else:
+            preview = data
+            order = 0
+        if formatted.endswith("gif"):
+            formatted = formatted[:-4]
+        if query:
+            score = fuzzy_match_score(query, formatted)
+        else:
+            score = score_cutoff + int(order) if fav else 0
+        if score < worst_score and query:
+            continue
+        heapq.heappush(results, (("Favorite: " if fav else "Tenor: ") + formatted, ("gif " if cmd else "") + url, score, preview))
         if len(results) > limit:
             heapq.heappop(results)
             worst_score = results[0][2]

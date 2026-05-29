@@ -55,7 +55,7 @@
 ### Extra window
 - `Alt+Up/Down` - navigate in extra window / member list
 - `Alt+Enter` - select in extra window / member list
-- `Alt+V` - Preview selected file in upload assist or when searching gif
+- `Alt+V` - Preview selected file in upload assist or when searching gif or attachments ready to send
 
 ### Other
 - `Ctrl+/` * - Open command palette
@@ -205,7 +205,7 @@ Special commands available only for command-bindings are documented in [Commands
 ### extra window
 - `,/.` - navigate in extra window / member list
 - `q` - select in extra window / member list
-- `V` - Preview selected file in upload assist or when searching gif
+- `V` - Preview selected file in upload assist or when searching gif or attachments ready to send
 
 ### other
 - `:` - Open command palette

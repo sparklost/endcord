@@ -41,6 +41,8 @@ sudo pacman -Syu protobuf
 protoc -I tools --python_out=endcord user_settings.proto
 sed -i '/wrappers_pb2/s/$/   # noqa/' endcord/user_settings_pb2.py
 ruff check --fix endcord/user_settings_pb2.py
+protoc -I tools --python_out=endcord user_frecency.proto
+ruff check --fix endcord/user_frecency_pb2.py
 ```
 
 

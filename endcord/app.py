@@ -74,7 +74,7 @@ LIMIT_MSG_LEN_PREMIUM = 4000
 FORUM_COMMANDS = (1, 2, 7, 13, 14, 15, 17, 20, 22, 25, 27, 29, 30, 31, 32, 40, 42, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 61, 62, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 79, 81, 83)
 COLLAPSE_ALL_EXCEPT_OPTIONS = ("current", "selected", "above", "bellow")
 STANDING_TYPES = ("All Good", "Limited", "Very Limited", "At risk", "Suspended")
-ASSISTED_COMMANDS = ("set ", "string_select ", "set_notifications ", "game_detection_blacklist ", "switch_tab ", "goto ", "collapse_all_except ", "insert_timestamp ", "voice_set_input_device ", "switch_profile ")
+ASSISTED_COMMANDS = ("set ", "string_select ", "set_notifications ", "game_detection_blacklist ", "switch_tab ", "goto ", "collapse_all_except ", "insert_timestamp ", "voice_set_input_device ", "switch_profile ", "gif ")
 
 match_emoji = re.compile(r"<:(.*):(\d*)>")
 match_youtube = re.compile(r"(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)[a-zA-Z0-9_-]{11}")
@@ -640,7 +640,8 @@ class Endcord:
         self.current_member_roles = []
         self.threads = []
         self.activities = []
-        self.search_messages = []
+        self.search_results = []
+        self.search_extension_results = []
         self.members = []
         self.subscribed_members = []
         self.member_list = []
@@ -1295,6 +1296,16 @@ class Endcord:
                 })
 
 
+    def insert_into_input_store(self, text):
+        """Insert toext at cursor position for current channel input store"""
+        for num, channel in enumerate(self.input_store):
+            if channel["id"] == self.active_channel["channel_id"]:
+                input_text = self.input_store[num]["content"]
+                input_index = self.input_store[num]["index"]
+                self.input_store[num]["content"] = input_text[:input_index] + text + input_text[input_index:]
+                self.input_store[num]["index"] = len(input_text[:input_index] + text)
+
+
     def add_to_command_history(self, command):
         """Add command to command history and limit its size"""
         if not self.command_history or self.command_history[-1] != command:
@@ -1537,12 +1548,14 @@ class Endcord:
             elif self.restore_input_text[1] in ("search", "command", "react", "edit"):
                 init_text = self.restore_input_text[0]
                 prompt_text = self.restore_input_text[1]
+                autocomplete = False
                 if self.search_gif and prompt_text == "search":
+                    autocomplete = True
                     prompt_text = "gif search"
                 prompt_text = prompt_text.upper()
                 command = self.restore_input_text[1] == "command"
                 self.restore_input_text = (None, None)
-                input_text, chat_sel, tree_sel, action = self.tui.wait_input(self.custom_prompt(prompt_text), init_text=init_text, forum=self.forum, command=command)
+                input_text, chat_sel, tree_sel, action = self.tui.wait_input(self.custom_prompt(prompt_text), init_text=init_text, autocomplete=autocomplete, forum=self.forum, command=command)
             else:
                 restore_text = None
                 input_index = 0
@@ -1817,7 +1830,7 @@ class Endcord:
                     self.thread_toggle_join(guild_id, channel_id, thread_id)
                     self.update_tree()
 
-            # preview file to upload / selected gif from picker
+            # preview file to upload / selected gif from picker / attachments ready to send
             elif action == 22:
                 if self.uploading:
                     self.restore_input_text = (input_text, "autocomplete")
@@ -1827,14 +1840,18 @@ class Endcord:
                     if isinstance(file_path, str):
                         self.media_thread = threading.Thread(target=self.open_media, daemon=True, args=(file_path, ))
                         self.media_thread.start()
-                elif self.search_gif:
-                    self.restore_input_text = (input_text, "search")
+                elif self.search_gif or (self.command and input_text.startswith("gif ")):
+                    self.restore_input_text = (input_text, "command" if self.command else "search")
                     self.ignore_typing = True
                     extra_index = self.tui.get_extra_selected()
-                    url = self.search_messages[extra_index]["gif"]
+                    if not len(self.assist_found[extra_index]) > 3:
+                        continue
+                    url = self.assist_found[extra_index][3]
                     self.download_threads.append(threading.Thread(target=self.download_file, daemon=True, args=(url, False, True)))
                     self.download_threads[-1].start()
-                else:
+                    continue
+                else:   # if any attachments ready to send
+                    self.restore_input_text = (input_text, "command" if self.command else "standard")
                     active_channel = self.active_channel["channel_id"]
                     attachments = self.ready_attachments.get(active_channel)
                     if attachments and len(attachments) >= self.selected_attachment - 1:
@@ -1885,18 +1902,21 @@ class Endcord:
                         self.tui.disable_wrap_around(False)
                         self.go_to_message(message_id)
                         self.close_extra_window()
-                    elif self.search_gif:
-                        extra_selected = self.tui.get_extra_selected()
-                        if extra_selected < 0:
+                    elif self.search_gif or (self.command and input_text.startswith("gif ")):
+                        self.restore_input_text = (input_text, "command" if self.command else "search")
+                        self.ignore_typing = True
+                        extra_index = self.tui.get_extra_selected()
+                        if not len(self.assist_found[extra_index]) > 3:
                             continue
-                        gif = self.search_messages[extra_selected]["url"]
-                        self.restore_input_text = (gif, "standard")
+                        url = self.assist_found[extra_index][3]
+                        self.download_threads.append(threading.Thread(target=self.download_file, daemon=True, args=(url, False, True)))
+                        self.download_threads[-1].start()
                         continue
                     elif self.search_ext:
                         extra_selected = self.tui.get_extra_selected()
                         if extra_selected < 0:
                             continue
-                        repo = self.search_messages[extra_selected]
+                        repo = self.search_results[extra_selected]
                         from endcord import git
                         status, message = git.install_extension(repo[0] + "/" + repo[1], cli=False)
                         self.stop_extra_window()
@@ -1953,7 +1973,7 @@ class Endcord:
                     self.search = False
                     self.tui.disable_wrap_around(False)
                     self.search_end = False
-                    self.search_messages = []
+                    self.search_results = []
                     self.update_status_line()
                     self.stop_assist()
 
@@ -2086,7 +2106,13 @@ class Endcord:
 
             # search gif
             elif action == 44:
-                if not self.search_gif:
+                if self.search_gif:
+                    self.close_extra_window()
+                    self.reset_states()
+                    self.search_gif = False
+                    self.update_status_line()
+                    self.stop_assist()
+                else:
                     self.reset_states()
                     self.add_to_store(self.active_channel["channel_id"], input_text)
                     self.restore_input_text = (None, "search")
@@ -2094,12 +2120,7 @@ class Endcord:
                     self.ignore_typing = True
                     self.stop_assist(close=False)
                     self.extra_window_open = True
-                else:
-                    self.close_extra_window()
-                    self.reset_states()
-                    self.search_gif = False
-                    self.update_status_line()
-                    self.stop_assist()
+                    self.assist("", 8)
 
             # open external editor
             elif action == 45 and self.external_editor is not None:
@@ -2365,8 +2386,12 @@ class Endcord:
                     self.tui.set_input_index(0)
                     self.restore_input_text = (None, None)   # load text from cache
                 elif self.assist_word and not self.tui.instant_assist:
-                    if self.search or self.search_gif:
+                    if self.search:
                         self.restore_input_text = (input_text, "search")
+                    elif self.search_gif:
+                        self.reset_states()
+                        self.search_gif = False
+                        self.restore_input_text = (None, None)
                     elif self.command:
                         self.restore_input_text = (input_text, "command")
                         if self.vim_mode:
@@ -2440,8 +2465,8 @@ class Endcord:
                 pass
 
             # enter
-            elif (action == 0 and input_text and input_text != "\n" and self.active_channel["channel_id"]) or self.command:
-                if self.assist_word is not None and self.assist_found:
+            elif (action == 0 and input_text and input_text != "\n" and self.active_channel["channel_id"]) or self.command or self.search_gif:
+                if (self.assist_word is not None or self.search_gif) and self.assist_found:
                     self.restore_input_text = (input_text, "standard")
                     new_input_text, new_input_index = self.insert_assist(
                         input_text,
@@ -2452,8 +2477,9 @@ class Endcord:
                     # self.reset_states(reacting=False)
                     self.update_status_line()
                     # 1000000 means its command execution and should restore text from store
-                    if new_input_text is not None and new_input_index != 1000000:
-                        if (self.search or self.search_gif) and self.extra_bkp:
+                    # 2000000 means its executed extended gif search, and should keep search running
+                    if new_input_text is not None and new_input_index < 1000000:
+                        if self.search and self.extra_bkp:
                             self.restore_input_text = (new_input_text, "search")
                             self.ignore_typing = True
                         elif self.command and self.extra_bkp:
@@ -2470,6 +2496,9 @@ class Endcord:
                         self.tui.input_buffer = new_input_text
                         self.tui.set_input_index(new_input_index)
                     else:
+                        if new_input_index == 2000000:
+                            self.restore_input_text = ("", "search")
+                            continue
                         self.assist_word = None
                         self.assist_found = []
                         if new_input_index != 1000000:
@@ -2543,26 +2572,6 @@ class Endcord:
 
                 elif self.search:
                     self.do_search(input_text)
-                    self.restore_input_text = (None, "search")
-                    self.reset_states()
-                    self.ignore_typing = True
-                    self.update_status_line()
-                    continue
-
-                elif self.search_gif:
-                    max_w = self.tui.get_dimensions()[2][1]
-                    self.add_running_task("Searching gifs", 4)
-                    self.search_messages = self.discord.search_gifs(input_text)
-                    self.remove_running_task("Searching gifs", 4)
-                    if self.search_messages is None:
-                        self.search_messages = []
-                        self.gateway.set_offline()
-                        self.stop_assist()
-                        self.update_extra_line("Network error")
-                        self.restore_input_text = (input_text, "standard")
-                        continue
-                    extra_title, extra_body = formatter.generate_extra_window_search_gif(self.search_messages, max_w)
-                    self.tui.draw_extra_window(extra_title, extra_body, select=True)
                     self.restore_input_text = (None, "search")
                     self.reset_states()
                     self.ignore_typing = True
@@ -2645,7 +2654,7 @@ class Endcord:
                     except ValueError:
                         pass
 
-                elif input_text[0] == "/" and parser.check_start_command(input_text, self.my_commands, self.guild_commands, self.guild_commands_permitted) and not self.disable_sending:
+                elif input_text and input_text[0] == "/" and parser.check_start_command(input_text, self.my_commands, self.guild_commands, self.guild_commands_permitted) and not self.disable_sending:
                     if self.forum:
                         self.update_extra_line("Can't run app command in forum")
                     else:
@@ -2800,13 +2809,6 @@ class Endcord:
                     self.tui.disable_wrap_around(False)
                     self.go_to_message(message_id)
                     self.close_extra_window()
-
-                elif self.search_gif and self.extra_window_open:
-                    extra_selected = self.tui.get_extra_selected()
-                    if extra_selected < 0:
-                        continue
-                    url = self.search_messages[extra_selected]["url"]
-                    self.restore_input_text = (url, "standard insert")
 
                 elif self.hiding_ch["channel_id"]:
                     channel_id = self.hiding_ch["channel_id"]
@@ -3339,13 +3341,7 @@ class Endcord:
 
         elif cmd_type == 33:   # INSERT_TIMESTAMP
             timestamp = cmd_args["timestamp"]
-            for num, channel in enumerate(self.input_store):
-                if channel["id"] == self.active_channel["channel_id"]:
-                    input_text = self.input_store[num]["content"]
-                    input_index = self.input_store[num]["index"]
-                    self.input_store[num]["content"] = input_text[:input_index] + timestamp + input_text[input_index:]
-                    self.input_store[num]["index"] = len(input_text[:input_index] + timestamp)
-                    break
+            self.insert_into_input_store(timestamp)
 
         elif cmd_type == 34:   # VOTE
             select_num = max(cmd_args.get("num", 0), 0)
@@ -3533,26 +3529,9 @@ class Endcord:
 
         elif cmd_type == 41:   # GIF
             search_text = cmd_args.get("search_text", None)
-            if search_text:
-                reset = False
-                max_w = self.tui.get_dimensions()[2][1]
-                self.add_running_task("Searching gifs", 4)
-                self.search_messages = self.discord.search_gifs(search_text)
-                self.remove_running_task("Searching gifs", 4)
-                if self.search_messages is None:
-                    self.search_messages = []
-                    self.gateway.set_offline()
-                    self.stop_assist()
-                    self.update_extra_line("Network error")
-                    return
-                extra_title, extra_body = formatter.generate_extra_window_search_gif(self.search_messages, max_w)
-                self.tui.draw_extra_window(extra_title, extra_body, select=True)
-                self.restore_input_text = (None, "search")
-                self.reset_states()
-                self.search = True
-                self.ignore_typing = True
-                self.update_status_line()
-                self.extra_window_open = True
+            search_text = search_text.strip()
+            if search_text.startswith("https://tenor.com/"):
+                self.insert_into_input_store(search_text)
             elif not self.search:
                 reset = False
                 self.reset_states()
@@ -3560,8 +3539,17 @@ class Endcord:
                 self.search_gif = True
                 self.ignore_typing = True
                 self.stop_assist(close=False)
-                self.tui.remove_extra_window()
                 self.extra_window_open = True
+                if search_text:
+                    self.add_running_task("Searching gifs", 4)
+                    self.search_results = self.discord.search_gifs(search_text)
+                    self.remove_running_task("Searching gifs", 4)
+                    if self.search_results is None:
+                        self.search_results = []
+                        self.gateway.set_offline()
+                        self.stop_assist()
+                        self.update_extra_line("Network error")
+                self.assist("", 8)
 
         elif cmd_type == 42:   # REDRAW
             self.tui.force_redraw()
@@ -3921,7 +3909,7 @@ class Endcord:
                 self.tui.disable_wrap_around(True)
                 max_w = self.tui.get_dimensions()[2][1]
                 self.search_ext = True
-                self.search_messages = extensions
+                self.search_results = extensions
                 extra_title, extra_body = formatter.generate_extra_window_search_ext(extensions, max_w)
                 self.stop_assist(close=False)
                 self.tui.draw_extra_window(extra_title, extra_body, select=True)
@@ -4181,17 +4169,23 @@ class Endcord:
         return guild_id, parent_id, guild_name
 
 
-    def find_parents_from_id(self, channel_id):
+    def find_parents_from_id(self, target_id):
         """Find channel parents from its id"""
         for guild in self.guilds:
             for channel in guild["channels"]:
-                if channel["id"] == channel_id:
-                    return channel_id, channel["name"], guild["guild_id"], guild["name"], channel["parent_id"]
+                if channel["id"] == target_id:
+                    return target_id, channel["name"], guild["guild_id"], guild["name"], channel["parent_id"]
         # check dms
         for dm in self.dms:
-            if dm["id"] == channel_id:
+            if dm["id"] == target_id:
                 name = dm["name"]
-                return channel_id, name, None, None, None
+                return target_id, name, None, None, None
+        # check threads
+        for guild in self.threads:
+            for channel in guild["channels"]:
+                for thread in channel["threads"]:
+                    if thread["id"] == target_id:
+                        return target_id, thread["name"], guild["guild_id"], None, thread["parent_id"]
         return None, None, None, None, None
 
 
@@ -5434,7 +5428,7 @@ class Endcord:
         self.search = (content, channel_id, author_id, mentions, has, max_id, min_id, pinned)
         logger.debug(f"Starting search with params: {self.search}")
         is_dm = not(self.active_channel["guild_id"])
-        total_search_messages, self.search_messages = self.discord.search(
+        total_search_messages, self.search_results = self.discord.search(
             self.active_channel["channel_id"] if is_dm else self.active_channel["guild_id"],
             channel=is_dm,
             content=content,
@@ -5451,10 +5445,10 @@ class Endcord:
             self.update_extra_line("Network error")
             self.remove_running_task("Searching", 4)
             return
-        if len(self.search_messages) >= total_search_messages:
+        if len(self.search_results) >= total_search_messages:
             self.search_end = True
         extra_title, self.extra_body, self.extra_indexes = formatter.generate_extra_window_search(
-            self.search_messages,
+            self.search_results,
             self.current_roles,
             self.current_channels,
             self.blocked,
@@ -5482,7 +5476,7 @@ class Endcord:
             max_id=self.search[5],
             min_id=self.search[6],
             pinned=self.search[7],
-            offset=len(self.search_messages),
+            offset=len(self.search_results),
         )
         if total_search_messages is None:
             self.gateway.set_offline()
@@ -5490,8 +5484,8 @@ class Endcord:
             self.remove_running_task("Searching", 4)
             return
         if search_chunk:
-            self.search_messages += search_chunk
-            if len(self.search_messages) >= total_search_messages:
+            self.search_results += search_chunk
+            if len(self.search_results) >= total_search_messages:
                 self.search_end = True
             extra_title, extra_body_chunk, indexes_chunk = formatter.generate_extra_window_search(
                 search_chunk,
@@ -5680,6 +5674,14 @@ class Endcord:
                     score_cutoff=self.assist_score_cutoff,
                 )
 
+            elif assist_word.lower().startswith("gif "):
+                self.assist_found = search.search_gif(
+                    self.discord.get_settings_proto(2)["favoriteGifs"]["gifs"],
+                    assist_word[4:],
+                    limit=self.assist_limit,
+                    score_cutoff=self.assist_score_cutoff,
+                )
+
             elif assist_word:
                 self.assist_found = search.search_client_commands(
                     COMMAND_ASSISTS,
@@ -5732,6 +5734,16 @@ class Endcord:
             else:
                 self.assist_found.append(("Provided path is invalid", True))
 
+        elif assist_type == 8:   # gif search
+            self.assist_found = search.search_gif(
+                self.search_results if self.search_results else self.discord.get_settings_proto(2)["favoriteGifs"]["gifs"],
+                assist_word,
+                limit=self.assist_limit,
+                score_cutoff=self.assist_score_cutoff,
+                fav=not(self.search_results),
+                cmd=False,
+            )
+
         max_w = self.tui.get_dimensions()[2][1]
         extra_title, extra_body = formatter.generate_extra_window_assist(self.assist_found, assist_type, max_w, self.placeholder_emoji)
         self.extra_window_open = True
@@ -5752,7 +5764,7 @@ class Endcord:
             self.assist_found = []
             self.tui.assist_start = -1
             # if search was open, restore it
-            if (self.search or self.search_gif or self.command) and self.extra_bkp:
+            if (self.search or self.command) and self.extra_bkp:
                 self.extra_window_open = True
                 self.tui.draw_extra_window(self.extra_bkp[0], self.extra_bkp[1], select=True)
         else:
@@ -5771,7 +5783,7 @@ class Endcord:
         self.search_ext = False
         self.tui.disable_wrap_around(False)
         self.search_end = False
-        self.search_messages = []
+        self.search_results = []
         self.command = False
         self.uploading = False
         if update:
@@ -5784,23 +5796,30 @@ class Endcord:
         """Insert specified assist to specified position in the text"""
         if index >= len(self.assist_found) or index < 0:
             return None, None
+
         if self.assist_type == 1:   # channel
             insert_string = f"<#{self.assist_found[index][1]}>"   # format: "<#ID>"
+
         elif self.assist_type == 2:   # username/role
             # username format: "<@ID>"
             # role format: "<@&ID>" - already has "&" in ID
             insert_string = f"<@{self.assist_found[index][1]}>"
+
         elif self.assist_type == 3:   # emoji
             # default emoji - :emoji_name:
             # discord emoji format: "<:name:ID>"
             insert_string = self.assist_found[index][1]
             if input_text.startswith("+:") and start == 2 and insert_string.startswith("<:"):
                 insert_string = ":" + insert_string
+
         elif self.assist_type == 4:   # sticker
             insert_string = f"<;{self.assist_found[index][1]};>"   # format: "<;ID;>"
+
         elif self.assist_type == 5:   # command
             if self.assist_found[index][1]:
-                if input_text.endswith(" ") and input_text not in ASSISTED_COMMANDS:
+                if (input_text.endswith(" ") and input_text not in ASSISTED_COMMANDS) or len(self.assist_found[index]) > 3:
+                    if len(self.assist_found[index]) > 3:   # instant assist for "gif" command
+                        input_text = self.assist_found[index][1]
                     self.tui.instant_assist = False
                     command_type, command_args = parser.command_string(input_text)
                     self.close_extra_window()
@@ -5822,6 +5841,7 @@ class Endcord:
                 new_pos = len(new_text)
                 return new_text, new_pos
             return input_text, len(input_text)
+
         elif self.assist_type == 6:   # app command
             if self.assist_found[index][1] is None:   # execute app command
                 if self.forum:
@@ -5849,6 +5869,7 @@ class Endcord:
                 new_text = new_text + " "
             new_pos = len(new_text)
             return new_text, new_pos
+
         elif self.assist_type == 7:   # upload file select
             if self.assist_found[index][1] is True or self.assist_found[index][1] == input_text:
                 if self.uploading:
@@ -5862,6 +5883,24 @@ class Endcord:
             new_text = self.assist_found[index][1]
             new_pos = len(new_text)
             return new_text, new_pos
+
+        elif self.assist_type == 8:   # gif search
+            if self.assist_found[index][2] == 1000:   # search
+                self.add_running_task("Searching gifs", 4)
+                self.search_results = self.discord.search_gifs(self.assist_found[index][1])
+                self.remove_running_task("Searching gifs", 4)
+                if self.search_results is None:
+                    self.search_results = []
+                    self.gateway.set_offline()
+                    self.stop_assist()
+                    self.update_extra_line("Network error")
+                self.assist("", 8)
+                return None, 2000000   # keep search running
+            # insert assist
+            self.insert_into_input_store(self.assist_found[index][1])
+            self.stop_extra_window()
+            return None, None
+
         if not end:
             end = len(input_text)
         new_text = input_text[:start-1] + insert_string + input_text[end:]
@@ -8398,10 +8437,18 @@ class Endcord:
                         self.app_command_autocomplete_resp = app_command_autocomplete_resp
                         self.assist(assist_word, assist_type)
                 elif assist_word != self.assist_word:
+                    if self.search_gif:
+                        assist_type = 8
                     self.assist(assist_word, assist_type)
             elif assist_type == 7 and assist_word != self.assist_word:   # path
-                paths = utils.complete_path(assist_word, separator=True)
-                self.assist(assist_word, assist_type, query_results=paths)
+                if self.search_gif:
+                    self.assist(assist_word, 8)
+                else:
+                    paths = utils.complete_path(assist_word, separator=True)
+                    self.assist(assist_word, assist_type, query_results=paths)
+            elif self.assist_type == 8 and not assist_word and self.assist_word:
+                 self.assist("", 8)
+
 
             # check member assist query results
             if self.assist_type == 2:

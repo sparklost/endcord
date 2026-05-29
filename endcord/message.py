@@ -48,7 +48,7 @@ def prepare_embeds(embeds, message_content):
                 main_url = embed["url"]
                 skip_main_url = True
 
-        if "author" in embed and "name" in embed["author"] and "giphy.com/" not in embed["url"]:
+        if "author" in embed and "name" in embed["author"] and "giphy.com/" not in embed.get("url", ""):
             name = embed["author"]["name"]
             if name not in embed.get("title", "") and name not in embed.get("description", ""):
                 content.append(quote(name))

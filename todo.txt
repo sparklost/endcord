@@ -1,7 +1,7 @@
+Add favorite and recently used emoji in emoji assist
 Fix selected line removing inline image
 Fix inline image scrolling with tree
 Add colors and formatting in assist window
-Add favorite gifs
 Add spoiler to inline media (double click to spoil, next to open) and extensions
 Update screenshots
 
@@ -26,7 +26,6 @@ after fixing https://github.com/python/cpython/issues/119138
     Add colors for status sign in selected, muted and active dm in tree
     Add red fg white bg color for selected + unread in tree
     Add red fg gray bg color for active + unread in tree
-    Show inline media in chat
 
 Extensions:
 endcord-termux-rich
