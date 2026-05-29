@@ -24,10 +24,10 @@ Third party endcord forks may add features that can lead to account ban, contain
 - Vim-mode
 - Integrated RPC (only Rich Presence) and game detection
 - Mouse controls
-- Kitty protocol images (through extensions: [1](https://github.com/sparklost/endcord-image-emoji), [[2](https://github.com/sparklost/endcord-inline-image)])
+- Kitty protocol images (through extensions: [1](https://github.com/sparklost/endcord-image-emoji), [[2](https://github.com/sparklost/endcord-image-inline)])
 - Login with email, 2fa, QR code, or paste token
 - Desktop notifications
-- Inline images (pixelated/ascii-art/[kitty-protocol](https://github.com/sparklost/endcord-inline-image))
+- Inline images (pixelated/ascii-art/[kitty-protocol](https://github.com/sparklost/endcord-image-inline))
 - View images, gifs, videos, audio, stickers and YouTube with ASCII art or in external app
 - Download/upload attachments
 - Select message and: reply, edit, delete, go to replied, react, vote in a poll...
