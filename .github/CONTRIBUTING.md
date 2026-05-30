@@ -1,6 +1,7 @@
 ## **DO NOT CONTRIBUTE**
 You'll save your mental health, and I will save time trying to understand your code. Open an issue, and I will get to it.  
 The code is total mess that only I can efficiently navigate through, and if someone else adds any-quality code to it, it will only get harder for me.  
+And I'm greedily taking all the fun of programming in this project for myself.  
 Any PR will be rejected, sorry.  
 
 

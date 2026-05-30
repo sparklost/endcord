@@ -1799,7 +1799,7 @@ class Endcord:
                     self.selected_attachment += 1
                     self.update_extra_line()
 
-            # reveal one-by-one spoiler in a message
+            # spoil
             elif action == 18:
                 self.restore_input_text = (input_text, "standard")
                 msg_index = self.lines_to_msg(chat_sel)
@@ -2297,9 +2297,14 @@ class Endcord:
                                 if message_id:
                                     self.go_to_message(message_id)
                         elif clicked_type == 10:   # embed image
-                            url = self.messages[msg_index]["embeds"][clicked_id]["url"]
-                            self.download_threads.append(threading.Thread(target=self.download_file, daemon=True, args=(url, False, True)))
-                            self.download_threads[-1].start()
+                            # check if its spoiler and spoil
+                            embed_name = self.messages[msg_index]["embeds"][clicked_id]["name"]
+                            if embed_name and embed_name.startswith("SPOILER_") and 1000 + clicked_id not in self.messages[msg_index].get("spoiled", []):
+                                self.spoil(msg_index, 1000 + clicked_id)
+                            else:
+                                url = self.messages[msg_index]["embeds"][clicked_id]["url"]
+                                self.download_threads.append(threading.Thread(target=self.download_file, daemon=True, args=(url, False, True)))
+                                self.download_threads[-1].start()
 
             # single click on extra line
             elif action == 48:
@@ -4464,8 +4469,9 @@ class Endcord:
 
     def spoil(self, msg_index, spoiler_index=None):
         """Reveal specific or one-by-one spoiler in selected message in chat"""
+        max_spoiler = len(re.findall(formatter.match_md_spoiler, self.messages[msg_index]["content"]))
         if "spoiled" in self.messages[msg_index]:
-            if not spoiler_index:
+            if spoiler_index is None:
                 nums = sorted(self.messages[msg_index]["spoiled"])
                 spoiler_index = 0
                 for num in nums:
@@ -4473,11 +4479,20 @@ class Endcord:
                         spoiler_index += 1
                     elif num > spoiler_index:
                         break
-            self.messages[msg_index]["spoiled"].append(spoiler_index)
+                if spoiler_index >= max_spoiler:
+                    spoiler_index = 1000 + max(0, nums[-1] - 1000 + 1)
+            if spoiler_index not in self.messages[msg_index]["spoiled"]:
+                if spoiler_index >= 1000:
+                    self.messages[msg_index]["spoiled"].append(spoiler_index)
+                else:
+                    self.messages[msg_index]["spoiled"].append(min(spoiler_index, max_spoiler))
         else:
             if not spoiler_index:
                 spoiler_index = 0
-            self.messages[msg_index]["spoiled"] = [spoiler_index]
+            if not (max_spoiler or spoiler_index):
+                self.messages[msg_index]["spoiled"] = [1000]
+            else:
+                self.messages[msg_index]["spoiled"] = [min(spoiler_index, max_spoiler)]
         self.update_chat(keep_selected=True, scroll=False, change_id=self.messages[msg_index]["id"], change_type=3)
 
 

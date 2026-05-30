@@ -1818,6 +1818,9 @@ class TUI():
         if self.disable_drawing:
             return
 
+        if self.inline_media_drawer and (not self.win_member_list or force):
+            self.inline_media_drawer.clear_images(force=True)
+
         with self.lock:
             self.member_list = member_list
             self.member_list_format = member_list_format

@@ -1639,6 +1639,9 @@ class ChatGenerator:
             if embed_url and not embed.get("hidden") and embed_url not in content:
                 if content:
                     content += "\n"
+                spoiler = embed["name"] and embed["name"].startswith("SPOILER_")
+                if spoiler:
+                    spoiler = 1000 + num_e not in message.get("spoiled", [])
                 if "main_url" not in embed:   # its attachment
                     if self.trim_embed_url_size:
                         embed_url = trim_string(embed_url, self.trim_embed_url_size)
@@ -1659,9 +1662,12 @@ class ChatGenerator:
                     scale = min(min(self.placeholder_images, smallest_h) / h, min(max_length - 1 - self.newline_len, smallest_w) / w, 1)
                     h = round(h * scale)
                     w = round(w * scale) - 1
-                    content += f"\n<{MARKER}:{num_e}>" + "\n " * (h - 1)
+                    if spoiler:
+                        content += f"\n<{MARKER}:{num_e}>" + ("\n" + " " * w) * (h - 1)
+                    else:
+                        content += f"\n<{MARKER}:{num_e}>" + "\n " * (h - 1)
                     # content += f"\n<{MARKER}:{num_e}>" + ("\n" + "#" * w) * (h - 1)
-                    image_locations.append((h, w))
+                    image_locations.append((h, w, spoiler))
         for sticker in message["stickers"]:
             sticker_type = sticker["format_type"]
             if content:
@@ -2012,7 +2018,8 @@ class ChatGenerator:
                 chat_format.append(format_line)
             line_num += 1
 
-        # update image_locations y and add them to ranges in chat_map for this message base line
+        # add images to ranges in chat_map relative to this message base line and add format for spoiler images
+        #
         start_y = len(chat_map) + 1
         len_images = len(image_locations)
         for idx_i, image_location in enumerate(reversed(image_locations)):   # y is relative to message base line
@@ -2027,14 +2034,19 @@ class ChatGenerator:
                     break
             if start_y - shift < 0:
                 continue
-            chat[start_y-shift] = chat[start_y-shift][:self.newline_len] + " "
+            spoiler = image_location[2]
+            h = image_location[0]
+            w = image_location[1]
+            chat[start_y-shift] = chat[start_y-shift][:self.newline_len] + (" " * w) if spoiler else " "
             for idx_rel in range(image_location[0]):
                 idx = start_y - shift + idx_rel
                 chat_map[idx][5][5].append(self.newline_len)   # start_x
-                chat_map[idx][5][5].append(image_location[1])   # width
+                chat_map[idx][5][5].append(w)   # width
                 chat_map[idx][5][5].append(num_i)   # embed index
                 if idx_rel == 0:
-                    chat_map[idx][5][5].append(image_location[0])   # height
+                    chat_map[idx][5][5].append(h)   # height
+                if spoiler:
+                    chat_format[idx].append([self.color_spoiler, self.newline_len, self.newline_len + image_location[1]])
 
         # reactions
         if message["reactions"]:

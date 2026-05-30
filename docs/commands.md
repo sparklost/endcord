@@ -28,8 +28,8 @@
     Copy selected message contents to clipboard.
 - `copy_attachment`  
     Download and copy selected attachment to clipboard. Only file reference is sent to clipboard, so if endcord is closed, file will likely be missing.  
-- `spoil`  
-    Reveal one-by-one spoiler in selected message.
+- `spoil *[num]`  
+    Reveal one-by-one spoiler in selected message or specific spoiler index (spoiler image index starts from 1000).
 - `copy_channel_link` / `copy_channel_link <#[channel_id]>`  
     Copy link of selected channel in tree to clipboard, or from provided channel id.
 - `copy_message_link`  

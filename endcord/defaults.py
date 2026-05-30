@@ -162,7 +162,7 @@ theme = {
     "color_chat_standout": [153, 234],
     "color_chat_edited": [241, -1],
     "color_chat_url": [153, -1, "u"],
-    "color_chat_spoiler": [245, -1],
+    "color_chat_spoiler": [239, 239],
     "color_chat_code": [250, 233],
     "color_status_line": [233, 255],
     "color_extra_line": [233, 245],

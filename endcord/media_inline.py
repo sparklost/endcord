@@ -4,6 +4,7 @@
 # the Free Software Foundation, version 3.
 
 import glob
+import importlib
 import logging
 import os
 import queue
@@ -12,9 +13,11 @@ import time
 
 from PIL import Image, ImageEnhance
 
-from endcord import media, peripherals, terminal_utils, utils, xterm256
+from endcord import peripherals, terminal_utils, utils, xterm256
 
 logger = logging.getLogger(__name__)
+ESC = "\x1b"
+RESET = f"{ESC}[0m"
 
 
 def freed_vertical_segments(old_rects, new_rects_y):
@@ -68,9 +71,9 @@ class InlineMedia:
         if not self.use_blocks:
             self.ascii_palette = list(config["media_ascii_palette"])
         if self.truecolor:   # select drawing algorithm
-            self.img_to_term_block = media.img_to_term_block_truecolor
+            self.img_to_term_block = img_to_term_block_truecolor
         else:
-            self.img_to_term_block = media.img_to_term_block
+            self.img_to_term_block = img_to_term_block
 
         threading.Thread(target=utils.delete_old_files, daemon=True, args=(   # might delay startup
             os.path.join(peripherals.cache_path, "images"),
@@ -87,7 +90,7 @@ class InlineMedia:
 
 
     def update(self, chat_map, messages):
-        """Get new data. queue downloads, update caches and trigger forced redraw if needed"""
+        """Get new data, queue downloads, update caches and trigger forced redraw if needed"""
         with self.image_cache_lock:
             image_cache = {}
 
@@ -105,11 +108,15 @@ class InlineMedia:
                     message = messages[line_map[0]]
                     message_id = message["id"]
                     image_id = f"{message_id}_{embed_idx}"
+                    embed_name = message["embeds"][embed_idx]["name"]
+                    draw = not (embed_name and embed_name.startswith("SPOILER_"))
+                    if not draw:
+                        draw = 1000 + embed_idx in message.get("spoiled", [])
                 except IndexError:
                     continue
-                if image_id not in self.image_cache:
-                    self.download_queue.put((message, embed_idx, image_id, rel_y, rel_x, h, w))
-                image_cache[image_id] = [rel_y, rel_x, h, w]
+                if image_id not in self.image_cache or h != self.image_cache[image_id][2] or w != self.image_cache[image_id][3]:
+                    self.download_queue.put((message, embed_idx, image_id, rel_y, rel_x, h, w, draw))
+                image_cache[image_id] = [rel_y, rel_x, h, w, draw]
 
             # update cahanged images and delete unused cache
             for image_id, image in image_cache.items():
@@ -141,8 +148,8 @@ class InlineMedia:
             chat_y, chat_x = self.tui.win_chat.getbegyx()
             chat_h = self.tui.chat_hw[0]
             with self.image_cache_lock:
-                for data, rel_y, rel_x, h, w in self.image_cache.values():
-                    if not data:
+                for data, rel_y, rel_x, h, w, draw in self.image_cache.values():
+                    if not data or not draw:
                         continue
                     abs_y = chat_h - (rel_y - self.tui.chat_index - self.tui.have_title + 1)
                     if abs_y - chat_y <= -h or abs_y >= chat_h:
@@ -156,7 +163,7 @@ class InlineMedia:
                         cut_h += abs_y - chat_y
                         cut_y = -abs_y + 1
                         abs_y = chat_y
-                    # logger.info(("draw", (h, w), abs_y, rel_y, cut_h, cut_y))
+                    # logger.info(("DRAW", (h, w), abs_y, rel_y, cut_h, cut_y))
                     terminal_utils.draw_over_curses("\n".join(data.split("\n")[cut_y:cut_y + cut_h]), abs_y, abs_x)
                     drawn_areas.append((abs_y, abs_x, cut_h, w))
         self.drawn_areas = drawn_areas
@@ -165,16 +172,18 @@ class InlineMedia:
         self.force_draw = False
 
 
-    def clear_images(self):
+    def clear_images(self, force=False):
         """Clear all areas that are no longer used by images"""
-        if not self.force_draw and self.prev_chat_index == self.tui.chat_index and self.prev_chat_hw == self.tui.chat_hw:
+        if not self.force_draw and not force and self.prev_chat_index == self.tui.chat_index and self.prev_chat_hw == self.tui.chat_hw:
             return
 
         # get occupied vertical ranges
         occupied = []
         chat_y, chat_x = self.tui.win_chat.getbegyx()
         chat_h = self.tui.chat_hw[0]
-        for _, rel_y, _, h, w in self.image_cache.values():
+        for _, rel_y, _, h, w, draw in self.image_cache.values():
+            if not draw:
+                continue
             abs_y = chat_h - (rel_y - self.tui.chat_index - self.tui.have_title + 1)
             cut_h = h
             if abs_y - chat_y <= -h or abs_y >= chat_h:
@@ -192,6 +201,9 @@ class InlineMedia:
         for y, x, h, w in self.drawn_areas:
             old_end = y + h
             new_y = y
+            if force:
+                to_clear.append((new_y, old_end, x, w))
+                continue
             for occupied_start, occupied_end, occupied_w in occupied:
                 if occupied_w < w:   # right of new image that is smaller than old image
                     to_clear.append((occupied_start, occupied_end, x + occupied_w, w - occupied_w))
@@ -213,12 +225,13 @@ class InlineMedia:
             for y_start, y_end, x, w in to_clear:
                 for row in range(y_start, y_end):
                     terminal_utils.draw_over_curses(" " * w, row, x)
+        self.drawn_areas = []
 
 
     def downloader(self):
         """Downloader for inline media"""
         while self.run:
-            message, embed_idx, image_id, rel_y, rel_x, h, w = self.download_queue.get()
+            message, embed_idx, image_id, rel_y, rel_x, h, w, draw = self.download_queue.get()
 
             # get message and image info
             embed = message["embeds"][embed_idx]
@@ -262,6 +275,8 @@ class InlineMedia:
                 if image_id not in self.image_cache:
                     continue
                 self.image_cache[image_id][0] = data
+            if not draw:
+                continue
 
             chat_y, chat_x = self.tui.win_chat.getbegyx()
             chat_h = self.tui.chat_hw[0]
@@ -279,7 +294,7 @@ class InlineMedia:
                         cut_h += abs_y - chat_y
                         cut_y = -abs_y + 1
                         abs_y = chat_y
-                    # logger.info(("initial", (h, w), abs_y, rel_y, cut_h, cut_y))
+                    # logger.info(("INIT", (h, w), abs_y, rel_y, cut_h, cut_y))
                     terminal_utils.draw_over_curses("\n".join(data.split("\n")[cut_y:cut_y + cut_h]), abs_y, abs_x)
                     self.drawn_areas.append((abs_y, abs_x, cut_h, w))
 
@@ -311,4 +326,161 @@ class InlineMedia:
         img_palette = Image.new("P", (16, 16))
         img_palette.putpalette(xterm256.palette_short)
         img = img.quantize(palette=img_palette, dither=0)
-        return media.img_to_term(img, img_gray, -1, self.ascii_palette, len(self.ascii_palette), w, h, w, h)
+        return img_to_term(img, img_gray, -1, self.ascii_palette, len(self.ascii_palette), w, h, w, h)
+
+
+def img_to_term(img, img_gray, bg_color, ascii_palette, ascii_palette_len, screen_width, screen_height, img_width, img_height):
+    """Convert image to ANSI-colored string made of ascii_palette, ready be printed in terminal"""
+    pixels = img.load()
+    pixels_gray = img_gray.load()
+
+    padding_h = (screen_height - img_height) // 2
+    padding_w = (screen_width - img_width) // 2
+
+    bg = f"{ESC}[48;5;{bg_color}m"
+    out_lines = []
+
+    # top padding
+    for _ in range(padding_h):
+        out_lines.append(bg + (" " * screen_width) + RESET)
+
+    # image rows
+    for y in range(img_height):
+        line_parts = []
+        current_fg = None
+
+        # left padding
+        if padding_w > 0:
+            line_parts.append(bg + (" " * padding_w))
+
+        # image columns
+        for x in range(img_width):
+            gray_val = pixels_gray[x, y]
+            color = pixels[x, y] + 16
+            if color != current_fg:
+                line_parts.append(f"{ESC}[38;5;{color}m")
+                current_fg = color
+            line_parts.append(ascii_palette[(gray_val * ascii_palette_len) // 255])
+
+        # right padding
+        visible_len = padding_w + img_width
+        if visible_len < screen_width:
+            line_parts.append(bg + (" " * (screen_width - visible_len)))
+
+        line_parts.append(RESET)
+        out_lines.append("".join(line_parts))
+
+    # bottom padding
+    while len(out_lines) < screen_height:
+        out_lines.append(bg + (" " * screen_width) + RESET)
+
+    return "\n".join(out_lines)
+
+
+def img_to_term_block(img, bg_color, screen_width, screen_height, img_width, img_height):
+    """Convert image to ANSI-colored string made of half-blocks, ready to be printed in terminal"""
+    pixels = img.load()
+
+    padding_h = (screen_height - img_height // 2) // 2
+    padding_w = (screen_width - img_width) // 2
+
+    bg = f"{ESC}[48;5;{bg_color}m"
+    out_lines = []
+
+    # top padding
+    for _ in range(padding_h):
+        out_lines.append(bg + (" " * screen_width) + RESET)
+
+    # image rows
+    for y in range(0, img_height - 1, 2):
+        line_parts = []
+        current_fg = None
+        current_bg = None
+
+        # left padding
+        if padding_w > 0:
+            line_parts.append(bg + (" " * padding_w))
+
+        # image columns
+        for x in range(img_width):
+            top_color = pixels[x, y] + 16
+            bot_color = pixels[x, y + 1] + 16
+            if top_color != current_fg:
+                line_parts.append(f"{ESC}[38;5;{top_color}m")
+                current_fg = top_color
+            if bot_color != current_bg:
+                line_parts.append(f"{ESC}[48;5;{bot_color}m")
+                current_bg = bot_color
+            line_parts.append("▀")
+
+        # right padding
+        visible_len = padding_w + img_width
+        if visible_len < screen_width:
+            line_parts.append(bg + (" " * (screen_width - visible_len)))
+
+        line_parts.append(RESET)
+        out_lines.append("".join(line_parts))
+
+    # bottom padding
+    while len(out_lines) < screen_height:
+        out_lines.append(bg + (" " * screen_width) + RESET)
+    return "\n".join(out_lines)
+
+
+def img_to_term_block_truecolor(img, bg_color, screen_width, screen_height, img_width, img_height):
+    """Convert image to ANSI true-color string made of half-blocks"""
+    pixels = img.load()
+    padding_h = (screen_height - img_height // 2) // 2
+    padding_w = (screen_width - img_width) // 2
+
+    bg = f"{ESC}[48;5;{bg_color}m"   # bg color is not in r;g;b
+    out_lines = []
+
+    # top padding
+    for _ in range(padding_h):
+        out_lines.append(bg + (" " * screen_width) + RESET)
+
+    # image rows
+    for y in range(0, img_height - 1, 2):
+        line_parts = []
+        current_fg = None
+        current_bg = None
+
+        # left padding
+        if padding_w > 0:
+            line_parts.append(bg + (" " * padding_w))
+
+        # image columns
+        for x in range(img_width):
+            top_color = pixels[x, y]
+            bot_color = pixels[x, y + 1]
+            if top_color != current_fg:
+                line_parts.append(f"{ESC}[38;2;{top_color[0]};{top_color[1]};{top_color[2]}m")
+                current_fg = top_color
+            if bot_color != current_bg:
+                line_parts.append(f"{ESC}[48;2;{bot_color[0]};{bot_color[1]};{bot_color[2]}m")
+                current_bg = bot_color
+            line_parts.append("▀")
+
+        # right padding
+        visible_len = padding_w + img_width
+        if visible_len < screen_width:
+            line_parts.append(bg + (" " * (screen_width - visible_len)))
+
+        line_parts.append(RESET)
+        out_lines.append("".join(line_parts))
+
+    # bottom padding
+    while len(out_lines) < screen_height:
+        out_lines.append(bg + (" " * screen_width) + RESET)
+
+    return "\n".join(out_lines)
+
+
+# use cython if available, ~1.7 times faster
+if importlib.util.find_spec("endcord_cython") and importlib.util.find_spec("endcord_cython.media"):
+    from endcord_cython.media import (
+        img_to_term,
+        img_to_term_block,
+        img_to_term_block_truecolor,
+    )

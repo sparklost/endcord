@@ -32,7 +32,7 @@ COMMAND_ASSISTS = (
     ("mark_as_unread - mark selected message as unread", "mark_as_unread"),
     ("copy_message - copy selected message text", "copy_message"),
     ("copy_attachment - download and copy selected attachment to clipboard", "copy_attachment"),
-    ("spoil - reveal one by one spoiler in selected message", "spoil"),
+    ("spoil *[num] - reveal one by one spoiler in selected message, or specific index", "spoil"),
     ("copy_channel_link *<#[channel_id]> - store channel link in clipboard", "copy_channel_link"),
     ("copy_message_link - store selected message link in clipboard", "copy_message_link"),
     ("goto_mention *[num] - go to channel/message mention in selected message", "goto_mention"),
