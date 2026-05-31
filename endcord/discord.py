@@ -717,9 +717,19 @@ class Discord():
             file_name = os.path.basename(url_object.path)
 
         connection = self.get_connection(url_object.netloc, 443)
-        connection.request("GET", url_object.path + "?" + url_object.query, message_data, self.header)
+        try:
+            connection.request("GET", url_object.path + "?" + url_object.query, message_data, self.header)
+        except (BrokenPipeError, ConnectionResetError, http.client.RemoteDisconnected, TimeoutError) as e:
+            try:
+                connection.close()
+            except Exception:
+                pass
+            logger.error("get_file" + f" error: {e}")
+            return None
         response = connection.getresponse()
         if response.status != 200:
+            log_api_error(response.read(), response.status, "get_file")
+            connection.close()
             return None
 
         extension = response.getheader("Content-Type").split("/")[-1].replace("jpeg", "jpg")
@@ -728,7 +738,8 @@ class Discord():
             destination = destination + "." + extension
         with open(destination, mode="wb") as file:
             file.write(response.read())
-            return destination
+        return destination
+        connection.close()
 
 
     def send_message(self, channel_id, message_content, reply_id=None, reply_channel_id=None, reply_guild_id=None, reply_ping=True, attachments=None, stickers=None, nonce=None):

@@ -1,7 +1,7 @@
+Fix selected line removing inline image
 Add colors and formatting in assist window
 Update screenshots
 
-Fix selected line removing inline image
 Fix sent audio is delayed and low quality
 Fix receiver audio mixer
 Add transmmitter audio mixer

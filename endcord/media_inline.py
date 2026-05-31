@@ -60,12 +60,12 @@ class InlineMedia:
         self.saturation = config["media_saturation"]
         self.run = True
         self.prev_chat_index = None
-        self.prev_chat_hw = None
         self.prev_win_hw = self.tui.screen_hw
         self.force_draw = False
         self.image_cache_path = os.path.expanduser(os.path.join(peripherals.cache_path, "images"))
         self.image_cache = {}
         self.drawn_areas = []
+        self.prev_chat_hw = None
         self.image_cache_lock = threading.Lock()
         self.download_queue = queue.Queue()
         if not self.use_blocks:
@@ -137,7 +137,7 @@ class InlineMedia:
 
     def draw_images(self):
         """Re-calculate image positions and draw them"""
-        if not self.force_draw and self.prev_chat_index == self.tui.chat_index and self.prev_chat_hw == self.tui.chat_hw:
+        if not self.force_draw and self.prev_chat_index == self.tui.chat_index and self.prev_chat_hw[0] == self.tui.chat_hw[0]:
             return
         if self.prev_win_hw != self.tui.screen_hw:
             self.prev_win_hw = self.tui.screen_hw
@@ -152,7 +152,7 @@ class InlineMedia:
                     if not data or not draw:
                         continue
                     abs_y = chat_h - (rel_y - self.tui.chat_index - self.tui.have_title + 1)
-                    if abs_y - chat_y <= -h or abs_y >= chat_h:
+                    if abs_y - chat_y <= -h or abs_y > chat_h:
                         continue
                     abs_x = chat_x + rel_x
                     cut_y = 0
@@ -174,7 +174,7 @@ class InlineMedia:
 
     def clear_images(self, force=False):
         """Clear all areas that are no longer used by images"""
-        if not self.force_draw and not force and self.prev_chat_index == self.tui.chat_index and self.prev_chat_hw == self.tui.chat_hw:
+        if not self.force_draw and not force and self.prev_chat_index == self.tui.chat_index and self.prev_chat_hw[0] == self.tui.chat_hw[0]:
             return
 
         # get occupied vertical ranges
@@ -283,7 +283,7 @@ class InlineMedia:
             with self.tui.lock:
                 with self.image_cache_lock:
                     abs_y = chat_h - (rel_y - self.tui.chat_index - self.tui.have_title + 1)
-                    if abs_y - chat_y <= -h or abs_y >= chat_h:
+                    if abs_y - chat_y <= -h or abs_y > chat_h:
                         continue
                     abs_x = chat_x + rel_x
                     cut_y = 0

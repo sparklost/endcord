@@ -930,6 +930,8 @@ class TUI():
                 self.tree_width = 1
         else:
             self.tree_width = value
+        if self.inline_media_drawer:
+            self.inline_media_drawer.clear_images(force=True)
         self.resize()
 
 
@@ -1389,7 +1391,7 @@ class TUI():
             self.need_update.set()
 
 
-    def draw_chat(self, norefresh=False):
+    def draw_chat(self, refresh=True, inline=True):
         """Draw chat with applied color formatting"""
         if self.inline_media_drawer:
             self.inline_media_drawer.clear_images()
@@ -1407,14 +1409,14 @@ class TUI():
                     self.default_color,
                 )
                 self.win_chat.noutrefresh()
-                if not norefresh:
+                if refresh:
                     self.need_update.set()
             except curses.error:
                 # exception will happen when window is resized to smaller w dimensions
                 self.resize()
         if self.have_scrollbar:
             self.draw_scrollbar()
-        if self.inline_media_drawer:
+        if self.inline_media_drawer and refresh and inline:
             self.inline_media_drawer.draw_images()
         self.execute_extensions_methods("on_chat_draw", cache=True)
 
@@ -1655,14 +1657,14 @@ class TUI():
                 self.remove_extra_line()
                 return
             self.extra_line_text = text
-            if text and not self.disable_drawing:
+            if text:
                 h, w = self.screen.getmaxyx()
                 if not self.win_extra_line:
                     extra_line_hwyx = (1, w - (self.tree_width + self.bordered + 1), h - self.bordered - 3, self.tree_width + self.bordered + 1)
                     self.win_extra_line = self.screen.derwin(*extra_line_hwyx)
                     del self.win_chat
                     self.init_chat()
-                    self.draw_chat(norefresh=True)
+                    self.draw_chat(refresh=False)
                     if self.member_list and self.bordered:   # have to redraw member list borders
                         h, w = self.screen.getmaxyx()
                         member_list_hwyx = (
@@ -1684,7 +1686,9 @@ class TUI():
                     self.win_extra_line.insstr(0, 0, text + " " * (w - len(text)) + "\n", curses.color_pair(11) | self.attrib_map[11])
                 self.win_extra_line.noutrefresh()
                 self.need_update.set()
-            self.draw_chat()
+                self.draw_chat(inline=False)
+        if self.inline_media_drawer and text:   # gotta be outside lock
+            self.inline_media_drawer.draw_images()
 
 
     def remove_extra_line(self):
@@ -1711,7 +1715,9 @@ class TUI():
                 if self.bordered:
                     self.draw_status_line()
                 self.draw_member_list(self.member_list, self.member_list_format, force=True)
-            self.draw_chat()
+                self.draw_chat(inline=False)
+            if self.inline_media_drawer:   # gotta be outside lock
+                self.inline_media_drawer.draw_images()
 
 
     def draw_extra_window(self, title_txt, body_text, select=False, reset_scroll=True):
@@ -1743,7 +1749,7 @@ class TUI():
                     self.win_extra_window = self.screen.derwin(*extra_window_hwyx)
                     self.init_chat()
                     if not self.member_list:
-                        self.draw_chat(norefresh=True)
+                        self.draw_chat(refresh=False)
                     self.draw_member_list(self.member_list, self.member_list_format, force=True)
                     if self.bordered:
                         self.draw_border(extra_window_hwyx, top=False, bot=False)
@@ -1778,9 +1784,11 @@ class TUI():
                 while y < h:
                     self.win_extra_window.insstr(y, 0, "\n", curses.color_pair(1))
                     y += 1
-                self.draw_chat(norefresh=True)
+                self.draw_chat(refresh=False)
                 self.win_extra_window.noutrefresh()
                 self.need_update.set()
+        if self.inline_media_drawer and title_txt:   # do here because of norefresh
+            self.inline_media_drawer.draw_images()
         self.execute_extensions_methods("on_extra_window_draw", cache=False)
 
 
@@ -1797,9 +1805,7 @@ class TUI():
                 self.extra_selected = -1
                 self.init_chat()
                 self.chat_hw = self.win_chat.getmaxyx()
-                if not self.member_list:
-                    self.draw_chat()
-                elif self.bordered:   # have to redraw member list borders
+                if self.member_list and self.bordered:   # have to redraw member list borders
                     h, w = self.screen.getmaxyx()
                     member_list_hwyx = (
                         h - (2 + bool(self.win_extra_line)) - self.have_title - 2*self.bordered,
@@ -1812,7 +1818,9 @@ class TUI():
                     self.draw_status_line()
                 self.draw_extra_line(self.extra_line_text)
                 self.draw_member_list(self.member_list, self.member_list_format, force=True)
-                self.draw_chat()
+                self.draw_chat(inline=False)
+            if self.inline_media_drawer:   # gotta be outside lock
+                self.inline_media_drawer.draw_images()
         self.execute_extensions_methods("on_extra_window_remove")
 
 

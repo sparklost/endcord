@@ -2060,14 +2060,11 @@ class Endcord:
                     self.command = True
                     self.command_history_index = max(len(self.command_history), 0)
                     self.ignore_typing = True
-                    max_w = self.tui.get_dimensions()[2][1]
-                    extra_title, extra_body = formatter.generate_extra_window_assist(COMMAND_ASSISTS, 5, max_w)
                     self.stop_assist(close=False)
                     self.assist_found = COMMAND_ASSISTS
                     self.assist_word = " "
                     self.assist_type = 5
                     self.tui.instant_assist = True
-                    self.tui.draw_extra_window(extra_title, extra_body, select=True)
                     self.extra_window_open = True
                     self.extra_bkp = (self.tui.extra_window_title, self.tui.extra_window_body)
                     if self.vim_mode:
