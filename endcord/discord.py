@@ -79,11 +79,11 @@ def get_sticker_url(sticker):
     """Generate sticker download url from its type and id, lottie stickers will return None"""
     sticker_type = sticker["format_type"]
     if sticker_type == 1:   # png - downloaded as webp
-        return f"https://media.discordapp.net/stickers/{sticker["id"]}.webp"
+        return f"https://{DYN_DISCORD_CDN_HOST}/stickers/{sticker["id"]}.webp"
     if sticker_type == 2:   # apng
-        return f"https://media.discordapp.net/stickers/{sticker["id"]}.png"
+        return f"https://{DYN_DISCORD_CDN_HOST}/stickers/{sticker["id"]}.png"
     if sticker_type == 4:   # gif
-        return f"https://media.discordapp.net/stickers/{sticker["id"]}.gif"
+        return f"https://{DYN_DISCORD_CDN_HOST}/stickers/{sticker["id"]}.gif"
     return None   # lottie
 
 
@@ -154,6 +154,9 @@ class Discord():
         self.connection_time = 0
         self.connection_pool = []
         self.connection_pool_lock = threading.Lock()
+        self.cdn_connection = None
+        self.cdn_connection_lock = threading.Lock()
+        self.cdn_connection_last_use = time.time()
         self.total_requests = 0
 
         self.my_id = self.get_my_id(exit_on_error=True)
@@ -699,47 +702,6 @@ class Discord():
             return retry_after
         log_api_error(data, status, "get_rpc_app_external")
         return False
-
-
-    def get_file(self, url, save_path, file_name=None, cache=False):
-        """Download file from discord with proper header"""
-        message_data = None
-        url_object = urllib.parse.urlsplit(url)
-
-        save_path = os.path.expanduser(save_path)
-        if not os.path.exists(save_path):
-            os.makedirs(save_path)
-        if file_name and cache:
-            destination = os.path.join(save_path, file_name)
-            if os.path.exists(destination):
-                return destination
-        if not file_name:
-            file_name = os.path.basename(url_object.path)
-
-        connection = self.get_connection(url_object.netloc, 443)
-        try:
-            connection.request("GET", url_object.path + "?" + url_object.query, message_data, self.header)
-        except (BrokenPipeError, ConnectionResetError, http.client.RemoteDisconnected, TimeoutError) as e:
-            try:
-                connection.close()
-            except Exception:
-                pass
-            logger.error("get_file" + f" error: {e}")
-            return None
-        response = connection.getresponse()
-        if response.status != 200:
-            log_api_error(response.read(), response.status, "get_file")
-            connection.close()
-            return None
-
-        extension = response.getheader("Content-Type").split("/")[-1].replace("jpeg", "jpg")
-        destination = os.path.join(save_path, file_name)
-        if os.path.splitext(destination)[-1] == "":
-            destination = destination + "." + extension
-        with open(destination, mode="wb") as file:
-            file.write(response.read())
-        return destination
-        connection.close()
 
 
     def send_message(self, channel_id, message_content, reply_id=None, reply_channel_id=None, reply_guild_id=None, reply_ping=True, attachments=None, stickers=None, nonce=None):
@@ -1712,76 +1674,6 @@ class Discord():
         return False
 
 
-    def get_pfp(self, user_id, avatar_id, size=None, save_path=None):
-        """Download pfp for specified user"""
-        if size is not None:
-            size = min(max(size, 16), 4096)
-        if not save_path:
-            save_path = peripherals.temp_path
-        destination = os.path.join(os.path.expanduser(save_path), f"{avatar_id}.webp")
-        if os.path.exists(destination):
-            return destination
-
-        message_data = None
-        url = f"/avatars/{user_id}/{avatar_id}.webp?size={size}"
-        header = {
-            "Origin": f"https://{self.host}",
-            "Sec-Fetch-Mode": "no-cors",
-            "Sec-Fetch-Site": "cross-site",
-            "User-Agent": self.user_agent,
-        }
-        try:
-            connection = self.get_connection(self.cdn_host, 443)
-            connection.request("GET", url, message_data, header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
-            return None
-        if response.status == 200:
-            with open(destination, "wb") as f:
-                f.write(response.read())
-            connection.close()
-            return destination
-        log_api_error(response.read(), response.status, "get_pfp")
-        connection.close()
-        return False
-
-
-    def get_emoji(self, emoji_id, size=None, img_type="webp", cache=peripherals.temp_path):
-        """Download image for specified custom emoji"""
-        destination = os.path.join(os.path.expanduser(cache), f"{emoji_id}.{img_type}")
-        if not os.path.exists(os.path.dirname(destination)):
-            os.makedirs(os.path.dirname(destination))
-        if os.path.exists(destination):
-            return destination
-
-        message_data = None
-        url = f"/emojis/{emoji_id}.{img_type}"
-        if size:
-            url = url + f"?size={size}"
-        header = {
-            "Origin": f"https://{self.host}",
-            "Sec-Fetch-Mode": "no-cors",
-            "Sec-Fetch-Site": "cross-site",
-            "User-Agent": self.user_agent,
-        }
-        try:
-            connection = self.get_connection(self.cdn_host, 443)
-            connection.request("GET", url, message_data, header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
-            return None
-        if response.status == 200:
-            with open(destination, "wb") as f:
-                f.write(response.read())
-            connection.close()
-            return destination
-        log_api_error(response.read(), response.status, "get_emoji")
-        connection.close()
-        return False
-
-
     def get_invite_url(self, channel_id, max_age, max_uses):
         """Get invite url for specified guild channel"""
         message_dict = {
@@ -1972,6 +1864,173 @@ class Discord():
         self.get_my_id()
         ping_time = round(time.time() - ping_time, 3)
         return self.total_requests, ping_time
+
+
+    def get_pfp(self, user_id, avatar_id, size=None, save_path=None, keepalive=False):
+        """Download pfp for specified user"""
+        if size is not None:
+            size = min(max(size, 16), 4096)
+        if not save_path:
+            save_path = peripherals.temp_path
+        destination = os.path.join(os.path.expanduser(save_path), f"{avatar_id}.webp")
+        if os.path.exists(destination):
+            return destination
+
+        message_data = None
+        url = f"/avatars/{user_id}/{avatar_id}.webp?size={size}"
+        header = {
+            "Origin": f"https://{self.host}",
+            "Sec-Fetch-Mode": "no-cors",
+            "Sec-Fetch-Site": "cross-site",
+            "User-Agent": self.user_agent,
+        }
+
+        if keepalive:
+            response = self.request_cdn_keepalive("GET", self.cdn_host, 443, url, headers=header)
+        else:
+            try:
+                connection = self.get_connection(self.cdn_host, 443)
+                connection.request("GET", url, message_data, header)
+                response = connection.getresponse()
+            except (socket.gaierror, TimeoutError):
+                connection.close()
+                return None
+
+        if response.status == 200:
+            with open(destination, "wb") as f:
+                f.write(response.read())
+            if not keepalive:
+                connection.close()
+            return destination
+        log_api_error(response.read(), response.status, "get_pfp")
+        if not keepalive:
+            connection.close()
+        return False
+
+
+    def get_emoji(self, emoji_id, size=None, img_type="webp", cache=peripherals.temp_path, keepalive=False):
+        """Download image for specified custom emoji"""
+        destination = os.path.join(os.path.expanduser(cache), f"{emoji_id}.{img_type}")
+        if not os.path.exists(os.path.dirname(destination)):
+            os.makedirs(os.path.dirname(destination))
+        if os.path.exists(destination):
+            return destination
+
+        message_data = None
+        url = f"/emojis/{emoji_id}.{img_type}"
+        logger.info(url)
+        if size:
+            url = url + f"?size={size}"
+        header = {
+            "Origin": f"https://{self.host}",
+            "Sec-Fetch-Mode": "no-cors",
+            "Sec-Fetch-Site": "cross-site",
+            "User-Agent": self.user_agent,
+        }
+
+        if keepalive:
+            response = self.request_cdn_keepalive("GET", self.cdn_host, 443, url, headers=header)
+        else:
+            try:
+                connection = self.get_connection(self.cdn_host, 443)
+                connection.request("GET", url, message_data, header)
+                response = connection.getresponse()
+            except (BrokenPipeError, ConnectionResetError, http.client.RemoteDisconnected, TimeoutError):
+                connection.close()
+                return None
+
+        if response.status == 200:
+            with open(destination, "wb") as f:
+                f.write(response.read())
+            if not keepalive:
+                connection.close()
+            return destination
+        log_api_error(response.read(), response.status, "get_emoji")
+        if not keepalive:
+            connection.close()
+        return False
+
+
+    def get_file(self, url, save_path, file_name=None, cache=False, keepalive=False):
+        """Download file from discord with proper header"""
+        save_path = os.path.expanduser(save_path)
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
+        if file_name and cache:
+            destination = os.path.join(save_path, file_name)
+            if os.path.exists(destination):
+                return destination
+
+        message_data = None
+        url_object = urllib.parse.urlsplit(url)
+        if not file_name:
+            file_name = os.path.basename(url_object.path)
+
+        if keepalive:
+            response = self.request_cdn_keepalive("GET", url_object.netloc, 443, url_object.path + "?" + url_object.query, headers=self.header, timeout=10)
+        else:
+            connection = self.get_connection(url_object.netloc, 443)
+            try:
+                connection.request("GET", url_object.path + "?" + url_object.query, message_data, self.header)
+            except (BrokenPipeError, ConnectionResetError, http.client.RemoteDisconnected, TimeoutError) as e:
+                connection.close()
+                logger.error("get_file" + f" error: {e}")
+                return None
+            response = connection.getresponse()
+
+        if not response:
+            return None
+        if response.status == 200:
+            extension = response.getheader("Content-Type").split("/")[-1].replace("jpeg", "jpg")
+            destination = os.path.join(save_path, file_name)
+            if os.path.splitext(destination)[-1] == "":
+                destination = destination + "." + extension
+            with open(destination, mode="wb") as file:
+                file.write(response.read())
+            if not keepalive:
+                connection.close()
+            return destination
+        log_api_error(response.read(), response.status, "get_file")
+        if not keepalive:
+            connection.close()
+        return None
+
+
+    def request_cdn_keepalive(self, method, host, port, path, body=None, headers=None, timeout=CONNECTION_TIMEOUT):
+        """Download file from discord with proper header, using keepalive connection"""
+        # get connection and do request
+        with self.cdn_connection_lock:
+            now = int(time.time())
+            if not self.cdn_connection:
+                self.cdn_connection = self.get_connection(host, port, timeout=timeout)
+            if now - self.cdn_connection_last_use > MAX_CONNECTION_AGE or self.cdn_connection.sock is None or host != self.cdn_connection.host:
+                try:
+                    self.cdn_connection.close()
+                except Exception:
+                    pass
+                self.cdn_connection = self.get_connection(host, port, timeout=timeout)
+            try:
+                try:
+                    self.cdn_connection.request(method, path, body, headers)
+                    return self.cdn_connection.getresponse()
+                except (BrokenPipeError, ConnectionResetError, http.client.RemoteDisconnected, TimeoutError):
+                    # server closed keepalive
+                    try:
+                        self.cdn_connection.close()
+                    except Exception:
+                        pass
+                    self.cdn_connection = self.get_connection(host, port)
+                    self.cdn_connection.request(method, path, headers)
+                    return self.cdn_connection.getresponse()
+            except Exception as e:   # connection is probably unusable so remove it
+                try:
+                    self.cdn_connection.close()
+                except Exception:
+                    pass
+                self.cdn_connection = None
+                logger.error("get_file " + f"Network error: {e}")
+                return None
+
 
 
     # BOT STUFF

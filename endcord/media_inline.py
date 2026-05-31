@@ -282,7 +282,7 @@ class InlineMedia:
             # download
             img_url = f"{img_url}&format=webp&quality={img_quality}&width={img_w}&height={img_h}"
             img_name = f"{image_id}_{img_w}_{img_h}.webp"
-            image_path = self.discord.get_file(img_url, self.image_cache_path, file_name=img_name, cache=True)
+            image_path = self.discord.get_file(img_url, self.image_cache_path, file_name=img_name, cache=True, keepalive=True)
             if not image_path:
                 continue
             data = self.load_image(image_path, h, w)

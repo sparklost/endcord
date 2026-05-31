@@ -1702,7 +1702,7 @@ class TUI():
                 self.win_extra_line = None
                 self.init_chat()
                 self.chat_hw = self.win_chat.getmaxyx()
-                self.draw_chat()
+                self.draw_chat(inline=False)
                 if self.member_list and self.bordered:   # have to redraw member list borders
                     h, w = self.screen.getmaxyx()
                     member_list_hwyx = (
