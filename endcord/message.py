@@ -43,7 +43,7 @@ def prepare_embeds(embeds, message_content):
 
         if "url" in embed and "tenor.com/" not in embed["url"] and "giphy.com/" not in embed["url"]:
             # dont repeat unless its not discord attachment and handle x=twitter
-            if (embed_type != "rich" and ".discordapp." not in embed["url"]) or embed["url"] not in message_content.replace("https://x.com", "https://twitter.com"):
+            if (embed_type != "rich" and ".discordapp." not in embed["url"]) or embed["url"] not in message_content.replace("https://x.com", "https://twitter.com") or embed_type == "image":
                 content.append(embed["url"])
                 main_url = embed["url"]
                 skip_main_url = True
@@ -70,14 +70,15 @@ def prepare_embeds(embeds, message_content):
             proxy_url = embed["thumbnail"]["proxy_url"]
             hw = (embed["thumbnail"]["height"], embed["thumbnail"]["width"])
         if "image" in embed and "url" in embed["image"]:
-            content.append(embed["image"]["url"])
+            if embed["image"]["url"] not in content:
+                content.append(embed["image"]["url"])
             main_url = embed["image"]["url"]
             if not proxy_url and "proxy_url" in embed["image"]:
                 proxy_url = embed["image"]["proxy_url"]
                 hw = (embed["image"]["height"], embed["image"]["width"])
             media.append(True)
         if "video" in embed and "url" in embed["video"]:
-            if "youtube." not in embed["video"]["url"]:
+            if "youtube." not in embed["video"]["url"] and embed["video"]["url"] not in content:
                 content.append(embed["video"]["url"])
             if not skip_main_url:
                 main_url = embed["video"]["url"]
