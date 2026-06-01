@@ -372,7 +372,6 @@ class Gateway():
         self.receiver_thread.start()
         self.heartbeat_thread = threading.Thread(target=self.send_heartbeat, daemon=True)
         self.heartbeat_thread.start()
-        self.reconnect_thread = threading.Thread()
         self.init_auth()
         return True
 

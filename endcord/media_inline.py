@@ -3,6 +3,7 @@
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, version 3.
 
+import curses
 import glob
 import importlib
 import logging
@@ -158,7 +159,7 @@ class InlineMedia:
             self.prev_win_hw = self.tui.screen_hw
             self.force_redraw()
         drawn_areas = []
-        time.sleep(0.001)   # delay for clear to clear_images to flush
+        time.sleep(0.0001)   # delay for clear_images to flush
         with self.tui.lock:
             chat_y, chat_x = self.tui.win_chat.getbegyx()
             chat_h = self.tui.chat_hw[0]
@@ -181,6 +182,7 @@ class InlineMedia:
                     # logger.info(("DRAW", (h, w), abs_y, rel_y, cut_h, cut_y))
                     terminal_utils.draw_over_curses("\n".join(data.split("\n")[cut_y:cut_y + cut_h]), abs_y, abs_x)
                     drawn_areas.append((abs_y, abs_x, cut_h, w))
+            self.draw_selection(self.tui.chat_selected)
         self.drawn_areas = drawn_areas
         self.prev_chat_index = self.tui.chat_index
         self.prev_chat_hw = self.tui.chat_hw
@@ -243,6 +245,37 @@ class InlineMedia:
         self.drawn_areas = []
 
 
+    def get_images(self):
+        """Get image y ranges in chat"""
+        images = []
+        for data, rel_y, rel_x, h, w, draw in self.image_cache.values():
+            if not data or not draw:
+                continue
+            images.append((rel_y - h + 1, rel_y))
+        return images
+
+
+    def draw_selection(self, pos):
+        """Draaw selection line around images"""
+        chat_y, chat_x = self.tui.win_chat.getbegyx()
+        chat_h, chat_w = self.tui.chat_hw
+        for data, rel_y, rel_x, h, w, draw in self.image_cache.values():
+            if not data or not draw:
+                continue
+            if pos < rel_y - h + 1 or pos > rel_y:
+                continue
+            line_y = chat_h - (pos - self.tui.chat_index + 1)
+            if line_y >= chat_h or line_y < 0:
+                continue
+            line = self.tui.chat_buffer[pos]
+            with self.tui.lock:
+                self.tui.win_chat.insstr(line_y, 0, line[:rel_x] + "\n", curses.color_pair(16))
+                self.tui.win_chat.insstr(line_y, rel_x + w, (" " * (chat_w - rel_x - w)) + "\n", curses.color_pair(16))
+                self.tui.win_chat.noutrefresh()
+                self.tui.need_update.set()
+            break
+
+
     def downloader(self):
         """Downloader for inline media"""
         while self.run:
@@ -254,6 +287,8 @@ class InlineMedia:
             embed = message["embeds"][embed_idx]
             img_url = embed["proxy_url"]
             img_h, img_w = embed["hw"]
+            if img_h == 0 or img_w == 0:
+                continue
             scale = min(h * (1 + self.use_blocks) * 2 / img_h, w * 2 / img_w, 1)
             img_w = int(img_w * scale)
             img_h = int(img_h * scale)
@@ -315,6 +350,7 @@ class InlineMedia:
                     # logger.info(("INIT", (h, w), abs_y, rel_y, cut_h, cut_y))
                     terminal_utils.draw_over_curses("\n".join(data.split("\n")[cut_y:cut_y + cut_h]), abs_y, abs_x)
                     self.drawn_areas.append((abs_y, abs_x, cut_h, w))
+                self.draw_selection(self.tui.chat_selected)
 
 
     def load_image(self, path, h, w):

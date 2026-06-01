@@ -28,7 +28,7 @@ dependencies = [
 [dependency-groups]
 build = [
     "cython>=3.2.5",
-    "nuitka[onefile]>=4.1.1",
+    "nuitka[onefile]>=4.1.2",
     "pyinstaller>=6.20.0",
     "setuptools>=82.0.0",
 ]

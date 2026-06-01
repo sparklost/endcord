@@ -5,7 +5,7 @@ from Cython.Build import cythonize
 from setuptools import Extension, setup
 
 extra_compile_args = [
-    "-flto",
+    "-flto=auto",
     "-O3",
     "-ffast-math",
     "-fomit-frame-pointer",

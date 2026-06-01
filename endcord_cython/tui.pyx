@@ -5,15 +5,27 @@ import threading
 cimport cython
 
 
-cdef void safe_insch(object win_chat, int y, int x, unicode ch, unsigned int attr):
+cdef inline void safe_insch(object win_chat, int y, int x, unicode ch, unsigned int attr):
     """
-    Writes a character safely to the curses window.
+    Write a character safely to the curses window.
     Uses insstr for emoji/multibyte characters, insch for ASCII-safe ones.
     """
     if ord(ch) > 127:   # for some reason insch wont draw 2-byte chars is cython
         win_chat.insstr(y, x, ch, attr)
     else:
         win_chat.insch(y, x, ch, attr)
+
+
+cpdef inline bint in_any_range(short x, list ranges):
+    """Check if x is in any of given ranges"""
+    cdef tuple r
+    cdef short a, b
+    for r in ranges:
+        a = <short>r[0]
+        b = <short>r[1]
+        if a <= x <= b:
+            return True
+    return False
 
 
 cpdef void draw_chat(
@@ -25,6 +37,7 @@ cpdef void draw_chat(
     int chat_selected,
     list attrib_map,
     int color_default,
+    list exclude_selection,
 ):
     cdef int num, pos
     cdef int line_idx
@@ -48,7 +61,7 @@ cpdef void draw_chat(
             break
 
         line = chat_buffer[line_idx]
-        if num == chat_selected - chat_index:
+        if num == chat_selected - chat_index and not in_any_range(chat_selected, exclude_selection):
             fill_len = w - len(line)
             win_chat.insstr(y, 0, line + (" " * fill_len) + "\n", curses.color_pair(16))
         else:

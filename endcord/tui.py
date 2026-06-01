@@ -142,7 +142,7 @@ def get_key(screen):
         return first
 
 
-def draw_chat(win_chat, h, w, chat_buffer, chat_format, chat_index, chat_selected, attrib_map, color_default):
+def draw_chat(win_chat, h, w, chat_buffer, chat_format, chat_index, chat_selected, attrib_map, color_default, exclude_selection):
     """Draw chat with applied color formatting"""
     y = h
     # drawing from down to up
@@ -156,7 +156,7 @@ def draw_chat(win_chat, h, w, chat_buffer, chat_format, chat_index, chat_selecte
             break
 
         line = chat_buffer[line_idx]
-        if num == chat_selected - chat_index:
+        if num == chat_selected - chat_index and not any(a <= chat_selected <= b for a, b in exclude_selection):
             fill_len = w - len(line)
             win_chat.insstr(y, 0, line + (" " * fill_len) + "\n", curses.color_pair(16))
         else:
@@ -365,7 +365,7 @@ class TUI():
         self.wrap_around_disable = False
         self.pressed_num_key = None
         self.insert_mode = not self.vim_mode   # leave it true to enable input
-        self.inline_media_drawer = None
+        self.inline_media = None
 
         # lock for thread-safe drawing with curses
         self.lock = threading.RLock()
@@ -405,9 +405,9 @@ class TUI():
                 self.chainable.append(split_binding[0])
 
 
-    def load_inline_media(self, inline_media_drawer):
+    def load_inline_media(self, inline_media):
         """Pass inline media drawer reference from app to tui"""
-        self.inline_media_drawer = inline_media_drawer
+        self.inline_media = inline_media
 
 
     def load_extensions(self, extensions):
@@ -660,8 +660,8 @@ class TUI():
             self.screen.noutrefresh()   # ??? needed only with windows-curses
             self.need_update.set()
         self.resize()
-        if self.inline_media_drawer:
-            self.inline_media_drawer.force_redraw()
+        if self.inline_media:
+            self.inline_media.force_redraw()
         self.execute_extensions_methods("on_force_redraw")
 
 
@@ -836,10 +836,7 @@ class TUI():
 
     def set_selected(self, selected, change_amount=0, scroll=True, draw=True):
         """Set selected line and text scrolling"""
-        if self.chat_selected >= selected:
-            up = True
-        else:
-            up = False
+        up = self.chat_selected >= selected
         self.chat_selected = selected
         if scroll:
             if self.chat_selected == -1:
@@ -856,6 +853,8 @@ class TUI():
             self.chat_index += change_amount
         if not self.disable_drawing and draw:
             self.draw_chat()
+            if self.inline_media:
+                self.inline_media.draw_selection(self.chat_selected)
 
 
     def set_chat_index(self, index):
@@ -931,8 +930,8 @@ class TUI():
                 self.tree_width = 1
         else:
             self.tree_width = value
-        if self.inline_media_drawer:
-            self.inline_media_drawer.clear_images(force=True)
+        if self.inline_media:
+            self.inline_media.clear_images(force=True)
         self.resize()
 
 
@@ -1010,10 +1009,8 @@ class TUI():
 
     def scroll_bot(self):
         """Scroll to chat bottom"""
-        self.chat_selected = -1
         self.chat_index = 0
-        if not self.disable_drawing:
-            self.draw_chat()
+        self.set_selected(-1, scroll=False)
 
 
     def store_input_selected(self):
@@ -1394,8 +1391,11 @@ class TUI():
 
     def draw_chat(self, refresh=True, inline=True):
         """Draw chat with applied color formatting"""
-        if self.inline_media_drawer:
-            self.inline_media_drawer.clear_images()
+        if self.inline_media:
+            self.inline_media.clear_images()
+            exclude_selection = self.inline_media.get_images()
+        else:
+            exclude_selection = []
         with self.lock:
             try:
                 draw_chat(
@@ -1408,6 +1408,7 @@ class TUI():
                     self.chat_selected,
                     self.attrib_map,
                     self.default_color,
+                    exclude_selection,
                 )
                 self.win_chat.noutrefresh()
                 if refresh:
@@ -1417,8 +1418,8 @@ class TUI():
                 self.resize()
         if self.have_scrollbar:
             self.draw_scrollbar()
-        if self.inline_media_drawer and refresh and inline:
-            self.inline_media_drawer.draw_images()
+        if self.inline_media and refresh and inline:
+            self.inline_media.draw_images()
         self.execute_extensions_methods("on_chat_draw", cache=True)
 
 
@@ -1691,8 +1692,8 @@ class TUI():
                 self.win_extra_line.noutrefresh()
                 self.need_update.set()
                 self.draw_chat(inline=False)
-        if self.inline_media_drawer and text:   # gotta be outside lock
-            self.inline_media_drawer.draw_images()
+        if self.inline_media and text:   # gotta be outside lock
+            self.inline_media.draw_images()
 
 
     def remove_extra_line(self):
@@ -1720,8 +1721,8 @@ class TUI():
                     self.draw_status_line()
                 self.draw_member_list(self.member_list, self.member_list_format, force=True)
                 self.draw_chat(inline=False)
-            if self.inline_media_drawer:   # gotta be outside lock
-                self.inline_media_drawer.draw_images()
+            if self.inline_media:   # gotta be outside lock
+                self.inline_media.draw_images()
 
 
     def draw_extra_window(self, title_txt, body_text, select=False, reset_scroll=True):
@@ -1791,8 +1792,8 @@ class TUI():
                 self.draw_chat(refresh=False)
                 self.win_extra_window.noutrefresh()
                 self.need_update.set()
-        if self.inline_media_drawer and title_txt:   # do here because of norefresh
-            self.inline_media_drawer.draw_images()
+        if self.inline_media and title_txt:   # do here because of norefresh
+            self.inline_media.draw_images()
         self.execute_extensions_methods("on_extra_window_draw", cache=False)
 
 
@@ -1823,8 +1824,8 @@ class TUI():
                 self.draw_extra_line(self.extra_line_text)
                 self.draw_member_list(self.member_list, self.member_list_format, force=True)
                 self.draw_chat(inline=False)
-            if self.inline_media_drawer:   # gotta be outside lock
-                self.inline_media_drawer.draw_images()
+            if self.inline_media:   # gotta be outside lock
+                self.inline_media.draw_images()
         self.execute_extensions_methods("on_extra_window_remove")
 
 
@@ -1833,8 +1834,8 @@ class TUI():
         if self.disable_drawing:
             return
 
-        if self.inline_media_drawer and (not self.win_member_list or force):
-            self.inline_media_drawer.clear_images(force=True)
+        if self.inline_media and (not self.win_member_list or force):
+            self.inline_media.clear_images(force=True)
 
         with self.lock:
             h, w = self.screen.getmaxyx()
@@ -2295,8 +2296,7 @@ class TUI():
                 top_line = self.chat_index + self.chat_hw[0] - 3
                 if top_line + 3 < len(self.chat_buffer) and self.chat_selected >= top_line:
                     self.chat_index += 1   # move history down
-                self.chat_selected += 1   # move selection up
-                self.draw_chat()
+                self.set_selected(self.chat_selected + 1, scroll=False)   # move selection up
 
         if key in self.KEYBINDINGS_CHAT_DOWN:
             if command:
@@ -2304,8 +2304,7 @@ class TUI():
             if self.chat_selected >= self.dont_hide_chat_selection:   # if it is -1, selection is hidden
                 if self.chat_index and self.chat_selected <= self.chat_index + 2:   # +2 from status and input lines
                     self.chat_index -= 1   # move history up
-                self.chat_selected -= 1   # move selection down
-                self.draw_chat()
+                self.set_selected(self.chat_selected - 1, scroll=False)   # move selection down
 
         elif key in self.keybindings["tree_up"]:
             if self.tree_selected >= 0:
@@ -3072,8 +3071,8 @@ class TUI():
 
         if self.mouse_in_window(x, y, self.win_chat):
             x, y = self.mouse_rel_pos(x, y, self.win_chat)
-            self.chat_selected = self.chat_index + self.win_chat.getmaxyx()[0] - y - 1
-            self.draw_chat()
+            new_pos = self.chat_index + self.win_chat.getmaxyx()[0] - y - 1
+            self.set_selected(new_pos, scroll=False)
 
         elif self.win_member_list and self.mouse_in_window(x, y, self.win_member_list):
             x, y = self.mouse_rel_pos(x, y, self.win_member_list)
