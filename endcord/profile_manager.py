@@ -831,9 +831,9 @@ def text_prompt(screen, description_text, prompts, init=None, mask=None, prompt_
             prompt_len = len(prompt) + 2
             text = texts[i]
             if mask[i]:
-                dots = "•" * len(text[:w-prompt_len])
-                line = prompt + dots
-                screen_input_index = input_index
+                shift = max(len(text) - (w - prompt_len), 0)
+                line = prompt + "•" * len(text[-(w-prompt_len):])
+                screen_input_index = input_index - shift
             else:
                 shift = max(len(text) - (w - prompt_len), 0)
                 line = prompt + text[-(w-prompt_len):]
@@ -893,7 +893,6 @@ def text_prompt(screen, description_text, prompts, init=None, mask=None, prompt_
             input_index = len(texts[selected])
 
         elif key == curses.KEY_LEFT and input_index > 0:
-            logger.info(input_index)
             input_index -= 1
 
         elif key == curses.KEY_RIGHT and input_index < len(texts[selected]):
