@@ -1335,22 +1335,33 @@ class TUI():
                 self.input_border_hwyx, top=True,
                 color_pair=self.input_border_insert_pair,
             )
-            # Re-overlay the [--INSERT--] mode label on the status
-            # row so it stays visible after the orange `─` covers the
-            # rest of that row. Position derived from where the
-            # formatted status_line text put it.
-            label = "[--INSERT--]"
-            if hasattr(self, "last_status_line") and self.last_status_line:
-                label_pos = self.last_status_line.find(label)
-                if label_pos >= 0 and self.win_status_line is not None:
-                    try:
-                        self.win_status_line.addstr(
-                            0, label_pos, label,
-                            curses.color_pair(self.default_color),
-                        )
-                        self.win_status_line.noutrefresh()
-                    except curses.error:
-                        pass
+            # Re-overlay every non-box-drawing character from the
+            # status line in default colour so things like
+            # "Replying to <user>", "[--INSERT--]", typing indicator,
+            # etc. punch through the orange border like tabs. We
+            # keep the orange `─` only where the status had filler.
+            if (
+                hasattr(self, "last_status_line")
+                and self.last_status_line
+                and self.win_status_line is not None
+            ):
+                box_glyphs = set("─│╭╮╰╯├┤┬┴┼━┃┏┓┗┛┣┫┳┻╋ ")
+                try:
+                    for col, ch in enumerate(self.last_status_line):
+                        if ch in box_glyphs:
+                            continue
+                        try:
+                            self.win_status_line.addstr(
+                                0, col, ch,
+                                curses.color_pair(self.default_color),
+                            )
+                        except curses.error:
+                            # addstr at the rightmost cell of a window
+                            # raises after writing — ignore.
+                            pass
+                    self.win_status_line.noutrefresh()
+                except curses.error:
+                    pass
         else:
             self.draw_border(self.input_border_hwyx, top=False, color_pair=None)
             # Repaint status content that the orange overwrote.
