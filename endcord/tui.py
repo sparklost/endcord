@@ -1408,6 +1408,19 @@ class TUI():
             self.last_status_line = status_line
             self.win_status_line.noutrefresh()
             self.need_update.set()
+        # The status line shares its row with the input box's TOP edge
+        # in INSERT mode. After redrawing status content (which lives
+        # in default colour), restore the orange top edge if we're in
+        # INSERT — otherwise it would visibly flicker back to default
+        # every time the typing indicator updates / a channel switches.
+        if self.vim_mode and self.insert_mode and hasattr(self, "input_border_hwyx"):
+            try:
+                self.draw_border(
+                    self.input_border_hwyx, top=True, bot=False, left=False, right=False,
+                    color_pair=self.input_border_insert_pair,
+                )
+            except curses.error:
+                pass
 
 
     def _mention_badge(self):
