@@ -6968,18 +6968,27 @@ class Endcord:
                     continue
                 cols, rows = dims
                 self._image_geom[(mid, url)] = (cols, rows)
-                plan.append((line_idx, url, cols, rows))
+                # Snag msg_num here so the reserves can be tagged with
+                # it (formatter.remove_message filters by chat_map[i][0]
+                # and would orphan our blanks if msg_num=None).
+                plan.append((line_idx, msg_num, url, cols, rows))
 
         if not plan:
             return
 
         blank_text = ""
         blank_format = [getattr(self.formatter, "color_default", 1)]
-        blank_map = (None, None, None, None, None, None, None)
         # Process in REVERSE line-index order so earlier insertions
         # don't invalidate later indices.
         for entry in sorted(plan, key=lambda e: -e[0]):
-            line_idx, _url, _cols, rows = entry
+            line_idx, msg_num, _url, _cols, rows = entry
+            # Tag reserve rows with the image message's msg_num. This is
+            # critical: formatter.remove_message walks chat_map and
+            # removes lines where chat_map[i][0] == target — if we
+            # leave it as None, the reserves get orphaned on every edit
+            # or delete and _reserve_image_rows stacks new reserves on
+            # top, accumulating empty rows below each image forever.
+            blank_map = (msg_num, None, None, None, None, None, None)
             n_extra = max(0, rows - 1)
             for _ in range(n_extra):
                 self.chat.insert(line_idx, blank_text)
