@@ -3108,23 +3108,6 @@ class TUI():
                 self.input_select_start = None
                 self.spellcheck()
 
-            # Shift+H / Shift+L in vim NORMAL mode → switch tabs.
-            # Falls through to select_word_left/right when in INSERT
-            # so input-buffer word-selection still works.
-            elif (
-                self.vim_mode
-                and not self.insert_mode
-                and key in self.keybindings["select_word_left"]
-            ):
-                return self.return_input_code((50, "switch_tab prev"))
-
-            elif (
-                self.vim_mode
-                and not self.insert_mode
-                and key in self.keybindings["select_word_right"]
-            ):
-                return self.return_input_code((50, "switch_tab next"))
-
             elif key in self.keybindings["select_word_left"]:
                 if self.input_select_start is None:
                     self.input_select_end = self.input_select_start = self.input_index
@@ -3210,6 +3193,18 @@ class TUI():
                         self.input_index = delta_index + 1
                 self.input_select_start = None
                 self.spellcheck()
+
+            # Ctrl+H / Ctrl+L → previous / next tab, in BOTH vim
+            # NORMAL and INSERT mode. These keycodes (8 and 12) are
+            # also the default vim-mode select_left/select_right
+            # bindings — we intercept them here so tab switching wins
+            # everywhere. Side effect: vim INSERT loses Ctrl+H/L for
+            # char-selection (use Shift+Left/Right instead).
+            elif self.vim_mode and key == 8:
+                return self.return_input_code((50, "switch_tab prev"))
+
+            elif self.vim_mode and key == 12:
+                return self.return_input_code((50, "switch_tab next"))
 
             elif key in self.keybindings["select_left"]:
                 if self.input_select_start is None:
