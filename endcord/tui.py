@@ -304,7 +304,11 @@ class TUI():
 
         # initial values
         self.disable_drawing = False
-        self.prompt = "> "
+        # Empty fallback so users with `format_prompt = ""` don't see a
+        # stale "> " before app.update_prompt() runs. Upstream default
+        # is "> ", but anyone configuring an empty prompt got the
+        # default flickering in for a tick.
+        self.prompt = ""
         self.input_buffer = ""
         self.status_txt_l = ""
         self.status_txt_r = ""
