@@ -1319,15 +1319,13 @@ class TUI():
         """Color the input border based on vim mode.
 
         In INSERT mode draw all four sides of the input box in the
-        insert colour so the user sees a fully-enclosed orange
-        rectangle. The top edge sits on the same row as the status
-        line and will overwrite its `[--INSERT--]` / dash content
-        with `─` glyphs in the insert colour — that's intentional
-        since the orange rectangle itself is now the mode indicator.
+        insert colour AND overlay the `[--INSERT--]` label at its
+        position on the status row in default colour. The orange
+        rectangle is the primary mode indicator; the label punches
+        through it like a tab.
 
-        In NORMAL mode draw NO border (top=False, color=default
-        passes through draw_border doing nothing special). The
-        status line on that row stays untouched.
+        In NORMAL mode draw bottom + sides in default colour and
+        leave the top row to the status line.
         """
         if not hasattr(self, "input_border_hwyx"):
             return
@@ -1337,15 +1335,25 @@ class TUI():
                 self.input_border_hwyx, top=True,
                 color_pair=self.input_border_insert_pair,
             )
+            # Re-overlay the [--INSERT--] mode label on the status
+            # row so it stays visible after the orange `─` covers the
+            # rest of that row. Position derived from where the
+            # formatted status_line text put it.
+            label = "[--INSERT--]"
+            if hasattr(self, "last_status_line") and self.last_status_line:
+                label_pos = self.last_status_line.find(label)
+                if label_pos >= 0 and self.win_status_line is not None:
+                    try:
+                        self.win_status_line.addstr(
+                            0, label_pos, label,
+                            curses.color_pair(self.default_color),
+                        )
+                        self.win_status_line.noutrefresh()
+                    except curses.error:
+                        pass
         else:
-            # Repaint with default color (will not have stale orange
-            # left on left/right/bottom). Don't redraw the top — that
-            # row belongs to the status line.
             self.draw_border(self.input_border_hwyx, top=False, color_pair=None)
-            # The status-line row was overwritten with orange `─`
-            # chars while we were in INSERT mode. Repaint it so the
-            # original status content (typing indicator, etc.) comes
-            # back when we leave INSERT.
+            # Repaint status content that the orange overwrote.
             try:
                 self.draw_status_line()
             except (curses.error, AttributeError):
@@ -1408,33 +1416,12 @@ class TUI():
             self.last_status_line = status_line
             self.win_status_line.noutrefresh()
             self.need_update.set()
-        # The status line shares its row with the input box's TOP edge
-        # in INSERT mode. After redrawing status content (which lives
-        # in default colour), restore the orange top edge if we're in
-        # INSERT — otherwise it would visibly flicker back to default
-        # every time the typing indicator updates / a channel switches.
-        # Then re-overlay the [--INSERT--] label in default colour so
-        # the mode indicator stays visible as a "tab" punching through
-        # the orange border.
-        if self.vim_mode and self.insert_mode and hasattr(self, "input_border_hwyx"):
-            try:
-                self.draw_border(
-                    self.input_border_hwyx, top=True, bot=False, left=False, right=False,
-                    color_pair=self.input_border_insert_pair,
-                )
-            except curses.error:
-                pass
-            label = "[--INSERT--]"
-            label_pos = self.last_status_line.find(label) if self.last_status_line else -1
-            if label_pos >= 0:
-                try:
-                    self.win_status_line.addstr(
-                        0, label_pos, label,
-                        curses.color_pair(self.default_color),
-                    )
-                    self.win_status_line.noutrefresh()
-                except curses.error:
-                    pass
+        # In INSERT mode the status row got overwritten by orange `─`
+        # last time draw_input_border ran. Repaint orange + label so
+        # typing indicators / channel switches don't flicker the
+        # row back to default for a tick.
+        if self.vim_mode and self.insert_mode:
+            self.draw_input_border()
 
 
     def _mention_badge(self):
