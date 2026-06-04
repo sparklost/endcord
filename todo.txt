@@ -1,5 +1,6 @@
 Add colors and formatting in assists
-Update screenshots
+Update screenshots: 02 - command assist
+Fix workflow to skip patchelf 0.18.0
 
 Fix sent audio is delayed and low quality
 Fix receiver audio mixer

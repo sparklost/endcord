@@ -2284,7 +2284,7 @@ class TUI():
 
     def common_keybindings(self, key, mouse=False, switch=False, command=False, forum=False, alt=False):
         """Handle keybinding events that can be executed by mouse events"""
-        if key in self.KEYBINDINGS_CHAT_UP or (self.swap_assist and self.win_extra_window and key in self.keybindings["extra_up"] and not alt):
+        if key in self.KEYBINDINGS_CHAT_UP or (self.swap_assist and self.win_extra_window and key in self.keybindings["extra_up"] and not alt and not command):
             if command and key not in self.keybindings["extra_up"]:
                 return 46
             if self.swap_assist and self.win_extra_window and not mouse and key in self.KEYBINDINGS_CHAT_UP:
@@ -2296,7 +2296,7 @@ class TUI():
                     self.chat_index += 1   # move history down
                 self.set_selected(self.chat_selected + 1, scroll=False)   # move selection up
 
-        if key in self.KEYBINDINGS_CHAT_DOWN or (self.swap_assist and self.win_extra_window and key in self.keybindings["extra_down"] and not alt):
+        if key in self.KEYBINDINGS_CHAT_DOWN or (self.swap_assist and self.win_extra_window and key in self.keybindings["extra_down"] and not alt and not command):
             if command and key not in self.keybindings["extra_up"]:
                 return 47
             if self.swap_assist and self.win_extra_window and not mouse and key in self.KEYBINDINGS_CHAT_DOWN:
