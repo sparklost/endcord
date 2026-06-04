@@ -1318,19 +1318,38 @@ class TUI():
     def draw_input_border(self):
         """Color the input border based on vim mode.
 
-        Only the input box border itself is recoloured — we used to
-        also tint the box-drawing chars inside the status line, but
-        that left an interrupted "half-orange / half-default" stripe
-        where the actual status text sat between the separators.
-        The `[--INSERT--]` mode label + the orange input border are
-        enough indication of insert mode without colouring through
-        the status text.
+        In INSERT mode draw all four sides of the input box in the
+        insert colour so the user sees a fully-enclosed orange
+        rectangle. The top edge sits on the same row as the status
+        line and will overwrite its `[--INSERT--]` / dash content
+        with `─` glyphs in the insert colour — that's intentional
+        since the orange rectangle itself is now the mode indicator.
+
+        In NORMAL mode draw NO border (top=False, color=default
+        passes through draw_border doing nothing special). The
+        status line on that row stays untouched.
         """
         if not hasattr(self, "input_border_hwyx"):
             return
         is_insert = self.vim_mode and self.insert_mode
-        color = self.input_border_insert_pair if is_insert else None
-        self.draw_border(self.input_border_hwyx, top=False, color_pair=color)
+        if is_insert:
+            self.draw_border(
+                self.input_border_hwyx, top=True,
+                color_pair=self.input_border_insert_pair,
+            )
+        else:
+            # Repaint with default color (will not have stale orange
+            # left on left/right/bottom). Don't redraw the top — that
+            # row belongs to the status line.
+            self.draw_border(self.input_border_hwyx, top=False, color_pair=None)
+            # The status-line row was overwritten with orange `─`
+            # chars while we were in INSERT mode. Repaint it so the
+            # original status content (typing indicator, etc.) comes
+            # back when we leave INSERT.
+            try:
+                self.draw_status_line()
+            except (curses.error, AttributeError):
+                pass
 
 
 
