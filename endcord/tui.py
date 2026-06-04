@@ -1413,6 +1413,9 @@ class TUI():
         # in default colour), restore the orange top edge if we're in
         # INSERT — otherwise it would visibly flicker back to default
         # every time the typing indicator updates / a channel switches.
+        # Then re-overlay the [--INSERT--] label in default colour so
+        # the mode indicator stays visible as a "tab" punching through
+        # the orange border.
         if self.vim_mode and self.insert_mode and hasattr(self, "input_border_hwyx"):
             try:
                 self.draw_border(
@@ -1421,6 +1424,17 @@ class TUI():
                 )
             except curses.error:
                 pass
+            label = "[--INSERT--]"
+            label_pos = self.last_status_line.find(label) if self.last_status_line else -1
+            if label_pos >= 0:
+                try:
+                    self.win_status_line.addstr(
+                        0, label_pos, label,
+                        curses.color_pair(self.default_color),
+                    )
+                    self.win_status_line.noutrefresh()
+                except curses.error:
+                    pass
 
 
     def _mention_badge(self):
