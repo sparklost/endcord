@@ -1754,6 +1754,9 @@ class Endcord:
                             "global_name": message["global_name"],
                             "mention": mention,
                         }
+                        # Drop into INSERT so the user can type their
+                        # reply right away.
+                        self.tui.set_vim_insert(True)
 
             # edit
             elif action == 2 and self.messages:
@@ -1768,6 +1771,8 @@ class Endcord:
                     self.add_to_store(self.active_channel["channel_id"], input_text)
                     self.restore_input_text = (utils.demojize(message["content"], safe=True), "edit")
                     self.update_status_line()
+                    # Drop into INSERT so the user can immediately type.
+                    self.tui.set_vim_insert(True)
 
             # action 56: edit MY LAST message in the current channel.
             # Walks self.messages newest-first and picks the first one
@@ -2394,6 +2399,9 @@ class Endcord:
                         "global_name": message["global_name"],
                     }
                     self.update_status_line()
+                    # Drop into INSERT so the user can type the
+                    # reaction emoji/name right away.
+                    self.tui.set_vim_insert(True)
 
             # show detailed reactions
             elif action == 37 and self.messages:
