@@ -1769,6 +1769,32 @@ class Endcord:
                     self.restore_input_text = (utils.demojize(message["content"], safe=True), "edit")
                     self.update_status_line()
 
+            # action 56: edit MY LAST message in the current channel.
+            # Walks self.messages newest-first and picks the first one
+            # authored by self.my_id that isn't deleted/pending. Useful
+            # when bound to Ctrl+E in both vim INSERT and NORMAL — you
+            # don't have to navigate to the message first.
+            elif action == 56 and self.messages:
+                self.restore_input_text = (input_text, "standard")
+                target = None
+                for msg in self.messages:
+                    if msg.get("user_id") != self.my_id:
+                        continue
+                    if "deleted" in msg or "pending" in msg:
+                        continue
+                    target = msg
+                    break
+                if target is None:
+                    self.update_extra_line("No editable message in this channel.", timed=True)
+                else:
+                    self.reset_states()
+                    self.editing = target["id"]
+                    self.add_to_store(self.active_channel["channel_id"], input_text)
+                    self.restore_input_text = (utils.demojize(target["content"], safe=True), "edit")
+                    self.update_status_line()
+                    # Drop into INSERT so the user can immediately type.
+                    self.tui.set_vim_insert(True)
+
             # delete
             elif action == 3 and self.messages:
                 self.restore_input_text = (input_text, "standard")

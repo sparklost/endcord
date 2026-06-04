@@ -3206,6 +3206,13 @@ class TUI():
             elif self.vim_mode and key == 12:
                 return self.return_input_code((50, "switch_tab next"))
 
+            # Ctrl+E in vim mode (NORMAL or INSERT) → edit my last
+            # message in the active channel. Action 56 in app.py
+            # walks self.messages to find the latest by my_id and
+            # enters edit + INSERT mode.
+            elif self.vim_mode and key == 5:
+                return self.return_input_code(56)
+
             elif key in self.keybindings["select_left"]:
                 if self.input_select_start is None:
                     self.input_select_start = self.input_index
