@@ -3108,6 +3108,23 @@ class TUI():
                 self.input_select_start = None
                 self.spellcheck()
 
+            # Shift+H / Shift+L in vim NORMAL mode → switch tabs.
+            # Falls through to select_word_left/right when in INSERT
+            # so input-buffer word-selection still works.
+            elif (
+                self.vim_mode
+                and not self.insert_mode
+                and key in self.keybindings["select_word_left"]
+            ):
+                return self.return_input_code((50, "switch_tab prev"))
+
+            elif (
+                self.vim_mode
+                and not self.insert_mode
+                and key in self.keybindings["select_word_right"]
+            ):
+                return self.return_input_code((50, "switch_tab next"))
+
             elif key in self.keybindings["select_word_left"]:
                 if self.input_select_start is None:
                     self.input_select_end = self.input_select_start = self.input_index
