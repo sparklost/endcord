@@ -677,9 +677,15 @@ class TUI():
         # Force at least 1-col prompt padding so the cursor lands AFTER
         # the input-border `│` (otherwise empty prompt puts cursor on the border).
         prompt_pad = max(len(self.prompt), 1)
+        # Reserve a 1-column safety margin between chat content and
+        # the right border. Without it, a wide character (emoji) at
+        # the last chat column extends into the border cell and
+        # leaves the right `│` with a gap on that row — only visible
+        # in narrow windows where reactions / message text hit the
+        # right edge.
         chat_hwyx = (
             h - 4 - self.have_title,
-            w - chat_offset - 1 - bool(self.member_list),
+            w - chat_offset - 2 - bool(self.member_list),
             self.have_title,
             chat_offset,
         )
@@ -785,7 +791,14 @@ class TUI():
             common_h = h - 2 - self.have_title - 2*self.bordered
         tree_hidden = self.tree_width <= 0
         chat_left = 2 if tree_hidden else (self.tree_width + 2 * self.bordered + 1)
-        chat_w = w - chat_left - self.bordered - bool(self.member_list) * (self.member_list_width + 1)
+        # 1-col safety margin so wide chars (emoji) at the rightmost
+        # chat column don't bleed into the right border — see the
+        # equivalent comment in resize_bordered.
+        chat_w = (
+            w - chat_left - self.bordered
+            - bool(self.member_list) * (self.member_list_width + 1)
+            - self.bordered   # reserve safety margin in bordered mode
+        )
         chat_hwyx = (
             common_h,
             chat_w,
