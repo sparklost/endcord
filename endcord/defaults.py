@@ -35,6 +35,7 @@ settings = {
     "limit_cache_deleted": 30,
     "max_thumb_cache_age": 14,
     "tree_show_folders": True,
+    "tree_hidden_on_start": True,   # tree collapses on launch; toggle_tree shows it
     "wrap_around": True,
     "mouse": True,
     "mouse_scroll_sensitivity": 3,
@@ -337,7 +338,9 @@ vim_mode_bindings = {
     "edit": "e",
     "delete": "d",
     "toggle_ping": "P",
-    "scroll_bottom": "B",
+    # scroll_bottom is now Ctrl+G in vim mode — intercepted directly
+    # in tui.py. Cleared so Shift+B doesn't double-fire.
+    "scroll_bottom": "",
     "go_replied": "g",
     "download": "D",
     "upload": 1,   # Ctrl+A (a for attach)

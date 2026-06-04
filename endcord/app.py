@@ -1833,22 +1833,53 @@ class Endcord:
                     continue
                 self.go_replied(msg_index)
 
-            # chat_msg_up / chat_msg_down: jump message-by-message.
-            # self.messages is newest-first (insert(0, ...)), so visually-up
-            # (older) means a HIGHER index, visually-down (newer) means lower.
+            # chat_msg_up / chat_msg_down: jump by AUTHOR STREAK rather
+            # than by individual message. Each press moves the cursor
+            # to the "start" (oldest message = visual top = the line
+            # with the avatar/header) of either the current streak (if
+            # not already there) or the adjacent streak in the chosen
+            # direction. self.messages is newest-first.
             elif (action == 50 or action == 51) and self.messages:
                 self.restore_input_text = (input_text, "standard")
-                # When the selection is hidden, first press lands on the
-                # newest message (matches j/k semantics: k from hidden
-                # highlights bottom-of-viewport).
+
+                def streak_start(idx):
+                    """Walk UP through messages (higher index = older)
+                    while the author matches. Returns the highest idx
+                    in the streak — the OLDEST message in the run,
+                    which is what shows the avatar/timestamp header."""
+                    if idx is None or idx < 0 or idx >= len(self.messages):
+                        return None
+                    uid = self.messages[idx].get("user_id")
+                    while idx + 1 < len(self.messages) and \
+                            self.messages[idx + 1].get("user_id") == uid:
+                        idx += 1
+                    return idx
+
                 if chat_sel >= 0:
                     cur = self.lines_to_msg(chat_sel, space=True)
                     if cur is None:
                         continue
-                    target = cur + (1 if action == 50 else -1)
                 else:
-                    target = 0
-                if 0 <= target < len(self.messages):
+                    cur = 0
+
+                target = None
+                if action == 50:   # Shift+K = up = older direction
+                    cur_start = streak_start(cur)
+                    if cur_start is not None and cur_start != cur:
+                        # Not yet at the top of this streak — jump there.
+                        target = cur_start
+                    elif cur_start is not None and cur_start + 1 < len(self.messages):
+                        # Already at top of current streak; go to the
+                        # start of the previous (older) streak.
+                        target = streak_start(cur_start + 1)
+                else:   # action == 51, Shift+J = down = newer direction
+                    cur_uid = self.messages[cur].get("user_id")
+                    for i in range(cur - 1, -1, -1):
+                        if self.messages[i].get("user_id") != cur_uid:
+                            target = streak_start(i)
+                            break
+
+                if target is not None and 0 <= target < len(self.messages):
                     self.tui.set_selected(self.msg_to_lines(target, smart=True))
 
             # jump_next_media / jump_prev_media. "next" = newer (visually

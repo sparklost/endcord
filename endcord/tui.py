@@ -258,6 +258,11 @@ class TUI():
         self.vline = acs_map.get(vline, vline)
         self.tree_width = max(config["tree_width"], 10)
         self.tree_width_conf = self.tree_width
+        # Start with the tree hidden (toggle_tree from NORMAL mode
+        # restores it to tree_width_conf). config["tree_hidden_on_start"]
+        # opt-out for anyone who wants the tree visible from launch.
+        if config.get("tree_hidden_on_start", True):
+            self.tree_width = 0
         self.extra_window_h = config["extra_window_height"]   # load initial value
         self.blink_cursor_on = config["cursor_on_time"]
         self.blink_cursor_off = config["cursor_off_time"]
@@ -3218,6 +3223,13 @@ class TUI():
             # default insert_newline=14 binding.
             elif self.vim_mode and key == 14:
                 return self.return_input_code(55)
+
+            # Ctrl+G in vim mode (NORMAL or INSERT) → scroll chat to
+            # the bottom (action 7). Replaces the upstream Shift+B
+            # binding, which we clear in defaults so it doesn't also
+            # fire from `B`.
+            elif self.vim_mode and key == 7:
+                return self.return_input_code(7)
 
             elif key in self.keybindings["select_left"]:
                 if self.input_select_start is None:
