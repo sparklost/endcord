@@ -312,6 +312,26 @@ class Endcord:
             self.config["format_reply"] = pad + self.config["format_reply"]
             self.config["format_reactions"] = pad + self.config["format_reactions"]
             self.config["format_interaction"] = pad + self.config["format_interaction"]
+            # Streak-continuation messages use format_message_grouped.
+            # Without padding it, follow-up messages in a streak start
+            # one indent level to the left of the streak's first
+            # message — visibly misaligned with the rest of the body.
+            # Strip the original leading marker (e.g. " ├ ") for the
+            # same reason as format_newline above.
+            fmt_g = self.config.get("format_message_grouped", "")
+            if fmt_g:
+                g_content_at = fmt_g.find("%content")
+                if g_content_at > 0:
+                    fmt_g = fmt_g[g_content_at:]
+                self.config["format_message_grouped"] = pad + fmt_g
+            # format_reactions_newline wraps long reaction lists; same
+            # alignment fix.
+            fmt_rn = self.config.get("format_reactions_newline", "")
+            if fmt_rn:
+                rn_content_at = fmt_rn.find("%reactions")
+                if rn_content_at > 0:
+                    fmt_rn = fmt_rn[rn_content_at:]
+                self.config["format_reactions_newline"] = pad + fmt_rn
         self.formatter = formatter.ChatGenerator(
             self.config,
             self.colors,
@@ -1757,6 +1777,10 @@ class Endcord:
                         # Drop into INSERT so the user can type their
                         # reply right away.
                         self.tui.set_vim_insert(True)
+                        # The initial update_status_line above ran
+                        # BEFORE self.replying was set — call again so
+                        # the "[Replying]" indicator appears now.
+                        self.update_status_line()
 
             # edit
             elif action == 2 and self.messages:
