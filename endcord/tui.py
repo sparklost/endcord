@@ -1655,6 +1655,28 @@ class TUI():
                 # terminal clear (from screen.clear / clearok) wipes the
                 # Kitty images right after they've been placed.
                 self._pfp_dirty = True
+                # Re-paint the right vline of the chat region. Wide
+                # characters (emoji) at the rightmost chat column
+                # extend their second cell into the border column;
+                # this rewrites the `│` on top so the border stays
+                # intact regardless of what the cython draw_chat
+                # spilled into the boundary. Only matters in bordered
+                # mode where the right border is at chat_x + chat_w.
+                if self.bordered:
+                    try:
+                        chat_y, chat_x = self.win_chat.getbegyx()
+                        ch, cw = self.chat_hw
+                        right_col = chat_x + cw
+                        if 0 <= right_col < self.screen_hw[1]:
+                            self.screen.vline(
+                                chat_y, right_col,
+                                self.vline if hasattr(self, "vline") else curses.ACS_VLINE,
+                                ch,
+                                curses.color_pair(self.default_color),
+                            )
+                            self.screen.noutrefresh()
+                    except curses.error:
+                        pass
             except curses.error:
                 # exception will happen when window is resized to smaller w dimensions
                 self.resize()
