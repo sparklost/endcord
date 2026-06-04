@@ -1307,27 +1307,21 @@ class TUI():
 
 
     def draw_input_border(self):
-        """Color the input border based on vim mode."""
+        """Color the input border based on vim mode.
+
+        Only the input box border itself is recoloured — we used to
+        also tint the box-drawing chars inside the status line, but
+        that left an interrupted "half-orange / half-default" stripe
+        where the actual status text sat between the separators.
+        The `[--INSERT--]` mode label + the orange input border are
+        enough indication of insert mode without colouring through
+        the status text.
+        """
         if not hasattr(self, "input_border_hwyx"):
             return
         is_insert = self.vim_mode and self.insert_mode
         color = self.input_border_insert_pair if is_insert else None
         self.draw_border(self.input_border_hwyx, top=False, color_pair=color)
-
-        if is_insert and self.win_status_line is not None and getattr(self, "last_status_line", None):
-            box_glyphs = set("─│╭╮╰╯├┤┬┴┼━┃┏┓┗┛┣┫┳┻╋")
-            pair = curses.color_pair(self.input_border_insert_pair)
-            for col, ch in enumerate(self.last_status_line):
-                if ch in box_glyphs:
-                    try:
-                        self.win_status_line.addstr(0, col, ch, pair)
-                    except curses.error:
-                        # addstr at the rightmost cell raises after writing.
-                        pass
-            try:
-                self.win_status_line.noutrefresh()
-            except curses.error:
-                pass
 
 
 
