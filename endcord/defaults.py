@@ -302,7 +302,11 @@ vim_mode_bindings = {
     "jump_next_media": 4,    # Ctrl+D
     "jump_prev_media": 21,   # Ctrl+U
     "jump_last_channel": 15,   # Ctrl+O
-    "jump_latest_unread": "N",
+    # `jump_latest_unread` is now intercepted directly in tui.py for
+    # Ctrl+N in both NORMAL and INSERT — see the explicit key==14
+    # dispatch alongside Ctrl+H/L/E. Leaving this slot empty so we
+    # don't double-fire on a key.
+    "jump_latest_unread": "",
     "tree_select": " ",
     "tree_collapse_threads": "W",
     "tree_join_thread": "O",

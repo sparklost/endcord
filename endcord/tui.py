@@ -3213,6 +3213,12 @@ class TUI():
             elif self.vim_mode and key == 5:
                 return self.return_input_code(56)
 
+            # Ctrl+N in vim mode (NORMAL or INSERT) → jump to the
+            # latest unread channel (action 55). Wins over the
+            # default insert_newline=14 binding.
+            elif self.vim_mode and key == 14:
+                return self.return_input_code(55)
+
             elif key in self.keybindings["select_left"]:
                 if self.input_select_start is None:
                     self.input_select_start = self.input_index
