@@ -1,7 +1,10 @@
 Add colors and formatting in assists
-Update screenshots: 02 - command assist
-
+Add delete forward binding
+Fix inline media messing tree on startup
 Add option to build with custom python
+Fix crash when built with nuitka
+
+Rebuild tab string
 Fix sent audio is delayed and low quality
 Fix receiver audio mixer
 Add transmmitter audio mixer
@@ -14,6 +17,7 @@ Remove ruff and uv
 Fix RTP metrics
 Fix some emoji are drawn as text
 Fix issues with wide characters in input line
+Add multiline input line
 Add option to select individual message
 Fix per-channel member list
 Rewrite experimental mode in not-pygame

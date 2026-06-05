@@ -640,8 +640,9 @@ def build_with_nuitka(onedir, clang, mingw, nosoundcard, print_cmd=False, experi
         pkgname = PKGNAME
         emoji_path = "endcord/emoji.json"
     full = pkgname == PKGNAME
+    static_python = False   # might be useful with custom python build
 
-    mode = "--standalone" if onedir else "--onefile"
+    mode = "standalone" if onedir else "onefile"
     compiler = ""
     if clang:
         compiler = "--clang"
@@ -717,7 +718,7 @@ def build_with_nuitka(onedir, clang, mingw, nosoundcard, print_cmd=False, experi
     # prepare command and run it
     cmd = [
         "uv", "run", "python", "-m", "nuitka",
-        mode,
+        f"--mode={mode}",
         compiler,
         *python_flags,
         *hidden_imports,
@@ -725,6 +726,7 @@ def build_with_nuitka(onedir, clang, mingw, nosoundcard, print_cmd=False, experi
         *package_data,
         *add_data,
         *options,
+        "--static-libpython=yes" if static_python else "",
         "--prefer-source-code",
         "--remove-output",
         "--output-dir=dist",

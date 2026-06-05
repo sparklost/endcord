@@ -517,6 +517,9 @@ Follow [fbterm setup instructions](https://wiki.archlinux.org/title/Fbterm#Insta
 Some characters may fail to render so set `emoji_as_text = True` in config and `compact = True` in theme. Some theme characters should also be tweaked.  
 Note: keybinding `Ctrl+Up/Down/Left/Right` does not work in tty, either rebind them or add custom keymap, or in `/etc/vconsole.conf`.  
 
+### Keybindings dont work in tmux
+Add this to tmux.conf: `set -g default-terminal xterm-256color`
+
 ### RAM usage
 RAM usage greatly depends on multiple factors:
 - Full binary version uses few MB more than lite.

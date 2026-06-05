@@ -559,10 +559,12 @@ def search_tabs(tabs, query, limit=50, score_cutoff=15):
     return sorted(results, key=lambda x: x[2], reverse=True)
 
 
-def search_mics(devices, query, limit=50, score_cutoff=15):
+def search_mics(devices, current_device, query, limit=50, score_cutoff=15):
     """Search for microphones"""
     results = []
     worst_score = score_cutoff
+    if current_device is None:
+        current_device = "Auto"
     results.append(("Auto", "voice_set_input_device " + "Auto", score_cutoff + fuzzy_match_score(query, "Auto") + 0.1))
 
     for device in devices:
@@ -575,6 +577,10 @@ def search_mics(devices, query, limit=50, score_cutoff=15):
             worst_score = results[0][2]
 
     results.append(("OFF", "voice_set_input_device " + "OFF", score_cutoff + fuzzy_match_score(query, "OFF") + 0.1))
+    for num, result in enumerate(results):
+        if current_device == result[0]:
+            results[num] = (f"* {result[0]}", *result[1:])
+            break
     return sorted(results, key=lambda x: x[2], reverse=True)
 
 

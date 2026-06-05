@@ -81,6 +81,8 @@ ASSISTED_COMMANDS = ("set ", "string_select ", "set_notifications ", "game_detec
 STATS_COMMAND_TEXT = ("Run time", "Gateway events/h", "Gateway messages/h", "Gateway ping time", "Message buffer size", "Total API requests", "API response time", "Cache sizes", "  Cached members", "  Deleted messages", "  Summaries", "  Image cache")
 match_emoji = re.compile(r"<:(.*):(\d*)>")
 match_youtube = re.compile(r"(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)[a-zA-Z0-9_-]{11}")
+match_last_parentheses = re.compile(r"\([^()]*\)(?!.*\([^()]*\))")
+match_last_brackets = re.compile(r"\[[^\[\]]*\](?!.*\[[^\[\]]*\])")
 
 
 class Endcord:
@@ -1676,7 +1678,7 @@ class Endcord:
                     embeds = self.get_msg_embeds(msg_index)
                     urls = self.get_msg_urls_chat(msg_index)
                 selected_urls = []
-                for num in self.get_stuff_from_selected_line(chat_sel, 0):   # get url
+                for num in self.get_stuff_from_selected_line(chat_sel, 0):
                     if urls[num] in embeds:
                         selected_urls.append(urls[num])
                 if len(selected_urls) == 1:
@@ -1693,7 +1695,7 @@ class Endcord:
                     self.restore_input_text = ("SELECT", "prompt")
                     self.update_status_line()
 
-            # open link in browser
+            # open in browser
             elif action == 10:
                 self.restore_input_text = (input_text, "standard")
                 msg_index = self.lines_to_msg(chat_sel)
@@ -1701,11 +1703,13 @@ class Endcord:
                     continue
                 urls = None
                 embeds = self.get_stuff_from_selected_line(chat_sel, 5)
+                selected_urls = []
                 if not embeds:
-                    selected_urls = []
                     urls = self.get_msg_urls_chat(msg_index)
-                    for num in self.get_stuff_from_selected_line(chat_sel, 0):   # get url
+                    for num in self.get_stuff_from_selected_line(chat_sel, 0):
                         selected_urls.append(urls[num])
+                else:
+                    selected_urls = embeds
                 if len(selected_urls) == 1:
                     selected_url = self.refresh_attachment_url(selected_urls[0])
                     webbrowser.open(selected_url, new=0, autoraise=True)
@@ -1735,7 +1739,7 @@ class Endcord:
                     urls = self.get_msg_urls_chat(msg_index)
                 selected_urls = []
                 if urls:
-                    for num in self.get_stuff_from_selected_line(chat_sel, 0):   # get url
+                    for num in self.get_stuff_from_selected_line(chat_sel, 0):
                         if urls[num] in embeds:
                             selected_urls.append(urls[num])
                 else:
@@ -5569,6 +5573,10 @@ class Endcord:
         """Generate and show various assists when typing"""
         self.assist_type = assist_type
         self.assist_found = []
+        extra_format = []
+        color_low = self.colors[8]
+        color_standout = self.colors[9]
+        max_w = self.tui.get_dimensions()[2][1]
 
         if assist_type == 1:   # channels
             if not self.command:   # current guild channels
@@ -5612,6 +5620,13 @@ class Endcord:
                 limit=self.assist_limit,
                 score_cutoff=self.assist_score_cutoff,
             )
+            for line in self.assist_found:
+                match = re.search(match_last_parentheses, line[0])
+                start, end = match.span()
+                if match:
+                    extra_format.append([(color_low, None, start, end + 4)])
+                else:
+                    extra_format.append(None)
 
         elif assist_type == 4:   # sticker
             if self.config["default_stickers"]:
@@ -5627,6 +5642,12 @@ class Endcord:
                 limit=self.assist_limit,
                 score_cutoff=self.assist_score_cutoff,
             )
+            for line in self.assist_found:
+                match = re.search(match_last_parentheses, line[0])
+                if match:
+                    extra_format.append([(color_low, None, *match.span())])
+                else:
+                    extra_format.append(None)
 
         elif assist_type == 5:   # client command
             if assist_word.lower().startswith("set "):
@@ -5640,6 +5661,8 @@ class Endcord:
                 else:
                     for key, value in self.config.items():
                         self.assist_found.append((f"{key} = {value}", f"set {key} = {value}"))
+                for line in self.assist_found:
+                    extra_format.append([(color_standout, None, 0, line[0].find(" = "))])
 
             elif assist_word.lower().startswith("string_select "):
                 chat_sel, _ = self.tui.get_chat_selected()
@@ -5653,6 +5676,8 @@ class Endcord:
                             limit=self.assist_limit,
                             score_cutoff=self.assist_score_cutoff,
                         )
+                        for line in self.assist_found:
+                            extra_format.append([(color_standout, None, line[0].find(" - ") + 3, max_w)])
 
             elif assist_word.lower().startswith("set_notifications "):
                 query_words = assist_word.split(" ")
@@ -5680,6 +5705,15 @@ class Endcord:
                         assist_word,
                         score_cutoff=self.assist_score_cutoff,
                     )
+                    for line in self.assist_found:
+                        if line[0].startswith("* "):
+                            extra_format.append([(color_standout, 1, 0, 1)])
+                        elif line[0].endswith("True"):
+                            extra_format.append([(color_standout, None, len(line[0]) - 4, max_w)])
+                        elif line[0].endswith("False"):
+                            extra_format.append([(color_standout, None, len(line[0]) - 5, max_w)])
+                        else:
+                            extra_format.append(None)
 
             elif assist_word.lower().startswith("game_detection_blacklist ") and self.enable_game_detection and self.game_detection.run:
                 self.assist_found = search.search_games(
@@ -5689,6 +5723,11 @@ class Endcord:
                     limit=self.assist_limit,
                     score_cutoff=self.assist_score_cutoff,
                 )
+                for line in self.assist_found:
+                    if line[0].endswith(" (blacklisted)"):
+                        extra_format.append([(color_low, None, len(line) - 14, max_w)])
+                    else:
+                        extra_format.append(None)
 
             elif assist_word.lower().startswith("switch_tab "):
                 self.assist_found = search.search_tabs(
@@ -5697,6 +5736,12 @@ class Endcord:
                     limit=self.assist_limit,
                     score_cutoff=self.assist_score_cutoff,
                 )
+                for line in self.assist_found:
+                    match = re.search(match_last_parentheses, line[0])
+                    if match:
+                        extra_format.append([(color_standout, 1, 0, 1), (color_low, None, *match.span())])
+                    else:
+                        extra_format.append(None)
 
             elif assist_word.lower().startswith("goto "):
                 self.assist_found = search.search_channels_all(
@@ -5726,10 +5771,16 @@ class Endcord:
             elif assist_word.lower().startswith("voice_set_input_device "):
                 self.assist_found = search.search_mics(
                     peripherals.get_audio_input_devices(),
+                    self.state["audio_input_device"],
                     assist_word[23:],
                     limit=self.assist_limit,
                     score_cutoff=self.assist_score_cutoff,
                 )
+                for line in self.assist_found:
+                    if line[0].startswith("* "):
+                        extra_format.append([(color_standout, 1, 0, 1)])
+                    else:
+                        extra_format.append(None)
 
             elif assist_word.lower().startswith("switch_profile "):
                 self.assist_found = search.search_profiles(
@@ -5738,6 +5789,12 @@ class Endcord:
                     limit=self.assist_limit,
                     score_cutoff=self.assist_score_cutoff,
                 )
+                for line in self.assist_found:
+                    match = re.search(match_last_parentheses, line[0])
+                    if match:
+                        extra_format.append([(color_low, None, *match.span())])
+                    else:
+                        extra_format.append(None)
 
             elif assist_word.lower().startswith("gif "):
                 self.assist_found = search.search_gif(
@@ -5746,6 +5803,13 @@ class Endcord:
                     limit=self.assist_limit,
                     score_cutoff=self.assist_score_cutoff,
                 )
+                for line in self.assist_found:
+                    if line[0].startswith("Search: "):
+                        extra_format.append([(color_standout, None, 0, 7)])
+                    elif ": " in line[0]:
+                        extra_format.append([(color_low, None, 0, len(line[0].split(": ")[0]) + 1)])
+                    else:
+                        extra_format.append(None)
 
             elif assist_word:
                 self.assist_found = search.search_client_commands(
@@ -5754,8 +5818,12 @@ class Endcord:
                     limit=self.assist_limit,
                     score_cutoff=self.assist_score_cutoff,
                 )
+                for line in self.assist_found:
+                    extra_format.append([(color_standout, None, 0, len(line[0].split(" ", 1)[0])), (color_low, None, line[0].find(" - ") + 3, max_w)])
             else:
                 self.assist_found = COMMAND_ASSISTS
+                for line in self.assist_found:
+                    extra_format.append([(color_standout, None, 0, len(line[0].split(" ", 1)[0])), (color_low, None, line[0].find(" - ") + 3, max_w)])
 
         elif assist_type == 6:   # app commands
             assist_words = assist_word[1:].split(" ")
@@ -5808,15 +5876,21 @@ class Endcord:
                 fav=not(self.search_results),
                 cmd=False,
             )
+            for line in self.assist_found:
+                if line[0].startswith("Search: "):
+                    extra_format.append([(color_standout, None, 0, 7)])
+                elif ": " in line[0]:
+                    extra_format.append([(color_low, None, 0, len(line[0].split(": ")[0]) + 1)])
+                else:
+                    extra_format.append(None)
 
-        max_w = self.tui.get_dimensions()[2][1]
         extra_title, extra_body = formatter.generate_extra_window_assist(self.assist_found, assist_type, max_w, self.placeholder_emoji)
         self.extra_window_open = True
         if (self.search or self.search_gif or self.command) and not (self.assist_word or self.assist_word == " "):
             self.extra_bkp = (self.tui.extra_window_title, self.tui.extra_window_body, self.tui.extra_window_format)
         self.assist_word = assist_word
         self.execute_extensions_methods("on_assist", self.assist_found, assist_type, cache=True)
-        self.tui.draw_extra_window(extra_title, extra_body, select=True)
+        self.tui.draw_extra_window(extra_title, extra_body, extra_format, select=True)
 
 
     def stop_assist(self, close=True):

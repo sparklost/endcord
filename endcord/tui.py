@@ -2296,8 +2296,8 @@ class TUI():
                     self.chat_index += 1   # move history down
                 self.set_selected(self.chat_selected + 1, scroll=False)   # move selection up
 
-        if key in self.KEYBINDINGS_CHAT_DOWN or (self.swap_assist and self.win_extra_window and key in self.keybindings["extra_down"] and not alt and not command):
-            if command and key not in self.keybindings["extra_up"]:
+        elif key in self.KEYBINDINGS_CHAT_DOWN or (self.swap_assist and self.win_extra_window and key in self.keybindings["extra_down"] and not alt and not command):
+            if command and key not in self.keybindings["extra_down"]:
                 return 47
             if self.swap_assist and self.win_extra_window and not mouse and key in self.KEYBINDINGS_CHAT_DOWN:
                 self.common_keybindings(self.keybindings["extra_down"][0], alt=True)
