@@ -331,7 +331,29 @@ def fix_line_format(line_format, text):
     for color, start, end in line_format[1:]:
         start_shift = bisect_left(wide_positions, start)
         end_shift = bisect_left(wide_positions, end)
-        corrected.append([color, start + start_shift, end + end_shift])
+        corrected.append((color, start + start_shift, end + end_shift))
+
+    return corrected
+
+
+def fix_line_format_extended(line_format, text):
+    """Fix extended line format ranges for wide character positions"""
+    if len(line_format) <= 1:
+        return line_format
+
+    wide_positions = []
+    for i, ch in enumerate(text):
+        character = ord(ch)
+        if (character < 0x20 or character >= 0x7f) and binary_search(character, WIDE_RANGES):
+            wide_positions.append(i)
+    if not wide_positions:
+        return line_format
+
+    corrected = []
+    for color, attr, start, end in line_format:
+        start_shift = bisect_left(wide_positions, start)
+        end_shift = bisect_left(wide_positions, end)
+        corrected.append((color, attr, start + start_shift, end + end_shift))
 
     return corrected
 
@@ -353,7 +375,7 @@ def fix_map_ranges(map_ranges, text):
     for start, end, data in map_ranges:
         start_shift = bisect_left(wide_positions, start)
         end_shift = bisect_left(wide_positions, end)
-        corrected.append([start + start_shift, end + end_shift, data])
+        corrected.append((start + start_shift, end + end_shift, data))
 
     return corrected
 
@@ -3154,7 +3176,7 @@ def generate_member_list(member_list_raw, guild_roles, width, use_nick, status_s
     return member_list, member_list_format
 
 
-def generate_message_notification(data, channels, roles, guild_name, convert_timezone, use_global_name=False, use_nick=False):
+def generate_message_notification(data, channels, roles, guild_name, my_data, convert_timezone, use_global_name=False, use_nick=False):
     """Generate message notification title and body"""
     if data["guild_id"]:
         # find guild and channel name
@@ -3175,7 +3197,7 @@ def generate_message_notification(data, channels, roles, guild_name, convert_tim
     if data["content"]:
         body = replace_spoilers(data["content"])
         body, _ = replace_discord_emoji(body)
-        body, _ = replace_mentions(body, data["mentions"], global_name=use_global_name, use_nick=use_nick)
+        body, _ = replace_mentions(body, chain(data["mentions"], (my_data, )), global_name=use_global_name, use_nick=use_nick)
         body, _ = replace_roles(body, roles)
         body = replace_discord_url(body)
         body, _ = replace_channels(body, channels)

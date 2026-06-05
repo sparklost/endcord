@@ -155,6 +155,8 @@ class InlineMedia:
         """Re-calculate image positions and draw them"""
         if not self.force_draw and self.prev_chat_index == self.tui.chat_index and self.prev_chat_hw[0] == self.tui.chat_hw[0]:
             return
+        if self.tui.disable_drawing:
+            return
         if self.prev_win_hw != self.tui.screen_hw:
             self.prev_win_hw = self.tui.screen_hw
             self.force_redraw()
@@ -192,6 +194,8 @@ class InlineMedia:
     def clear_images(self, force=False):
         """Clear all areas that are no longer used by images"""
         if not self.force_draw and not force and self.prev_chat_index == self.tui.chat_index and self.prev_chat_hw[0] == self.tui.chat_hw[0]:
+            return
+        if self.tui.disable_drawing:
             return
 
         # get occupied vertical ranges
@@ -331,7 +335,7 @@ class InlineMedia:
                 if image_id not in self.image_cache:
                     continue
                 self.image_cache[image_id][0] = data
-            if not draw:
+            if not draw or self.tui.disable_drawing:
                 continue
 
             # draw

@@ -1,8 +1,6 @@
-Add colors and formatting in assists
-Add delete forward binding
+Fix crash when built with nuitka
 Fix inline media messing tree on startup
 Add option to build with custom python
-Fix crash when built with nuitka
 
 Rebuild tab string
 Fix sent audio is delayed and low quality

@@ -82,7 +82,6 @@ STATS_COMMAND_TEXT = ("Run time", "Gateway events/h", "Gateway messages/h", "Gat
 match_emoji = re.compile(r"<:(.*):(\d*)>")
 match_youtube = re.compile(r"(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)[a-zA-Z0-9_-]{11}")
 match_last_parentheses = re.compile(r"\([^()]*\)(?!.*\([^()]*\))")
-match_last_brackets = re.compile(r"\[[^\[\]]*\](?!.*\[[^\[\]]*\])")
 
 
 class Endcord:
@@ -5586,6 +5585,13 @@ class Endcord:
                     limit=self.assist_limit,
                     score_cutoff=self.assist_score_cutoff,
                 )
+                for line in self.assist_found:
+                    text = line[0]
+                    line_format = [(color_standout, None, 0, 1)]
+                    if " - " in text:
+                        line_format.append((color_standout, None, text.rfind(" - ") + 4, max_w))
+                    extra_format.append(formatter.fix_line_format_extended(line_format, text))
+
             else:   # all guilds, channels, and dms
                 self.assist_found = search.search_channels_all(
                     self.guilds,
@@ -5595,6 +5601,16 @@ class Endcord:
                     limit=self.assist_limit,
                     score_cutoff=self.assist_score_cutoff,
                 )
+                for line in self.assist_found:
+                    text = line[0]
+                    line_format = []
+                    match = re.search(match_last_parentheses, text)
+                    if match:
+                        line_format.append((color_low, None, *match.span()))
+                    if " - " in text:
+                        start = text.rfind(" - ") + 3
+                        line_format.append((color_standout, None, start, start + len(text[start:].split(" ")[0])))
+                    extra_format.append(formatter.fix_line_format_extended(line_format, text))
 
         elif assist_type == 2:   # username/role
             self.assist_found = search.search_usernames_roles(
@@ -5607,6 +5623,17 @@ class Endcord:
                 limit=self.assist_limit,
                 score_cutoff=self.assist_score_cutoff,
             )
+            for line in self.assist_found:
+                text = line[0]
+                match = re.search(match_last_parentheses, text)
+                line_format = [(color_standout, None, 0, 1)]
+                if match:
+                    start, _ = match.span()
+                    line_format.append((color_low, None, start, max_w))
+                elif " - role" in line[0]:
+                    line_format.append((color_standout, None, text.rfind(" - role") + 4, max_w))
+                extra_format.append(formatter.fix_line_format_extended(line_format, text))
+
 
         elif assist_type == 3:   # emoji
             self.assist_found = search.search_emojis(
@@ -5622,8 +5649,8 @@ class Endcord:
             )
             for line in self.assist_found:
                 match = re.search(match_last_parentheses, line[0])
-                start, end = match.span()
                 if match:
+                    start, end = match.span()
                     extra_format.append([(color_low, None, start, end + 4)])
                 else:
                     extra_format.append(None)
@@ -5754,6 +5781,16 @@ class Endcord:
                     limit=self.assist_limit,
                     score_cutoff=self.assist_score_cutoff,
                 )
+                for line in self.assist_found:
+                    text = line[0]
+                    line_format = []
+                    match = re.search(match_last_parentheses, text)
+                    if match:
+                        line_format.append((color_low, None, *match.span()))
+                    if " - " in text:
+                        start = text.rfind(" - ") + 3
+                        line_format.append((color_standout, None, start, start + len(text[start:].split(" ")[0])))
+                    extra_format.append(formatter.fix_line_format_extended(line_format, text))
 
             elif assist_word.lower().startswith("collapse_all_except "):
                 self.assist_found = search.search_options(
@@ -5851,6 +5888,24 @@ class Endcord:
                 elif self.app_command_autocomplete_resp:
                     for choice in self.app_command_autocomplete_resp:
                         self.assist_found.append((choice["name"], choice["value"]))
+            for line in self.assist_found:
+                text = line[0]
+                line_format = []
+                if text == "EXECUTE":
+                    extra_format.append([(color_standout, 1, 0, 7)])
+                    continue
+                for word in ("option:", "subcommand", "group"):
+                    if word not in text:
+                        continue
+                    start = text.find(word)
+                    line_format.append((color_standout, None, start, start + len(word)))
+                if " - " in text:
+                    start = text.rfind(" - ") + 3
+                    line_format.append((color_low, None, start, max_w))
+                match = re.search(match_last_parentheses, text)
+                if match:
+                    line_format.append((color_standout, None, *match.span()))
+                extra_format.append(formatter.fix_line_format_extended(line_format, text))
 
         elif assist_type == 7:   # upload file select
             if query_results:
@@ -7838,6 +7893,7 @@ class Endcord:
             channels,
             guild_roles,
             guild_name,
+            self.my_user_data,
             self.config["convert_timezone"],
             use_global_name=("%global_name" in self.config["format_message"]),
             use_nick=self.config["use_nick_when_available"],

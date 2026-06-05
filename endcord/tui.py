@@ -769,6 +769,9 @@ class TUI():
             self.screen.refresh()
             self.disable_drawing = False
             self.resize(redraw_only=True)
+            if self.inline_media:
+                self.inline_media.force_redraw()
+            self.execute_extensions_methods("on_force_redraw")
 
 
     def is_window_open(self):
@@ -2664,7 +2667,7 @@ class TUI():
 
             elif key in self.keybindings["delete_word"]:
                 word = ""
-                for word_part in self.input_buffer[:self.input_index].split(" ")[::-1]:
+                for word_part in resplit(self.input_buffer[:self.input_index])[::-1]:
                     if word_part == "":
                         word += " "
                     else:
@@ -2683,6 +2686,27 @@ class TUI():
                         selected_completion = 0
                     for char in word:
                         self.add_to_delta_store("BACKSPACE", char)
+                    self.spellcheck()
+
+            elif key in self.keybindings["delete_word_forward"]:
+                word = ""
+                for word_part in resplit(self.input_buffer[self.input_index:]):
+                    if word_part == "":
+                        word += " "
+                    else:
+                        word += word_part
+                        break
+                if word:
+                    self.input_buffer = self.input_buffer[:self.input_index] + self.input_buffer[self.input_index+len(word):]
+                    input_line_index_diff = self.input_index - max(0, len(self.input_buffer) - w + 1 - self.input_line_index)
+                    if input_line_index_diff <= 0:
+                        self.input_line_index -= input_line_index_diff - 4   # diff is negative
+                        self.input_line_index = min(max(0, self.input_line_index), max(0, len(self.input_buffer) - w))
+                    self.input_select_start = None
+                    if self.enable_autocomplete:
+                        selected_completion = 0
+                    for char in word:
+                        self.add_to_delta_store("DELETE", char)
                     self.spellcheck()
 
             elif key in self.keybindings["word_left"]:

@@ -22,7 +22,8 @@
 - `Alt+C` - Copy selection in input line, otherwise copy selected message in the chat
 - `Alt+X` - Cut selection
 - `Ctrl+V` - Smart paste - paste text or file as attachment
-- `Ctrl+Backspace` - Delete word
+- `Ctrl+Backspace` - Delete word backwards
+- `Ctrl+Del` - Delete word forwards
 
 ### Chat
 - `Enter` - Send message

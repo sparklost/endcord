@@ -225,6 +225,7 @@ keybindings = {
     "cut": "ALT+120",   # Alt+X
     "paste": 22,   # Ctrl+V
     "delete_word": 8,   # Ctrl+Backspace/Ctrl+H
+    "delete_word_forward": 528,   # Ctrl+Del
     # chat
     "send_message": 10,   # Enter
     "chat_up": 259,   # Up
