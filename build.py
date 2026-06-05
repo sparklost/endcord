@@ -727,7 +727,7 @@ def build_with_nuitka(onedir, clang, mingw, nosoundcard, print_cmd=False, experi
         *add_data,
         *options,
         "--static-libpython=yes" if static_python else "",
-        "--prefer-source-code",
+        "--no-prefer-source-code",
         "--remove-output",
         "--output-dir=dist",
         f"--output-filename={pkgname}",

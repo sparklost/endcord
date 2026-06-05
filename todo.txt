@@ -1,4 +1,4 @@
-Fix crash when built with nuitka
+Build custom pyav
 Fix inline media messing tree on startup
 Add option to build with custom python
 
