@@ -2938,6 +2938,16 @@ class TUI():
                 continue
             w = self.input_hw[1]
 
+            # ncurses maps ESC[I / ESC[O focus events to integer codes
+            # 590 / 591 in keypad mode, not the raw byte sequence — so
+            # the [27, 91, 73/79, -1] match below never fires for them.
+            if key == 590:   # focus in
+                self.terminal_focused = True
+                continue
+            if key == 591:   # focus out
+                self.terminal_focused = False
+                continue
+
             if key == 27 and not press:   # ESCAPE
                 # terminal waits when Esc is pressed, but not when sending escape sequence
                 self.screen.nodelay(True)
