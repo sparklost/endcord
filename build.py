@@ -117,6 +117,15 @@ def get_python_version():
     return sys.version_info.major, sys.version_info.minor, is_gil_enabled()
 
 
+def get_nice_python_version():
+    """Get clean python version"""
+    version = sys.version
+    start = version.find("(++")
+    if start < 0:
+        return version
+    return version[:start] + version[version.find(")", start):]
+
+
 def supports_color():
     """Return True if the running terminal supports ANSI colors."""
     if sys.platform == "win32":
@@ -158,7 +167,7 @@ def check_python():
                 fprint(f"Using {version.stdout.strip()}")
             except Exception:
                 pass
-            fprint(f"Using Python {sys.version}")
+            fprint(f"Using Python {get_nice_python_version()}")
         if not is_gil_enabled():
             if sys.version_info.minor == PYTHON_FREETHREADED:
                 fprint("WARNING: While endcord works with freethreaded python, final binary is much larger. Nutka doesnt yet support freethreaded python, so build is likely to fail.", color_code="\033[1;31m")
@@ -574,11 +583,11 @@ def build_numpy_lite(clang):
         fprint("Skipping numpy lite (no openblas) building on non-linux platforms")
         return
     fprint("Building numpy-lite (no openblas)")
-    cmd = [
+    check_openblas_cmd = [
         "uv", "run", "python", "-c",
         "import numpy; print(int(numpy.__config__.show_config('dicts')['Build Dependencies']['blas'].get('found', False)))",
     ]   # check if numpy without blas is not already installed
-    value = subprocess.run(cmd, capture_output=True, text=True, check=False).stdout.strip()
+    value = subprocess.run(check_openblas_cmd, capture_output=True, text=True, check=False).stdout.strip()
     if not value or not int(value):
         print("Numpy-lite (no openblas) is already built", flush=True)
         return
@@ -591,14 +600,20 @@ def build_numpy_lite(clang):
             python_interpreter = ".venv/bin/python"
         subprocess.run([python_interpreter, "-m", "pip", "uninstall", "--yes", "numpy"], check=True)
         subprocess.run([
-            python_interpreter, "-m", "pip", "install", "--no-cache-dir", "--no-binary=:all:", "numpy",
-            "--config-settings=setup-args=-Dblas=None",
-            "--config-settings=setup-args=-Dlapack=None",
+            python_interpreter, "-m", "pip", "install", "numpy",
+            "--no-cache-dir",
+            "--no-binary=:all:",
+            "--config-settings=setup-args=-Dblas=none",
+            "--config-settings=setup-args=-Dlapack=none",
+            "--config-settings=setup-args=-Dallow-noblas=true",
         ], check=True)
     except subprocess.CalledProcessError as e:   # fallback
         print(e, flush=True)
         print("Failed building numpy-lite (no openblas), faling back to default numpy", flush=True)
         subprocess.run(["uv", "pip", "install", "numpy"], check=True)
+    value = subprocess.run(check_openblas_cmd, capture_output=True, text=True, check=False).stdout.strip()
+    if value and int(value):
+        print("Verification failed: numpy after building is still linked to openblas!", flush=True)
     subprocess.run(["uv", "pip", "uninstall", "pip"], check=True)
 
 
@@ -897,7 +912,7 @@ def parser():
     parser.add_argument(
         "--mingw",
         action="store_true",
-        help="use mingw instead msvc on windows, has no effect on Linux and macOS, or with --clang flag",
+        help="use mingw instead msvc on windows, has no effect on Linux and macOS or with --clang flag",
     )
     parser.add_argument(
         "--toggle-experimental",

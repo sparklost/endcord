@@ -46,7 +46,7 @@ LDFLAGS="${LDFLAGS} \
     -Wl,-rpath,$PREFIX/lib \
     -LModules/_hacl"
 [[ "$2" == "clang" ]] && CFLAGS="${CFLAGS} -flto=thin"
-[[ "$2" == "clang" ]] && LDFLAGS="${LDFLAGS} -flto=thin"
+[[ "$2" == "clang" ]] && LDFLAGS="${LDFLAGS} -flto=thin -fuse-ld=lld"
 export CFLAGS LDFLAGS
 
 cat > ./Modules/Setup.local << EOF

@@ -1,11 +1,9 @@
-Fix build script failing to detect no-openblas numpy on gh runner
-Fix build script clang python build
-Update screenshots
+Fix mouse controls on windows
+Fix flickering when scroll tree up/down
 
-Add custom environment package management through build.py
+Add custom environment management through build.py - remove uv dependency
 Add --norust option to build script
-Add --minimal option to build script (rempves numpy orjson soundcard)
-Remove ruff and uv
+Add --minimal option to build script (removes numpy orjson soundcard)
 
 Fix sent audio is delayed and low quality
 Fix receiver audio mixer

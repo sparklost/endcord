@@ -6,24 +6,24 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "filetype>=1.2.0",
-    "numpy>=2.4.6",
+    "numpy>=2.5.0",
     "orjson>=3.11.9",
     "pycryptodome>=3.23.0",
     "pysocks>=1.7.1",
     "soundcard>=0.4.6",
     "soundfile>=0.14.0",
     "websocket-client>=1.9.0",
-    "certifi>=2026.5.20; sys_platform == 'darwin'",
-    "psutil>=7.2.2; sys_platform != 'linux'",
     "pywin32>=312; sys_platform == 'win32'",
     "pywin32-ctypes>=0.2.3; sys_platform == 'win32'",
     "windows-curses>=2.4.2; sys_platform == 'win32'",
     "windows-toasts>=1.3.1; sys_platform == 'win32'",
+    "certifi>=2026.6.17; sys_platform == 'darwin'",
+    "psutil>=7.2.2; sys_platform != 'linux'",
 ]
 
 [dependency-groups]
 build = [
-    "cython>=3.2.5",
+    "cython>=3.2.6",
     "nuitka[onefile]>=4.1.3",
     "pyinstaller>=6.21.0",
     "setuptools>=82.0.0",

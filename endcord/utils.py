@@ -129,7 +129,11 @@ def get_build_info(cythonized, uses_pgcurses, support_media, support_call):
     if support_call:
         build_info.append("call support")
     custom_build = " (CUSTOM BUILD)" if importlib.util.find_spec("_bz2") is None else ""
-    return f"Python {sys.version}{custom_build} on {sys.platform}\n  Features: {", ".join(build_info)}"
+    version = sys.version
+    start = version.find("(++")
+    if start >= 0:
+        version = version[:start] + version[version.find(")", start):]
+    return f"Python {version}{custom_build} on {sys.platform}\n  Features: {", ".join(build_info)}"
 
 
 def remove_args(cmd, *args):

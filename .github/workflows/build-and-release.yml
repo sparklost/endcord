@@ -20,7 +20,7 @@ jobs:
             python-version: 3.14.6
             nuitka: true
             clang: true
-            clang-version: 21.1.8
+            clang-version: 22.1.3
           - os: windows-latest
             platform: windows
             python-version: 3.14
@@ -92,6 +92,12 @@ jobs:
           brew install ccache
           echo "SDKROOT=$(xcrun --sdk macosx --show-sdk-path)" >> $GITHUB_ENV
 
+      - name: Ensure no BLAS/LAPACK (Linux)
+        if: ${{ matrix.platform == 'linux' }}
+        run: |
+          sudo apt-get purge -y libopenblas-dev libopenblas0 libblas-dev liblapack-dev
+          sudo apt-get autoremove -y
+
       - name: Install LLVM and Clang (Linux)
         if: ${{ matrix.platform == 'linux' && matrix.clang == true }}
         shell: bash
@@ -100,9 +106,21 @@ jobs:
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
           sudo ./llvm.sh $MAJOR_VERSION
+          sudo mkdir -p /usr/lib/bfd-plugins
           sudo ln -sf /usr/bin/clang-$MAJOR_VERSION /usr/bin/clang
           sudo ln -sf /usr/bin/clang++-$MAJOR_VERSION /usr/bin/clang++
           sudo ln -sf /usr/bin/llvm-profdata-$MAJOR_VERSION /usr/bin/llvm-profdata
+          sudo ln -sf /usr/bin/llvm-ar-$MAJOR_VERSION /usr/bin/llvm-ar
+          sudo ln -sf /usr/bin/llvm-ranlib-$MAJOR_VERSION /usr/bin/llvm-ranlib
+          sudo ln -sf /usr/bin/llvm-nm-$MAJOR_VERSION /usr/bin/llvm-nm
+          sudo ln -sf /usr/lib/llvm-$MAJOR_VERSION/lib/LLVMgold.so /usr/lib/bfd-plugins/LLVMgold.so
+          echo "AR=llvm-ar" >> $GITHUB_ENV
+          echo "RANLIB=llvm-ranlib" >> $GITHUB_ENV
+          echo "NM=llvm-nm" >> $GITHUB_ENV
+          VERSION_FILE="/usr/lib/llvm-$MAJOR_VERSION/include/llvm/Config/llvm-config.h"
+          if [ -f "$VERSION_FILE" ]; then   # cleanup version string
+            sudo sed -i -E 's/(\+[0-9a-f~exp]+[-[0-9a-f~exp\.]*)//g' "$VERSION_FILE"
+          fi
 
       - name: Install LLVM and Clang (Windows/MacOS)
         uses: KyleMayes/install-llvm-action@v2
@@ -165,7 +183,7 @@ jobs:
           cp ../README.md ../LICENSE .
           cp ../docs/{commands.md,configuration.md,extensions.md,keybindings.md} docs/
           if [[ "${{ matrix.platform }}" == "linux" ]]; then
-            tar -czf "endcord-$version-${{ matrix.platform }}.tar.gz" endcord $extra
+            # tar -czf "endcord-$version-${{ matrix.platform }}.tar.gz" endcord $extra
             tar -czf "endcord-lite-$version-${{ matrix.platform }}.tar.gz" endcord-lite $extra
           elif [[ "${{ matrix.platform }}" == "windows" ]]; then
             7z a "endcord-$version-${{ matrix.platform }}.zip" endcord.exe $extra
