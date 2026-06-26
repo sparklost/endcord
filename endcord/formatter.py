@@ -799,7 +799,7 @@ def replace_code_blocks(text, *ranges_lists):
 
 def replace_spoilers(line):
     """Replace spoiler: ||content|| with ACS_BOARD characters"""
-    for _ in range(10):   # lets have some limits
+    for _ in range(20):   # safety limit
         string_match = re.search(match_md_spoiler, line)
         if not string_match:
             break
@@ -863,7 +863,7 @@ def format_md_all(line, content_start, except_ranges):
     """
     line_format = []
     indexes = []
-    for _ in range(10):   # lets have some limits
+    for _ in range(20):   # safety limit
         line_content = line[content_start:]
         string_match = re.search(match_md_all, line_content)
         if not string_match:
@@ -886,7 +886,7 @@ def format_md_all(line, content_start, except_ranges):
             start_r = except_range[0]
             end_r = except_range[1]
             # if this match is inside excepted range
-            if (start > start_r and start < end_r) or (end > start_r and end < end_r):
+            if (start >= start_r and start <= end_r) or (end > start_r and end < end_r):
                 skip = True
                 break
         if skip:
@@ -1884,7 +1884,7 @@ class ChatGenerator:
             spoilers = [value for i, value in enumerate(spoilers) if i not in spoiled]   # exclude spoiled messages
 
         # find all markdown and correct format indexes
-        message_line, md_format, md_indexes = format_md_all(message_line, pre_content_len, chain(code_snippets, code_blocks, urls))
+        message_line, md_format, md_indexes = format_md_all(message_line, pre_content_len, code_snippets + code_blocks + urls)
         if md_indexes:
             move_by_indexes(
                 md_indexes,
@@ -1898,7 +1898,7 @@ class ChatGenerator:
                 timestamp_ranges,
                 embed_marker_ranges,
             )
-        message_line, escaped_indexes = replace_escaped_md(message_line, chain(code_snippets, code_blocks, urls))
+        message_line, escaped_indexes = replace_escaped_md(message_line, code_snippets + code_blocks + urls)
 
         # correct format indexes for removed markdown escape characters "\"
         if escaped_indexes:
@@ -3464,7 +3464,7 @@ def generate_message_notification(data, channels, roles, guild_name, my_data, co
     if data["content"]:
         body = replace_spoilers(data["content"])
         body, _ = replace_discord_emoji(body)
-        body, _ = replace_mentions(body, chain(data["mentions"], (my_data, )), global_name=use_global_name, use_nick=use_nick)
+        body, _ = replace_mentions(body, data["mentions"] + [my_data], global_name=use_global_name, use_nick=use_nick)
         body, _ = replace_roles(body, roles)
         body = replace_discord_url(body)
         body, _ = replace_channels(body, channels)

@@ -8,9 +8,9 @@ comment on nix endcord package pr
 
 RUST FREE:
 Add custom environment management through build.py - remove uv dependency
-Add --norust option to build script
-Add --minimal option to build script (removes numpy orjson soundcard)
+Add --minimal option to build script (removes numpy orjson soundcard soundfile)
 Write custom optimized json parser in cython - remove orjson dependency
+or Add --norust option to build script
 
 MISC:
 Fix sent audio is delayed and low quality
