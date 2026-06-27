@@ -165,7 +165,7 @@ def color_palette_internal(screen):
         x = 1
         y = 3
         for i in range(0, curses.COLORS):
-            screen.addstr(y, x, str(i) + " " * (3 - len(str(i))), curses.color_pair(i))
+            screen.addstr(y, x, "0" * (3 - len(str(i))) + str(i), curses.color_pair(i))
             x += 5
             if x + 3 > w:
                 y += 1

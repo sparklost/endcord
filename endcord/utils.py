@@ -119,6 +119,7 @@ def detect_runtime():
 
 def get_build_info(cythonized, uses_pgcurses, support_media, support_call):
     """Write build info string"""
+    import curses
     build_info = [detect_runtime()]
     if cythonized:
         build_info.append("cythonized")
@@ -133,7 +134,8 @@ def get_build_info(cythonized, uses_pgcurses, support_media, support_call):
     start = version.find("(++")
     if start >= 0:
         version = version[:start] + version[version.find(")", start):]
-    return f"Python {version}{custom_build} on {sys.platform}\n  Features: {", ".join(build_info)}"
+    curses_version = f"{curses.ncurses_version.major}.{curses.ncurses_version.minor}.{curses.ncurses_version.patch}"
+    return f"Python {version}{custom_build} on {sys.platform}\n  ncurses {curses_version}\n  Features: {", ".join(build_info)}"
 
 
 def remove_args(cmd, *args):

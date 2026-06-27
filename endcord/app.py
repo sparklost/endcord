@@ -8681,6 +8681,8 @@ class Endcord:
                     self.set_channel_seen(channel_id, new_message_ack["message_id"], ack=False, force=this_channel)
                     if this_channel:
                         self.update_status_line()
+                    else:
+                        self.update_status_line(status=False, title=False, tree=False)
                 else:
                     break
 

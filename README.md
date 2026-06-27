@@ -477,13 +477,6 @@ Additionally if built with nuitka, custom Python is compiled from source (prefer
 ### Running multiple endcord instances
 To run multiple endcord instances at the same time, while keeping them completely separated, run endcord with `ENDCORD_APP_NAME` environment variable set to something else. This will change "endcord" everywhere: in config and cache paths, notifications, keyring...
 
-### Some role colors are wrong
-This is an [issue](https://github.com/python/cpython/issues/119138) with cpython ncurses API. It is ignoring color pairs with ID larger than 255. This means only 255 color pairs can actually be used. Only role colors can reach this limit, because they are initialized last.
-This will be updated in endcord when cpython issue is resolved.
-
-### Status sign in tree has no color when selected or active
-Same reason as above, colors will be added when curses bug is fixed.  
-
 ### No emoji
 If emoji are drawn as empty box or similar, it means emoji are not supported by this terminal. In that case, enable `emoji_as_text` in `config.ini`.
 

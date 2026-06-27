@@ -223,9 +223,9 @@ Gateway returns error code 4000 if event "update presence" (opcode 3) is sent.
 
 
 ## Build steps for package maintainers
-1. Download and build custom python (optional)
+1. Download and build custom python with recent ncurses (optional)
 - Clang is optional everywhere, but it's recommended as it provides better binary.  
-- The entire process is done by `tools/build_python.sh`. to run it: `bash tools/build_python.sh 3.14.5 clang`.
+- The entire process is done by `tools/build_python.sh`. to run it: `bash tools/build_python.sh 3.14.5 clang curses v6_6_20251230`.
 - Python will be installed in `./.cpython/bin/python3.14`.
 - Once finished just configure venv to use `./.cpython/bin/python3.14`
 

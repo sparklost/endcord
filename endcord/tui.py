@@ -1365,6 +1365,8 @@ class TUI():
 
     def draw_subtitle_line(self):
         """Draw subtitle line, of no text then remove it"""
+        if self.disable_drawing:
+            return
         if not self.subtitle_txt.strip(" ").strip("─"):
             if self.win_subtitle_line:
                 del self.win_subtitle_line
@@ -1434,6 +1436,8 @@ class TUI():
 
     def draw_member_list_title(self, title_line, color=None, force=False):
         """Draw title above member list"""
+        if self.disable_drawing:
+            return
         if not self.win_member_list or self.member_list_width == 2 or not title_line or (not force and title_line == self.member_list_title_text):
             return
         self.member_list_title_text = title_line

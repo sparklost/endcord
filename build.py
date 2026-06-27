@@ -18,12 +18,12 @@ PYTHON_MAX_MINOR = 14
 PYTHON_FREETHREADED = 14
 PYTHON_LAST_SAFE = 13
 PYTHON_PATCH = 6
+CURSES_TAG = "v6_6_20251230"
 
 CUSTOM_CFLAGS = [
     "-DNDEBUG",
     "-g0",
     "-O3",
-    "-march=x86-64",
     "-mtune=generic",
     "-fno-semantic-interposition",
     "-fno-strict-overflow",
@@ -46,6 +46,9 @@ UNSAFE_FLAGS = [   # unsafe to use when building some libraries
 CFLAGS_OLD = os.environ.get("CFLAGS", "")
 CXXFLAGS_OLD = os.environ.get("CFLAGS", "")
 LDFLAGS_OLD = os.environ.get("CFLAGS", "")
+
+RED = "\033[1;31m"
+PURPLE = "\033[1;35m"
 
 if sys.platform.startswith("android"):
     sys.platform = "linux"
@@ -144,7 +147,7 @@ PKGVER = get_version_number()
 USE_COLOR = supports_color()
 
 
-def fprint(text, color_code="\033[1;35m", prepend=f"[{PKGNAME.capitalize()} Build Script]: "):
+def fprint(text, color_code=PURPLE, prepend=f"[{PKGNAME.capitalize()} Build Script]: "):
     """Print colored text prepended with text, default is light purple"""
     if USE_COLOR:
         print(f"{color_code}{prepend}{text}\033[0m", flush=True)
@@ -160,7 +163,7 @@ def check_python():
 
     if os.environ.get("UV", ""):
         if sys.version_info.minor < 12 or sys.version_info.minor > PYTHON_MAX_MINOR:
-            fprint(f'WARNING: Python {sys.version_info.major}.{sys.version_info.minor} is not supported but build may succeed. Run "python build.py" to let uv download and setup recommended temporary python interpreter.', color_code="\033[1;31m")
+            fprint(f'WARNING: Python {sys.version_info.major}.{sys.version_info.minor} is not supported but build may succeed. Run "python build.py" to let uv download and setup recommended temporary python interpreter.', color_code=RED)
         else:
             try:
                 version = subprocess.run(["uv", "--version"], capture_output=True, text=True, check=True)
@@ -170,9 +173,9 @@ def check_python():
             fprint(f"Using Python {get_nice_python_version()}")
         if not is_gil_enabled():
             if sys.version_info.minor == PYTHON_FREETHREADED:
-                fprint("WARNING: While endcord works with freethreaded python, final binary is much larger. Nutka doesnt yet support freethreaded python, so build is likely to fail.", color_code="\033[1;31m")
+                fprint("WARNING: While endcord works with freethreaded python, final binary is much larger. Nutka doesnt yet support freethreaded python, so build is likely to fail.", color_code=RED)
             else:
-                fprint(f'WARNING: Endcord is known to only build with freethreaded python version 3.{PYTHON_FREETHREADED}. Buil is likely to fail on other versions. Run "python build.py" to let uv download and setup recommended temporary python interpreter, optionally with flag "--freethreaded".', color_code="\033[1;31m")
+                fprint(f'WARNING: Endcord is known to only build with freethreaded python version 3.{PYTHON_FREETHREADED}. Buil is likely to fail on other versions. Run "python build.py" to let uv download and setup recommended temporary python interpreter, optionally with flag "--freethreaded".', color_code=RED)
         return False
 
     try:
@@ -209,6 +212,26 @@ def ensure_python(freethreaded, safe=False):
     subprocess.run(["uv", "python", "install", version], check=True)
 
     return version, have_freethreaded or freethreaded
+
+
+def check_patchelf():
+    """Patchelf is required for nuitka, so check early if its installed"""
+    if sys.platform != "linux":
+        return
+
+    patchelf_path = shutil.which("patchelf")
+    if not patchelf_path:
+        fprint("Patchelf is required for building with nuitka. Please install it first.", color_code=RED)
+        sys.exit(1)
+    try:
+        result = subprocess.run([patchelf_path, "--version"], capture_output=True, text=True, check=True)
+        output = result.stdout.strip().lower()
+        if not output.startswith("patchelf "):
+            return
+        if output.split(" ")[1].startswith("0.18."):
+            fprint("Patchelf version 0.18.0 is a known buggy release, nuitka will likely refuse to use it! Please upgrade or downgrade it.", color_code=RED)
+    except Exception:
+        pass
 
 
 def check_media_support():
@@ -262,7 +285,7 @@ def force_ujson():
     """Remove orjson and force installing ujson instead. WARNING: this modifies pyproject.toml"""
     try:
         subprocess.run(["uv", "remove", "orjson"], check=True, stderr=subprocess.DEVNULL)
-        fprint("Switching orjson -> ujson   !! pyproject.toml is modified !!", color_code="\033[1;31m")
+        fprint("Switching orjson -> ujson   !! pyproject.toml is modified !!", color_code=RED)
         subprocess.run(["uv", "add", "ujson"], check=True)
     except subprocess.CalledProcessError:
         pass
@@ -399,12 +422,14 @@ def compress_emoji():
 
 def toggle_experimental(check_only=False):
     """Toggle experimental mode"""
+    whitelist = ("endcord" + os.sep, "endcord_cython" + os.sep)
     file_list = []
     for path, subdirs, files in os.walk(os.getcwd()):
         subdirs[:] = [d for d in subdirs if not d.startswith(".")]
         for name in files:
             file_path = os.path.join(path, name)
-            if not name.startswith(".") and (file_path.endswith(".py") or file_path.endswith(".pyx")):
+            file_relpath = os.path.relpath(file_path)
+            if not name.startswith(".") and (file_path.endswith(".py") or file_path.endswith(".pyx")) and any(x in file_relpath for x in whitelist):
                 file_list.append(file_path)
     enable = False
     for path in file_list:
@@ -521,7 +546,7 @@ def setup_compiler(clang, clear=False, overwrite=False, cflags=[], ldflags=[], c
     return cflags, cxxflags, ldflags
 
 
-def ensure_custom_python(safe, clang):
+def ensure_custom_python(safe, clang, curses):
     """Check if current python is custom built, setup env or build it if not"""
     minor = PYTHON_LAST_SAFE if safe else PYTHON_MAX_MINOR
     version = f"3.{minor}.{PYTHON_PATCH}"
@@ -537,14 +562,15 @@ def ensure_custom_python(safe, clang):
         os.execvp("uv", ["uv", "run", *sys.argv])
         sys.exit(0)
     else:
-        build_custom_python(version, clang)
+        build_custom_python(version, clang, curses)
 
 
-def build_custom_python(version, clang):
+def build_custom_python(version, clang, curses):
     """Build custom Pyhon in .cpython dir"""
     fprint("Building custom Python")
-    setup_compiler(clang, clear=True)
-    cmd = ["/bin/bash", "tools/build_python.sh", version, "clang"]
+    cmd = ["/bin/bash", "tools/build_python.sh", version, "clang" if clang else "None", "curses" if curses else "None"]
+    if CURSES_TAG:
+        cmd.append(CURSES_TAG)
     process = subprocess.Popen(
         cmd,
         stdout=subprocess.PIPE,
@@ -554,11 +580,18 @@ def build_custom_python(version, clang):
     )
     line = None
     first = True
+    built_curses = not curses
     for line in process.stdout:
-        # print(line.strip(), flush=True)
         if len(line) > 100:
             continue
-        if "Resolving www.python.org" in line:
+        if line.startswith("Building curses"):
+            print(line.strip().replace("_", "."))
+        if line.startswith("Building Python"):
+            built_curses = True
+            print(line.strip())
+        if not built_curses:
+            continue
+        elif "Resolving www.python.org" in line:
             print("Downloading Python source", flush=True)
         elif "checking build system type" in line:
             print("Configuring build system", flush=True)
@@ -570,7 +603,6 @@ def build_custom_python(version, clang):
             first = False
             print("Rebuilding with profile guided optimizations", flush=True)
     process.wait()
-    setup_compiler(clang, clear=True)
     if process.returncode != 0:
         if line:
             print(line.strip(), flush=True)
@@ -942,7 +974,7 @@ def parser():
     parser.add_argument(
         "--print-cmd",
         action="store_true",
-        help="print build command for nuitka or pyinstaller and exit",
+        help="print build command for nuitka or pyinstaller and exit, without configuring any environment",
     )
     parser.add_argument(
         "--build-licenses",
@@ -955,6 +987,10 @@ def parser():
 if __name__ == "__main__":
     args = parser()
     clang = not (args.noclang or args.mingw)
+    compile_deps = not args.nocompile_deps
+
+    if args.nuitka:
+        check_patchelf()
 
     if args.print_cmd:
         if args.nuitka:
@@ -964,7 +1000,7 @@ if __name__ == "__main__":
         sys.exit(0)
 
     if args.custom_python:
-        ensure_custom_python(args.safe, clang)
+        ensure_custom_python(args.safe, clang, compile_deps)
 
     if check_python():
         version, freethreaded = ensure_python(args.freethreaded, args.safe)
@@ -1021,7 +1057,7 @@ if __name__ == "__main__":
 
     if not args.nobuild:
         if args.nuitka:
-            build_with_nuitka(args.onedir, clang, args.mingw, args.nosoundcard, not(args.nocompile_deps), experimental=experimental)
+            build_with_nuitka(args.onedir, clang, args.mingw, args.nosoundcard, compile_deps, experimental=experimental)
         else:
             build_with_pyinstaller(args.onedir, args.nosoundcard)
 
