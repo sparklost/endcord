@@ -53,7 +53,7 @@ def get_key(screen, backspace_code=127):
             if sequence.startswith("\x1b[<") and (sequence.endswith("m") or sequence.endswith("M")):
                 clicked = sequence.endswith("M")
                 try:
-                    button_str, x_str, y_str = sequence[3:-1].split(";")
+                    button_str, x_str, y_str = sequence.split("\x1b[<")[-1][:-1].split(";")
                     return (int(y_str) - 1, int(x_str) - 1, int(button_str), clicked)
                 except (ValueError, IndexError):
                     return -1

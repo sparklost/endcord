@@ -143,7 +143,6 @@ def read_key():
     first = os.read(fd, 1)
     if not first:
         return None
-    return repr(first)
 
     # backspace
     if first == b"\x7f":

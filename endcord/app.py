@@ -6938,7 +6938,7 @@ class Endcord:
 
         # get selected tree entry id so it can "stick" to DM when it moves
         tree_sel = self.tui.get_tree_selected()
-        if tree_sel > -1 and self.tree_metadata[tree_sel]["type"] in (1, 3):
+        if tree_sel > -1 and tree_sel < len(self.tree_metadata) and self.tree_metadata[tree_sel] and self.tree_metadata[tree_sel]["type"] in (1, 3):
             selected_id = self.tree_metadata[tree_sel]["id"]
         else:
             selected_id = None

@@ -842,7 +842,7 @@ class TerminalMedia():
         """Handle input from user"""
         while self.run:
             key = terminal_utils.read_key()
-            if key == 27:   # ESCAPE
+            if key == "ESC":
                 self.control_codes(100)
                 self.run = False
             elif key in self.keybindings["media_pause"]:
