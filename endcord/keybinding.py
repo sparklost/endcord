@@ -17,7 +17,7 @@ MESSAGE = """ Press key combination, its code will be printed in terminal.
  Ctrl+C to exit."""
 
 ARROW_MAP = {"A": "UP", "B": "DOWN", "C": "RIGHT", "D": "LEFT"}
-MODIFIER_MAP = (None, None, "S", "M", "M-S", "C", None, None)
+MODIFIER_MAP = (None, None, "S", "M", "M-S", "C", "C-S", None)
 
 
 def get_key(screen, backspace_code=127):
@@ -79,17 +79,17 @@ def get_key(screen, backspace_code=127):
                         return f"{modifier}-DEL"
                 return "DEL"
 
-            # terminal focus and bracket pasting
+            # misc
             if sequence == "\x1b[I":
                 return "FOCUS_IN"
             if sequence == "\x1b[O":
                 return "FOCUS_OUT"
-            if sequence == "\x1b[200~":
-                return "PASTE_START"
-            if sequence == "\x1b[201~":
-                return "PASTE_END"
             if sequence == "\x1b\n":
                 return "M-ENTER"
+
+            # bracket paste
+            if sequence.startswith("\x1b[200~") and sequence.endswith("\x1b[201~"):
+                return f"PASTE {sequence[6:-6]}"
 
             # 2-byte escape sequences
             if len(sequence_list) == 2:
@@ -257,13 +257,11 @@ def get_key_fallback(screen, backspace_code=127):
             screen.nodelay(False)
             return "ESC"
         sequence_list = [27, ch]
-        while ch != -1:   # -1 means no key is pressed, 126 is end of escape sequence
+        while True:
             ch = get_key_code(screen)
             if ch == -1:
                 break
             sequence_list.append(ch)
-            if ch == 126 or ch == 27:
-                break
         screen.nodelay(False)
         if len(sequence_list) == 2:
             payload = sequence_list[1]
@@ -286,10 +284,8 @@ def get_key_fallback(screen, backspace_code=127):
                 if char.isupper():
                     return f"M-S-{char.lower()}"
                 return f"M-{char}"
-        if sequence_list == [27, 91, 50, 48, 48, 126]:   # bracket paste start
-            return "PASTE_START"
-        if sequence_list == [27, 91, 50, 48, 49, 126]:   # bracket paste end
-            return "PASTE_END"
+        if sequence_list[:6] == [27, 91, 50, 48, 48, 126]:   # bracket paste
+            return f"PASTE {"".join(chr(b) for b in sequence_list[6:-6])}"
         if sequence_list[-1] == 27:   # holding escape key
             return "ESC"
         return "ESC"
@@ -458,6 +454,8 @@ def picker_internal(screen, keybindings, command_bindings, fallback):
     curses.use_default_colors()
     curses.curs_set(0)
     curses.init_pair(1, -1, -1)
+    sys.stdout.write("\x1b[?2004h")
+    sys.stdout.flush()
     curses.mousemask(curses.ALL_MOUSE_EVENTS | curses.REPORT_MOUSE_POSITION)
     if sys.platform == "win32":
         fallback = True

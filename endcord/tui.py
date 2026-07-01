@@ -329,7 +329,6 @@ class TUI():
         self.cursor_pos = 0   # on-screen position of cursor
         self.cursor_on = True
         self.enable_autocomplete = False
-        self.bracket_paste = False
         self.spelling_range = [0, 0]
         self.misspelled = []
         self.delta_store = []
@@ -2317,7 +2316,7 @@ class TUI():
 
     def spellcheck(self):
         """Spellcheck words visible on screen"""
-        if not self.input_buffer or self.enable_autocomplete or self.bracket_paste:
+        if not self.input_buffer or self.enable_autocomplete:
             return
         w = self.input_hw[1]
         line_start = max(0, len(self.input_buffer) - w + 1 - self.input_line_index)
@@ -2588,7 +2587,6 @@ class TUI():
             self.last_key = None
             self.delta_cache = ""
             self.undo_index = None
-        self.bracket_paste = False
         selected_completion = 0
         self.keybinding_chain = None
         key = -1
@@ -2625,11 +2623,10 @@ class TUI():
                     selected_completion = 0
                 self.add_to_delta_store(key)
                 self.show_cursor()
-                if self.assist and not self.bracket_paste:
+                if self.assist:
                     if key in ASSIST_TRIGGERS:
                         self.assist_start = self.input_index
-                if not self.bracket_paste:
-                    self.spellcheck()
+                self.spellcheck()
                 self.cursor_pos = self.input_index - max(0, len(self.input_buffer) - w + 1 - self.input_line_index)
                 self.cursor_pos = max(self.cursor_pos, 0)
                 self.cursor_pos = min(w - 1, self.cursor_pos)
@@ -2656,6 +2653,9 @@ class TUI():
                 key = f"{self.keybinding_chain} {"SPC" if key == " " else key}"
                 self.keybinding_chain = None
 
+            if key.startswith("PASTE"):
+                self.paste_text(key[6:])
+
             key = self.key_map.get(key, key)
 
             # special keys
@@ -2668,23 +2668,7 @@ class TUI():
                     return self.return_input_code(26)
                 return self.return_input_code(5)
 
-            if key == keybinding.KEY_PASTE_START:
-                self.bracket_paste = True
-                self.misspelled = []
-                continue
-            elif key == keybinding.KEY_PASTE_END:
-                self.bracket_paste = False
-                self.spellcheck()
-                self.draw_input_line()
-                continue
-
-            elif key == keybinding.KEY_ENTER and self.bracket_paste:
-                # when pasting, dont return, but insert newline character
-                self.input_buffer = self.input_buffer[:self.input_index] + "\n" + self.input_buffer[self.input_index:]
-                self.input_index += 1
-                self.add_to_delta_store("\n")
-
-            elif key == keybinding.KEY_RESIZE:
+            if key == keybinding.KEY_RESIZE:
                 self.resize()
                 _, w = self.input_hw
             elif key == keybinding.KEY_FOCUS_IN:

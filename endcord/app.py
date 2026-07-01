@@ -156,7 +156,7 @@ class Endcord:
         self.notifications_pfp = config["notifications_pfp"]
         self.silence_threshold = config["call_silence_threshold"]
         self.font_ratio = config["media_font_aspect_ratio"]
-        self.inline_media = config["inline_media"] and support_media and sys.platform != "win32"
+        self.inline_media = config["inline_media"] and importlib.util.find_spec("PIL") is not None and sys.platform != "win32"
         self.placeholder_emoji = False   # for extensions
         self.placeholder_images = self.inline_media   # keeping this separated so extension can toggle it
 
