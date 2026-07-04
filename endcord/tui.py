@@ -65,7 +65,7 @@ def set_list_item(input_list, item, index):
 
 
 def trim_with_dash(text, dash=True):
-    """Trim spaces from a line and add '─' if there were spaces prepended"""
+    """Trim spaces from a line and add '─' if there were spaces prefixed"""
     if dash and text and text[0] == " ":
         return "─" + text.strip()
     return text.strip()

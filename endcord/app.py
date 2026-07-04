@@ -160,6 +160,7 @@ class Endcord:
         self.inline_media = config["inline_media"] and importlib.util.find_spec("PIL") is not None and sys.platform != "win32"
         self.placeholder_emoji = False   # for extensions
         self.placeholder_images = self.inline_media   # keeping this separated so extension can toggle it
+        self.premium_override_commands = []   # for extensions
 
         if not self.font_ratio:
             self.font_w, self.font_h = terminal_utils.get_font_size()
@@ -4713,7 +4714,7 @@ class Endcord:
                     urls.append(embed["url"])
         if stickers:
             for sticker in self.messages[msg_index]["stickers"]:
-                sticker_url = discord.get_sticker_url(sticker)
+                sticker_url = self.discord.get_sticker_url(sticker)
                 if sticker_url:
                     urls.append(sticker_url)
         return urls
@@ -5832,7 +5833,7 @@ class Endcord:
         self.remove_running_task("Searching", 4)
 
 
-    def assist(self, assist_word, assist_type, query_results=None):
+    def assist(self, assist_word, assist_type, query_results=None, input_context=None):
         """Generate and show various assists when typing"""
         self.assist_type = assist_type
         self.assist_found = []
@@ -5900,11 +5901,12 @@ class Endcord:
 
 
         elif assist_type == 3:   # emoji
+            premium_override = input_context and input_context.split(" ")[0] in self.premium_override_commands
             self.assist_found = search.search_emojis(
                 self.gateway.get_emojis(),
                 self.discord.get_settings_proto(2).get("favorite_emojis", {}).get("emojis", []),
                 self.state["favorite_emojis"],
-                self.premium,
+                self.premium or premium_override,
                 self.active_channel["guild_id"],
                 assist_word,
                 safe_emoji=self.emoji_as_text,
@@ -5920,6 +5922,7 @@ class Endcord:
                     extra_format.append(None)
 
         elif assist_type == 4:   # sticker
+            premium_override = input_context and input_context.split(" ")[0] in self.premium_override_commands
             if self.config["default_stickers"]:
                 default_stickers = self.discord.get_stickers()
             else:
@@ -5927,7 +5930,7 @@ class Endcord:
             self.assist_found = search.search_stickers(
                 self.gateway.get_stickers(),
                 default_stickers,
-                self.premium,
+                self.premium or premium_override,
                 self.active_channel["guild_id"],
                 assist_word,
                 limit=self.assist_limit,
@@ -9010,7 +9013,7 @@ class Endcord:
                 elif assist_word != self.assist_word:
                     if self.search_gif:
                         assist_type = 8
-                    self.assist(assist_word, assist_type)
+                    self.assist(assist_word, assist_type, input_context=(self.tui.input_buffer if self.command else None))
             elif assist_type == 7 and assist_word != self.assist_word:   # path
                 if self.search_gif:
                     self.assist(assist_word, 8)

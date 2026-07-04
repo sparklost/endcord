@@ -300,7 +300,7 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
  - `app_string = "- (%app)"`  
     A string that replaces `%app` in the message format when the message is sent from app or webhook.
 - `quote_character = "║"`  
-    A character that is prepended to each line of single or multiline quote.
+    A character that is prefixed to each line of single or multiline quote.
 - `scrollbar_character = "┃"`  
     A character used to draw scrollbar on the right side of the chat.
 - `reactions_separator = " "`  
@@ -344,7 +344,7 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
 - `tree_drop_down_voice = "○"`  
     A single character used to draw voice channel pointer in tree drop down menus.
 - `tree_dm_status = "●"`  
-    A single character prepended to DM name in tree drop down, to indicate status: online/away/dnd. Also used in member list.
+    A single character prefixed to DM name in tree drop down, to indicate status: online/away/dnd. Also used in member list.
 - `border_corners = "╭╰╮╯"`  
     Characters used to draw corners in bordered mode.
 - `activity_icons = "🎮︎📺︎♪📺︎🎮︎"`  

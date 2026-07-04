@@ -25,7 +25,7 @@ def generate_timestamp(timestamp, timestamp_format, unix=False):
 
 
 def quote(text):
-    """Prepend '> ' to text and to each newline"""
+    """prefix '> ' to text and to each newline"""
     return f"> {text.replace("\n", "\n> ")}"
 
 

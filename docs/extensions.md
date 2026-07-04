@@ -26,7 +26,7 @@ Extensions are loaded in alphanumeric order, and in some cases it can matter bec
 
 ### Settings
 Extensions can access settings loaded from main settings - `config.ini` in config directory.  
-Extensions settings must always be in form: `ext_extension_name_setting_name` - starts with `ext_`, followed by lowercase extension name and then custom setting name. Extension name should be same as repo name, use underscore instead dash, and remove prepended "endcord".  
+Extensions settings must always be in form: `ext_extension_name_setting_name` - starts with `ext_`, followed by lowercase extension name and then custom setting name. Extension name should be same as repo name, use underscore instead dash, and remove prefixed "endcord".  
 Settings can be accessed in extension as `app.settings` in extensions `__init__`, it is a dict so do `app.settings.get("ext_extension_name_setting_name", "default_value")`.  
 
 ### Forced build-time disable
@@ -35,7 +35,7 @@ But extension can modify almost everything in endcord, and can even access all t
 To prevent extension injection (malware can modify endcord config to enable extensions and inject extension in extensions directory) - which is very unlikely, there is build script option: `--disable-extensions` which disables extension loading in the code itself, overriding config.  
 
 ### Extension search and publishing
-It is recommended to use `endcord-extension` tag on github and other git hosting services for easier extension search. Repo name should be prepended with `endcord` eg. `endcord-your-extension-name`.  
+It is recommended to use `endcord-extension` tag on github and other git hosting services for easier extension search. Repo name should be prefixed with `endcord` eg. `endcord-your-extension-name`.  
 
 ### Logging
 Extensions can add log entries at any level and will have their name in the module name section of log entry.  
@@ -165,7 +165,7 @@ See [Example dependency installer](#example-dependency-installer), it is enough 
 
 
 ## Creating bots
-1. First of all, bot has to have `Bot ` prepended to its token.  
+1. First of all, bot has to have `Bot ` prefixed to its token.  
 2. It is recommended to set bot intents value in the config `capabilities` option. Default is `50364033` which allows basic chat features.  
 Refer to [this](https://docs.discord.com/developers/events/gateway#gateway-intents) for more info on intents.  
 4. Next step is to register application commands.  

@@ -147,12 +147,12 @@ PKGVER = get_version_number()
 USE_COLOR = supports_color()
 
 
-def fprint(text, color_code=PURPLE, prepend=f"[{PKGNAME.capitalize()} Build Script]: "):
-    """Print colored text prepended with text, default is light purple"""
+def fprint(text, color_code=PURPLE, prefix=f"[{PKGNAME.capitalize()} Build Script]: "):
+    """Print colored text prefixed with text, default is light purple"""
     if USE_COLOR:
-        print(f"{color_code}{prepend}{text}\033[0m", flush=True)
+        print(f"{color_code}{prefix}{text}\033[0m", flush=True)
     else:
-        print(f"{prepend}{text}", flush=True)
+        print(f"{prefix}{text}", flush=True)
 
 
 def check_python():

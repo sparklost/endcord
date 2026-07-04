@@ -73,18 +73,6 @@ def log_api_error(data, status, function_name):
     logger.warning(text)
 
 
-def get_sticker_url(sticker):
-    """Generate sticker download url from its type and id, lottie stickers will return None"""
-    sticker_type = sticker["format_type"]
-    if sticker_type == 1:   # png - downloaded as webp
-        return f"https://{DYN_DISCORD_CDN_HOST}/stickers/{sticker["id"]}.webp"
-    if sticker_type == 2:   # apng
-        return f"https://{DYN_DISCORD_CDN_HOST}/stickers/{sticker["id"]}.png"
-    if sticker_type == 4:   # gif
-        return f"https://{DYN_DISCORD_CDN_HOST}/stickers/{sticker["id"]}.gif"
-    return None   # lottie
-
-
 def generate_nonce():
     """Generate nonce string - current UTC time as discord snowflake"""
     return str((int(time.time() * 1000) - DISCORD_EPOCH * 1000) << 22)
@@ -124,9 +112,11 @@ class Discord():
                 self.host = host_obj.path
             host_netloc = self.host.lstrip("api.")
             self.cdn_host = f"cdn.{host_netloc}"
+            self.dyn_cdn_host = self.cdn_host
         else:
             self.host = DISCORD_HOST
             self.cdn_host = DISCORD_CDN_HOST
+            self.dyn_cdn_host = DYN_DISCORD_CDN_HOST
         logger.debug(f"Endpoints: API={self.host}, CDN={self.cdn_host}")
         self.token = token
         self.header = {
@@ -169,6 +159,18 @@ class Discord():
         self.voice_regions = []
         self.ranked_voice_regions = []
         self.attachment_id = 1
+
+
+    def get_sticker_url(self, sticker):
+        """Generate sticker download url from its type and id, lottie stickers will return None"""
+        sticker_type = sticker["format_type"]
+        if sticker_type == 1:   # png - downloaded as webp
+            return f"https://{self.dyn_cdn_host}/stickers/{sticker["id"]}.webp"
+        if sticker_type == 2:   # apng
+            return f"https://{self.dyn_cdn_host}/stickers/{sticker["id"]}.png"
+        if sticker_type == 4:   # gif
+            return f"https://{self.dyn_cdn_host}/stickers/{sticker["id"]}.gif"
+        return None   # lottie
 
 
     def check_expired_attachment_url(self, url):

@@ -1,4 +1,4 @@
-<div align="center">
+prefix<div align="center">
 <h1>Endcord</h1>
 <a href="https://github.com/sparklost/endcord?tab=readme-ov-file#features">Features</a> |
 <a href="https://github.com/sparklost/endcord/blob/main/.github/screenshots.md">Screenshots</a> |
@@ -46,7 +46,7 @@ Any third party endcord forks may add features that can lead to account ban, con
     - Show channels with mention as red with number of mentions
     - Collapse categories and servers
     - DMs in separate drop-down, show DM status
-    - Forums, imageborads and threadsthread channels 
+    - Forums, imageborads and threadsthread channels
     - Folders with custom naming
 - Show reactions, replied message, forwarded message
 - Show embeds, attachment types and links, code blocks
@@ -194,7 +194,7 @@ Popup window is drawn for viewing:
 `Alt+Enter` in member list will show user profile of the selected member.  
 
 ### Assist with mention, role, channel, emoji, sticker
-When typing eg. username prepended with `@`, assist will open as popup window with search results for typed text after `@` (search is case-insensitive).  
+When typing eg. username prefixed with `@`, assist will open as popup window with search results for typed text after `@` (search is case-insensitive).  
 Assist triggers are (the first character): `@username`, `@role`, `#channel`, `:emoji:`, `;sticker;`.  
 Press `Esc` to stop assist. Re-type trigger to start it again.  
 Navigation: `Alt+Up/Down` - Go up/down, `Alt+Enter` or `Enter` - insert selected item.  
@@ -204,10 +204,10 @@ Emoji assist has special feature: type `:**` to search all favorited emojis.
 
 ### Adding/Removing reactions
 To start reaction assist, press `Alt+E`.  
-Then type emoji name prepended with `:`, just like with regular assist then enter.  
+Then type emoji name prefixed with `:`, just like with regular assist then enter.  
 If reaction is already present it will be +1. Reaction is removed if current account already reacted (reactions are toggled).  
 To add/remove one of already present reactions, only type its index (starts from 1).  
-If this account reacted to the message, that reaction will have `*` prepended to reaction count.  
+If this account reacted to the message, that reaction will have `*` prefixed to reaction count.  
 
 ### Escape key priority order
 Stop recording, close popup window, stop replying, everything else.

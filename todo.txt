@@ -23,8 +23,7 @@ Video, stage and stream calls
 Localization
 
 EXTENSIONS:
-endcord-custom-emoji
+endcord-image-pfp
 endcord-undelete
 endcord-message-replace
-endcord-image-pfp
 endcord-kitty-media
