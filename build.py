@@ -148,10 +148,11 @@ def supports_color():
 
 build_config = load_build_config()
 
-PYTHON_MAX_MINOR = build_config.get("python_max", "3.14.6").split(".")[1]
-PYTHON_PATCH = build_config.get("python_max", "3.14.6").split(".")[2]
-PYTHON_FREETHREADED = build_config.get("python_freethreaded", "3.14").split(".")[1]
-PYTHON_LAST_SAFE = build_config.get("python_last_safe", "3.13").split(".")[1]
+PYTHON_MAJOR = int(build_config.get("python_max", "3.14.6").split(".")[0])
+PYTHON_MAX_MINOR = int(build_config.get("python_max", "3.14.6").split(".")[1])
+PYTHON_PATCH = int(build_config.get("python_max", "3.14.6").split(".")[2])
+PYTHON_FREETHREADED = int(build_config.get("python_freethreaded", "3.14").split(".")[1])
+PYTHON_LAST_SAFE = int(build_config.get("python_last_safe", "3.13").split(".")[1])
 CURSES_TAG = build_config.get("curses_tag", "v6_6_20260627")
 PKGNAME = get_app_name()
 PKGVER = get_version_number()
@@ -212,11 +213,11 @@ def ensure_python(freethreaded, safe=False):
         return None, have_freethreaded
 
     if freethreaded:
-        version = f"3.{PYTHON_FREETHREADED}+freethreaded"
+        version = f"{PYTHON_MAJOR}.{PYTHON_FREETHREADED}+freethreaded"
     else:
-        version = f"3.{selected_version}"
+        version = f"{PYTHON_MAJOR}.{selected_version}"
         # ensure there is no same-name freethreaded python
-        subprocess.run(["uv", "python", "uninstall", f"3.{minor}+freethreaded"], check=False)
+        subprocess.run(["uv", "python", "uninstall", f"{PYTHON_MAJOR}.{minor}+freethreaded"], check=False)
 
     freethreaded_string = "freethreaded " if freethreaded else ""
     fprint(f"Setting up {freethreaded_string}python {version} for this project")
@@ -560,16 +561,16 @@ def setup_compiler(clang, clear=False, overwrite=False, cflags=[], ldflags=[], c
 def ensure_custom_python(safe, clang, curses):
     """Check if current python is custom built, setup env or build it if not"""
     minor = PYTHON_LAST_SAFE if safe else PYTHON_MAX_MINOR
-    version = f"3.{minor}.{PYTHON_PATCH}"
+    version = f"{PYTHON_MAJOR}.{minor}.{PYTHON_PATCH}"
     if importlib.util.find_spec("_bz2") is None:
         return
-    if os.path.exists(".cpython") and os.path.exists(f".cpython/bin/python3.{version.split(".")[1]}"):
+    if os.path.exists(".cpython") and os.path.exists(f".cpython/bin/python{PYTHON_MAJOR}.{version.split(".")[1]}"):
         if os.environ.get("UV", ""):
             if os.environ.get("_CUSTOM_PYTHON_CHECKED"):
                 fprint("Failed starting custom python build, delete .cpython dir and try again")
                 sys.exit(1)
             os.environ["_CUSTOM_PYTHON_CHECKED"] = "1"
-            subprocess.run(["uv", "venv", "--clear", "--python", f".cpython/bin/python3.{minor}"], check=True)
+            subprocess.run(["uv", "venv", "--clear", "--python", f".cpython/bin/python{PYTHON_MAJOR}.{minor}"], check=True)
         os.execvp("uv", ["uv", "run", *sys.argv])
         sys.exit(0)
     else:
