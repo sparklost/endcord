@@ -139,9 +139,14 @@ jobs:
         shell: bash
         run: |
           chmod +x ./tools/build_python.sh
+          CURSES_VERSION=$(sed -n '/^\[build\]/,/^\[/p' pyproject.toml | grep '^curses_tag' | cut -d '"' -f 2)
+          if [ -z "$CURSES_VERSION" ]; then
+            echo "Error: Could not extract curses_tag from pyproject.toml"
+            exit 1
+          fi
           args=("${{ matrix.python-version }}")
           [[ "${{ matrix.clang }}" == "true" ]] && args+=("clang")
-          ./tools/build_python.sh "${args[@]}" curses v6_6_20260627
+          ./tools/build_python.sh "${args[@]}" curses "$CURSES_VERSION"
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7

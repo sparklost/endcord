@@ -299,7 +299,7 @@ class Gateway():
 
 
     def stop(self):
-        """Stop gatway"""
+        """Stop gateway"""
         self.run = False
         self.stop_event.set()
         self.disconnect_ws()
@@ -321,7 +321,7 @@ class Gateway():
     def connect(self):
         """Create initial connection to Discord gateway"""
         try:
-            header = {"Authorization": self.token, "Priority": "u=1", "User-Agent": self.user_agent}
+            header = {"Priority": "u=1", "User-Agent": self.user_agent}
             connection = peripherals.get_connection(self.host, timeout=3, proxy=None)
             connection.request("GET", "/api/v9/gateway", headers=header)   # subscribe works differently in v10
         except (socket.gaierror, TimeoutError, ConnectionResetError):
