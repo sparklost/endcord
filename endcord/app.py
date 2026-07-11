@@ -6377,15 +6377,16 @@ class Endcord:
 
     def cache_deleted(self):
         """Cache all deleted messages from current channel"""
-        if not self.active_channel["channel_id"]:
+        channel_id = self.active_channel["channel_id"]
+        if not channel_id:
             return
         for channel in self.deleted_cache:
-            if channel["channel_id"] == self.active_channel["channel_id"]:
+            if channel["channel_id"] == channel_id:
                 this_channel_cache = channel["messages"]
                 break
         else:
             self.deleted_cache.append({
-                "channel_id": self.active_channel["channel_id"],
+                "channel_id": channel_id,
                 "messages": [],
             })
             this_channel_cache = self.deleted_cache[-1]["messages"]
@@ -6402,8 +6403,9 @@ class Endcord:
 
     def restore_deleted(self, messages):
         """Restore all cached deleted messages for this channels in the correct position"""
+        channel_id = self.active_channel["channel_id"]
         for channel in self.deleted_cache:
-            if channel["channel_id"] == self.active_channel["channel_id"]:
+            if channel["channel_id"] == channel_id:
                 this_channel_cache = channel["messages"]
                 break
         else:

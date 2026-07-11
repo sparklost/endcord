@@ -159,7 +159,7 @@ class Gateway():
 
     def create_udp_socket(self):
         """Create udp soocket to the server"""
-        if self.proxy.scheme:
+        if self.proxy:
             if self.proxy.startswith("socks"):
                 self.udp = socks.Socks5UDPSocket(self.proxy)
             else:

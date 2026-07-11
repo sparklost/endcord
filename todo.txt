@@ -18,6 +18,5 @@ Video, stage and stream calls
 Localization
 
 endcord-image-pfp
-endcord-undelete
 endcord-message-replace
 endcord-kitty-media
