@@ -182,6 +182,7 @@ theme = {
     "color_prompt": [255, -1],
     "color_input_line": [255, -1],
     "color_cursor": [233, 255],
+    "color_scrollbar": [-1, -1],
     "color_misspelled": [222, -1],
     "color_tree_default": [255, -1],
     "color_tree_category": [153, -1],

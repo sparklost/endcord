@@ -653,7 +653,7 @@ class Gateway():
                     else:
                         names += f"{recipient["username"]}"
             if names:
-                name = f"{owner_name}; {names.strip(", ")}"
+                name = f"{owner_name}; {names.removesuffix(", ")}"
             else:
                 name = f"{owner_name}'s Group"
         elif recipients:   # regular DM

@@ -8290,11 +8290,8 @@ class Endcord:
             cache_path = os.path.join(os.path.expanduser(peripherals.cache_path), "pfp")
             if not os.path.exists(cache_path):
                 os.makedirs(cache_path)
-            for file_name in os.listdir(cache_path):
-                avatar_path = os.path.join(cache_path, file_name)
-                if os.path.isfile(avatar_path) and os.path.splitext(file_name)[0].strip("_round") == avatar_id:
-                    break
-            else:   # download to cache
+            avatar_path = utils.search_pfp_cache(cache_path, f"{avatar_id}*", avatar_id)
+            if not avatar_path:
                 if self.notifications_pfp != 1:
                     avatar_path = self.discord.get_pfp(data["user_id"], avatar_id, size=self.notifications_pfp, save_path=cache_path)
                 else:

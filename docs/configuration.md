@@ -171,7 +171,7 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
 - `downloads_path = None`  
     Path to custom downloads directory. Set to `None` to use system default.
 - `notifications_pfp = True`  
-    Whether to include profile pictures in notifications.   
+    Whether to include profile pictures in notifications.  
     If enabled will slightly delay notification if picture is being downloaded. Pictures are cached in system default cache dir.  
     Set to number to change maximum picture resolution, eg. `notifications_pfp = 128` will always download image with resolution 128x128 or worse.
 - `linux_notification_sound = "message"`  
@@ -431,6 +431,8 @@ Every next list has additional `start` and `end`- indexes on a line where color 
     Base color for input line.
 - `color_cursor = [233, 255]`  
     Color for cursor in input line.
+- `color_scrollbar = [-1, -1]`
+    Color for scrollbars.
 - `color_misspelled = [222, -1]`  
     Color for misspelled words in input line.
 - `color_tree_default = [255, -1]`  

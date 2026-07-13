@@ -359,6 +359,17 @@ def complete_path(path, separator=True):
     return sorted(completions)
 
 
+def search_pfp_cache(cache_path, search_patter, target_id):
+    """Search for specified pfp in cache"""
+    search_pattern = os.path.join(cache_path, search_patter)
+    for path in glob.iglob(search_pattern):
+        if os.path.isfile(path):
+            file_name = os.path.basename(path)
+            stem = os.path.splitext(file_name)[0]
+            if stem.removesuffix("_round") == target_id:
+                return path
+
+
 def json_array_objects(stream):
     """Stream a json array from a file like object. Yield one parsed object at a time without loading full json into memory"""
     # replaces ijson.items(data, "item")

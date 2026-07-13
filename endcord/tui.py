@@ -218,7 +218,7 @@ class TUI():
         self.last_free_id = 1   # last free color pair id
         self.color_pairs = {}
         self.attrib_map = [0]   # has 0 so its index starts from 1 to be matched with color pairs
-        self.protected_colors = 25   # first N colors that must not be reused
+        self.protected_colors = 26   # first N colors that must not be reused
         self.init_pair((255, -1))   # white on default
         self.init_pair((233, 255))   # black on white
         self.init_pair(config["color_tree_default"])   # 3
@@ -244,6 +244,7 @@ class TUI():
         self.init_pair(config["color_subtitle_line"])
         self.init_pair(config["color_tree_category"])   # 24
         self.init_pair(config["color_tree_server"])
+        self.init_pair(config["color_scrollbar"])
         curses.init_pair(255, config["color_default"][0], config["color_default"][1])   # temporary
         self.default_color = 255
         self.tree_unread_inherit_color = config["color_tree_unseen"][0] == -2 and config["color_tree_unseen"][1] == -2
@@ -281,6 +282,7 @@ class TUI():
         self.corner_dr = config["border_corners"][3]
         self.have_scrollbar = config["draw_scrollbar"] and self.bordered
         self.scrollbar_char = config["scrollbar_character"]
+        self.fine_scrollbar = self.scrollbar_char == "┃" and config["color_scrollbar"] == [-1, -1]   # can be drawn at double resolution with this character
         self.hline = config["tree_drop_down_hline"]
         self.tab_spaces = int(config["tab_spaces"])
         self.vim_mode = config["vim_mode"]
@@ -1529,13 +1531,13 @@ class TUI():
                 # draw thumb and border
                 self.screen.vline(y, abs_x, curses.ACS_VLINE, h, curses.color_pair(self.default_color))
                 if thumb_size > 0:
-                    if self.scrollbar_char == "┃":   # can be drawn at double resolution with this character
+                    if self.fine_scrollbar:
                         start_row = thumb_pos_half // 2
                         is_half_step = (thumb_pos_half % 2 != 0)
                         loop_range = thumb_size + 1 if is_half_step else thumb_size
                         for rel_y in range(loop_range):
                             char = ("╽" if rel_y == 0 else "╿" if rel_y == loop_range - 1 else "┃") if is_half_step else "┃"
-                            self.screen.addch(y + start_row + rel_y, abs_x, char, curses.color_pair(self.default_color))
+                            self.screen.addch(y + start_row + rel_y, abs_x, char, curses.color_pair(26))
                     else:
                         for rel_y in range(thumb_size):
                             self.screen.addch(y + rel_y + thumb_pos, abs_x, self.scrollbar_char, curses.color_pair(self.default_color))
@@ -1583,13 +1585,13 @@ class TUI():
             try:
                 self.screen.vline(y, abs_x, curses.ACS_VLINE, h, curses.color_pair(self.default_color))
                 if thumb_size > 0:
-                    if self.scrollbar_char == "┃":
+                    if self.fine_scrollbar:
                         start_row = thumb_pos_half // 2
                         is_half_step = (thumb_pos_half % 2 != 0)
                         loop_range = thumb_size + 1 if is_half_step else thumb_size
                         for rel_y in range(loop_range):
                             char = ("╽" if rel_y == 0 else "╿" if rel_y == loop_range - 1 else "┃") if is_half_step else "┃"
-                            self.screen.addch(y + start_row + rel_y, abs_x, char, curses.color_pair(self.default_color))
+                            self.screen.addch(y + start_row + rel_y, abs_x, char, curses.color_pair(26))
                     else:
                         for rel_y in range(thumb_size):
                             self.screen.addch(y + rel_y + thumb_pos, abs_x, self.scrollbar_char, curses.color_pair(self.default_color))
