@@ -481,7 +481,7 @@ class Discord():
         return []
 
 
-    def get_messages(self, channel_id, num=50, before=None, after=None, around=None):
+    def get_messages(self, channel_id, num=50, before=None, after=None, around=None, avatars=False):
         """Get specified number of messages, optionally number before and after message ID"""
         message_data = None
         url = f"/api/v9/channels/{channel_id}/messages?limit={num}"
@@ -499,7 +499,7 @@ class Discord():
             # debug_chat
             # from endcord import debug
             # debug.save_json(data, "messages.json", False)
-            return prepare_messages(data)
+            return prepare_messages(data, avatars=avatars)
         log_api_error(data, status, "get_messages")
         return []
 

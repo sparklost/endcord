@@ -160,6 +160,7 @@ class Endcord:
         self.placeholder_emoji = False   # for extensions
         self.placeholder_images = self.inline_media   # keeping this separated so extension can toggle it
         self.premium_override_commands = []   # for extensions
+        self.keep_avatars = False   # for extensions
 
         if not self.font_ratio:
             self.font_w, self.font_h = terminal_utils.get_font_size()
@@ -2622,11 +2623,11 @@ class Endcord:
 
             # terminal focus out/in
             elif action == 2001:
-                self.restore_input_text = (input_text, "standard")
+                self.restore_input_text = (input_text, "command" if self.command else "standard extra")   # prevents closing extra window
                 if self.idle_timeout and self.my_status["status"] == "online":
                     threading.Thread(target=self.idle_timer, daemon=True).start()
             elif action == 2000:
-                self.restore_input_text = (input_text, "standard")
+                self.restore_input_text = (input_text, "command" if self.command else "standard extra")
                 if not self.idle_timeout:
                     continue
                 if self.my_status["afk"] == 2:
@@ -3499,7 +3500,7 @@ class Endcord:
                 if msg_index is None:
                     return
                 user_id = self.messages[msg_index]["user_id"]
-            avatar_id = None
+            avatar_id = self.messages[msg_index].get("avatar")
             if user_id == self.my_id:
                 avatar_id = self.my_user_data["extra"]["avatar"]
             if not avatar_id:
@@ -4886,7 +4887,6 @@ class Endcord:
             if open_media:
                 self.add_running_task("Loading video", 2)
                 self.open_media(url, bool(open_media - 1))
-                self.media_thread.start()
                 self.remove_running_task("Loading video", 2)
             else:
                 self.update_extra_line("Can only play YouTube video")
@@ -5088,7 +5088,7 @@ class Endcord:
     def get_messages_with_members(self, num=50, before=None, after=None, around=None):
         """Get messages, check for missing members, request and wait for member chunk, and update local member list"""
         channel_id = self.active_channel["channel_id"]
-        messages = self.discord.get_messages(channel_id, num, before, after, around)
+        messages = self.discord.get_messages(channel_id, num, before, after, around, avatars=self.keep_avatars)
         if messages is None:   # network error
             self.gateway.set_offline()
             self.update_extra_line("Network error", color=20)
@@ -5288,7 +5288,7 @@ class Endcord:
     def preload_chat(self):
         """Download chat before switching channel to allow faster switching, used for initial chat when starting up"""
         if self.state and self.state["last_channel_id"]:
-            messages = self.discord.get_messages(self.state["last_channel_id"], self.msg_num)
+            messages = self.discord.get_messages(self.state["last_channel_id"], self.msg_num, avatars=True)
             if messages is None:   # network error
                 return
             # emoji safe
@@ -7067,7 +7067,7 @@ class Endcord:
         if smart:
             for line_map in reversed(self.chat_map):
                 if line_map and line_map[0] == msg_index and line_map[4]:
-                    if line_map[1]:
+                    if line_map[1] is not None:
                         break
                     in_msg_start_index += 1
             else:
@@ -8630,7 +8630,10 @@ class Endcord:
                     new_message = self.execute_extensions_methods("on_message_event", new_message, cache=True)[0]
                     new_message_channel_id = new_message["d"]["channel_id"]
                     this_channel = (new_message_channel_id == self.active_channel["channel_id"])
-                    avatar_id = new_message["d"].pop("avatar", None)
+                    if self.keep_avatars:
+                        avatar_id = new_message["d"].get("avatar", None)
+                    else:
+                        avatar_id = new_message["d"].pop("avatar", None)
                     if this_channel and self.get_chat_last_message_id() == self.last_message_id:   # if its scrolled far up, this channel bottom is cached
                         self.process_msg_events_active_channel(new_message)
                     # handle cached channels
@@ -8646,8 +8649,7 @@ class Endcord:
                             # still have to do this when scrolled far up, only to handle message delete/edit/react/poll
                             self.process_msg_events_active_channel(new_message, latest_chat=False)
                     # handle unseen and mentions
-                    if not this_channel or this_channel:
-                        self.process_msg_events_other_channels(new_message, avatar_id)
+                    self.process_msg_events_other_channels(new_message, avatar_id)
                     # remove ghost pings
                     self.process_msg_events_ghost_ping(new_message)
                     # rearrange dms

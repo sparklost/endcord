@@ -301,12 +301,12 @@ def prepare_message(message):
     return message_dict
 
 
-def prepare_messages(data, have_channel_id=False, clean=True):
+def prepare_messages(data, have_channel_id=False, avatars=False):
     """Prepare list of messages"""
     messages = []
     for message in data:
         ready_message = prepare_message(message)
-        if clean:
+        if not avatars:
             del ready_message["avatar"]
         messages.append(ready_message)
         if have_channel_id:

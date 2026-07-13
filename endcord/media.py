@@ -732,7 +732,7 @@ class TerminalMedia():
         """Select runner based on file type"""
         if not path:
             return
-        if not os.path.exists(path):
+        if not path.startswith("http") and not os.path.exists(path):
             return
         if os.path.isdir(path):
             return

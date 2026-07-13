@@ -1220,6 +1220,7 @@ class ChatGenerator:
 
     def __init__(self, config, colors, colors_formatted, my_id, placeholder_emoji, placeholder_images, font_ratio=2.25, dpw=1):
         # load from config
+        self.config = config
         self.format_message = config["format_message"]
         self.format_message_grouped = config["format_message_grouped"]
         self.format_newline = config["format_newline"]
@@ -1301,7 +1302,17 @@ class ChatGenerator:
         self.chat_map = []
         # self.chat_lock = threading.Lock()   # enable if threads collide which is very unlikely
 
-        # calculate stuff
+        self.calculate_lengths()
+
+
+    def calculate_lengths(self):
+        """Calculate all lengths based on config"""
+        # moved to method so extensions can modify settings and trigger recalculation
+        if self.smart_chat_lines:
+            self.tree_drop_down_intersect = self.config["tree_drop_down_intersect"]
+            self.tree_drop_down_vline = self.config["tree_drop_down_vline"]
+            self.spaces_before_text = len(self.format_reactions) - len(self.format_reactions.lstrip(" "))
+
         self.placeholder_timestamp = generate_timestamp("2015-01-01T00:00:00.000000+00:00", self.format_timestamp)
         placeholder_message = (self.format_message
             .replace("%username", " " * self.limit_username)
@@ -2060,7 +2071,8 @@ class ChatGenerator:
         mentions_this_line = fix_map_ranges(ranges_multiline_one_line(mention_ranges, newline_index+1, 0, quote), message_line)
         channels_this_line = fix_map_ranges(ranges_multiline_one_line(channel_ranges, newline_index+1, 0, quote), message_line)
         this_line_ranges = (urls_this_line, spoilers_this_line, emoji_this_line, mentions_this_line, channels_this_line, None)
-        chat_map.append((num, (self.pre_name_len, end_name), False, None, (0, 0) if group else self.timestamp_range, this_line_ranges))
+        # using False for name range if group so app.msg_to_lines still can find message base (if its None then its not base)
+        chat_map.append((num, False if group else (self.pre_name_len, end_name), False, None, (0, 0) if group else self.timestamp_range, this_line_ranges))
 
         # formatting
         len_message_line = len(message_line)

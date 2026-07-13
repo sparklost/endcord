@@ -877,20 +877,26 @@ class Player():
             self.play_thread.join()
 
 
-def make_round_image_pillow(input_path, output_path):
+def make_round_image_pillow(input_path, output_path, antialias=False):
     """Create new image with circular shape using pillow"""
     from PIL import Image, ImageDraw
     img = Image.open(input_path).convert("RGBA")
     w, h = img.size
-    mask = Image.new("L", (w, h), 0)
-    draw = ImageDraw.Draw(mask)
-    draw.ellipse((0, 0, w, h), fill=255)
+    if antialias:
+        mask = Image.new("L", (w * 4, h * 4), 0)
+        draw = ImageDraw.Draw(mask)
+        draw.ellipse((0, 0, w * 4, h * 4), fill=255)
+        mask = mask.resize((w, h), Image.Resampling.LANCZOS)
+    else:
+        mask = Image.new("L", (w, h), 0)
+        draw = ImageDraw.Draw(mask)
+        draw.ellipse((0, 0, w, h), fill=255)
     result = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     result.paste(img, mask=mask)
     result.save(output_path, "WEBP")
 
 
-def make_round_image_imagemagick(input_path, output_path):
+def make_round_image_imagemagick(input_path, output_path, antialias=False):
     """Create new image with circular shape using imagemagick"""
     subprocess.run([
         "magick", input_path,
@@ -898,6 +904,7 @@ def make_round_image_imagemagick(input_path, output_path):
             "+clone",
             "-alpha", "transparent",
             "-fill", "white",
+            "-antialias" if antialias else "+antialias",
             "-draw", "circle %[fx:w/2],%[fx:h/2] %[fx:w/2],0",
         ")",
         "-alpha", "set",
@@ -907,7 +914,25 @@ def make_round_image_imagemagick(input_path, output_path):
     ], check=True)
 
 
-def make_round_image(image_path):
+def make_round_image_graphicsmagick(input_path, output_path, antialias=False):
+    """Create new image with circular shape using graphicsmagick"""
+    result = subprocess.run(["gm", "identify", "-format", "%w %h", input_path], capture_output=True, text=True, check=True)
+    width, height = map(int, result.stdout.strip().split())
+    mask_path = output_path + "_mask.png"
+    subprocess.run([
+        "gm", "convert",
+        "-size", f"{width}x{height}",
+        "xc:transparent",
+        "-fill", "white",
+        "-antialias" if antialias else "+antialias",
+        "-draw", f"circle {width // 2},{height // 2} {width // 2},0",
+        mask_path,
+    ], check=True)
+    subprocess.run(["gm", "composite", "-compose", "In", input_path, mask_path, output_path], check=True)
+    os.remove(mask_path)
+
+
+def make_round_image(image_path, antialias=False):
     """
     Convert image to round image and delete old one, if possible.
     Use pillow if available, fallback to imagemagick if available.
@@ -921,14 +946,23 @@ def make_round_image(image_path):
         if importlib.util.find_spec("PIL") is not None:
             base, ext = os.path.splitext(image_path)
             save_path = base + "_round" + ext
-            make_round_image_pillow(image_path, save_path)
+            make_round_image_pillow(image_path, save_path, antialias)
             os.remove(image_path)
             return save_path
         if shutil.which("magick"):
             try:
                 base, ext = os.path.splitext(image_path)
                 save_path = base + "_round" + ext
-                make_round_image_imagemagick(image_path, save_path)
+                make_round_image_imagemagick(image_path, save_path, antialias)
+                os.remove(image_path)
+                return save_path
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                pass
+        elif shutil.which("gm"):
+            try:
+                base, ext = os.path.splitext(image_path)
+                save_path = base + "_round" + ext
+                make_round_image_graphicsmagick(image_path, save_path, antialias)
                 os.remove(image_path)
                 return save_path
             except (subprocess.CalledProcessError, FileNotFoundError):
