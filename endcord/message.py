@@ -2,6 +2,7 @@
 # Source-available under the Endcord License. See LICENSE for terms.
 # Redistribution of modified versions is not permitted.
 
+import os
 import re
 from datetime import datetime
 
@@ -167,9 +168,12 @@ def prepare_message(message):
                 message["referenced_message"]["attachments"] = forwarded.get("attachments")
             reference_embeds, _ = prepare_embeds(message["referenced_message"]["embeds"], "")
             for attachment in message["referenced_message"].get("attachments", []):
+                name = attachment["filename"]
+                if attachment.get("title"):
+                    name = attachment["title"] + os.path.splitext(name)[1]
                 reference_embeds.append({
                     "type": attachment.get("content_type", "unknown"),
-                    "name": attachment["filename"],
+                    "name": name,
                     "url": attachment["url"],
                 })   # keep attachments in same place as embeds
             message["referenced_message"], reference_embeds = content_to_attachment(message["referenced_message"], reference_embeds)
@@ -227,13 +231,19 @@ def prepare_message(message):
     # embeds and attachments
     embeds, message["content"] = prepare_embeds(message["embeds"], message["content"])
     for attachment in message["attachments"]:
-        embeds.append({
+        name = attachment["filename"]
+        if attachment.get("title"):
+            name = attachment["title"] + os.path.splitext(name)[1]
+        data = {
             "type": attachment.get("content_type", "unknown"),
-            "name": attachment["filename"],
+            "name": name,
             "url": attachment["url"],
             "proxy_url": attachment.get("proxy_url"),
             "hw": (attachment["height"], attachment["width"]) if "height" in attachment else None,
-        })   # keep attachments in same place as embeds (attachments have no "main_url")
+        }
+        if attachment.get("duration_secs"):
+            data["duration"] = round(attachment["duration_secs"])
+        embeds.append(data)   # keep attachments in same place as embeds (attachments have no "main_url")
     message, embeds = content_to_attachment(message, embeds)
     # mentions
     mentions = []

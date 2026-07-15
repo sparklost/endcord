@@ -181,17 +181,19 @@ def generate_relative_time(timestamp):
     return time_string
 
 
-def format_seconds(seconds, nice=False):
+def format_seconds(seconds, nice=False, pad=True):
     """Convert seconds to hh:mm:ss or HHh MMm SSs"""
     hours = seconds // 3600
     minutes = (seconds % 3600) // 60
     secs = seconds % 60
     parts = []
+    fmt = "02d" if pad else "d"
     if hours:
-        parts.append(f"{hours:02d}" + ("h" if nice else ""))
+        parts.append(f"{hours:{fmt}}" + ("h" if nice else ""))
     if minutes or hours:
-        parts.append(f"{minutes:02d}" + ("m" if nice else ""))
-    parts.append(f"{secs:02d}" + ("s" if nice else ""))
+        if pad:
+            parts.append(f"{minutes:{fmt}}" + ("m" if nice else ""))
+    parts.append(f"{secs:{fmt}}" + ("s" if nice else ""))
     if nice:
         return " ".join(parts)
     return ":".join(parts)
@@ -1874,10 +1876,12 @@ class ChatGenerator:
                     elif self.trim_embed_url_size:
                         embed_url = trim_string(embed_url, self.trim_embed_url_size)
                     embed_type = clean_type(embed["type"])
-                    if embed_type.lower() not in ("image", "video", "audio"):
-                        embeds.append([len(content), len(content) + len(embed_type) + 15 + len(embed.get("name", ""))])
+                    if embed_type.lower() not in ("image", "video"):
                         embed_type = "file"
-                        embed_url = embed.get("name")
+                        embed_url = embed.get("name", "")
+                        if embed.get("duration"):
+                            embed_url += f" ({format_seconds(embed["duration"], nice=True, pad=False)})"
+                        embeds.append([len(content), len(content) + len(embed_type) + 15 + len(embed_url)])
                     embed_marker_ranges.append([len(content), len(content) + len(embed_type) + 14])
                     content += f"[{embed_type} attachment]: {embed_url}"
                 elif embed["type"] == "rich":
