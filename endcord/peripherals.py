@@ -29,7 +29,7 @@ try:
     logger.info(APP_NAME)
 except (AttributeError, NameError):
     APP_NAME = "endcord"
-VERSION = "1.5.2"
+VERSION = "1.5.3"
 NO_NOTIFY_SOUND_DE = ("kde", "plasma")   # linux desktops without notification sound
 
 # platform specific code

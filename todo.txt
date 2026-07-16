@@ -1,9 +1,9 @@
-Patch python 3.14 using python 3.16 curses module to enable 255+ colors
-Update tui.py to support 255+ colors
 Fix sent audio is delayed and low quality
 Fix receiver audio mixer
-Fix RTP metrics
 Add transmitter audio mixer
+Fix RTP metrics
+Patch python 3.14 using python 3.16 curses module to enable 255+ colors
+Update tui.py to support 255+ colors
 Add code block language syntax
 Add inbox
 Add pinned servers and channels
@@ -13,8 +13,8 @@ Fix issues with wide characters in input line
 Add multiline input line
 Add option to select individual message
 Rewrite experimental mode in not-pygame
-Video, stage and stream calls
-Localization
+Add video, stage and stream calls
+Add localization
 
 endcord-kitty-media
 endcord-p2p-network (name subject to change)

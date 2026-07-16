@@ -221,7 +221,7 @@ wheels = [
 
 [[package]]
 name = "endcord"
-version = "1.5.2"
+version = "1.5.3"
 source = { virtual = "." }
 dependencies = [
     { name = "certifi", marker = "sys_platform == 'darwin'" },

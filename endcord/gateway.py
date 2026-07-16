@@ -34,12 +34,14 @@ from endcord.message import is_relevant_message, prepare_message
 DISCORD_HOST = "discord.com"
 LOCAL_MEMBER_COUNT = 50   # members per guild, CPU-RAM intensive
 LOCAL_VOICE_PRESENCE_LIMIT = 50   # per guild, slightly RAM intensive
-ZLIB_SUFFIX = b"\x00\x00\xff\xff"
+LIMIT_SUBSCRIBED = 5   # channels per guild
+LIMIT_SUBSCRIBED_THREADS = 3   # threads per guild
 VOICE_FLAGS = 3   # CLIPS_ENABLED and ALLOW_VOICE_RECORDING
 DEFAULT_CAPABILITIES = 30717
 DEFAULT_INTENTS = 50364033
 QOS_HEARTBEAT = True
 QOS_PAYLOAD = {"ver": 26, "active": True, "reason": "foregrounded"}
+ZLIB_SUFFIX = b"\x00\x00\xff\xff"
 inflator = None
 logger = logging.getLogger(__name__)
 status_unpacker = struct.Struct("!H")
@@ -68,6 +70,27 @@ def double_get(data, key1, key2, default=None):
     if key1 in data:
         return data[key1].get(key2, default)
     return default
+
+
+def extract_activities(raw_activities):
+    """Extract custom status and activities from member activity object"""
+    custom_status = None
+    activities = []
+    for activity in raw_activities:
+        if activity["type"] == 4:
+            custom_status = activity.get("state", "")
+        elif activity["type"] in (0, 2):
+            # assets = activity.get("assets", {})
+            activities.append((   # using tuple to save on ram
+                activity["type"],
+                activity["state"] if activity["type"] == 2 and "state" in activity else activity["name"],
+                # int(activity["timestamps"].get("start", 0)/1000) if "timestamps" in activity else None,
+                # activity.get("state"),
+                # activity.get("details"),
+                # assets.get("small_text"),
+                # assets.get("large_text"),
+            ))
+    return custom_status, activities
 
 
 class Gateway():
@@ -687,6 +710,52 @@ class Gateway():
             self.dms.append(new_dm)
 
 
+    def update_thread_member(self, data):
+        """Update this member in all member lists for this server"""
+        guild_id = data["guild_id"]
+        for guild in self.activities:
+            if guild[0] == guild_id and guild[1]:
+                break
+        else:
+            return
+        ready_member = None
+        user_id = data["user"]["id"]
+        status_changed = None
+
+        for channel_id, channel in guild[1].items():
+            if not isinstance(channel_id, str):   # taking only threads
+                continue
+            for num, member_ch in enumerate(channel[1]):
+                if member_ch.get("id") == user_id:
+                    break
+            else:
+                continue
+            if not ready_member:
+                custom_status, activities = extract_activities(data["activities"])
+                ready_member = {
+                    "status": data["status"],
+                    "custom_status": custom_status,
+                    "activities": activities,
+                }
+
+            if status_changed is None:
+                status_changed = (channel[1][num].get("status") == "offline") != (data["status"] == "offline")
+            channel[1][num].update(ready_member)
+            if status_changed:
+                online = [u for u in channel[1] if u.get("status") in ("online", "idle", "dnd")]
+                offline = [u for u in channel[1] if u.get("status") == "offline"]
+                members = []
+                if online:
+                    online.sort(key=lambda x: x.get("global_name") or x["username"])
+                    members.append({"group": "online", "count": len(online)})
+                    members.extend(online)
+                if offline:
+                    offline.sort(key=lambda x: x.get("global_name") or x["username"])
+                    members.append({"group": "offline", "count": len(offline)})
+                    members.extend(offline)
+                channel[1][:] = members
+
+
     def set_my_user_data(self, data):
         """Set my user data from user object"""
         tag = None
@@ -765,7 +834,7 @@ class Gateway():
                 self.resumable = True
                 break
             self.gateway_events_per_h += 1
-            logger.debug(f"Received: opcode={opcode}, optext={response["t"] if (response and "t" in response and response["t"]) else 'None'}")
+            logger.debug(f"Received: opcode={opcode}, optext={response["t"] if (response and "t" in response and response["t"]) else "None"}")
             # debug_events
             # if response.get("t"):
             #     debug.save_json(response, f"{int(time.time())}_{response["t"]}.json", False)
@@ -914,7 +983,7 @@ class Gateway():
                         })
                         self.user_settings_proto = old_user_settings
                         if old_user_settings.get("custom_status"):
-                            self.user_settings_proto["status"]["custom_tatus"] = old_user_settings["custom_status"]
+                            self.user_settings_proto["status"]["custom_status"] = old_user_settings["custom_status"]
                     self.proto_changed = True
                     time_log_string += f"    protobuf - {round((time.time() - ready_time_mid) * 1000, 3)} ms\n"
                     ready_time_mid = time.time()
@@ -1089,7 +1158,7 @@ class Gateway():
                     })
 
                 elif optext == "MESSAGE_REACTION_ADD":
-                    if "member" in data and "user" in data["member"]:   # spacebar_fix - "user" is mising
+                    if "member" in data and "user" in data["member"]:   # spacebar_fix - "user" is missing
                         user_id = data["member"]["user"]["id"]
                         username = data["member"]["user"]["username"]
                         global_name = data["member"]["user"].get("global_name")   # spacebar_fix - get
@@ -1179,8 +1248,7 @@ class Gateway():
                     })
 
                 elif optext == "GUILD_MEMBERS_CHUNK":
-                    # received when requesting members (op 8)
-                    if self.querying_members:
+                    if self.querying_members:   # received when requesting members (op 8)
                         self.querying_members = False
                         self.member_query_results = []
                         for member in data["members"]:
@@ -1194,18 +1262,20 @@ class Gateway():
                                 "username": member["user"]["username"],
                                 "name": name,
                             })
-                    else:
+                    else:   # subscribed members changed presence and for updating thread member list
                         guild_id = data["guild_id"]
                         for member in data["members"]:
-                            if "roles" in member and "roles" in member:
-                                self.add_member_roles(
-                                    guild_id,
-                                    member["user"]["id"],
-                                    member["roles"],
-                                    nick=member.get("nick"),
-                                )
-                                if data.get("nonce"):
-                                    self.roles_changed = data["nonce"]
+                            if "roles" not in member:
+                                continue
+                            self.add_member_roles(
+                                guild_id,
+                                member["user"]["id"],
+                                member["roles"],
+                                nick=member.get("nick"),
+                            )
+                            if data.get("nonce"):
+                                self.roles_changed = data["nonce"]
+
 
                 elif self.want_member_list and optext == "GUILD_MEMBER_LIST_UPDATE":
                     guild_id = data["guild_id"]
@@ -1242,22 +1312,7 @@ class Gateway():
                                     members_sync.append({"group": group_id, "count": group_count})
                                 else:
                                     member_data = item["member"]
-                                    custom_status = None
-                                    activities = []
-                                    for activity in member_data["presence"]["activities"]:
-                                        if activity["type"] == 4:
-                                            custom_status = activity.get("state", "")
-                                        elif activity["type"] in (0, 2):
-                                            # assets = activity.get("assets", {})
-                                            activities.append((   # using tuple to save on ram
-                                                activity["type"],
-                                                activity["state"] if activity["type"] == 2 and "state" in activity else activity["name"],
-                                                # int(activity["timestamps"].get("start", 0)/1000) if "timestamps" in activity else None,
-                                                # activity.get("state"),
-                                                # activity.get("details"),
-                                                # assets.get("small_text"),
-                                                # assets.get("large_text"),
-                                            ))
+                                    custom_status, activities = extract_activities(member_data["presence"]["activities"])
                                     members_sync.append({
                                         "id": member_data["user"]["id"],
                                         "username": member_data["user"]["username"],
@@ -1277,7 +1332,6 @@ class Gateway():
                                 pass
                         elif memlist["op"] in ("UPDATE", "INSERT"):
                             try:
-                                custom_status = None
                                 if list_id not in self.activities[guild_index][1]:
                                     self.activities[guild_index][1][list_id] = [0, []]   # [last_index, members]
                                 if "group" in memlist["item"]:   # group can only be inserted
@@ -1294,21 +1348,7 @@ class Gateway():
                                     self.activities[guild_index][1][list_id][0] = int(memlist["index"])
                                     continue
                                 member_data = memlist["item"]["member"]
-                                activities = []
-                                for activity in member_data["presence"]["activities"]:
-                                    if activity["type"] == 4:
-                                        custom_status = activity.get("state", "")
-                                    elif activity["type"] in (0, 2):
-                                        # assets = activity.get("assets", {})
-                                        activities.append((   # using tuple to save on ram
-                                            activity["type"],
-                                            activity["state"] if activity["type"] == 2 and "state" in activity else activity["name"],
-                                            # int(activity["timestamps"].get("start", 0)/1000) if "timestamps" in activity else None,
-                                            # activity.get("state"),
-                                            # activity.get("details"),
-                                            # assets.get("small_text"),
-                                            # assets.get("large_text"),
-                                        ))
+                                custom_status, activities = extract_activities(member_data["presence"]["activities"])
                                 member_id = member_data["user"]["id"]
                                 ready_data = {
                                     "id": member_id,
@@ -1339,10 +1379,51 @@ class Gateway():
                                 pass
                         self.activities_changed.append(guild_id)
 
+                elif optext == "THREAD_MEMBER_LIST_UPDATE":
+                    online = []
+                    offline = []
+                    for member in data["members"]:
+                        member_data = member["member"]
+                        presence = member["presence"]
+                        custom_status, activities = extract_activities(presence["activities"])
+                        target = offline if presence["status"] == "offline" else online
+                        target.append({
+                            "id": member_data["user"]["id"],
+                            "username": member_data["user"]["username"],
+                            "global_name": member_data["user"].get("global_name"),   # spacebar_fix - get
+                            "nick": member_data["nick"],
+                            "roles": member_data["roles"],
+                            "status": presence["status"],
+                            "custom_status": custom_status,
+                            "activities": activities,
+                        })
+                    members = []
+                    if online:
+                        online.sort(key=lambda x: x.get("global_name") or x["username"])
+                        members.append({"group": "online", "count": len(online)})
+                        members.extend(online)
+                    if offline:
+                        offline.sort(key=lambda x: x.get("global_name") or x["username"])
+                        members.append({"group": "offline", "count": len(offline)})
+                        members.extend(offline)
+                    if len(members) > 100:
+                        members = members[:99]
+                    for guild_index, guild in enumerate(self.activities):
+                        if guild[0] == guild_id:
+                            break
+                    else:
+                        self.activities.append([guild_id, {}, 0, 0])
+                        guild_index = -1
+                    self.activities[guild_index][1][data["thread_id"]] = [0, members]
+                    self.activities_changed.append(data["guild_id"])
+
                 elif optext == "PRESENCE_UPDATE":
                     # received when friend/DM user changes presence state (online/rich/custom)
+                    # or for updating subscribed thread member list
                     user_id = data["user"]["id"]
                     custom_status = None
+                    if self.want_member_list and data.get("guild_id"):
+                        self.update_thread_member(data)
                     activities = []
                     for activity in data.get("activities", []):
                         if activity["type"] == 4:
@@ -1684,7 +1765,7 @@ class Gateway():
 
                 elif optext == "THREAD_DELETE":
                     self.threads_buffer.append({
-                        "op": "THRRAD_DELETE",
+                        "op": "THREAD_DELETE",
                         "guild_id": data["guild_id"],
                         "threads": [{
                             "id": data["id"],
@@ -1984,7 +2065,7 @@ class Gateway():
     def resume(self):
         """
         Try to resume discord gateway session on url provided by Discord in READY event.
-        Return gateway response code, 9 means resumming has failed
+        Return gateway response code, 9 means resuming has failed
         """
         if not self.ws:
             return 9
@@ -2045,7 +2126,7 @@ class Gateway():
             self.state = 1
             logger.debug("Connection established")
         except (socket.gaierror, TimeoutError, ConnectionResetError):
-            if not self.wait:   # if not running from wait_oline
+            if not self.wait:   # if not running from wait_online
                 logger.warning("No internet connection")
                 self.ws.close()
                 threading.Thread(target=self.wait_online, daemon=True, args=()).start()
@@ -2070,7 +2151,7 @@ class Gateway():
 
 
     def update_presence(self, status, custom_status=None, custom_status_emoji=None, activities=None, afk=False):
-        """Update client status. Statuses: 'online', 'idle', 'dnd', 'invisible', 'offline'"""
+        """Update client status. Statuses: online, idle, dnd, invisible, offline"""
         if self.legacy:
             return   # spacebar_fix - gateway returns error if this event is sent
 
@@ -2100,7 +2181,7 @@ class Gateway():
         logger.debug("Updated presence")
 
 
-    def subscribe(self, channel_id, guild_id):
+    def subscribe(self, channel_id, guild_id, thread=False):
         """
         Subscribe to the channel to receive "typing" events from gateway for specified channel.
         And threads updates, and member presence updates for this guild.
@@ -2110,40 +2191,52 @@ class Gateway():
         if self.bot:
             return
         if guild_id:
-            # when subscribing, add channel to list of subscribed channels
-            # then send whole list
-            # if channel is already in list send nothing
-            # when subscribing to guild for the first time, send extra config
             for num, guild in enumerate(self.subscribed):
                 if guild["guild_id"] == guild_id:
-                    if channel_id in guild["channels"]:
-                        logger.debug("Already subscribed to the channel")
-                    else:
-                        logger.debug("Adding channel to subscribed")
-                        guild["channels"].append(channel_id)
-                        channels = {}
+                    if channel_id in guild["channels"]:   # if channel is already in list send nothing
+                        break
+                    guild["channels"].insert(0, channel_id)
+                    if len(guild["channels"]) > LIMIT_SUBSCRIBED:
+                        removed_id = guild["channels"].pop(len(guild["channels"]) - 1)
+                        for guild_index, guild_rem in enumerate(self.activities):
+                            if guild_rem[0] == guild_id:
+                                self.activities[guild_index][1].pop(removed_id, None)
+                                break
+                    channels = {}
+                    if not thread:
                         for channel in guild["channels"]:
-                            channels[channel] = [[0, 99]]   # what is [[0, 99]]?
-                        payload = {
-                            "op": 37,   # changed in gateway v10
-                            "d": {
-                                "subscriptions": {
-                                    guild_id: {
-                                        "channels": channels,
-                                    },
+                            channels[channel] = [[0, 99]]   # range 0-99
+                    else:
+                        if channel_id not in guild["threads"]:
+                            guild["threads"].append(channel_id)
+                            if len(guild["threads"]) > LIMIT_SUBSCRIBED_THREADS:
+                                removed_id = guild["threads"].pop(len(guild["threads"]) - 1)
+                                for guild_index, guild_rem in enumerate(self.activities):
+                                    if guild_rem[0] == guild_id:
+                                        self.activities[guild_index][1].pop(removed_id, None)
+                                        break
+                        channels = guild["threads"]
+                    payload = {
+                        "op": 37,   # changed in gateway v10
+                        "d": {
+                            "subscriptions": {
+                                guild_id: {
+                                    "channels" if not thread else "thread_member_lists": channels,
                                 },
                             },
-                        }
-                        self.send(payload)
+                        },
+                    }
+                    logger.debug(payload)
+                    self.send(payload)
                     break
             else:
-                logger.debug("Adding guild to subscribed")
                 self.subscribed.append({
                     "guild_id": guild_id,
-                    "channels": [channel_id],
+                    "channels": [channel_id] if not thread else [],
+                    "threads": [channel_id] if thread else [],
                     "members": [],
                 })
-                payload = {
+                payload = {   # extra config when subscribing for first time
                     "op": 37,   # changed in gateway v10
                     "d": {
                         "subscriptions": {
@@ -2151,13 +2244,13 @@ class Gateway():
                                 "typing": True,
                                 "activities": self.want_member_list,
                                 "threads": True,
-                                "channels": {
-                                    channel_id: [[0, 99]],
-                                },
+                                "channels" if not thread else "thread_member_lists":
+                                    {channel_id: [[0, 99]]} if not thread else [channel_id],
                             },
                         },
                     },
                 }
+                logger.debug(payload)
                 self.send(payload)
         else:   # for DMs
             payload = {
@@ -2166,8 +2259,8 @@ class Gateway():
                     "channel_id": channel_id,
                 },
             }
+            logger.debug(payload)
             self.send(payload)
-            logger.debug("Subscribed to a DM")
 
 
     def subscribe_member(self, member_id, guild_id):
@@ -2307,7 +2400,7 @@ class Gateway():
 
 
     def get_ready(self):
-        """Return wether gateway processed entire READY event"""
+        """Return whether gateway processed entire READY event"""
         return self.ready
 
 
@@ -2503,7 +2596,7 @@ class Gateway():
         user update (self) - dict,
         whether roles have changed - guild_id
         whether guild roles have changed - (guild_id, role_id)
-        If user_update has only user_id and nick, then its guild_memember_update event.
+        If user_update has only user_id and nick, then its guild_member_update event.
         """
         if self.user_update:
             cache = (*self.user_update, self.guild_roles_changed)

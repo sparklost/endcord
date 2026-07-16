@@ -767,6 +767,7 @@ class Endcord:
         self.gateway.subscribe(
             self.active_channel["channel_id"],
             self.active_channel["guild_id"],
+            thread=(self.current_channel.get("type") in (11, 12)),
         )
         self.session_id = self.gateway.session_id
 
@@ -954,7 +955,7 @@ class Endcord:
         self.unread_count = 0
         self.got_commands = False
         self.selected_attachment = 0
-        self.gateway.subscribe(channel_id, guild_id)
+        self.gateway.subscribe(channel_id, guild_id, thread=(self.current_channel.get("type") in (11, 12)))
         self.tui.reset_chat_scrolled_top()
         self.gateway.set_subscribed_channels([x[0] for x in self.channel_cache] + [channel_id])
         if self.recording:
@@ -991,13 +992,16 @@ class Endcord:
                 member_count, online_count = 0, 0
                 for guild in self.members:
                     if guild[0] == guild_id:
+                        member_count, online_count = guild[2], guild[3]
+                        if self.current_channel.get("type") in (11, 12):
+                            self.member_list = guild[1].get(self.active_channel["channel_id"], [0, []])[1]
+                            break
                         permission_overwrites = self.current_channel.get("permission_overwrites", [])
                         member_list_id = perms.compute_member_list_id(permission_overwrites)
                         if member_list_id and member_list_id in guild[1]:
                             self.member_list = guild[1][member_list_id][1]
                         else:
                             self.member_list = []
-                        member_count, online_count = guild[2], guild[3]
                         break
                 else:
                     self.member_list = []
@@ -4481,7 +4485,7 @@ class Endcord:
             for channel in guild["channels"]:
                 for thread in channel["threads"]:
                     if thread["id"] == target_id:
-                        return target_id, thread["name"], guild["guild_id"], None, thread["parent_id"]
+                        return target_id, thread["name"], guild["guild_id"], None, thread.get("parent_id", guild["guild_id"])
         return None, None, None, None, None
 
 
@@ -8944,12 +8948,18 @@ class Endcord:
             if self.get_members:
                 new_members, changed_guilds = self.gateway.get_activities()
                 if changed_guilds:
+                    self.members = new_members
+                if changed_guilds and self.active_channel["guild_id"] in changed_guilds:
                     member_count = 0
                     online_count = 0
-                    self.members = new_members
                     last_index = 99
                     for guild in new_members:   # select guild
                         if guild[0] == self.active_channel["guild_id"]:
+                            member_count, online_count = guild[2], guild[3]
+                            if self.current_channel.get("type") in (11, 12):
+                                self.member_list = guild[1].get(self.active_channel["channel_id"], [0, []])[1]
+                                last_index = 0
+                                break
                             permission_overwrites = self.current_channel.get("permission_overwrites", [])
                             member_list_id = perms.compute_member_list_id(permission_overwrites)
                             if member_list_id and member_list_id in guild[1]:
@@ -8958,10 +8968,8 @@ class Endcord:
                             else:
                                 self.member_list = []
                                 last_index = None
-                            member_count, online_count = guild[2], guild[3]
                             break
-                    if (self.active_channel["guild_id"] in changed_guilds and self.get_members and self.state["member_list"] and
-                        self.screen.getmaxyx()[1] - self.config["tree_width"] - self.member_list_width - 2 >= 32):
+                    if self.get_members and self.state["member_list"] and self.screen.getmaxyx()[1] - self.config["tree_width"] - self.member_list_width - 2 >= 32:
                         self.update_member_list(last_index)
                     member_list_title = f"Members: {formatter.format_kilo(online_count)}/{formatter.format_kilo(member_count)}"[:self.member_list_width - self.tui.bordered]
                     self.tui.draw_member_list_title(member_list_title, color=self.colors[9])

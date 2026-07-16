@@ -145,7 +145,7 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
     Download discord default stickers and add them to sticker search. Disable to save some RAM.
 - `only_one_open_server = False`  
     Force only one open server at a time in tree. When one is opened other is closed, excluding DMs.
-- `remember_collapsed_channels = False`  
+- `remember_collapsed_channels = True`  
     Whether to persist collapsed state for forums and channels with threads.
 - `assist_skip_app_command = False`  
     Skip assist for app_name when typing app command. Instead, show all app commands and insert app_name with selected command.
@@ -389,8 +389,9 @@ Every next list has additional `start` and `end`- indexes on a line where color 
 - `color_orange = [208, -1]`  
 - `color_red = [196, -1]`  
     Colors for green/orange/red elements in various windows and lines.
-- `color_chat_mention = [223, 234]`  
-    Color for highlighted messages containing mentions (reply with ping included) and mention roles.
+- `color_chat_mention = [-2, 234]`  
+    Color for highlighted messages containing mentions (reply with ping included) and mention roles.  
+    If fg is `-2` then it will not overwrite message element original fg.  
 - `color_chat_blocked = [242, -1]`  
     Color for blocked messages if `block_mode = 1`.
 - `color_chat_deleted = [95, -1]`  

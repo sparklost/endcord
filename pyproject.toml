@@ -1,6 +1,6 @@
 [project]
 name = "endcord"
-version = "1.5.2"
+version = "1.5.3"
 description = "The most feature rich Discord TUI client."
 readme = "README.md"
 requires-python = ">=3.12"

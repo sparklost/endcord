@@ -2278,8 +2278,7 @@ class TUI():
             format_codes = []
             for num, color in enumerate(format_colors):
                 if num == 0:
-                    # skip fg update for color_format_reply, color_format_reactions, color_chat_edited, color_chat_url
-                    if num_f not in (2, 3, 4, 5):
+                    if num_f in (0, 1, 2) and alt_color[0] != -2:   # update fg onlt for message, message_grouped and newline
                         color[0] = alt_color[0]
                     color[1] = alt_color[1]
                 if color[1] == -2:
