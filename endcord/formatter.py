@@ -1881,7 +1881,7 @@ class ChatGenerator:
                         embed_url = embed.get("name", "")
                         if embed.get("duration"):
                             embed_url += f" ({format_seconds(embed["duration"], nice=True, pad=False)})"
-                        embeds.append([len(content), len(content) + len(embed_type) + 15 + len(embed_url)])
+                        embeds.append([len(content), len(content) + len(embed_type) + 15 + len(embed_url), embed["url"]])
                     embed_marker_ranges.append([len(content), len(content) + len(embed_type) + 14])
                     content += f"[{embed_type} attachment]: {embed_url}"
                 elif embed["type"] == "rich":

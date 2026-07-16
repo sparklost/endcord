@@ -8733,7 +8733,7 @@ class Endcord:
                     if thread_event["op"] == "THREAD_UPDATE":
                         self.load_threads(thread_event)   # add or update thread
                     elif thread_event["op"] == "THREAD_DELETE":
-                        self.remove_thread()
+                        self.remove_thread(thread_event)
                 else:
                     break
 
