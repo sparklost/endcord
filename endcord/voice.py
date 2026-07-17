@@ -35,13 +35,12 @@ DISCORD_HOST = "discord.com"
 BASE_SOUND_GAIN = 2.0
 VOICE_FLAGS = 2   # ALLOW_VOICE_RECORDING
 UDP_TIMEOUT = 10
-OPUS_MODE = os.environ.get("ENDCORD_VOICE_OPUS_MODE", "voip")
 OPUS_SILENCE = bytes([0xF8, 0xFF, 0xFE])
 SILENCE_BUFFER = 5
 MAX_SILENCE = 10
+MIXER_BUFFER = 3
 RTCP_SEND_DELAY = 5   # set to 0 to disable RTCP SR
 CODECS = [
-    # pyav depends on ffmpeg, and its usually built without encode for av1 and vp9
     {"name": "opus", "type": "audio", "priority": 1000, "payload_type": 120},
     # video disabled for now
     # {"name": "AV1", "type": "video", "priority": 1000, "payload_type": 101, "rtx_payload_type": 102, "encode": False, "decode": True},
@@ -106,7 +105,7 @@ def detect_silence(data, threshold=0.03):
 class Gateway():
     """Methods for fetching and sending data to Discord voice gateway through websocket"""
 
-    def __init__(self, voice_gateway_data, my_id, volume_input, volume_output, user_agent, proxy=None, custom_mic=None, silence=-30):
+    def __init__(self, voice_gateway_data, my_id, volume_input, volume_output, user_agent, proxy=None, custom_mic=None, silence=-30, opus_mode="voip", fast_mixer=False):
         self.voice_gateway_data = voice_gateway_data
         self.guild_id = voice_gateway_data["guild_id"]
         self.channel_id = voice_gateway_data["channel_id"]
@@ -145,6 +144,8 @@ class Gateway():
         self.volume_output = volume_output
         self.custom_mic = custom_mic
         self.silence_threshold = silence
+        self.opus_mode = opus_mode
+        self.fast_mixer = fast_mixer
 
         self.connect()
 
@@ -210,6 +211,8 @@ class Gateway():
                 self.volume_output,
                 custom_mic=(self.custom_mic if self.enable_input else "OFF"),
                 silence=self.silence_threshold,
+                opus_mode=self.opus_mode,
+                fast_mixer=self.fast_mixer,
             )
             self.voice_handler.start()
 
@@ -671,7 +674,7 @@ class Gateway():
 class VoiceHandler:
     """Voice call sound receiver, transmitter, player and recorder"""
 
-    def __init__(self, gateway, my_id, my_ssrc, udp, secret_key, encryption_mode, volume_input, volume_output, custom_mic=None, silence=-30):
+    def __init__(self, gateway, my_id, my_ssrc, udp, secret_key, encryption_mode, volume_input, volume_output, custom_mic=None, silence=-30, opus_mode="voip", fast_mixer=False):
         self.gateway = gateway
         self.my_id = my_id
         self.my_ssrc = my_ssrc
@@ -689,16 +692,18 @@ class VoiceHandler:
         self.audio_queue_in = queue.Queue(maxsize=25)   # 0.5s buffer
         self.audio_thread_rec = None
 
+        if opus_mode not in ("voip", "audio", "lowdelay"):
+            opus_mode = "voip"
         self.opus_decoder = av.codec.CodecContext.create("opus", "r")
         self.opus_encoder = av.codec.CodecContext.create("opus", "w")
         self.opus_encoder.sample_rate = 48000
         self.opus_encoder.layout = "stereo"
         self.opus_encoder.format = "flt"
         self.opus_encoder.options = {
-            "application": OPUS_MODE,
-            "vbr": "off" if OPUS_MODE == "audio" else "on",
+            "application": opus_mode,
+            "vbr": "off" if opus_mode == "audio" else "on",
         }
-        if OPUS_MODE != "audio":
+        if opus_mode != "audio":
             self.opus_encoder.bit_rate = 96000
         self.opus_encoder.open()
 
@@ -706,6 +711,7 @@ class VoiceHandler:
         self.gain_input = volume_to_gain(volume_input, boost=1)
         self.gain_output = volume_to_gain(volume_output, boost=BASE_SOUND_GAIN)
         self.silence_threshold = 10 ** (silence / 20)
+        self.fast_mixer = fast_mixer
 
         self.run = False
         self.recording = False
@@ -883,7 +889,6 @@ class VoiceHandler:
                 if decryptor is None:
                     logger.debug(f"Unknown ssrc {ssrc}")
                     continue
-                # logger.info(("BEFORE DAVE", bytes(payload)))
                 decrypted = decryptor.decrypt(dave.MediaType.audio, bytes(payload))
                 if decrypted is None:
                     continue
@@ -1108,38 +1113,61 @@ class VoiceHandler:
                     jitter = struct.unpack_from(">I", payload, block_offset + 12)[0]
                     jitter_ms = (jitter / 48000) * 1000   # convert from rtp timestamp unit to ms
                     logger.debug(
-                        f"RTCP Receiver Report: ssrc={source_ssrc}: "
-                        f"loss={loss_percentage:.1f}% cumulative={cum_lost} "
-                        f"jitter={jitter_ms:.1f}ms "
-                        f"rtt={self.rtt_ms:.1f}ms ",
+                        f"RTCP Receiver Report: ssrc={source_ssrc}:\n"
+                        f"  loss={loss_percentage:.1f}% cumulative={cum_lost}\n"
+                        f"  jitter={jitter_ms:.1f}ms\n"
+                        f"  rtt={self.rtt_ms:.1f}ms\n",
                     )
                 block_offset += 24
 
 
     def audio_player(self, samplerate, channels):
-        """Play audio frames from the queue"""
+        """Play audio frames from the queue with jitter buffering and soft limiting"""
+        peer_buffer = {}
         with speaker.player(samplerate=samplerate, channels=channels, blocksize=960) as stream:
             mixed = np.zeros((960, channels), dtype="float32")
             while self.run:
                 frames_to_mix = []
 
+                # do small buffering to smooth out network jitter
                 with self.audio_queue_out_lock:
-                    for buf in self.audio_queue_out.values():
-                        if buf:
-                            frames_to_mix.append(buf.popleft())
+                    for ssrc, buf in self.audio_queue_out.items():
+                        if not buf:
+                            peer_buffer[ssrc] = True
+                            continue
+                        if peer_buffer.get(ssrc, True):   # jitter buffer
+                            if len(buf) >= MIXER_BUFFER:
+                                peer_buffer[ssrc] = False
+                            else:
+                                continue  # keep buffering
+                        frames_to_mix.append(buf.popleft())
 
+                # mixing
                 if frames_to_mix:
                     mixed.fill(0)
                     for frame in frames_to_mix:
-                        audio = frame.to_ndarray().astype("float32").T
+                        if frame.format.name in ("s16", "s16p"):
+                            audio = frame.to_ndarray().astype("float32") / 32768.0
+                        else:
+                            audio = frame.to_ndarray().astype("float32")
+                        if audio.shape == (2, 960):
+                            audio = audio.T
+                        elif audio.shape == (1, 1920):
+                            audio = audio.reshape(960, 2)
                         mixed += audio * self.gain_output
-                    logger.info(len(frames_to_mix))
-                    # if len(frames_to_mix) > 1:   # normalize if many are talking
-                    #     mixed /= np.sqrt(len(frames_to_mix))
-                    np.clip(mixed, -1.0, 1.0, out=mixed)   # hard limiter
-                    # np.multiply(mixed, 3.0, out=mixed)   # soft limiter (with normalization)
-                    # np.tanh(mixed, out=mixed)
-                    # mixed /= np.tanh(g)
+
+                    # normalization
+                    num_speakers = len(frames_to_mix)
+                    if num_speakers > 1:
+                        if self.fast_mixer:
+                            np.tanh(mixed, out=mixed)
+                        else:
+                            mixed /= np.sqrt(num_speakers)
+                            mixed *= 3.0
+                            np.tanh(mixed, out=mixed)
+                            mixed /= 0.99505   # tanh(3)
+                    else:
+                        np.clip(mixed, -1.0, 1.0, out=mixed)
                 else:
                     mixed.fill(0)  # silence
 

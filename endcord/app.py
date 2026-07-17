@@ -154,7 +154,6 @@ class Endcord:
         self.game_detection_download_delay = config["game_detection_download_delay"]
         self.vim_mode = config["vim_mode"]
         self.notifications_pfp = config["notifications_pfp"]
-        self.silence_threshold = config["call_silence_threshold"]
         self.font_ratio = config["media_font_aspect_ratio"]
         self.inline_media = config["inline_media"] and importlib.util.find_spec("PIL") is not None and sys.platform != "win32"
         self.placeholder_emoji = False   # for extensions
@@ -8054,7 +8053,9 @@ class Endcord:
             self.user_agent,
             proxy=self.config["proxy"],
             custom_mic=self.state["audio_input_device"],
-            silence=self.silence_threshold,
+            silence=self.config["call_silence_threshold"],
+            opus_mode=self.config["call_opus_mode"],
+            fast_mixer=self.config["call_fast_mixer"],
         )
         self.in_call = {"guild_id": guild_id, "channel_id": channel_id}
         for _ in range(100):   # wait for 10s
