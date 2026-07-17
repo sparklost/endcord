@@ -623,7 +623,7 @@ def build_custom_python(version, clang, curses):
             if line.startswith("Building ncurses"):
                 curses = line.strip().split(" ")[-1].replace("_", ".")
             elif downloading and "Length" in line and "[application/" in line:
-                curses_size = line.split("(")[1].split(")")[0]
+                curses_size = line.split("(")[1].split(")")[0] if "(" in line else "unknown size"
                 downloading = False
                 iprint(f"Downloading ncurses-{curses}.tar.gz ({curses_size})")
             elif "checking build system type" in line:
@@ -633,7 +633,7 @@ def build_custom_python(version, clang, curses):
                 downloading = True
             continue
         elif downloading and "Length" in line and "[application/" in line:
-            python_size = line.split("(")[1].split(")")[0]
+            python_size = line.split("(")[1].split(")")[0] if "(" in line else "unknown size"
             downloading = False
             iprint(f"Downloading Python-{version}.tgz ({python_size})")
         elif "checking build system type" in line:
