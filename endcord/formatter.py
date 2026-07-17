@@ -2871,9 +2871,10 @@ def generate_extra_line_ring(caller_name, max_len, bordered, colors):
 def generate_extra_line_call(call_participants, volume_in, volume_out, max_len, bordered, rtt, colors):   # noqa
     """Generate extra line containing information about ongoing call"""
     max_len = max_len - bordered * 3
+    color_low = colors[8]
     color_standout = colors[9]
     left_text = "In the call: You"
-    rtt_text = ""   # f"({min(rtt, 999.9):.1f}ms) " if rtt is not None else ""
+    rtt_text = f"({min(rtt, 999.9):.1f}ms) " if rtt is not None else ""
     right_text = f"{rtt_text}[I:{(str(volume_in)+"%").center(4)} O:{(str(volume_out)+"%").center(4)}] [Leave]"
     max_str_length = max_len - len(right_text) - 3   # 3 for ...
 
@@ -2885,7 +2886,8 @@ def generate_extra_line_call(call_participants, volume_in, volume_out, max_len, 
     line_format = [
         (color_standout, None, 13, len(left_text[:max_str_length])),
         (color_standout, None, max_len - 23, max_len - 8),
-        (20 if volume_in == 0 else None, None, max_len - 15, max_len - 9),
+        (20 if int(rtt) > 500 else 19 if rtt > 200 else color_low, None, max_len - 23 - len(rtt_text), max_len - 23),
+        (20 if volume_out == 0 else None, None, max_len - 15, max_len - 9),
         (20 if volume_in == 0 else None, None, max_len - 22, max_len - 16),
         (20, None, max_len - 7, max_len),
     ]

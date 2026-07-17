@@ -6493,7 +6493,8 @@ class Endcord:
             open_native = self.terminal_media.play(path, loop=loop)
             if not open_native:
                 time.sleep(0.1)
-                self.tui.resume_curses()
+            self.tui.resume_curses()
+            if not open_native:
                 return
         # fallback to open in native
         mpv_path = self.config["mpv_path"] if shutil.which(self.config["mpv_path"]) else ""
