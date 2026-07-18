@@ -1881,7 +1881,8 @@ class ChatGenerator:
                         embed_url = embed.get("name", "")
                         if embed.get("duration"):
                             embed_url += f" ({format_seconds(embed["duration"], nice=True, pad=False)})"
-                        embeds.append([len(content), len(content) + len(embed_type) + 15 + len(embed_url), embed["url"]])
+                        pre_embed_len = pre_content_len + len(content)
+                        embeds.append([pre_embed_len, pre_embed_len + len(embed_type) + 15 + len(embed_url), 0])
                     embed_marker_ranges.append([len(content), len(content) + len(embed_type) + 14])
                     content += f"[{embed_type} attachment]: {embed_url}"
                 elif embed["type"] == "rich":
@@ -1964,6 +1965,9 @@ class ChatGenerator:
         urls = sorted(urls, key=lambda x: x[0])
         for idx, url in enumerate(urls):
             url[2] = idx
+        idx = len(urls)
+        for i, embed in enumerate(embeds):
+            embed[2] = idx + i
 
         # find spoilers - must be after all other replacements
         spoilers = []
