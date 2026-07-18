@@ -715,8 +715,9 @@ class VoiceHandler:
 
         self.run = False
         self.recording = False
-        self.pause_mic = False
+        self.mix_mic = False
         self.playing = False
+        self.active_file_queues = []
         self.rtp_sequence = random.randint(0, 0xFFFF)   # must be random per rfc3550
         self.rtp_timestamp = random.randint(0, 0xFFFFFFFF)
         self.transport_counter = 0
@@ -1179,7 +1180,12 @@ class VoiceHandler:
         with self.microphone.recorder(samplerate=samplerate, channels=channels) as rec:
             while self.run and self.recording:
                 audio_data = rec.record(numframes=960)
-                if self.pause_mic:
+                if self.active_file_queues:
+                    if self.mix_mic:
+                        try:
+                            self.raw_mic_queue.put_nowait(audio_data)
+                        except queue.Full:
+                            pass
                     continue
                 try:
                     self.audio_queue_in.put_nowait(audio_data)
@@ -1193,44 +1199,115 @@ class VoiceHandler:
             self.audio_queue_in.put(None)
 
 
-    def audio_file_player(self, path, mix=False):
-        """Play audio file from specified path. If mic is ON then mix sounds"""
-        self.playing = True
-        container = av.open(path)
-        if not container.streams.audio:
-            return
-        in_stream = container.streams.audio[0]
-        resampler = av.audio.resampler.AudioResampler(format="fltp", layout="stereo", rate=48000)
-        fifo = av.audio.fifo.AudioFifo()
-        frame_duration = 960 / 48000
+    def send_mixer(self):
+        """Mixer loop for file playback and mic integration"""
         next_time = time.perf_counter()
-        if not mix:
-            pass
-        self.pause_mic = True
-
-        for frame in container.decode(in_stream):
-            if not self.playing:
+        while self.run:
+            if not self.active_file_queues:
+                self.send_mixer_thread = None
+                self.mix_mic = False
                 break
+            queues = list(self.active_file_queues)
+            frames_to_mix = []
 
-            for new_frame in resampler.resample(frame):
+            # collect from players
+            for q in queues:
+                try:
+                    frame = q.get(timeout=0.005)
+                    if frame is not None:
+                        frames_to_mix.append(frame)
+                except queue.Empty:
+                    pass
+
+            # collect from mic
+            if self.mix_mic:
+                try:
+                    mic_data = self.raw_mic_queue.get_nowait()
+                    if mic_data.dtype == np.int16:
+                        mic_data = mic_data.astype("float32") / 32768.0
+                    else:
+                        mic_data = mic_data.astype("float32")
+                    if mic_data.shape == (2, 960):
+                        mic_data = mic_data.T
+                    elif mic_data.shape == (1, 1920):
+                        mic_data = mic_data.reshape(960, 2)
+                    frames_to_mix.append(mic_data)
+                except queue.Empty:
+                    pass
+
+            # mixing
+            if frames_to_mix:
+                mixed = np.zeros((960, 2), dtype="float32")
+                for frame in frames_to_mix:
+                    mixed += frame
+                num_signals = len(frames_to_mix)
+                if num_signals > 1:
+                    if self.fast_mixer:
+                        np.tanh(mixed, out=mixed)
+                    else:
+                        mixed /= np.sqrt(num_signals)
+                        mixed *= 3.0
+                        np.tanh(mixed, out=mixed)
+                        mixed /= 0.99505   # tanh(3)
+                else:
+                    np.clip(mixed, -1.0, 1.0, out=mixed)
+                self.audio_queue_in.put(mixed)
+
+            next_time += 0.02
+            sleep_time = next_time - time.perf_counter()
+            if sleep_time > 0:
+                time.sleep(sleep_time)
+            else:
+                next_time = time.perf_counter()
+
+
+    def audio_file_player(self, path, mix=False):
+        """Play audio file from path. Multi-thread safe with automatic mic handling."""
+        # init
+        if not hasattr(self, "file_players_lock"):
+            self.file_players_lock = threading.Lock()
+            self.send_mixer_thread = None
+            self.raw_mic_queue = queue.Queue(maxsize=10)
+        self.mix_mic = self.mix_mic or mix
+        player_queue = queue.Queue(maxsize=5)
+        with self.file_players_lock:
+            self.active_file_queues.append(player_queue)
+            if self.send_mixer_thread is None:
+                self.send_mixer_thread = threading.Thread(target=self.send_mixer, daemon=True)
+                self.send_mixer_thread.start()
+
+        # player
+        try:
+            container = av.open(path)
+            if not container.streams.audio:
+                return
+            in_stream = container.streams.audio[0]
+            resampler = av.audio.resampler.AudioResampler(format="fltp", layout="stereo", rate=48000)
+            fifo = av.audio.fifo.AudioFifo()
+            self.playing = True
+            for frame in container.decode(in_stream):
                 if not self.playing:
                     break
-                new_frame.pts = None
-                fifo.write(new_frame)
+                for new_frame in resampler.resample(frame):
+                    if not self.playing:
+                        break
+                    new_frame.pts = None
+                    fifo.write(new_frame)
+                    while fifo.samples >= 960 and self.playing:
+                        arr = fifo.read(960).to_ndarray()
+                        if arr.dtype == np.int16:
+                            arr = arr.astype(np.float32) / 32768.0
+                        else:
+                            arr = arr.astype(np.float32)
+                        player_queue.put(arr.T)
+        except Exception as e:
+            logger.error(f"Error while playing audio file {path}: {e}")
 
-                while fifo.samples >= 960 and self.playing:
-                    arr = fifo.read(960).to_ndarray()
-                    if arr.dtype == np.int16:
-                        arr = arr.astype(np.float32) / 32768.0
-                    else:
-                        arr = arr.astype(np.float32)
-                    self.audio_queue_in.put(arr.T)
-
-                    next_time += frame_duration
-                    sleep_time = next_time - time.perf_counter()
-                    if sleep_time > 0:
-                        time.sleep(sleep_time)
-        self.pause_mic = False
+        # cleanup
+        finally:
+            with self.file_players_lock:
+                if player_queue in self.active_file_queues:
+                    self.active_file_queues.remove(player_queue)
 
 
     def stop_file_playback(self):

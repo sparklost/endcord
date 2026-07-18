@@ -1060,9 +1060,9 @@ if __name__ == "__main__":
     if check_python():
         version, freethreaded = ensure_python(args.freethreaded, args.safe)
         if version:
-            os.execvp("uv", ["uv", "run", "-p", version, *sys.argv] + (["--freethreaded"] if freethreaded else []))
+            os.execvp("uv", ["uv", "run", "-p", "--no-sync", version, *sys.argv] + (["--freethreaded"] if freethreaded else []))
         else:
-            os.execvp("uv", ["uv", "run", *sys.argv])
+            os.execvp("uv", ["uv", "run", "--no-sync", *sys.argv])
         sys.exit(0)
 
     if args.freethreaded:
