@@ -51,7 +51,7 @@ def extract_file_name(headers, url_path):
                     _, encoded_filename = value.split("''", 1)
                     return urllib.parse.unquote(encoded_filename)
         for part in parts:
-            if part.startswith("filename="):
+            if part.strip().startswith("filename="):
                 return part.strip().split("=", 1)[1].strip('"\'')
 
     filename = os.path.basename(url_path) or "downloaded_file"
