@@ -1060,6 +1060,8 @@ class Endcord:
         self.execute_extensions_methods("on_switch_channel_end")
 
         # update UI
+        if self.tui.inline_media:   # new images will take time to download so clear everything
+            self.tui.inline_media.clear_images(force=True)
         if not guild_id:   # no member list in dms
             self.tui.remove_member_list()
         elif self.get_members:

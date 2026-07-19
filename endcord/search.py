@@ -345,7 +345,12 @@ def search_emojis(all_emojis, favorite_emojis, local_emojis, premium, guild_id, 
                 emoji_name = data[0]
                 long_name = None
                 formatted += " - " + data[0]
-            score = fuzzy_match_score(query, emoji_name + (f" {long_name}" if long_name else ""))
+            score = fuzzy_match_score(query, emoji_name)
+            if long_name:
+                score_long = fuzzy_match_score(query, long_name)
+                score = max(score, score_long)
+            if "_" in emoji_name:   # penalizing multi-word matches
+                score -= emoji_name.count("_")
             if score < worst_score:
                 continue
             heapq.heappush(results, (formatted, emoji_name, score))

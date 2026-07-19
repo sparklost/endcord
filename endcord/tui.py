@@ -805,11 +805,7 @@ class TUI():
         """
         if self.assist_start >= 0:
             if self.assist_start < self.input_index - (MIN_ASSIST_LETTERS - 1):
-                if (
-                    self.assist_start != -1 and
-                    self.assist_start < len(self.input_buffer) and
-                    self.input_buffer[self.assist_start-1] in ASSIST_TRIGGERS
-                ):
+                if self.assist_start < len(self.input_buffer) and self.input_buffer[self.assist_start-1] in ASSIST_TRIGGERS:
                     assist_type = ASSIST_TRIGGERS.index(self.input_buffer[self.assist_start-1]) + 1
                     before_assist = ALLOWED_BEFORE_ASSIST_EXTRA if extended else ALLOWED_BEFORE_ASSIST
                     if self.assist_start != 1 and (self.input_buffer[self.assist_start-2] not in before_assist or self.input_buffer[self.assist_start] in (" ", "\n")):

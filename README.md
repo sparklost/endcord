@@ -200,7 +200,9 @@ Press `Esc` to stop assist. Re-type trigger to start it again.
 Navigation: `Alt+Up/Down` - Go up/down, `Alt+Enter` or `Enter` - insert selected item.  
 When inserted in input line, item will usually be shown as `<some_numbers>` - that is intended - do not alter it.  
 Stickers and emoji are sorted into packs, and will be shown as `pack name - emoji/sticker name`, and search is performed on that string.  
-Emoji assist has special feature: type `:**` to search all favorited emojis.  
+Emoji assist has special features:
+- Type  `:**` to search all favorited emojis.
+- Type `+:` at the start of input line, and when eg `+:sparkles:` is sent, it will react to selected message instead.
 
 ### Adding/Removing reactions
 To start reaction assist, press `Alt+E`.  
