@@ -890,6 +890,8 @@ class VoiceHandler:
                 if decryptor is None:
                     logger.debug(f"Unknown ssrc {ssrc}")
                     continue
+                if len(payload) < 12 or not payload.endswith(b"\xfa\xfa"):   # skip empty or non-opus packets
+                    continue
                 decrypted = decryptor.decrypt(dave.MediaType.audio, bytes(payload))
                 if decrypted is None:
                     continue

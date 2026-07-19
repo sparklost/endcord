@@ -8078,7 +8078,7 @@ class Endcord:
         else:
             self.update_extra_line(permanent=True)
             self.update_extra_line("Failed to start call: voice gateway timeout", color=20)
-            logger.warning("Failed to start call: voice gateway timeout", color=20)
+            logger.warning("Failed to start call: voice gateway timeout")
             del self.voice_gateway
             self.voice_gateway = None
             self.joining_call = False
