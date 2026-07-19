@@ -61,7 +61,7 @@ def load_config(path, default, section="main", gen_config=False, merge=False):
                 try:
                     eval_value = literal_eval(config_data_raw[key])
                     if section == "theme":
-                        eval_value = parse_color(eval_value)
+                        eval_value = color.parse_color(eval_value)
                     config_data[key] = eval_value
                 except ValueError:
                     config_data[key] = config_data_raw[key]
@@ -72,7 +72,7 @@ def load_config(path, default, section="main", gen_config=False, merge=False):
                 try:
                     eval_value = literal_eval(value)
                     if section == "theme":
-                        eval_value = parse_color(eval_value)
+                        eval_value = color.parse_color(eval_value)
                     config_data[key] = eval_value
                 except ValueError:
                     config_data[key] = value
@@ -153,20 +153,6 @@ def update_config(config, key, value):
     save_config(config_path, new_config, "main")
     save_config(config_path, new_theme, "theme")
     return config
-
-
-def parse_color(data):
-    """Automatically parse (r, g, b) and '#123abc' color formats and convert to 8-bit ansi"""
-    if isinstance(data, list):
-        for i, value in enumerate(data):
-            data[i] = parse_color(value)
-    if isinstance(data, int):   # already ansi
-        return data
-    if isinstance(data, tuple) and len(data) == 3:   # rgb tuple
-        return color.closest_color(data)[0]
-    if isinstance(data, str) and data.startswith("#"):   # hex string
-        return color.closest_color(color.hex_to_rgb(data))[0]
-    return data
 
 
 def load_keybindings(path, default, section="keybindings", gen_config=False, merge=False):

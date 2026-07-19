@@ -80,6 +80,9 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
     Limit number of cached deleted messages per channel.
 - `max_thumb_cache_age = 7`  
     How long to keep cached thumbs for inline images, in days. Set `0` to clear on each new run.  
+- `syntax_highlight = True`  
+    Whether to enable code block syntax highlighting. Code block needs to have language prefix.  
+    For this to work, either GNU `source-highlight` or `python-pygments` needs to be installed.
 - `tree_show_folders = True`  
     Whether to show or hide server folders in tree.
 - `wrap_around = True`  
@@ -468,6 +471,10 @@ Every next list has additional `start` and `end`- indexes on a line where color 
     Color format for message app interaction string. Corresponding to `format_interaction`.
 - `color_format_forum = [[-1, -1], [242, -2, 0, 0, 12], [25, -2, 0, 15, 20]]`  
     Color format for threads in forum. Corresponding to `format_forum`.
+- `"syntax_token_colors = [133, 185, 102, 173, 133, 173, 111, -1, 167, 111, -1, -1]`  
+    A list of foreground colors for code block syntax. Must have all 12 values. Values correspond to (in order):  
+    keyword, string, comment, number, type, classname, function, variable, preproc/builtin, specialchar, symbol, cbracket.  
+    Set to negative value to disable this token.  
 - `media_color_bg = -1`  
     Single color value for background color when showing media.
 

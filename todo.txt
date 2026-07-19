@@ -1,6 +1,5 @@
 Patch python 3.14 using python 3.16 curses module to enable 255+ colors
 Update tui.py to support 255+ colors
-Add code block language syntax
 Add inbox
 Add pinned servers and channels
 Make build.py work without uv

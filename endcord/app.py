@@ -275,8 +275,14 @@ class Endcord:
             global MSG_MIN
             MSG_MIN = 0
         utils.load_emoji()
+        color_code = self.colors[6]
         self.colors = self.tui.init_colors(self.colors)
         self.colors_formatted = self.tui.init_colors_formatted(self.colors_formatted, self.default_msg_alt_color)
+        if config["syntax_highlight"] and (shutil.which("source-highlight") or shutil.which("pygmentize")):
+            token_colors = [color.parse_color(x) for x in config["syntax_token_colors"]]
+            self.colors_code = self.tui.init_colors_code(token_colors, color_code)
+        else:
+            self.colors_code = None
         self.tui.update_chat(self.chat, [[[self.colors[0]]]] * len(self.chat))
         self.tui.update_status_line(" CONNECTING")
         self.my_id = None   # will be taken from gateway in main()
@@ -288,6 +294,7 @@ class Endcord:
             self.config,
             self.colors,
             self.colors_formatted,
+            self.colors_code,
             self.my_id,
             self.placeholder_emoji,
             self.placeholder_images,

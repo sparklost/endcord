@@ -5,12 +5,13 @@
 import curses
 import logging
 import re
+import shutil
 import time
 from bisect import bisect_left
 from datetime import UTC, datetime
 from itertools import chain
 
-from endcord import utils
+from endcord import peripherals, utils
 from endcord.wide_ranges import WIDE_RANGES
 
 logger = logging.getLogger(__name__)
@@ -40,7 +41,7 @@ match_timestamp = re.compile(r"<t:(\d+)(:[tTdDfFsSR])?>")
 match_escaped_md = re.compile(r"\\(?=[^a-zA-Z\d\s])")
 match_md_spoiler = re.compile(r"(?<!\\)\|\|.+?\|\|")
 match_md_code_snippet = re.compile(r"(?<!`|\\)`[^`]+`")
-match_md_code_block = re.compile(r"(?s)```(.*?)```")
+match_md_code_block = re.compile(r"(?s)```(?:([a-zA-Z0-9+#-]+)?[ \t]*\n)?(.*?)```")
 match_md_url = re.compile(r"(?<!\\)\[([^\]]+)\]\(([^)]+)\)")
 match_url = re.compile(r"https?:\/\/[\w.-]+(\.[\w-])+[^\s)\]>]*[^\s).\]>]")
 match_discord_channel_url = re.compile(r"https:\/\/discord(?:app)?\.com\/channels\/(\d*)\/(\d*)(?:\/(\d*))?")
@@ -782,9 +783,9 @@ def replace_code_blocks(text, *ranges_lists):
     for match in re.finditer(match_md_code_block, text):
         start, end = match.span()
         result.append(text[last_pos:start])
-        new_text = match.group(1)
+        new_text = match.group(2)
         new_text = new_text.removeprefix("\n")
-        lang = None
+        lang = match.group(1)
         result.append(new_text)
 
         new_start = start + offset
@@ -1220,7 +1221,7 @@ def format_poll(poll):
 class ChatGenerator:
     """Chat generator class"""
 
-    def __init__(self, config, colors, colors_formatted, my_id, placeholder_emoji, placeholder_images, font_ratio=2.25, dpw=1):
+    def __init__(self, config, colors, colors_formatted, colors_code, my_id, placeholder_emoji, placeholder_images, font_ratio=2.25, dpw=1):
         # load from config
         self.config = config
         self.format_message = config["format_message"]
@@ -1249,6 +1250,7 @@ class ChatGenerator:
         self.trim_embed_url_size = max(config["trim_embed_url_size"], 20)
         self.dynamic_name_len = config["dynamic_name_len"]
         self.limit_chat_buffer = config["limit_chat_buffer"]
+        self.syntax_highlight = config["syntax_highlight"]
         self.smart_chat_lines = config["smart_chat_lines"] and self.message_grouping
         self.unreads_edge = "" if self.emoji_as_text else config["tree_drop_down_thread"]
         if self.smart_chat_lines:
@@ -1274,6 +1276,7 @@ class ChatGenerator:
         self.color_mention_chat_edited = colors_formatted[16][0]
         self.color_mention_chat_url = colors_formatted[17][0][0]
         self.color_mention_spoiler = colors_formatted[18][0][0]
+        self.colors_code = colors_code
 
         # load formatted colors: [[id], [id, start, end]...]
         self.color_message = colors_formatted[0]
@@ -1303,6 +1306,13 @@ class ChatGenerator:
         self.chat_format = []
         self.chat_map = []
         # self.chat_lock = threading.Lock()   # enable if threads collide which is very unlikely
+
+        self.tokenize_code = None
+        if self.syntax_highlight:
+            if shutil.which("pygmentize"):
+                self.tokenize_code = peripherals.tokenize_code_pygments
+            elif shutil.which("source-highlight"):
+                self.tokenize_code = peripherals.tokenize_code_srchl
 
         self.calculate_lengths()
 
@@ -1838,6 +1848,15 @@ class ChatGenerator:
             content, code_snippets = replace_code_snippets(content, emoji_ranges, mention_ranges, channel_ranges, timestamp_ranges)
             content, code_blocks = replace_code_blocks(content, emoji_ranges, mention_ranges, channel_ranges, timestamp_ranges, code_snippets)
             content, urls = replace_markdown_urls(content, (code_snippets, code_blocks), emoji_ranges, mention_ranges, channel_ranges, timestamp_ranges, code_snippets)
+            code_blocks_tokens = []
+            if self.syntax_highlight:
+                for block in code_blocks:
+                    if not block[2]:
+                        continue
+                    tokens = self.tokenize_code(content[block[0]:block[1]], block[2], initial_idx=block[0])
+                    for token in tokens:
+                        token[2] = self.colors_code[token[2]]
+                    code_blocks_tokens += tokens
             shift_ranges_all(
                 pre_content_len,
                 emoji_ranges,
@@ -1846,6 +1865,7 @@ class ChatGenerator:
                 timestamp_ranges,
                 code_snippets,
                 code_blocks,
+                code_blocks_tokens,
                 urls,
             )
             if content.startswith("> "):
@@ -1858,6 +1878,7 @@ class ChatGenerator:
             timestamp_ranges = []
             code_snippets = []
             code_blocks = []
+            code_blocks_tokens = []
             urls = []
         embeds = []
         image_locations = []
@@ -1987,6 +2008,7 @@ class ChatGenerator:
                 spoilers,
                 code_snippets,
                 code_blocks,
+                code_blocks_tokens,
                 emoji_ranges,
                 mention_ranges,
                 channel_ranges,
@@ -2005,6 +2027,7 @@ class ChatGenerator:
                 spoilers,
                 code_snippets,
                 code_blocks,
+                code_blocks_tokens,
                 emoji_ranges,
                 mention_ranges,
                 channel_ranges,
@@ -2020,6 +2043,7 @@ class ChatGenerator:
                 urls,
                 code_snippets,
                 code_blocks,
+                code_blocks_tokens,
                 emoji_ranges,
                 mention_ranges,
                 channel_ranges,
@@ -2078,6 +2102,7 @@ class ChatGenerator:
         code_block_format = format_multiline_one_line_end(code_blocks, newline_index+1, 0, self.color_code, max_length-1, quote)
         if code_block_format:
             message_line = message_line.ljust(max_length-1)
+        code_block_format += format_multiline_one_line_format(code_blocks_tokens, newline_index+1, 0, quote)
 
         chat.append(message_line)
         urls_this_line = fix_map_ranges(ranges_multiline_one_line(urls + embeds, newline_index+1, 0, quote), message_line)
@@ -2165,6 +2190,7 @@ class ChatGenerator:
                 spoilers,
                 code_snippets,
                 code_blocks,
+                code_blocks_tokens,
                 emoji_ranges,
                 mention_ranges,
                 channel_ranges,
@@ -2223,8 +2249,9 @@ class ChatGenerator:
             code_block_format = format_multiline_one_line_end(code_blocks, len_new_line, self.newline_len, self.color_code, max_length-1, this_quote)
             if code_block_format:
                 new_line = new_line.ljust(max_length-1)
-            len_new_line = len(new_line)
+            code_block_format += format_multiline_one_line_format(code_blocks_tokens, len_new_line, self.newline_len, this_quote)
 
+            len_new_line = len(new_line)
             chat.append(new_line)
             urls_this_line = fix_map_ranges(ranges_multiline_one_line(urls + embeds, len_new_line, self.newline_len, quote), new_line)
             spoilers_this_line = fix_map_ranges(ranges_multiline_one_line(spoilers, len_new_line, self.newline_len, quote), new_line)

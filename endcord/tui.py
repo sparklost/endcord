@@ -848,6 +848,7 @@ class TUI():
     def set_selected(self, selected, change_amount=0, scroll=True, draw=True):
         """Set selected line and text scrolling"""
         up = self.chat_selected >= selected
+        selected = min(max(selected, -1), len(self.chat_buffer))
         self.chat_selected = selected
         if scroll:
             if self.chat_selected == -1:
@@ -2286,6 +2287,20 @@ class TUI():
                 pair_id = self.init_pair(color[:3])
                 format_codes.append([pair_id, *color[3:]])
             color_codes.append(format_codes)
+        self.role_color_start_id = self.last_free_id
+        return color_codes
+
+
+    def init_colors_code(self, tokens_fg, color_code):
+        """Initialize color pairs for code block syntax highlighting, built from token foreground color and code block background color"""
+        color_codes = []
+        code_bg = color_code[1]
+        for color_fg in tokens_fg:
+            if color_fg >= 0:
+                pair_id = self.init_pair((color_fg, code_bg))
+            else:
+                pair_id = self.init_pair(color_code)
+            color_codes.append(pair_id)
         self.role_color_start_id = self.last_free_id
         return color_codes
 

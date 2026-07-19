@@ -2,10 +2,12 @@
 # Source-available under the Endcord License. See LICENSE for terms.
 # Redistribution of modified versions is not permitted.
 
+import ast
 import http.client
 import importlib.util
 import logging
 import os
+import re
 import shutil
 import ssl
 import struct
@@ -617,7 +619,6 @@ def get_connection(host, port=443, timeout=2, proxy=None):
     return connection
 
 
-
 def find_aspell():
     """Find aspell executable"""
     if sys.platform == "linux":
@@ -1009,3 +1010,107 @@ def resize_image(image_path, h, w):
         return image_path
     except FileNotFoundError:
         return None
+
+
+TOKEN_MAP = ("keyword", "string", "comment", "number", "type", "classname", "function", "variable", "preproc", "specialchar", "symbol", "cbracket")
+HTML_REPLACEMENTS = (("&lt;", "<"), ("&gt;", ">"), ("&quot;", '"'), ("&#39;", "'"), ("&nbsp;", " "), ("&amp;", "&"))
+match_html_code_block = re.compile(r"<pre><tt>(.*?)</tt></pre>", re.DOTALL)
+match_span = re.compile(r'<span class="([^"]+)">([^<]*)</span>|([^<]+)')
+
+
+def unescape_html(text):
+    """Decode standard HTML entities"""
+    for entity, char in HTML_REPLACEMENTS:
+        text = text.replace(entity, char)
+    return text
+
+
+def tokenize_code_srchl(code_text, lang, initial_idx=0):
+    """Get token locations for specified language, using GNU source-highlight, return [[start_idx, end_idx, token_id]...]"""
+    cmd = ["source-highlight", f"--src-lang={lang}", "--out-format=html", "--css=style.css"]
+    try:
+        result = subprocess.run(cmd, input=code_text, text=True, capture_output=True, check=True)
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return []
+    html_output = result.stdout
+    code_block_match = re.search(match_html_code_block, html_output)
+    if not code_block_match:
+        return []
+    html_lines = code_block_match.group(1).splitlines()
+
+    tokens = []
+    start_idx = initial_idx
+    for line in html_lines:
+        for match in match_span.finditer(line):
+            if match.group(1):
+                text = unescape_html(match.group(2))
+                end_idx = start_idx + len(text)
+                try:
+                    token_id = TOKEN_MAP.index(match.group(1))
+                except ValueError:
+                    token_id = None
+                if token_id is not None:
+                    tokens.append([start_idx, end_idx, token_id])
+                start_idx = end_idx
+            elif match.group(3):
+                text = unescape_html(match.group(3))
+                start_idx += len(text)
+        start_idx += 1
+
+    return tokens
+
+
+PYGMENTS_TOKEN_MAP = [
+    "Keyword",
+    "Literal.String",
+    "Comment",
+    "Literal.Number",
+    "Keyword.Type",
+    "Name.Class",
+    "Name.Function",
+    "Name.Variable",
+    "Name.Builtin",
+    "Literal.String.Escape",
+    "Operator",
+    "Punctuation",
+]
+
+
+def tokenize_code_pygments(code_text, lang, initial_idx=0):
+    """Get token locations for specified language using Pygments, return [[start_idx, end_idx, token_id]...]"""
+    cmd = ["pygmentize", f"-l={lang}", "-f=raw"]
+    try:
+        result = subprocess.run(cmd, input=code_text, text=True, capture_output=True, check=True)
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return []
+
+    tokens = []
+    current_idx = initial_idx
+
+    # line: Token.Keyword\t'def'\n
+    for line in result.stdout.splitlines():
+        if not line:
+            continue
+        parts = line.split("\t", 1)
+        if len(parts) != 2:
+            continue
+        token_type, token_repr = parts
+        token_type = token_type[6:]
+        try:
+            text = ast.literal_eval(token_repr)
+        except (ValueError, SyntaxError):
+            continue
+        end_idx = current_idx + len(text)
+        try:
+            token_id = PYGMENTS_TOKEN_MAP.index(token_type)
+        except ValueError:   # fallback: search for broader token group
+            token_id = None
+            for idx, mapped_type in enumerate(PYGMENTS_TOKEN_MAP):
+                if token_type.startswith(mapped_type):
+                    token_id = idx
+                    break
+        if token_id is not None:
+            tokens.append([current_idx, end_idx, token_id])
+        current_idx = end_idx
+
+    return tokens

@@ -46,6 +46,20 @@ def hex_to_rgb(hex_str):
     return tuple(int(hex_str[i : i + 2], 16) for i in (0, 2, 4))
 
 
+def parse_color(data):
+    """Parse (r, g, b) and '#123abc' color formats and convert to 8-bit ansi"""
+    if isinstance(data, list):
+        for i, value in enumerate(data):
+            data[i] = parse_color(value)
+    if isinstance(data, int):   # already ansi
+        return data
+    if isinstance(data, tuple) and len(data) == 3:   # rgb tuple
+        return closest_color(data)[0]
+    if isinstance(data, str) and data.startswith("#"):   # hex string
+        return closest_color(hex_to_rgb(data))[0]
+    return data
+
+
 def convert_role_colors(all_roles, guild_id=None, role_id=None, default=-1):
     """
     For all roles, in all guilds, convert integer color format into rgb tuple color and closest 8bit ANSI color code.
@@ -118,16 +132,16 @@ def check_color_formatted(color_format):
 def extract_colors(config):
     """Extract simple colors from config if any value is None, default is used"""
     return (   # DO NOT CHANGE ORDER
-        check_color(config["color_default"]),
+        check_color(config["color_default"]),   # 0
         check_color(config["color_chat_mention"]),
         check_color(config["color_chat_blocked"]),
-        check_color(config["color_chat_deleted"]),
+        check_color(config["color_chat_deleted"]),   # 3
         check_color(config["color_chat_pending"]),
         check_color(config["color_chat_separator"]),
-        check_color(config["color_chat_code"]),
+        check_color(config["color_chat_code"]),   # 6
         check_color(config["color_chat_standout"]),
         check_color(config["color_extra_window_low"]),   # color_extra_window is loaded in tui
-        check_color(config["color_extra_window_standout"]),
+        check_color(config["color_extra_window_standout"]),   # 9
     )
 
 

@@ -49,7 +49,7 @@ Any third party endcord forks may add features that can lead to account ban, con
     - Forums, imageborads and thread channels
     - Folders with custom naming
 - Show reactions, replied message, forwarded message
-- Show embeds, attachment types and links, code blocks
+- Show embeds, attachment types and links, code blocks (with syntax highlighting)
 - Spellchecking
 - Advanced input line operations and ability to use external editor
 - Tabs and temporary tabs with mouse controls (click, double click, middle click)
@@ -348,6 +348,7 @@ Optional dependencies:
 - `libsecret` - Store token in system keyring (secret service provider is also required (eg. `gnome-keyring`, `KWallet`, `KeePassXC`), with `dbus` as dependency)
 - `libappindicator-gtk3` - Tray support under wayland, for [experimental windowed mode](#experimental-windowed-mode) only.
 - `imagemagick` - To make notification images round; only needed for endcord-lite.
+- `source-highlight` or `python-pygments` - Code block syntax highlighting (Alternatively use [this extension](https://github.com/sparklost/endcord-pygments-syntax)).
 
 ### Windows
 - Pre-built binaries (built with nuitka) are available in releases
