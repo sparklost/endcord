@@ -397,9 +397,9 @@ def main_tui(screen, profiles_enc, profiles_plain, selected, have_keyring, confi
         draw_buttons(screen, selected_button, h-1, w)
 
         key = screen.getch()
-        if key == 27:   # escape key
+        if key in (27, "ESC"):
             break
-        if key == 10:   # ENTER
+        if key in (10, "ENTER"):
             if selected_button == 0 and profiles:   # LOAD
                 proceed = True
                 selected = profiles[selected_num]["name"]
@@ -444,19 +444,19 @@ def main_tui(screen, profiles_enc, profiles_plain, selected, have_keyring, confi
                 regenerate = True
             elif selected_button == 4:   # QUIT
                 break
-        elif key == curses.KEY_UP:
+        elif key in (curses.KEY_UP, "UP"):
             if selected_num > 0:
                 selected_num -= 1
-        elif key == curses.KEY_DOWN:
+        elif key in (curses.KEY_DOWN, "DOWN"):
             if selected_num < len(profiles) - 1:
                 selected_num += 1
-        elif key == curses.KEY_LEFT:
+        elif key in (curses.KEY_LEFT, "LEFT"):
             if selected_button > 0:
                 selected_button -= 1
-        elif key == curses.KEY_RIGHT:
+        elif key in (curses.KEY_RIGHT, "RIGHT"):
             if selected_button < 4:
                 selected_button += 1
-        elif key == curses.KEY_RESIZE:
+        elif key in (curses.KEY_RESIZE, "RESIZE"):
             regenerate = True
 
         if regenerate:
@@ -804,9 +804,9 @@ def delete_profile(screen, profiles_enc, profiles_plain, selected_profile):
         screen.addstr(int(h/2), 0, text, curses.color_pair(1) | curses.A_STANDOUT)
 
         key = screen.getch()
-        if key == 27 or key == 110:   # ESCAPE / N
+        if key in (27, 110, "ESC", "n"):
             return profiles_enc, profiles_plain, False
-        if key == 10 or key == 121:   # ENTER / Y
+        if key in (10, 121, "ENTER", "y"):
             if enc_source:
                 profiles_enc.pop(num)
             else:
@@ -880,37 +880,42 @@ def text_prompt(screen, description_text, prompts, init=None, mask=None, prompt_
             screen.nodelay(False)
             if sequence[-1] == -1 and sequence[-2] == 27:
                 break
+        elif key == "ESC":
+            break
+        elif isinstance(key, str) and key.startswith("PASTE"):
+            texts[selected] = texts[selected][:input_index] + key[6:] + texts[selected][input_index:]
+            input_index += len(key) - 6
 
-        if key == 10:  # ENTER
+        elif key in (10, "ENTER"):
             try:
                 selected = next(i for i, t in enumerate(texts) if not t.strip())
             except StopIteration:
                 proceed = True
                 break
 
-        elif key in (BACKSPACE, 127) and input_index > 0:
+        elif key in (BACKSPACE, 127, "BACKSPACE") and input_index > 0:
             texts[selected] = texts[selected][:input_index-1] + texts[selected][input_index:]
             input_index -= 1
 
-        if key == curses.KEY_UP:
+        if key in (curses.KEY_UP, "UP"):
             selected = max(0, selected - 1)
             input_index = len(texts[selected])
-
-        elif key == curses.KEY_DOWN:
+        elif key in (curses.KEY_DOWN, "DOWN"):
             selected = min(len(prompts) - 1, selected + 1)
             input_index = len(texts[selected])
-
-        elif key == curses.KEY_LEFT and input_index > 0:
+        elif key in (curses.KEY_LEFT, "LEFT") and input_index > 0:
             input_index -= 1
-
-        elif key == curses.KEY_RIGHT and input_index < len(texts[selected]):
+        elif key in (curses.KEY_RIGHT, "RIGHT") and input_index < len(texts[selected]):
             input_index += 1
 
         elif isinstance(key, int) and 32 <= key <= 126:
             texts[selected] = texts[selected][:input_index] + chr(key) + texts[selected][input_index:]
             input_index += 1
+        elif isinstance(key, str) and len(key) == 1:
+            texts[selected] = texts[selected][:input_index] + key + texts[selected][input_index:]
+            input_index += 1
 
-        elif key == 9:  # TAB
+        elif key in (9, "TAB"):
             selected = (selected + 1) % len(prompts)
             input_index = len(texts[selected])
 
@@ -950,18 +955,18 @@ def select_prompt(screen, description_text, options, y_offset):
 
         key = screen.getch()
 
-        if key == 27:   # ESCAPE
+        if key in (27, "ESC"):
             break
 
-        elif key == 10:   # ENTER
+        elif key in (10, "ENTER"):
             proceed = True
             break
 
-        elif key == curses.KEY_UP:
+        elif key in (curses.KEY_UP, "UP"):
             if selected_num > 0:
                 selected_num -= 1
 
-        elif key == curses.KEY_DOWN:
+        elif key in (curses.KEY_DOWN, "DOWN"):
             if selected_num < len(options) - 1:
                 selected_num += 1
 
@@ -985,12 +990,12 @@ def key_prompt(screen, description_text, enter=False):
     proceed = False
     while run:
         key = screen.getch()
-        if key and not enter:
+        if key not in (-1, "RESIZE", "FOCUS_IN", "FOCUS_OUT") and not isinstance(key, tuple) and not enter:
             proceed = True
             break
-        if key == 27:   # ESCAPE
+        if key in (27, 110, "ESC", "n"):
             break
-        elif key == 10:   # ENTER
+        elif key in (10, 121, "ENTER", "y"):
             proceed = True
             break
     screen.clear()

@@ -46,7 +46,6 @@ def prepare_embeds(embeds, message_content):
         if url and not any(domain in url for domain in GIF_PROVIDERS):
             # dont repeat unless its not discord attachment and handle x=twitter
             if (embed_type != "rich" and ".discordapp." not in embed["url"]) or embed["url"] not in message_content.replace("https://x.com", "https://twitter.com") or embed_type == "image":
-                content.append(url)
                 main_url = url
                 skip_main_url = True
 
@@ -55,7 +54,10 @@ def prepare_embeds(embeds, message_content):
             if name not in embed.get("title", "") and name not in embed.get("description", ""):
                 content.append(quote(name))
         if "title" in embed:
-            content.append(quote(embed["title"]))
+            if main_url:
+                content = [" ", quote(f"[{embed["title"]}]({main_url})")]
+            else:
+                content.append(quote(embed["title"]))
         if "description" in embed and (not main_url or "youtube." not in main_url):   # skip long descriptions for yt
             content.append(quote(embed["description"]))
 
@@ -75,6 +77,8 @@ def prepare_embeds(embeds, message_content):
             if embed["image"]["url"] not in content:
                 if embed_type == "rich":
                     content.append(quote(embed["image"]["url"]))
+                elif embed_type.startswith("gif") and "title" in embed:
+                    content = [f"[{embed["title"]}]({embed["image"]["url"]})"]
                 else:
                     content.append(embed["image"]["url"])
             main_url = embed["image"]["url"]
@@ -86,6 +90,8 @@ def prepare_embeds(embeds, message_content):
             if "youtube." not in embed["video"]["url"] and embed["video"]["url"] not in content:
                 if embed_type == "rich":
                     content.append(quote(embed["video"]["url"]))
+                elif embed_type.startswith("gif") and "title" in embed:
+                    content = [f"[{embed["title"]}]({embed["video"]["url"]})"]
                 else:
                     content.append(embed["video"]["url"])
             if not skip_main_url:

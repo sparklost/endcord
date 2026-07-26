@@ -573,7 +573,7 @@ Note: everything after `%content` may be pushed to newline.
 - `%app` - either `App`, `App - Ephemeral` or `Webhook`
 
 
-## pgcurses.json - config for experimental windowed mode
+## gtkcurses.json - config for GTK3 windowed mode
 - `window_size: [900, 600]`  
     Initial window width and height in pixels.
 - `maximized: false`  
@@ -582,12 +582,10 @@ Note: everything after `%content` may be pushed to newline.
     Size of the font.
 - `font_name: "Source Code Pro"`  
     Name of the font installed on the system.
+- `gtk_dark_theme = True`  
+    Whether to use dark GTK theme for the window.
 - `app_name: "Endcord"`  
     Only changes title of the window.
-- `repeat_delay: 400`  
-    Delay before held key will start repeating, in ms.
-- `repeat_interval: 25`  
-    Delay between each key repeat when holding key, in ms.
 - `ctrl_v_paste: false`  
     If `true` will use `Ctrl+V` instead `Ctrl+Shift+V` for pasting.
 - `enable_tray: true`  

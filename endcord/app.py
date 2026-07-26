@@ -52,7 +52,7 @@ support_call = (
     importlib.util.find_spec("nacl") is not None
 )
 cythonized = importlib.util.find_spec("endcord_cython") and importlib.util.find_spec("endcord_cython.search")
-uses_pgcurses = tui.uses_pgcurses
+uses_gtkcurses = tui.uses_gtkcurses
 logger = logging.getLogger(__name__)
 recorder = peripherals.Recorder()
 
@@ -155,7 +155,7 @@ class Endcord:
         self.vim_mode = config["vim_mode"]
         self.notifications_pfp = config["notifications_pfp"]
         self.font_ratio = config["media_font_aspect_ratio"]
-        self.inline_media = config["inline_media"] and importlib.util.find_spec("PIL") is not None and sys.platform != "win32"
+        self.inline_media = config["inline_media"] and importlib.util.find_spec("PIL") is not None and sys.platform != "win32" and not uses_gtkcurses
         self.placeholder_emoji = False   # for extensions
         self.placeholder_images = self.inline_media   # keeping this separated so extension can toggle it
         self.premium_override_commands = []   # for extensions
@@ -180,7 +180,7 @@ class Endcord:
         self.default_msg_alt_color = self.colors[1]
 
         # write build info to log
-        logger.info(f"Build info:\n  {utils.get_build_info(cythonized, uses_pgcurses, support_image, support_media, support_call)}")
+        logger.info(f"Build info:\n  {utils.get_build_info(cythonized, uses_gtkcurses, support_image, support_media, support_call)}")
 
         # variables
         self.run = False
@@ -206,6 +206,7 @@ class Endcord:
         self.input_store = []
         self.running_tasks = []
         self.cached_downloads = []
+        self.deleted_cache = []
         self.last_summary_save = time.time() - SUMMARY_SAVE_INTERVAL - 1
         self.new_version = None
 
@@ -318,7 +319,6 @@ class Endcord:
         self.tab_string_map = []
         self.uncollapsed_threads = []
         self.my_roles = []
-        self.deleted_cache = []
         self.extra_window_open = False
         self.extra_indexes = []
         self.extra_body = []
@@ -355,7 +355,7 @@ class Endcord:
         try:
             signal.signal(signal.SIGINT, self.sigint_handler)
         except ValueError:
-            pass   # error when ran in pgcurses
+            pass   # error when ran in gtkcurses
 
         # init extensions
         if config["extensions"] and ENABLE_EXTENSIONS:
@@ -412,7 +412,7 @@ class Endcord:
             if force:
                 sys.exit(0)
         except Exception:   # failsafe
-            sys.exit()
+            sys.exit(0)
 
 
     def load_extensions(self, version):
@@ -1344,6 +1344,8 @@ class Endcord:
 
     def add_to_store(self, channel_id, text):
         """Adds entry to input line store"""
+        if not text or text == "\n":
+            return
         if self.cache_typed:
             for num, channel in enumerate(self.input_store):
                 if channel["id"] == channel_id:
@@ -1355,6 +1357,7 @@ class Endcord:
                     "id": channel_id,
                     "content": text,
                     "index": self.tui.input_index,
+                    "reply": self.replying if self.replying["id"] else None,
                 })
 
 
@@ -1673,8 +1676,12 @@ class Endcord:
                     active_channel_id = self.active_channel["channel_id"]
                     for num, channel in enumerate(self.input_store):
                         if channel["id"] == active_channel_id:
-                            restore_text = self.input_store[num]["content"]
-                            input_index = self.input_store.pop(num)["index"]
+                            data = self.input_store.pop(num)
+                            restore_text = data["content"]
+                            if data["reply"]:
+                                self.replying = data["reply"]
+                                self.update_status_line()
+                            input_index = data["index"]
                             break
                 if restore_text:
                     self.tui.update_prompt(self.prompt)
@@ -2229,9 +2236,10 @@ class Endcord:
             # switch tab
             elif action == 42:
                 pressed_num_key = self.tui.pressed_num_key
-                self.add_to_store(self.active_channel["channel_id"], input_text)
                 if pressed_num_key:
                     self.switch_tab(pressed_num_key - 1)
+                    self.add_to_store(self.active_channel["channel_id"], input_text)
+                    self.restore_input_text = (None, None)
 
             # show pinned
             elif action == 43:
@@ -2556,9 +2564,8 @@ class Endcord:
                         else:
                             success = self.switch_tab(tab[2])
                         if success:
+                            self.add_to_store(active_channel_id, input_text)
                             self.restore_input_text = (None, None)
-                            if input_text and input_text != "\n":
-                                self.add_to_store(active_channel_id, input_text)
                         break
 
             # double click on subtitle line
@@ -2655,7 +2662,11 @@ class Endcord:
             elif isinstance(action, tuple):
                 if action[0] == 50:
                     self.restore_input_text = (input_text, "standard")
-                    for command in parser.split_command_binding(action[1]):
+                    commands = list(parser.split_command_binding(action[1]))
+                    while commands:
+                        command = commands.pop(0)
+                        if command == "end":
+                            continue
                         if command.startswith("sleep "):
                             try:
                                 time.sleep(float(command[6:]))
@@ -2669,6 +2680,30 @@ class Endcord:
                                 if self.restore_input_text[1] == "standard":
                                     self.tui.set_input_index(self.tui.input_index + len(text))
                                 continue
+                        elif command.startswith("repeat "):
+                            try:
+                                parts = command[7:].strip().split(" ", 1)
+                                count = int(parts[0])
+                                if len(parts) > 1:   # single repeat like "repeat 3 some_command"
+                                    commands = [parts[1]] * count + commands
+                                    continue
+                                depth = 1
+                                end_idx = -1
+                                for idx, cmd in enumerate(commands):   # repeat until "end"
+                                    # like "repeat 3; sleep 0.5; some_command; end; other_command"
+                                    if cmd.startswith("repeat "):
+                                        depth += 1
+                                    elif cmd == "end":
+                                        depth -= 1
+                                        if depth == 0:
+                                            end_idx = idx
+                                            break
+                                if end_idx != -1:
+                                    block = commands[:end_idx]
+                                    commands = (block * count) + commands[end_idx + 1:]
+                                    continue
+                            except (ValueError, IndexError):
+                                pass
                         cmd_type, cmd_args = parser.command_string(command)
                         chat_sel, _ = self.tui.get_chat_selected()
                         tree_sel = self.tui.get_tree_selected()
@@ -3397,6 +3432,9 @@ class Endcord:
                     message_id = None
                 channel_id, _, guild_id, _, parent_hint = self.find_parents_from_id(object_id)
                 if channel_id:
+                    if not reset:   # means its from command bindings
+                        self.add_to_store(self.active_channel["channel_id"], self.restore_input_text[0])
+                        self.restore_input_text = (None, None)
                     self.switch_channel(channel_id, guild_id, parent_hint=parent_hint)
                     if message_id:
                         self.go_to_message(message_id)
@@ -3505,6 +3543,9 @@ class Endcord:
                     self.open_guild(0, select=True, open_only=True)
                     self.tui.tree_select(self.tree_pos_from_id(object_id))
                     time.sleep(0.1)   # sometimes dms list gets collapsed if no delay
+                if not reset:   # means its from command bindings
+                    self.add_to_store(self.active_channel["channel_id"], self.restore_input_text[0])
+                    self.restore_input_text = (None, None)
                 self.switch_channel(channel_id, guild_id, parent_hint=parent_hint)
                 if tp:
                     self.update_extra_line("You're inside building. There is food here.", color=self.colors[9])
@@ -3590,6 +3631,9 @@ class Endcord:
 
         elif cmd_type == 31:   # SWITCH_TAB
             # if its number its already converted to index (num-1)
+            if not reset:   # means its from command bindings
+                self.add_to_store(self.active_channel["channel_id"], self.restore_input_text[0])
+                self.restore_input_text = (None, None)
             self.switch_tab(cmd_args.get("num", 0))
 
         elif cmd_type == 32:   # MARK_AS_READ:
@@ -4005,9 +4049,13 @@ class Endcord:
             if self.tree_metadata[tree_sel]["type"] == 2:
                 channel_id = self.tree_metadata[tree_sel]["id"]
                 guild_id = self.find_parents_from_tree(tree_sel)[0]
-                self.switch_channel(channel_id, guild_id, voice=False)
             elif self.in_call and self.in_call["guild_id"]:
-                self.switch_channel(self.in_call["channel_id"], self.in_call["guild_id"], voice=False)
+                channel_id = self.in_call["channel_id"]
+                guild_id = self.in_call["guild_id"]
+            if not reset:   # means its from command bindings
+                self.add_to_store(self.active_channel["channel_id"], self.restore_input_text[0])
+                self.restore_input_text = (None, None)
+            self.switch_channel(channel_id, guild_id, voice=False)
 
         elif cmd_type == 57:   # VIEW_EMOJI
             if cmd_args.get("name"):
@@ -4023,6 +4071,7 @@ class Endcord:
                 self.view_emoji(emojis[select_num])
 
         elif cmd_type == 58:   # QUIT
+            self.add_to_command_history(cmd_text)
             self.exit()
 
         elif cmd_type == 59:   # MARK_AS_UNREAD
@@ -4330,7 +4379,7 @@ class Endcord:
             about = (ABOUT
                 .replace("%ver", peripherals.VERSION)
                 .replace("%year", datetime.now().date().strftime("%Y"))
-                .replace("%build", utils.get_build_info(cythonized, uses_pgcurses, support_image, support_media, support_call))
+                .replace("%build", utils.get_build_info(cythonized, uses_gtkcurses, support_image, support_media, support_call))
                 )
             self.chat, self.chat_format, self.chat_map = formatter.generate_about(
                 about,
@@ -4943,7 +4992,7 @@ class Endcord:
                         destination = path
                 else:
                     self.remove_running_task("Downloading file", 2)
-                    self.update_extra_line("Error downloading file, check log", color=20)
+                    self.update_extra_line(f"Error downloading file: {filename}", color=20)
                     return
             except Exception as e:
                 logger.error(f"Error downloading file: {e}")
@@ -6492,7 +6541,7 @@ class Endcord:
                     time.sleep(0.1)
                     self.tui.resume_curses()
                 return
-        if support_image and not self.config["native_media_player"] and not uses_pgcurses and not force_native:
+        if support_image and not self.config["native_media_player"] and not uses_gtkcurses and not force_native:
             if not self.terminal_media:
                 from endcord import media
                 self.terminal_media = media.TerminalMedia(self.config, self.keybindings, font_ratio=self.font_ratio)
@@ -7016,7 +7065,7 @@ class Endcord:
                     break
 
         # check for unreads/mentions for tray icon
-        if uses_pgcurses:
+        if uses_gtkcurses:
             if not self.tui.get_focused() and not self.tui.get_chat_selected()[1]:
                 # tree update for current channel is triggered from process_msg_events_other_channels
                 self.tui.set_chat_index(1)

@@ -13,7 +13,7 @@ import time
 from endcord import acs, keybinding, peripherals, utils
 
 logger = logging.getLogger(__name__)
-uses_pgcurses = hasattr(curses, "PGCURSES")
+uses_gtkcurses = hasattr(curses, "GTKCURSES")
 INPUT_LINE_JUMP = 20   # jump size when moving input line
 MAX_DELTA_STORE = 50   # limit undo size
 MIN_ASSIST_LETTERS = 2
@@ -23,7 +23,7 @@ ALLOWED_BEFORE_ASSIST_EXTRA = (" ", "\n", "+", ":", "=")
 APP_COMMAND_ASSIST_TRIEGGER = "/"
 BUTTON4_PRESSED = getattr(curses, "BUTTON4_PRESSED", 0)
 BUTTON5_PRESSED = getattr(curses, "BUTTON5_PRESSED", 0)
-ALT_SPACE = "⠀"   # U+2800 - braille pattern blank
+ALT_SPACE = " " if uses_gtkcurses else " "   # U+2000 - en quad
 match_word = re.compile(r"\w")
 match_split = re.compile(r"[^\w']")
 match_spaces = re.compile(r" {3,}")
@@ -199,18 +199,22 @@ class TUI():
         curses.curs_set(0)   # using custom cursor
         curses.mousemask(curses.ALL_MOUSE_EVENTS)
         curses.mouseinterval(0)
-        sys.stdout.write("\x1b[?2004h")   # enable bracketed paste mode
-        sys.stdout.write("\x1b[?1004h")   # enable terminal focus change reporting
-        sys.stdout.flush()
+        if not uses_gtkcurses:
+            sys.stdout.write("\x1b[?2004h")   # enable bracketed paste mode
+            sys.stdout.write("\x1b[?1004h")   # enable terminal focus change reporting
+            sys.stdout.flush()
         try:
             self.backspace_code = 8 if (curses.erasechar() == 8 or "XTERM_VERSION" in os.environ or sys.platform == "win32") else 127
         except Exception:
             self.backspace_code = 127
-        self.fallback_keybinding_parser = config["fallback_keybinding_parser"] or sys.platform == "win32"
+        self.fallback_keybinding_parser = (config["fallback_keybinding_parser"] or sys.platform == "win32") and not uses_gtkcurses
         if self.fallback_keybinding_parser:
             screen.keypad(True)
             self.get_key = keybinding.get_key_fallback
             self.backspace_code = 263 if self.backspace_code == 127 else 8
+        elif uses_gtkcurses:
+            curses.set_nice_exit(True)
+            self.get_key = keybinding.get_key_passthrough
         else:
             screen.keypad(False)
             self.get_key = keybinding.get_key
@@ -251,6 +255,9 @@ class TUI():
         self.role_color_start_id = self.last_free_id   # starting id for role colors
         self.keybindings = keybindings
         self.key_map = keybinding.build_key_map(keybindings)
+        if uses_gtkcurses:   # add ctrl+c if its free
+            if "C-c" not in self.key_map:
+                self.key_map["C-c"] = 34
         self.switch_tab_modifier = keybindings["switch_tab_modifier"][0][:-3]
         self.command_bindings = command_bindings
         self.screen = screen
@@ -690,6 +697,8 @@ class TUI():
 
     def pause_curses(self):
         """Pause curses and disable drawing, releasing terminal"""
+        if uses_gtkcurses:
+            return
         if self.win_member_list:
             with self.lock:
                 h, w = self.win_member_list.getmaxyx()
@@ -711,13 +720,16 @@ class TUI():
 
     def resume_curses(self):
         """Resume curses and enable drawing, capturing terminal"""
+        if uses_gtkcurses:
+            return
         with self.lock:
             curses.reset_prog_mode()
             curses.curs_set(0)
             curses.flushinp()
-            sys.stdout.write("\x1b[?2004h")   # disable bracketed paste mode
-            sys.stdout.write("\x1b[?1004h")   # enable terminal focus change reporting
-            sys.stdout.flush()
+            if not uses_gtkcurses:
+                sys.stdout.write("\x1b[?2004h")   # enable bracketed paste mode
+                sys.stdout.write("\x1b[?1004h")   # enable terminal focus change reporting
+                sys.stdout.flush()
             self.screen.refresh()
             self.disable_drawing = False
             self.resize(redraw_only=True)
@@ -820,6 +832,8 @@ class TUI():
             if self.assist_start > self.input_index:
                 self.assist_start = -1
                 return None, 100
+        if self.assist_start == -2:
+            return None, 100
         if self.enable_autocomplete and self.input_buffer:
             return self.input_buffer, 7
         if self.input_buffer and self.input_buffer[0] == APP_COMMAND_ASSIST_TRIEGGER:
@@ -836,7 +850,7 @@ class TUI():
 
     def get_focused(self):
         """Get whether chat is focused or not"""
-        if uses_pgcurses:
+        if uses_gtkcurses:
             return curses.focused
         return self.focused and not self.disable_drawing
 
@@ -908,7 +922,7 @@ class TUI():
         1 - unreads
         2 - mention
         """
-        if uses_pgcurses:
+        if uses_gtkcurses:
             curses.set_tray_icon(icon)
 
 
@@ -997,7 +1011,7 @@ class TUI():
             curses.init_pair(15, bkp_fg, bkp_bg)
             self.red_list = []
 
-        elif self.fun == 3 and not uses_pgcurses:
+        elif self.fun == 3 and not uses_gtkcurses:
             h, w = self.screen.getmaxyx()
             flakes = []
             while self.run and self.fun == 3:
@@ -2044,7 +2058,7 @@ class TUI():
                 self.win_member_list.noutrefresh()
                 self.need_update.set()
 
-        if uses_pgcurses:   # quick fix but not ideal, find why is tree cleared on derwin
+        if uses_gtkcurses:   # quick fix but not ideal, find why is tree cleared on derwin
             self.draw_tree()
             self.draw_title_tree()
 
@@ -2082,7 +2096,7 @@ class TUI():
                 self.draw_subtitle_line()
                 # self.draw_chat()   # chat will be regenerated and resized in app main loop
 
-        if uses_pgcurses:   # quick fix but not ideal, find why is tree cleared on derwin
+        if uses_gtkcurses:   # quick fix but not ideal, find why is tree cleared on derwin
             self.draw_tree()
             self.draw_title_tree()
 
@@ -2652,7 +2666,11 @@ class TUI():
                 self.show_cursor()
                 if self.assist:
                     if key in ASSIST_TRIGGERS:
-                        self.assist_start = self.input_index
+                        # stop assist when same trigger is typed while assist is active
+                        if self.assist_start >= 0 and key == self.input_buffer[self.assist_start - 1]:
+                            self.assist_start = -2
+                        else:
+                            self.assist_start = self.input_index
                 self.spellcheck()
                 self.cursor_pos = self.input_index - max(0, len(self.input_buffer) - w + 1 - self.input_line_index)
                 self.cursor_pos = max(self.cursor_pos, 0)
@@ -2682,6 +2700,9 @@ class TUI():
 
             if key.startswith("PASTE"):
                 self.paste_text(key[6:])
+
+            if key == "QUIT":   # special for gtkcurses window X button
+                return self.return_input_code(34)
 
             key = self.key_map.get(key, key)
 
@@ -3288,8 +3309,9 @@ class TUI():
     def drag_extra_window(self):
         """Handle extra window resizing with mouse dragging until mouse is released"""
         curses.mousemask(curses.ALL_MOUSE_EVENTS | curses.REPORT_MOUSE_POSITION)
-        sys.stdout.write("\x1b[?1003h")   # enable mouse movement reporting
-        sys.stdout.flush()
+        if not uses_gtkcurses:
+            sys.stdout.write("\x1b[?1003h")   # enable mouse movement reporting
+            sys.stdout.flush()
         prev_y = None
         first = True
         try:
@@ -3316,8 +3338,9 @@ class TUI():
     def drag_scrollbar(self):
         """Handle dragging scrollbar with mouse until mouse is released"""
         curses.mousemask(curses.ALL_MOUSE_EVENTS | curses.REPORT_MOUSE_POSITION)
-        sys.stdout.write("\x1b[?1003h")   # enable mouse movement reporting
-        sys.stdout.flush()
+        if not uses_gtkcurses:
+            sys.stdout.write("\x1b[?1003h")   # enable mouse movement reporting
+            sys.stdout.flush()
         prev_y = None
         first_y = None
         first = True

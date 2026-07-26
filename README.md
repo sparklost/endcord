@@ -82,7 +82,7 @@ Any third party endcord forks may add features that can lead to account ban, con
 - Proxy support
 - Profile manager for multiple accounts
 - Store token in system keyring
-- Experimental windowed mode with tray icon
+- GTK windowed mode with tray icon
 - Works in termux, with android notifications
 - Auto endcord and extensions check for updates
 - Run bots, with interactions
@@ -297,15 +297,16 @@ All the visual media is converted to ASCII art that can be additionally configur
 But there is also setting in config to open media in external app (cross-system, will use default system app for that file format).  
 "endcord-lite" (without voice calls and ASCII media support), can be built by specifying `--lite` flag to build script. Lite version is significantly smaller, cant make voice calls, but still can open media in external app.  
 
-### Experimental windowed mode
-This mode entirely replaces curses with pygame-ce GUI library. This means Endcord runs in its own window, not in terminal, but UI remains terminal-like.  
+### Windowed mode
+This mode entirely replaces curses and the need for terminal emulator with GTK window, but UI remains terminal-like.  
 Tray icon will also be enabled, so closing window will only minimize it to tray.  
 If using external editor, use editor with graphical interface. TUI editors will not work, as this is no longer in terminal.  
 Also, endcord built-in media player will not work because its standalone TUI thats not using curses. All media will be opened in native player.  
-Building with nuitka on python >=3.13 will create executable that segfaults! Building with pyinstaller is not recommended because it generates huge binary.  
-You can toggle experimental mode by running: `python build.py --experimental`.  
+Building with pyinstaller is not recommended because it generates huge binary.  
+You can toggle windowed mode by running: `python build.py --toggle-windowed`.  
 Then run endcord from source: `uv run main.py`.  
-After first run in experimental mode, extra config will be generated in endcord config path in file called `pgcurses.json`. More info in [configuration](docs/configuration.md).
+After first run in windowed mode, extra config will be generated in endcord config path, a file called `gtkcurses.json`. More info in [configuration](docs/configuration.md).  
+Note: To have tray icon on Linux, [ayatana appindicator](https://github.com/AyatanaIndicators/libayatana-appindicator) must be installed.  
 
 ### Custom hosts
 Connecting to other discord-like instance can be configured in `config.ini` by setting `custom_host = ` to preferred host domain. Set to `None` to use default host (`discord.com`) or use `--custom-host=` command argument.  
@@ -314,7 +315,7 @@ Whether endcord will work or crash depends on hosts api implementation, the more
 
 ### Termux
 Endcord cant be built in termux, so to run it: first install python >= 3.12 and `uv`, then clone this repo, setup env to "MICRO" level: `python --nobuild --level=MICRO` (one time), and run it: `uv run main.py`.  
-Setting up environment for higer levels will probably fail because these dependencies will have to be built for arm architecture.  
+Setting up environment for higher levels will probably fail because these dependencies will have to be built for arm architecture.  
 To enable android notifications simply run `pkg install termux-api` and install Termux:API app. Vibration is disabled by default, to enable it: run endcord at least once, then in Termux:Api notification settings enable vibration for endcord notifications.  
 Notifications will work as ling as endcord is running, so it might be necessary for termux to "Acquire wakelock".  
 
@@ -348,7 +349,7 @@ Optional dependencies:
 - `yt-dlp` - youtube support
 - `mpv` - Play youtube videos in native player (non-ascii)
 - `libsecret` - Store token in system keyring (secret service provider is also required (eg. `gnome-keyring`, `KWallet`, `KeePassXC`), with `dbus` as dependency)
-- `libappindicator-gtk3` - Tray support under wayland, for [experimental windowed mode](#experimental-windowed-mode) only.
+- `libappindicator-gtk3` - Tray support under wayland, for [windowed mode](#windowed-mode) only.
 - `imagemagick` - To make notification images round; only needed for endcord-lite.
 - `source-highlight` or `python-pygments` - Code block syntax highlighting (Alternatively use [this extension](https://github.com/sparklost/endcord-pygments-syntax)).
 
@@ -356,7 +357,7 @@ Optional dependencies:
 - Pre-built binaries (built with nuitka) are available in releases
 - [Build](#building) endcord, standalone executable can be found in `./dist/endcord.exe`  
 
-Install [WezTerm](https://wezterm.org/) (recommended), [windows terminal](https://github.com/microsoft/terminal), [cmder](https://github.com/cmderdev/cmder), or any other modern terminal. And run exe from there. If built with experimental windowed mode, terminal is not required to use endcord.  
+Install [WezTerm](https://wezterm.org/) (recommended), [windows terminal](https://github.com/microsoft/terminal), [cmder](https://github.com/cmderdev/cmder), or any other modern terminal. And run exe from there. If built with windowed mode, terminal is not required to use endcord.  
 WezTerm proved to introduce the least drawing issues.  
 Cmder settings: "Mouse" > check "Send mouse events to console" and "Mark/Copy" > uncheck "Intelligent mode", and set "Main console font" and "Alternative font" to same monospace font.  
 Emoji are known to work only with WezTerm but many will fail to draw and mess-up the UI, so its best to set `emoji_as_text = True` in config.  
@@ -389,7 +390,7 @@ To build endcord-lite, add `--level=LITE` flag. No voice calls and terminal medi
 To build into directory, not as a single executable, add `--onedir` flag. Will speed up startup.  
 To build with Nuitka, add `--nuitka` flag. More optimized, smaller executable, long compile time. See [Nuitka](#nuitka) for more info.  
 If compiler is not available, or built binary is failing, try building with `--nocython`, which will produce slightly less optimized binaries.  
-To toggle [experimental windowed mode](#experimental-windowed-mode) run: `python build.py --toggle-experimental`.  
+To toggle [windowed mode](#windowed-mode) run: `python build.py --toggle-windowed`.  
 
 ### Linux
 1. Clone this repository: `git clone https://github.com/sparklost/endcord.git`

@@ -20,6 +20,7 @@ try:
     APP_NAME = __main__.APP_NAME   # set in main.py
 except (AttributeError, NameError):
     APP_NAME = "endcord"
+uses_gtkcurses = hasattr(curses, "GTKCURSES")
 
 DAY_MS = 24 * 60 * 60 * 1000
 DISCORD_EPOCH_MS = 1420070400000
@@ -27,7 +28,7 @@ TREE_EMOJI_REPLACE = "▮"
 TIME_DIVS = [1, 60, 3600, 86400, 2678400, 31190400]
 TIME_UNITS = ["second", "minute", "hour", "day", "month", "year"]
 SPLIT_AFTER_TIME = 10 * 60
-ALT_SPACE = "⠀"   # U+2800 - braille pattern blank
+ALT_SPACE = " " if uses_gtkcurses else " "   # U+2000 - en quad
 MIN_TAB_LEN = 8
 
 ACTIVITY_VERBS = ("Playing", "Streaming", "Listening to", "Watching", "Competing in")
@@ -42,7 +43,7 @@ match_escaped_md = re.compile(r"\\(?=[^a-zA-Z\d\s])")
 match_md_spoiler = re.compile(r"(?<!\\)\|\|.+?\|\|")
 match_md_code_snippet = re.compile(r"(?<!`|\\)`[^`]+`")
 match_md_code_block = re.compile(r"(?s)```(?:([a-zA-Z0-9+#-]+)?[ \t]*\n)?(.*?)```")
-match_md_url = re.compile(r"(?<!\\)\[([^\]]+)\]\(([^)]+)\)")
+match_md_url = re.compile(r"(?<!\\)\[((?:(?!\]\().)+)\]\(([^)]+)\)")
 match_url = re.compile(r"https?:\/\/[\w.-]+(\.[\w-])+[^\s)\]>]*[^\s).\]>]")
 match_discord_channel_url = re.compile(r"https:\/\/discord(?:app)?\.com\/channels\/(\d*)\/(\d*)(?:\/(\d*))?")
 match_sticker_id = re.compile(r"<;\d+;>")
@@ -1885,60 +1886,75 @@ class ChatGenerator:
         embed_marker_ranges = []
         for num_e, embed in enumerate(message["embeds"]):
             embed_url = embed["url"]
-            if embed_url and not embed.get("hidden") and embed_url not in content:
-                if content:
-                    content += "\n"
-                spoiler = embed["name"] and embed["name"].startswith("SPOILER_")
-                if spoiler:
-                    spoiler = 1000 + num_e not in message.get("spoiled", [])
-                if "main_url" not in embed:   # its attachment
-                    if self.placeholder_images:
-                        embed_url = ""
-                    elif self.trim_embed_url_size:
-                        embed_url = trim_string(embed_url, self.trim_embed_url_size)
-                    embed_type = clean_type(embed["type"])
-                    if embed_type.lower() not in ("image", "video"):
-                        embed_type = "file"
-                        embed_url = embed.get("name", "")
-                        if embed.get("duration"):
-                            embed_url += f" ({format_seconds(embed["duration"], nice=True, pad=False)})"
-                        pre_embed_len = pre_content_len + len(content)
-                        embeds.append([pre_embed_len, pre_embed_len + len(embed_type) + 15 + len(embed_url), 0])
-                    embed_marker_ranges.append([len(content), len(content) + len(embed_type) + 14])
-                    content += f"[{embed_type} attachment]: {embed_url}"
-                elif embed["type"] == "rich":
-                    embed_url = embed_url.replace("\r\n", "\n")
-                    embed_marker_ranges.append([len(content), len(content) + 13])
-                    content += f"[rich embed]:\n{embed_url}"
+            embed_type = embed["type"]
+            if not embed_url or embed.get("hidden") or embed_url in content:
+                continue
+            if content:
+                content += "\n"
+            spoiler = embed["name"] and embed["name"].startswith("SPOILER_")
+            if spoiler:
+                spoiler = 1000 + num_e not in message.get("spoiled", [])
+            if "main_url" not in embed:   # its attachment
+                if self.placeholder_images:
+                    embed_url = ""
+                elif self.trim_embed_url_size:
+                    embed_url = trim_string(embed_url, self.trim_embed_url_size)
+                embed_type = clean_type(embed_type)
+                if embed_type.lower() not in ("image", "video"):
+                    embed_type = "file"
+                    embed_url = embed.get("name", "")
+                    if embed.get("duration"):
+                        embed_url += f" ({format_seconds(embed["duration"], nice=True, pad=False)})"
+                    pre_embed_len = pre_content_len + len(content)
+                    embeds.append([pre_embed_len, pre_embed_len + len(embed_type) + 15 + len(embed_url), 0])
+                embed_marker_ranges.append([len(content), len(content) + len(embed_type) + 14])
+                content += f"[{embed_type} attachment]: {embed_url}"
+            elif embed_type == "rich":
+                embed_url = embed_url.replace("\r\n", "\n").strip(" \n")
+                embed_url, url_ranges = replace_markdown_urls(embed_url, ())
+                if url_ranges:
+                    pre_embed_len = pre_content_len + len(content) + len(embed_type) + 10
+                    for url_range in url_ranges:
+                        urls.append([pre_embed_len + url_range[0], pre_embed_len + url_range[1], 0])
+                embed_marker_ranges.append([len(content), len(content) + 13])
+                content += f"[rich embed]:\n{embed_url}"
+            else:
+                if embed_type.startswith("gif") and embed_url.startswith(">"):
+                    embed_url = embed_url[2:]
+                embed_url, url_ranges = replace_markdown_urls(embed_url, ())
+                if url_ranges:
+                    pre_embed_len = pre_content_len + len(content) + len(embed_type) + 10
+                    for url_range in url_ranges:
+                        urls.append([pre_embed_len + url_range[0], pre_embed_len + url_range[1], 0])
+                if embed_type.startswith("gif") and embed_url.startswith("["):
+                    pass
+                elif self.placeholder_images and embed_type not in ("article", "link"):
+                    embed_url = ""
+                elif embed["main_url"] == embed_url and self.trim_embed_url_size:
+                    embed_url = trim_string(embed_url, self.trim_embed_url_size)
+                embed_marker_ranges.append([len(content), len(content) + len(embed_type) + 9])
+                content += f"[{embed_type} embed]: {embed_url}"
+            if self.placeholder_images and embed.get("proxy_url") and embed["hw"]:
+                if not embed["hw"][0] or not embed["hw"][1]:
+                    continue
+                h = embed["hw"][0] / self.font_ratio
+                w = embed["hw"][1]
+                smallest_h = h / self.dpw
+                smallest_w = w / self.dpw
+                scale = min(min(self.placeholder_images, smallest_h) / h, min(max_length - 1 - self.newline_len, smallest_w) / w, 1)
+                h = round(h * scale)
+                w = round(w * scale) - 1
+                if self.chat_constant_space_idx is None:   # insert here if cant in newline format
+                    content += f"\n<{MARKER}:{num_e}>"
+                    for line in range(h - 1):
+                        content += f"\n{" " if line % 2 else ALT_SPACE}"
+                        if spoiler:
+                            content += " " * w
+                elif spoiler:
+                    content += f"\n<{MARKER}:{num_e}>" + ("\n" + " " * w) * (h - 1)
                 else:
-                    if self.placeholder_images and embed["type"] != "article":
-                        embed_url = ""
-                    elif embed["main_url"] == embed_url and self.trim_embed_url_size:
-                        embed_url = trim_string(embed_url, self.trim_embed_url_size)
-                    embed_type = clean_type(embed["type"])
-                    embed_marker_ranges.append([len(content), len(content) + len(embed_type) + 9])
-                    content += f"[{embed_type} embed]: {embed_url}"
-                if self.placeholder_images and embed.get("proxy_url") and embed["hw"]:
-                    if not embed["hw"][0] or not embed["hw"][1]:
-                        continue
-                    h = embed["hw"][0] / self.font_ratio
-                    w = embed["hw"][1]
-                    smallest_h = h / self.dpw
-                    smallest_w = w / self.dpw
-                    scale = min(min(self.placeholder_images, smallest_h) / h, min(max_length - 1 - self.newline_len, smallest_w) / w, 1)
-                    h = round(h * scale)
-                    w = round(w * scale) - 1
-                    if self.chat_constant_space_idx is None:   # insert here if cant in newline format
-                        content += f"\n<{MARKER}:{num_e}>"
-                        for line in range(h - 1):
-                            content += f"\n{" " if line % 2 else ALT_SPACE}"
-                            if spoiler:
-                                content += " " * w
-                    elif spoiler:
-                        content += f"\n<{MARKER}:{num_e}>" + ("\n" + " " * w) * (h - 1)
-                    else:
-                        content += f"\n<{MARKER}:{num_e}>" + "\n " * (h - 1)
-                    image_locations.append((h, w, spoiler))
+                    content += f"\n<{MARKER}:{num_e}>" + "\n " * (h - 1)
+                image_locations.append((h, w, spoiler))
         for sticker in message["stickers"]:
             sticker_type = sticker["format_type"]
             if content:

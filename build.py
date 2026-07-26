@@ -453,9 +453,9 @@ def compress_emoji():
     return json_path_out
 
 
-def toggle_experimental(check_only=False):
-    """Toggle experimental mode"""
-    whitelist = ("endcord" + os.sep, "endcord_cython" + os.sep)
+def toggle_windowed(check_only=False):
+    """Toggle windowed mode"""
+    whitelist = ("endcord" + os.sep, "endcord_cython" + os.sep, "main.py")
     file_list = []
     for path, subdirs, files in os.walk(os.getcwd()):
         subdirs[:] = [d for d in subdirs if not d.startswith(".")]
@@ -472,11 +472,11 @@ def toggle_experimental(check_only=False):
         changed = False
         for num, line in enumerate(lines):
             if line.startswith("import curses"):
-                lines[num] = "from endcord import pgcurses as curses\n"
+                lines[num] = "from endcord import gtkcurses as curses\n"
                 changed = True
                 enable = True
                 break
-            elif line.startswith("from endcord import pgcurses as curses"):
+            elif line.startswith("from endcord import gtkcurses as curses"):
                 lines[num] = "import curses\n"
                 changed = True
                 enable = False
@@ -522,15 +522,13 @@ def toggle_experimental(check_only=False):
                     os.rename(old_name, new_name)
 
     # toggle dependencies
-    experimental_dependencies = ["pygame-ce", "pyperclip", "pystray"]
-    if sys.platform == "linux":
-        experimental_dependencies += ["pygobject"]
+    windowed_deps = load_build_config().get("windowed_deps", [])
     if enable:
-        subprocess.run(["uv", "pip", "install"] + experimental_dependencies, check=True)
-        fprint("Experimental windowed mode enabled!")
+        subprocess.run(["uv", "pip", "install"] + windowed_deps, check=True)
+        fprint("Windowed mode enabled!")
     else:
-        subprocess.run(["uv", "pip", "uninstall"] + experimental_dependencies, check=True)
-        fprint("Experimental windowed mode disabled!")
+        subprocess.run(["uv", "pip", "uninstall"] + windowed_deps, check=True)
+        fprint("Windowed mode disabled!")
     return not enable
 
 
@@ -829,7 +827,7 @@ def build_with_pyinstaller(level, onedir, print_cmd=False):
     fprint(f"Finished building {pkgname}")
 
 
-def build_with_nuitka(level, onedir, clang, mingw, compile_deps, print_cmd=False, experimental=False):
+def build_with_nuitka(level, onedir, clang, mingw, compile_deps, print_cmd=False, windowed=False):
     """Build with nuitka"""
     clang = clang or os.environ.get("CC") == "clang"
     pkgname = PKGNAME if level == "FULL" else f"{PKGNAME}-{level.lower()}"
@@ -881,7 +879,7 @@ def build_with_nuitka(level, onedir, clang, mingw, compile_deps, print_cmd=False
     # platform-specific
     if sys.platform == "linux":
         options = []
-        if experimental:
+        if windowed:
             options += ["--include-package=gi._enum"]
             hidden_imports += ["--include-package=ctypes.util"]
     elif sys.platform == "win32":
@@ -999,9 +997,9 @@ def parser():
         help="use mingw instead msvc on windows, has no effect on Linux and macOS or with --clang flag",
     )
     parser.add_argument(
-        "--toggle-experimental",
+        "--toggle-windowed",
         action="store_true",
-        help="toggle experimental mode and exit",
+        help="toggle windowed mode and exit",
     )
     parser.add_argument(
         "--freethreaded",
@@ -1068,18 +1066,15 @@ if __name__ == "__main__":
     if args.freethreaded:
         force_ujson()
 
-    if args.toggle_experimental:
-        toggle_experimental()
+    if args.toggle_windowed:
+        toggle_windowed()
         sys.exit(0)
     setup_dependencies(args.level, not args.nobuild)
 
-    experimental = toggle_experimental(check_only=True)
-    if experimental:
-        experimental_dependencies = ["pygame-ce", "pyperclip", "pystray"]
-        if sys.platform == "linux":
-            experimental_dependencies += ["pygobject"]
-        subprocess.run(["uv", "pip", "install"] + experimental_dependencies, check=True)
-        fprint("Experimental windowed mode enabled!")
+    windowed = toggle_windowed(check_only=True)
+    if windowed:
+        subprocess.run(["uv", "pip", "install"] + load_build_config().get("windowed_deps", []), check=True)
+        fprint("Windowed mode enabled!")
 
     enable_extensions(enable=(not args.disable_extensions))
 
@@ -1104,7 +1099,7 @@ if __name__ == "__main__":
 
     if not args.nobuild:
         if args.nuitka:
-            build_with_nuitka(args.level, args.onedir, clang, args.mingw, compile_deps, experimental=experimental)
+            build_with_nuitka(args.level, args.onedir, clang, args.mingw, compile_deps, windowed=windowed)
         else:
             build_with_pyinstaller(args.level, args.onedir)
 

@@ -81,10 +81,11 @@ class Downloader:
 
 
     def download(self, url, file_id=None, headers=None):
-        """Thread that downloads file and stores it in temp folder"""
+        """Thread that downloads file and stores it in save_dir"""
         if url.lower().split("/")[0] == "http":
-            logger.warning("REJECTING HTTP-ONLY DOWNLOAD - HIGH SECURITY RISK")
-            return None, None
+            error = "Rejecting http download"
+            logger.warning(f"{error} - HIGH SECURITY RISK")
+            return None, error
         os.makedirs(self.save_dir, exist_ok=True)
         self.active += 1
         self.downloading = True
@@ -92,6 +93,7 @@ class Downloader:
         connection = None
         current_url = url
         redirects = 0
+        destination = None
         if not headers:
             headers = self.headers
 
@@ -111,13 +113,21 @@ class Downloader:
                     redirect_url = response.getheader("Location")
                     if not redirect_url:
                         logger.error("Redirect without location")
-                        break
+                        return None, "Redirect without location"
                     current_url = urllib.parse.urljoin(current_url, redirect_url)
                     redirects += 1
                     connection.close()
                     continue
-                else:
+                elif response.status in (200, 206):
                     break
+                else:
+                    error = f"HTTP Error {response.status}"
+                    logger.error(f"{error} for URL: '{current_url}'")
+                    return None, error
+            else:
+                error = "Exceeded maximum redirect limit"
+                logger.error(f"{error} (5) for URL: '{url}'")
+                return None, error
 
             filename = extract_file_name(response.headers, url_object.path)
             unique_filename = f"{file_id}_{filename}" if file_id else filename
@@ -136,13 +146,19 @@ class Downloader:
         finally:
             if connection:
                 connection.close()
+            if not complete and destination and os.path.exists(destination):
+                try:
+                    os.remove(destination)
+                except OSError:
+                    pass
             self.active -= 1
             if self.active == 0:
                 self.downloading = True
         if complete:
             return destination, filename
-        logger.error(f"Error downloading file. Requested url: '{url}'")
-        return None, None
+        error = "Download incomplete or failed"
+        logger.error(f"{error} for URL: '{url}'")
+        return None, error
 
 
     def cancel(self):

@@ -174,12 +174,12 @@ class InlineMedia:
                     if not data or not draw:
                         continue
                     abs_y = chat_h - (rel_y - self.tui.chat_index - self.tui.have_title - subtitle_line + 1)
-                    if abs_y - chat_y <= -h or abs_y > chat_h:
+                    if abs_y - chat_y <= -h or abs_y > chat_h + 1 + subtitle_line:
                         continue
                     abs_x = chat_x + rel_x
                     cut_y = 0
                     cut_h = h
-                    if abs_y > chat_h - h + 1:
+                    if abs_y > chat_h - h + 1 + subtitle_line:
                         cut_h = min(h, chat_h - abs_y + 1) + subtitle_line
                     if abs_y <= subtitle_line:
                         cut_h += abs_y - chat_y
@@ -367,12 +367,12 @@ class InlineMedia:
                 subtitle_line = bool(self.tui.win_subtitle_line)
                 with self.image_cache_lock:
                     abs_y = chat_h - (rel_y - self.tui.chat_index - self.tui.have_title - subtitle_line + 1)
-                    if abs_y - chat_y <= -h or abs_y > chat_h:
+                    if abs_y - chat_y <= -h or abs_y > chat_h + 1 + subtitle_line:
                         continue
                     abs_x = chat_x + rel_x
                     cut_y = 0
                     cut_h = h
-                    if abs_y > chat_h - h + 1:
+                    if abs_y > chat_h - h + 1 + subtitle_line:
                         cut_h = min(h, chat_h - abs_y + 1) + subtitle_line
                     if abs_y <= subtitle_line:
                         cut_h += abs_y - chat_y

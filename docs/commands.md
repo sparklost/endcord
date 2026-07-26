@@ -189,3 +189,7 @@ Special commands available only for command-bindings (macros).
     Sleep for specified number of seconds. If some macro fails to execute, adding `sleep 0.1` between the two commands may help.
 - `type [text]`  
     "Type" specified text at cursor position in input line in current context.
+- `repeat [times]` / `repeat [times] [command]`  
+    Repeat following command/commands N times. There are 2 options:  
+    `repeat 3 some_command; other_command` - will execute `some_command` 3 times then execute `other_command` as usual.  
+    `repeat 3; some_command; sleep 0.5; end; other_command` - will execute all commands until `end` in this case `some_command` then `sleep` 3 times, then execute `other_command` as usual.  

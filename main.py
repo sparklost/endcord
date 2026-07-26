@@ -23,12 +23,12 @@ VERSION = "1.5.3"
 default_config_path = peripherals.config_path
 log_path = peripherals.log_path
 threading.stack_size(512 * 1024)
-uses_pgcurses = hasattr(curses, "PGCURSES")
+uses_gtkcurses = hasattr(curses, "GTKCURSES")
 log_file_path = os.path.join(os.path.expanduser(log_path), APP_NAME + ".log")
 run = True
 
-if os.path.exists(log_file_path):
-    os.rename(log_file_path, log_file_path[:-4] + "-prev.log")
+# if os.path.exists(log_file_path):
+#     os.rename(log_file_path, log_file_path[:-4] + "-prev.log")
 logger = logging
 logging.basicConfig(
     level="INFO",
@@ -55,7 +55,7 @@ def sigint_handler(_signum, _frame):
 
 def main(args):
     """Main function"""
-    if not uses_pgcurses:
+    if not uses_gtkcurses:
         utils.ensure_terminal()
     config_path = args.config
     theme_path = args.theme
@@ -101,13 +101,13 @@ def main(args):
     if args.colors:
         # import here for faster startup
         from endcord import color
-        if uses_pgcurses:
+        if uses_gtkcurses:
             curses.enable_tray = False
         color.color_palette()
         sys.exit(0)
     elif args.keybinding:
         from endcord import keybinding
-        if uses_pgcurses:
+        if uses_gtkcurses:
             curses.enable_tray = False
         keybinding.picker(keybindings, command_bindings, config_data["fallback_keybinding_parser"])
         sys.exit(0)
@@ -119,7 +119,7 @@ def main(args):
             print("Terminal media player is not supported", file=sys.stderr)
             sys.exit(1)
         from endcord import media
-        if uses_pgcurses:
+        if uses_gtkcurses:
             curses.enable_tray = False
         try:
             media.runner(args.media, config_data, keybindings)

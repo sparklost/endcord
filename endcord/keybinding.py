@@ -8,6 +8,7 @@ import os
 import sys
 
 logger = logging.getLogger(__name__)
+uses_gtkcurses = hasattr(curses, "GTKCURSES")
 
 
 MESSAGE = """ Press key combination, its code will be printed in terminal.
@@ -80,6 +81,33 @@ def get_key(screen, backspace_code=127):
                         return f"{modifier}-DEL"
                 return "DEL"
 
+            # home and end keys
+            if sequence in ("\x1b[H", "\x1b[1~", "\x1b[7~", "\x1bOH"):
+                return "HOME"
+            if sequence in ("\x1b[F", "\x1b[4~", "\x1b[8~", "\x1bOF"):
+                return "END"
+            if sequence.startswith("\x1b[1;") and sequence[-1] in ("H", "F"):
+                key = "HOME" if sequence[-1] == "H" else "END"
+                if len(sequence) >= 6:
+                    modifier = MODIFIER_MAP[int(sequence[4])]
+                    if modifier:
+                        return f"{modifier}-{key}"
+                return key
+
+            # pgup and pgdn keys
+            if sequence.startswith("\x1b[5"):
+                if len(sequence) >= 6 and sequence.startswith("\x1b[5;"):
+                    modifier = MODIFIER_MAP[int(sequence[4])]
+                    if modifier:
+                        return f"{modifier}-PGUP"
+                return "PGUP"
+            if sequence.startswith("\x1b[6"):
+                if len(sequence) >= 6 and sequence.startswith("\x1b[6;"):
+                    modifier = MODIFIER_MAP[int(sequence[4])]
+                    if modifier:
+                        return f"{modifier}-PGDN"
+                return "PGDN"
+
             # misc
             if sequence == "\x1b[I":
                 return "FOCUS_IN"
@@ -98,7 +126,7 @@ def get_key(screen, backspace_code=127):
                 if 1 <= payload <= 26:
                     return f"C-M-{chr(payload + 96)}"
                 if payload == 0:
-                    return "C-M-SPC"
+                    return "C-M-SPACE"
                 if payload == backspace_code:
                     return "M-BACKSPACE"
                 if payload == 29:
@@ -271,7 +299,7 @@ def get_key_fallback(screen, backspace_code=127):
             if 1 <= payload <= 26:
                 return f"C-M-{chr(payload + 96)}"
             if payload == 0:
-                return "C-M-SPC"
+                return "C-M-SPACE"
             if payload == (backspace_code):
                 return "M-BACKSPACE"
             if payload == 29:
@@ -343,6 +371,14 @@ def get_key_fallback(screen, backspace_code=127):
         return "C-DEL"
     if key == 526:
         return "M-DEL"
+    if key == curses.KEY_HOME:
+        return "HOME"
+    if key == curses.KEY_END:
+        return "END"
+    if key == curses.KEY_PPAGE:
+        return "PGUP"
+    if key == curses.KEY_NPAGE:
+        return "PGDN"
     if key == curses.KEY_RESIZE:
         return "RESIZE"
     if key == 590:
@@ -361,6 +397,11 @@ def get_key_fallback(screen, backspace_code=127):
         return f"C-{chr(key + 96)}"
 
     return repr(key)
+
+
+def get_key_passthrough(screen, backspace_code):   # noqa
+    """Passthrough get_key, this is used with gtkcurses enabled because it internally parses events"""
+    return screen.getch()
 
 
 KEY_ESCAPE = 1000
@@ -463,6 +504,8 @@ def picker_internal(screen, keybindings, command_bindings, fallback):
         fallback = True
     if not fallback:
         screen.keypad(False)
+    if uses_gtkcurses:
+        fallback = False
     screen.bkgd(" ", curses.color_pair(1))
     screen.addstr(1, 0, MESSAGE)
     command_bindings = [(val, key) for key, val in command_bindings.items()]
@@ -475,11 +518,13 @@ def picker_internal(screen, keybindings, command_bindings, fallback):
     while True:
         if fallback:
             key_code = get_key_fallback(screen, backspace_code)
+        elif uses_gtkcurses:
+            key_code = get_key_passthrough(screen, backspace_code)
         else:
             key_code = get_key(screen, backspace_code)
         if key_code == -1:
             continue
-        if key_code == curses.KEY_RESIZE:
+        if key_code == KEY_RESIZE:
             screen.addstr(1, 0, MESSAGE)
         text = f"Keybinding code: {key_code}"
         warning = ""
@@ -491,6 +536,8 @@ def picker_internal(screen, keybindings, command_bindings, fallback):
             if key_code == value and not warning:
                 warning = f'Warning: same keybinding as for command "{key}"'
                 break
+        if key_code in ("C-c", "QUIT"):
+            break
         _, w = screen.getmaxyx()
         screen.addstr(7, 1, text + " " * (w - len(text)))
         screen.addstr(8, 1, warning + " " * (w - len(warning)))

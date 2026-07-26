@@ -128,12 +128,12 @@ def get_build_level(support_image, support_media, support_call):
     return "LITE"
 
 
-def get_build_info(cythonized, uses_pgcurses, support_image, support_media, support_call):
+def get_build_info(cythonized, uses_gtkcurses, support_image, support_media, support_call):
     """Write build info string"""
     build_info = [detect_runtime()]
     if cythonized:
         build_info.append("cythonized")
-    if uses_pgcurses:
+    if uses_gtkcurses:
         build_info.append("windowed")
     build_info.append(f"level={get_build_level(support_image, support_media, support_call)}")
     if support_media:
@@ -145,7 +145,7 @@ def get_build_info(cythonized, uses_pgcurses, support_image, support_media, supp
     start = version.find("(++")
     if start >= 0:
         version = version[:start] + version[version.find(")", start):]
-    if not importlib.util.find_spec("curses"):
+    if uses_gtkcurses or not importlib.util.find_spec("curses"):
         curses_ver = "None"
         curses_module = "None"
     else:
@@ -538,8 +538,9 @@ def demojize(text, safe=False):
             i += 1
             continue
         cluster, i = next_emoji_cluster(text, i)
-        if ord(cluster[-1]) == 0xFE0E or ord(cluster[-1]) == 0xFE0F:
-            cluster = cluster[0:-1]   # remove variation selector for for text/emoji
+        # not removing variation selector because they are used in emoji.json
+        # if ord(cluster[-1]) == 0xFE0E or ord(cluster[-1]) == 0xFE0F:
+        #     cluster = cluster[0:-1]
         emoji = EMOJI_DATA.get(cluster)
         if emoji:
             result.append(min(emoji, key=len))

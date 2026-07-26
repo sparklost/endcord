@@ -190,9 +190,9 @@ def color_palette_internal(screen):
 
         # chkeck key
         key_code = screen.getch()
-        if key_code == 32:   # space
+        if key_code in (32, "SPACE"):
             draw_bg = not draw_bg
-        else:
+        elif key_code not in ("RESIZE", "FOCUS_IN", "FOCUS_OUT") and not isinstance(key_code, tuple):
             break
 
 
