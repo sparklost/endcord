@@ -287,6 +287,7 @@ def quit_app(icon=None, item=None):   # noqa
 
     is_quitting = True   # first click
     event_queue.put("QUIT")
+    event_queue.put("QUIT")   # to be sure
 
     elapsed = 0
 

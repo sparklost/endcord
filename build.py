@@ -436,6 +436,34 @@ def patch_soundcard():
         iprint(f"Nothing to patch in file {path}")
 
 
+def patch_pystray():
+    """
+    Search for pystray/_util/gtk.py in .venv
+    Replace "finally: return False" in mainloop callback with "except Exception: pass" and "return False".
+    """
+    fprint("Patching pystray")
+    if not os.path.exists(".venv"):
+        iprint(".venv dir not found")
+        return
+
+    path = find_file_in_venv("pystray", "gtk.py", recurse=True)
+    if not path:
+        return
+    with open(path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    pattern = re.compile(r"(\n[ \t]*)finally:\s*\n[ \t]*return False\b")
+    if pattern.search(content):   # \1 is indentation spaces and newline
+        replacement = r"\1except:\1    pass\1return False"
+        new_content = pattern.sub(replacement, content)
+        new_content = pattern.sub(replacement, content)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(new_content)
+        iprint(f"Patched file: {path}")
+    else:
+        iprint(f"Nothing to patch in file {path}")
+
+
 def compress_emoji():
     """Compress emoji dict"""
     fprint("Compressing emoji data")
@@ -525,6 +553,7 @@ def toggle_windowed(check_only=False):
     windowed_deps = load_build_config().get("windowed_deps", [])
     if enable:
         subprocess.run(["uv", "pip", "install"] + windowed_deps, check=True)
+        patch_pystray()
         fprint("Windowed mode enabled!")
     else:
         subprocess.run(["uv", "pip", "uninstall"] + windowed_deps, check=True)
