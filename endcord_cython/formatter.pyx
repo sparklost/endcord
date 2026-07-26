@@ -74,6 +74,13 @@ cpdef len_wch(str text):
     return total_width
 
 
+cpdef is_wch(str ch):
+    cdef int codepoint = ord(ch)
+    if 0x20 <= codepoint < 0x7f:
+        return False
+    return binary_search(codepoint)
+
+
 cpdef Py_ssize_t split_index_wch(str text, int max_width):
     cdef int width = 0
     cdef int codepoint

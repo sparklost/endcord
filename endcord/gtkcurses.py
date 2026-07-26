@@ -13,6 +13,8 @@ import time
 
 import gi
 
+from endcord.wide_ranges import WIDE_RANGES
+
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
 gi.require_version("Pango", "1.0")
@@ -183,21 +185,38 @@ def xterm_to_rgb(x):
     return (0, 0, 0)
 
 
-def is_emoji(ch):
-    """Quick check if character is emoji"""
-    code = ord(ch)
-    return (
-        0x1F300 <= code <= 0x1F9FF or
-        0x2600 <= code <= 0x27BF or
-        0x2300 <= code <= 0x23FF or
-        0x2B00 <= code <= 0x2BFF
-    )
+def binary_search(codepoint, ranges):
+    """Binary-search a sorted tuple of (start, end) ranges and return 1 if codepoint is inside any range, else 0"""
+    low = 0
+    high = len(ranges) - 1
+
+    if codepoint < ranges[0][0] or codepoint > ranges[high][1]:
+        return 0
+
+    while low <= high:
+        mid = (low + high) >> 1
+        if codepoint < ranges[mid][0]:
+            high = mid - 1
+        else:
+            low = mid + 1
+
+    return high >= 0 and codepoint <= ranges[high][1]
 
 
-def set_nice_exit(value):
-    """Set fast exit to true/false"""
-    global nice_exit
-    nice_exit = value
+def is_wch(ch):
+    """Check if given character is wide"""
+    codepoint = ord(ch)
+    if 0x20 <= codepoint < 0x7f:
+        return False
+    return binary_search(codepoint, WIDE_RANGES)
+
+
+# use cython if available, ~? times faster
+try:
+    from endcord_cython.formatter import is_wch
+    # using same cached wide ranges from formatter, so no need to call init_wide_ranges() here
+except ImportError:
+    pass
 
 
 # tray stuff
@@ -293,6 +312,12 @@ def tray_thread():
     )
     icon = Icon(f"{APP_NAME.lower()}-tray", tray_icons[0], APP_NAME, menu)
     icon.run()
+
+
+def set_nice_exit(value):
+    """Set fast exit to true/false"""
+    global nice_exit
+    nice_exit = value
 
 
 # gtk stuff
@@ -664,7 +689,7 @@ class Window:
                 while src_idx < source_line_len and col_idx < max_col:
                     ch = line[src_idx]
                     src_idx += 1
-                    if is_emoji(ch):
+                    if is_wch(ch):
                         if src_idx < source_line_len and "\ufe00" <= line[src_idx] <= "\ufe0f":
                             ch += line[src_idx]
                             src_idx += 1
