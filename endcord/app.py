@@ -1023,7 +1023,6 @@ class Endcord:
 
         # manage roles
         if guild_id:   # for guilds only
-            # 255_curses_bug - make it run on init only
             self.all_roles = self.tui.init_role_colors(
                 self.all_roles,
                 self.default_msg_color[1],
@@ -7874,7 +7873,6 @@ class Endcord:
             if guild_id != self.active_channel["guild_id"]:
                 return
 
-            # 255_curses_bug - update only portion of roles color ids
             self.all_roles = self.tui.init_role_colors(
                 self.all_roles,
                 self.default_msg_color[1],

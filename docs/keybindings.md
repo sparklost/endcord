@@ -12,8 +12,10 @@
 ### Input line
 - `Left/Right` - character left/right
 - `Ctrl+Left/Right` - word left/right
-- `Shift+Left/Right` - select left/right
+- `HOME/END` - go to start/end of input line
+- `Shift+Left/Right` - select character left/right
 - `Ctrl+Shift+Left/Right` - select word left/right
+- `Shift+HOME/END` - select to start/end of input line
 - `Ctrl+N` - Insert newline in input line (warning `Shift+Enter` doesn't work in terminals)
 - `Alt+Z` - Undo
 - `Alt+Shift+Z` - Redo

@@ -2298,7 +2298,6 @@ class TUI():
             self.attrib_map = set_list_item(self.attrib_map, attribute, force_id)
             return force_id
 
-        # 255_curses_bug - reusing same pairs to save ids
         key = (fg & 0x1FF) | ((bg & 0x1FF) << 9) | (attribute << 18)
         if key in self.color_pairs and self.last_free_id > self.protected_colors:
             return self.color_pairs[key]
@@ -2802,17 +2801,6 @@ class TUI():
                     self.show_cursor()
                 self.spellcheck()
 
-            elif key == keybinding.KEY_HOME:
-                self.input_index = 0
-                self.input_line_index = 0
-                self.input_select_start = None
-                self.spellcheck()
-
-            elif key == keybinding.KEY_END:
-                self.input_index = len(self.input_buffer)
-                self.input_select_start = None
-                self.spellcheck()
-
             elif key == keybinding.KEY_TAB:
                 if self.enable_autocomplete:
                     if self.input_buffer and self.input_index == len(self.input_buffer):
@@ -2853,7 +2841,10 @@ class TUI():
                 return self.return_input_code(0)
 
             elif key == 504:   # input_left
-                if self.input_index > 0:
+                if self.input_select_start is not None:
+                    self.input_index = min(self.input_select_start, self.input_select_end)
+                    self.show_cursor()
+                elif self.input_index > 0:
                     # if index hits left screen edge, but there is more text to left, move line right
                     if self.input_index - max(0, len(self.input_buffer) - w + 1 - self.input_line_index) == 0:
                         self.input_line_index += min(INPUT_LINE_JUMP, w - 3)
@@ -2864,7 +2855,10 @@ class TUI():
                 self.spellcheck()
 
             elif key == 505:   # input_right
-                if self.input_index < len(self.input_buffer):
+                if self.input_select_start is not None:
+                    self.input_index = max(self.input_select_start, self.input_select_end)
+                    self.show_cursor()
+                elif self.input_index < len(self.input_buffer):
                     # if index hits right screen edge, but there is more text to right, move line right
                     if self.input_index - max(0, len(self.input_buffer) - w - self.input_line_index) == w:
                         self.input_line_index -= min(INPUT_LINE_JUMP, w - 3)
@@ -2873,6 +2867,138 @@ class TUI():
                     self.show_cursor()
                 self.input_select_start = None
                 self.spellcheck()
+
+            elif key == 506:   # word_left
+                left_len = 0
+                for word in resplit(self.input_buffer[:self.input_index])[::-1]:
+                    if word == "":
+                        left_len += 1
+                    else:
+                        left_len += len(word)
+                        break
+                self.input_index -= left_len
+                self.input_index = max(self.input_index, 0)
+                input_line_index_diff = self.input_index - max(0, len(self.input_buffer) - w + 1 - self.input_line_index)
+                if input_line_index_diff <= 0:
+                    self.input_line_index -= input_line_index_diff - 4   # diff is negative
+                    self.input_line_index = min(max(0, self.input_line_index), max(0, len(self.input_buffer) - w))
+                self.input_select_start = None
+                self.spellcheck()
+
+            elif key == 507:   # word_right
+                left_len = 0
+                for word in resplit(self.input_buffer[self.input_index:]):
+                    if word == "":
+                        left_len += 1
+                    else:
+                        left_len += len(word)
+                        break
+                self.input_index += left_len
+                self.input_index = min(self.input_index, len(self.input_buffer))
+                input_line_index_diff = self.input_index - max(0, len(self.input_buffer) - w - self.input_line_index) - w
+                if input_line_index_diff >= 0:
+                    self.input_line_index -= input_line_index_diff + 4   # diff is negative
+                    self.input_line_index = min(max(0, self.input_line_index), max(0, len(self.input_buffer) - w))
+                self.input_select_start = None
+                self.spellcheck()
+
+            elif key == 526:   # end_left
+                self.input_index = 0
+                self.input_line_index = 0
+                self.input_select_start = None
+                self.spellcheck()
+
+            elif key == 527:   # end_right
+                self.input_index = len(self.input_buffer)
+                self.input_select_start = None
+                self.spellcheck()
+
+            elif key == 508:   # select_left
+                if self.input_select_start is None:
+                    self.input_select_start = self.input_index
+                if self.input_index > 0:
+                    # if index hits left screen edge, but there is more text to left, move line right
+                    if self.input_index - max(0, len(self.input_buffer) - w + 1 - self.input_line_index) == 0:
+                        self.input_line_index += min(INPUT_LINE_JUMP, w - 3)
+                    else:
+                        self.input_index -= 1
+                self.input_select_end = self.input_index
+
+            elif key == 509:   # select_right
+                if self.input_select_start is None:
+                    self.input_select_start = self.input_index
+                if self.input_index < len(self.input_buffer):
+                    # if index hits right screen edge, but there is more text to right, move line right
+                    if self.input_index - max(0, len(self.input_buffer) - w - self.input_line_index) == w:
+                        self.input_line_index -= min(INPUT_LINE_JUMP, w - 3)
+                    else:
+                        self.input_index += 1
+                self.input_select_end = self.input_index
+
+            elif key == 510:   # select_word_left
+                if self.input_select_start is None:
+                    self.input_select_end = self.input_select_start = self.input_index
+                left_len = 0
+                for word in resplit(self.input_buffer[:self.input_index])[::-1]:
+                    if word == "":
+                        left_len += 1
+                    else:
+                        left_len += len(word)
+                        break
+                self.input_index -= left_len
+                self.input_index = max(self.input_index, 0)
+                input_line_index_diff = self.input_index - max(0, len(self.input_buffer) - w + 1 - self.input_line_index)
+                if input_line_index_diff <= 0:
+                    self.input_line_index -= input_line_index_diff - 4   # diff is negative
+                    self.input_line_index = min(max(0, self.input_line_index), max(0, len(self.input_buffer) - w))
+                if self.input_select_start is not None:
+                    self.input_select_end -= left_len
+                    self.input_select_end = min(max(0, self.input_select_end), len(self.input_buffer))
+                self.spellcheck()
+
+            elif key == 511:   # select_word_right
+                if self.input_select_start is None:
+                    self.input_select_end = self.input_select_start = self.input_index
+                left_len = 0
+                for word in resplit(self.input_buffer[self.input_index:]):
+                    if word == "":
+                        left_len += 1
+                    else:
+                        left_len += len(word)
+                        break
+                self.input_index += left_len
+                self.input_index = min(self.input_index, len(self.input_buffer))
+                input_line_index_diff = self.input_index - max(0, len(self.input_buffer) - w - self.input_line_index) - w
+                if input_line_index_diff >= 0:
+                    self.input_line_index -= input_line_index_diff + 4   # diff is negative
+                    self.input_line_index = min(max(0, self.input_line_index), max(0, len(self.input_buffer) - w))
+                if self.input_select_start is not None:
+                    self.input_select_end += left_len
+                    self.input_select_end = min(max(0, self.input_select_end), len(self.input_buffer))
+                self.spellcheck()
+
+            elif key == 528:   # select_end_left
+                if self.input_select_start is None:
+                    self.input_select_end = self.input_select_start = self.input_index
+                self.input_index = 0
+                self.input_line_index = 0
+                if self.input_select_start is not None:
+                    self.input_select_end = self.input_index
+                    self.input_select_end = min(max(0, self.input_select_end), len(self.input_buffer))
+                self.spellcheck()
+
+            elif key == 529:   # select_end_right
+                if self.input_select_start is None:
+                    self.input_select_end = self.input_select_start = self.input_index
+                self.input_index = len(self.input_buffer)
+                if self.input_select_start is not None:
+                    self.input_select_end = self.input_index
+                    self.input_select_end = min(max(0, self.input_select_end), len(self.input_buffer))
+                self.spellcheck()
+
+            elif key == 515:   # select_all
+                self.input_select_start = 0
+                self.input_select_end = len(self.input_buffer)
 
             elif key == 518:   # delete_word
                 word = ""
@@ -2918,82 +3044,6 @@ class TUI():
                         self.add_to_delta_store("DELETE", char)
                     self.spellcheck()
 
-            elif key == 506:   # word_left
-                left_len = 0
-                for word in resplit(self.input_buffer[:self.input_index])[::-1]:
-                    if word == "":
-                        left_len += 1
-                    else:
-                        left_len += len(word)
-                        break
-                self.input_index -= left_len
-                self.input_index = max(self.input_index, 0)
-                input_line_index_diff = self.input_index - max(0, len(self.input_buffer) - w + 1 - self.input_line_index)
-                if input_line_index_diff <= 0:
-                    self.input_line_index -= input_line_index_diff - 4   # diff is negative
-                    self.input_line_index = min(max(0, self.input_line_index), max(0, len(self.input_buffer) - w))
-                self.input_select_start = None
-                self.spellcheck()
-
-            elif key == 507:   # word_right
-                left_len = 0
-                for word in resplit(self.input_buffer[self.input_index:]):
-                    if word == "":
-                        left_len += 1
-                    else:
-                        left_len += len(word)
-                        break
-                self.input_index += left_len
-                self.input_index = min(self.input_index, len(self.input_buffer))
-                input_line_index_diff = self.input_index - max(0, len(self.input_buffer) - w - self.input_line_index) - w
-                if input_line_index_diff >= 0:
-                    self.input_line_index -= input_line_index_diff + 4   # diff is negative
-                    self.input_line_index = min(max(0, self.input_line_index), max(0, len(self.input_buffer) - w))
-                self.input_select_start = None
-                self.spellcheck()
-
-            elif key == 510:   # select_word_left
-                if self.input_select_start is None:
-                    self.input_select_end = self.input_select_start = self.input_index
-                left_len = 0
-                for word in resplit(self.input_buffer[:self.input_index])[::-1]:
-                    if word == "":
-                        left_len += 1
-                    else:
-                        left_len += len(word)
-                        break
-                self.input_index -= left_len
-                self.input_index = max(self.input_index, 0)
-                input_line_index_diff = self.input_index - max(0, len(self.input_buffer) - w + 1 - self.input_line_index)
-                if input_line_index_diff <= 0:
-                    self.input_line_index -= input_line_index_diff - 4   # diff is negative
-                    self.input_line_index = min(max(0, self.input_line_index), max(0, len(self.input_buffer) - w))
-                if self.input_select_start is not None:
-                    self.input_select_end -= left_len
-                    self.input_select_end = min(max(0, self.input_select_end), len(self.input_buffer))
-                self.spellcheck()
-
-            elif key == 511:   # select_word_right
-                if self.input_select_start is None:
-                    self.input_select_end = self.input_select_start = self.input_index
-                left_len = 0
-                for word in resplit(self.input_buffer[self.input_index:]):
-                    if word == "":
-                        left_len += 1
-                    else:
-                        left_len += len(word)
-                        break
-                self.input_index += left_len
-                self.input_index = min(self.input_index, len(self.input_buffer))
-                input_line_index_diff = self.input_index - max(0, len(self.input_buffer) - w - self.input_line_index) - w
-                if input_line_index_diff >= 0:
-                    self.input_line_index -= input_line_index_diff + 4   # diff is negative
-                    self.input_line_index = min(max(0, self.input_line_index), max(0, len(self.input_buffer) - w))
-                if self.input_select_start is not None:
-                    self.input_select_end += left_len
-                    self.input_select_end = min(max(0, self.input_select_end), len(self.input_buffer))
-                self.spellcheck()
-
             elif key == 513:   # undo
                 self.add_to_delta_store("UNDO")
                 if self.undo_index is None:
@@ -3037,32 +3087,6 @@ class TUI():
                         self.input_index = delta_index + 1
                 self.input_select_start = None
                 self.spellcheck()
-
-            elif key == 508:   # select_left
-                if self.input_select_start is None:
-                    self.input_select_start = self.input_index
-                if self.input_index > 0:
-                    # if index hits left screen edge, but there is more text to left, move line right
-                    if self.input_index - max(0, len(self.input_buffer) - w + 1 - self.input_line_index) == 0:
-                        self.input_line_index += min(INPUT_LINE_JUMP, w - 3)
-                    else:
-                        self.input_index -= 1
-                self.input_select_end = self.input_index
-
-            elif key == 509:   # select_right
-                if self.input_select_start is None:
-                    self.input_select_start = self.input_index
-                if self.input_index < len(self.input_buffer):
-                    # if index hits right screen edge, but there is more text to right, move line right
-                    if self.input_index - max(0, len(self.input_buffer) - w - self.input_line_index) == w:
-                        self.input_line_index -= min(INPUT_LINE_JUMP, w - 3)
-                    else:
-                        self.input_index += 1
-                self.input_select_end = self.input_index
-
-            elif key == 515:   # select_all
-                self.input_select_start = 0
-                self.input_select_end = len(self.input_buffer)
 
             elif key == 516:   # copy
                 if self.input_select_start is not None:

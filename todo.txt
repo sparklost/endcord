@@ -1,17 +1,17 @@
+# write MRE for pycryptodome for that dude
+    first try disabling pycryptodome building
+    try disabling all compiler flags
+    then build with clang on MRE
+    finally build MRE with gcc on 3.13 -> bug report
+
 Fix gtkcurses scrollbar dragging
-Add line_left, line_right, end_right and end_left bindings
-Add select_ line/end left/right bindings
+release 1.5.3
 
-Optimize gtkcurses
-Fix gtkcurses build with nuitka and add to workflow
-Add (block and full) inline images to gtkcurses
-Add image emoji to gtkcurses
-Add pfp to gtkcurses
-
+CORE:
 Patch python 3.14 using python 3.16 curses module to enable 255+ colors
 Update tui.py to support 255+ colors
 Add inbox
-Add pinned servers and channels
+Add pinned channels
 Add spellcheck corrections
 Make build.py work with and without uv
 Make custom json parser - remove orjson
@@ -21,5 +21,13 @@ Add option to select individual message
 Add video, stage and stream calls
 Add localization
 
+GTKCURSES:
+Optimize gtkcurses
+Fix gtkcurses build with nuitka and add to workflow
+Add (block and full) inline images to gtkcurses
+Add image emoji to gtkcurses
+Add pfp to gtkcurses
+
+EXTENSIONS:
 endcord-kitty-media
 endcord-p2p-network (name subject to change)
