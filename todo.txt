@@ -1,9 +1,3 @@
-# write MRE for pycryptodome for that dude
-    first try disabling pycryptodome building
-    try disabling all compiler flags
-    then build with clang on MRE
-    finally build MRE with gcc on 3.13 -> bug report
-
 Fix gtkcurses scrollbar dragging
 release 1.5.3
 

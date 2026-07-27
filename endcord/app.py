@@ -1634,6 +1634,7 @@ class Endcord:
                 init_text = self.restore_input_text[0]
                 self.stop_extra_window()
                 input_text, chat_sel, tree_sel, action = self.tui.wait_input(self.prompt, init_text=init_text, reset=False, keep_cursor=True, forum=self.forum, press=forced_binding)
+                self.restore_input_text = (input_text, "standard")
                 ephemeral = True   # stop loop
             elif self.restore_input_text[1] == "prompt":
                 prompt_text = self.restore_input_text[0]
@@ -2711,6 +2712,10 @@ class Endcord:
                             binding = self.keybindings.get(command)
                             if binding and binding[0]:
                                 self.wait_input(forced_binding=binding[0])
+                            elif command.startswith("*") and command[1:]:
+                                binding = True
+                                self.wait_input(forced_binding=command[1:])
+                                time.sleep(0.01)   # so cursor doesnt appear at the end off line
                         if not binding:
                             self.execute_command(cmd_type, cmd_args, action[1], chat_sel, tree_sel, reset=False)
                         self.check_tree_format()

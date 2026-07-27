@@ -2737,7 +2737,7 @@ class TUI():
 
             # switch tab key in normal mode in vim mode
             elif not self.insert_mode and not self.switch_tab_modifier and key.isdigit():
-                self.pressed_num_key = key - 48
+                self.pressed_num_key = int(key[-1:])
                 return self.return_input_code(42)
 
             if key in self.chainable and not self.keybinding_chain:

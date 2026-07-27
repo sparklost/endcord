@@ -34,7 +34,7 @@ KEY_CODES = {
     b"\x1b[C": "RIGHT",
     b"\x1b[H": "HOME",
     b"\x1b[F": "END",
-    b"\x1b[3~": "DELETE",
+    b"\x1b[3~": "DEL",
     b" ": "SPC",
     b"\t": "TAB",
     b"\r": "ENTER",
@@ -46,7 +46,7 @@ KEY_CODES_WIN = {
     b"P": "DOWN",
     b"M": "RIGHT",
     b"K": "LEFT",
-    b"S": "DELETE",
+    b"S": "DEL",
 }
 
 width = 0

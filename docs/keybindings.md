@@ -166,6 +166,7 @@ Command keybinding is added like this: `"C-x" = "send_message Hello World!"`. Th
 Note that all bindings must be inside quotes, even a single integer. To use same binding as standard keybindings, set standard keybinding to `None`.  
 Alongside commands, standard keybinding names can be used here too. Eg. `"C-x" = "tree_up; tree_up"` will "press" tree_up binding twice.  
 To execute multiple commands in a sequence, type them separated with `;` character. To use actual `;` character in command type it as `\;`.  
+To send raw keycode, prefix it with `*`. Eg. `"tree_down; *C-ENTER; *H; *I; *ENTER"`.  
 Special commands available only for command-bindings are documented in [Commands list](commands.md#command-bindings-only-commands).  
 
 

@@ -80,6 +80,7 @@ def main(args):
         section="command_bindings",
         gen_config=gen_config,
         merge=True,
+        lower=False,
     )
     if config_data["vim_mode"]:
         vim_keybindings = config.load_keybindings(
