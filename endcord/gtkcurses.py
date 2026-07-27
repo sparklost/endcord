@@ -155,6 +155,7 @@ ARROW_KEYS = {
 run = True
 toggle_window = False
 focused = True
+cursor_type = 1
 event_queue = queue.Queue()
 color_map = [DEFAULT_PAIR] * (COLORS + 1)
 icon = None
@@ -373,6 +374,7 @@ class GtkTerminalWindow(Gtk.Window):
 
         return False
 
+
     def on_draw(self, widget, cr):   # noqa
         """Window draw event"""
         bg = color_map[0][1]
@@ -380,7 +382,7 @@ class GtkTerminalWindow(Gtk.Window):
         cr.paint()
         layout = PangoCairo.create_layout(cr)
 
-        with self.curses_window.dirty_lock:
+        with self.curses_window.buffer_lock:
             for y in range(self.curses_window.nlines):
                 row = self.curses_window.buffer[y]
                 i = 0
@@ -433,6 +435,49 @@ class GtkTerminalWindow(Gtk.Window):
                         cr.move_to(px_x, px_y + self.char_height - 2)
                         cr.line_to(px_x + bg_px_width, px_y + self.char_height - 2)
                         cr.stroke()
+
+            # draw cursor
+            if cursor_type:
+                cursor_y = self.curses_window.cursor_y
+                cursor_x = self.curses_window.cursor_x
+                if 0 <= cursor_y < self.curses_window.nlines and 0 <= cursor_x < self.curses_window.ncols:
+                    cursor_px_y = cursor_y * self.char_height
+                    cursor_px_x = cursor_x * self.char_width
+
+                    # extract color and deal with emoji
+                    ch, attr = self.curses_window.buffer[cursor_y][cursor_x]
+                    flags = attr & 0xFFFF0000
+                    fg_idx = attr & 0xFFFF
+                    if fg_idx >= len(color_map):
+                        fg_idx = 0
+                    fg_color, bg_color = color_map[fg_idx]
+                    if flags & A_STANDOUT:
+                        fg_color, bg_color = bg_color, fg_color
+                    cursor_width = self.char_width * (2 if (attr & A_EMOJI) else 1)
+
+                    if cursor_type == 1:   # block with inverted collors
+                        cursor_bg = fg_color  # Solid block gets text color
+                        cursor_fg = bg_color  # Text gets background color
+                        # 1. Draw solid block
+                        cr.set_source_rgb(*rgb_to_cairo(cursor_bg))
+                        cr.rectangle(cursor_px_x, cursor_px_y, cursor_width, self.char_height)
+                        cr.fill()
+                        if ch:
+                            current_desc = self.font_desc.copy()
+                            if flags & A_BOLD:
+                                current_desc.set_weight(Pango.Weight.BOLD)
+                            if flags & A_ITALIC:
+                                current_desc.set_style(Pango.Style.ITALIC)
+                            layout.set_font_description(current_desc)
+                            layout.set_text(ch, -1)
+                            cr.set_source_rgb(*rgb_to_cairo(cursor_fg))
+                            cr.move_to(cursor_px_x, cursor_px_y)
+                            PangoCairo.show_layout(cr, layout)
+                    elif cursor_type == 2:   # bar
+                        bar_w = max(2.0, self.char_width * 0.15)
+                        cr.set_source_rgb(*rgb_to_cairo(fg_color))
+                        cr.rectangle(cursor_px_x, cursor_px_y, bar_w, self.char_height)
+                        cr.fill()
 
         return True
 
@@ -637,24 +682,28 @@ class Window:
 
         if parent is None:   # root window
             self.buffer = [[(" ", 0) for _ in range(self.ncols)] for _ in range(self.nlines)]
-            self.dirty_lock = threading.RLock()
+            self.buffer_lock = threading.RLock()
+            self.cursor_y, self.cursor_x = -1, -1
+            self.root = self
         else:   # derwins
             self.buffer = parent.buffer
-            self.dirty_lock = parent.dirty_lock
+            self.buffer_lock = parent.buffer_lock
+            self.root = parent.root
 
 
     def derwin(self, nlines, ncols, begy, begx): return Window(nlines, ncols, begy, begx, parent=self)   # noqa
     def getmaxyx(self): return (self.nlines, self.ncols)   # noqa
     def getbegyx(self): return (self.begy, self.begx)   # noqa
-    def getmouse(): return (0, 0, 0, 0, 0)   # noqa
-    def doupdate(): pass   # noqa
+    def getmouse(self): return (0, 0, 0, 0, 0)   # noqa
+    def doupdate(self): pass   # noqa
+    def leaveok(self, x): pass   # noqa
 
 
     def screen_resize(self, nlines, ncols):
         """Internal function used to update screen dimensions"""
         self.ncols = ncols
         self.nlines = nlines
-        with self.dirty_lock:
+        with self.buffer_lock:
             self.buffer.clear()
             self.buffer.extend([[(" ", 0) for _ in range(self.ncols)] for _ in range(self.nlines)])
 
@@ -671,7 +720,7 @@ class Window:
 
     def insstr(self, y, x, text, attr=0):   # noqa
         lines = text.split("\n")
-        with self.dirty_lock:
+        with self.buffer_lock:
             for i, line in enumerate(lines):
                 if y + i >= self.nlines:
                     break
@@ -716,7 +765,7 @@ class Window:
         abs_y = self.begy + y
         abs_x = self.begx + x
         abs_end = self.begx + end
-        with self.dirty_lock:
+        with self.buffer_lock:
             if abs_y < len(self.buffer):
                 row_buffer = self.buffer[abs_y]
                 abs_end = min(abs_end, len(row_buffer))
@@ -726,7 +775,7 @@ class Window:
 
 
     def clear(self):   # noqa
-        with self.dirty_lock:
+        with self.buffer_lock:
             if self.parent is None:   # clear root
                 self.buffer.clear()
                 self.buffer.extend([[(" ", 0) for _ in range(self.ncols)] for _ in range(self.nlines)])
@@ -739,6 +788,13 @@ class Window:
                             abs_x = self.begx + x
                             if abs_x < len(row):
                                 row[abs_x] = (" ", 0)
+        self.refresh()
+
+
+    def move(self, y, x):
+        """Set relative cursor position (y, x) in this window"""
+        self.root.cursor_y = self.begy + y
+        self.root.cursor_x = self.begx + x
         self.refresh()
 
 
@@ -823,9 +879,19 @@ def color_pair(color_id):
     return color_id
 
 
+def curs_set(value):
+    """Extra options: 0 - disable, 2 - block shape, 6 - bar shape"""
+    global cursor_type
+    if value == 2:
+        cursor_type = 1
+    elif value == 6:
+        cursor_type = 2
+    else:
+        cursor_type = 0
+
+
 def start_color(): pass   # noqa
 def use_default_colors(): time.sleep(0.2)   # noqa
-def curs_set(x): pass   # noqa
 def mousemask(x): pass   # noqa
 def mouseinterval(x): pass   # noqa
 def nocbreak(): pass   # noqa

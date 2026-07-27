@@ -52,12 +52,12 @@ Any third party endcord forks may add features that can lead to account ban, con
 - Show embeds, attachment types and links, code blocks (with syntax highlighting)
 - Spellchecking
 - Advanced input line operations and ability to use external editor
+- Configurable bar or block shaped cursor
 - Tabs and temporary tabs with mouse controls (click, double click, middle click)
 - Assist when typing channel/username/role/emoji/sticker
 - Search, preview and send gifs
 - Record and send voice messages
 - `s/old/new` replacement with extended regex
-- Open link in browser
 - Unlimited chat scrolling
 - Keep deleted messages (OFF by default)
 - Highlight messages with mentions

@@ -399,7 +399,7 @@ def get_key_fallback(screen, backspace_code=127):
     return repr(key)
 
 
-def get_key_passthrough(screen, backspace_code):   # noqa
+def get_key_passthrough(screen, backspace_code=None):   # noqa
     """Passthrough get_key, this is used with gtkcurses enabled because it internally parses events"""
     return screen.getch()
 

@@ -61,6 +61,8 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
     Assist when typing @username, @role, #channel, :emoji:, ;sticker;
  - `assist_swap_binding = True`  
     Whether to swap `chat_up` and `chat_down` with `extra_up` and `extra_down` when popup window is open.
+- `cursor_bar = True`  
+    Whether to use terminals own bar-shaped cursor, instead of builtin block-shaped cursor in input line.
 - `cursor_on_time = 0.7`  
     Time in seconds the cursor stays ON. Set to `None` or `0` to disable cursor blinking.
 - `cursor_off_time = 0.5`  

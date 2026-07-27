@@ -89,6 +89,15 @@ def safe_insch(screen, y, x, character, color):
         screen.insstr(y, x, character, color)
 
 
+def set_cursor(value):
+    """Set hardware cursor shape: 0 - default, 2 - block, 6 - bar"""
+    if uses_gtkcurses:
+        curses.curs_set(value)
+    else:
+        sys.stdout.write(f"\x1b[{value} q")
+        sys.stdout.flush()
+
+
 def select_word(text, index):
     """Select word at index position"""
     if index < 0 or index >= len(text):
@@ -294,6 +303,15 @@ class TUI():
         self.tab_spaces = int(config["tab_spaces"])
         self.vim_mode = config["vim_mode"]
         self.swap_assist = config["assist_swap_binding"]
+
+        # switch thin cursor
+        self.bar_cursor = config["cursor_bar"]
+        if self.bar_cursor:
+            curses.curs_set(0)
+            set_cursor(2 if self.vim_mode else 6)
+            screen.leaveok(True)
+            self.screen_update = self.screen_update_barcursor
+            self.set_cursor_color = self.draw_bar_cursor
 
         # select bordered method
         if self.bordered:
@@ -503,6 +521,7 @@ class TUI():
         """Stop all threads and restore terminal"""
         sys.stdout.write("\x1b[?2004l")   # disable bracketed paste mode
         sys.stdout.write("\x1b[?1004l")   # disable terminal focus change reporting
+        sys.stdout.write("\x1b[0 q")   # restore default cursor shape
         self.run = False
         self.need_update.set()
 
@@ -514,6 +533,19 @@ class TUI():
             # here must be delay, otherwise output gets messed up
             with self.lock:
                 time.sleep(self.screen_update_delay)
+                curses.doupdate()
+                self.need_update.clear()
+
+
+    def screen_update_barcursor(self):
+        """Thread that updates drawn content on physical screen"""
+        while self.run:
+            self.need_update.wait()
+            # here must be delay, otherwise output gets messed up
+            with self.lock:
+                time.sleep(self.screen_update_delay)
+                # must draw inlut line on each update so cursor belongs to it
+                self.win_input_line.noutrefresh()
                 curses.doupdate()
                 self.need_update.clear()
 
@@ -973,8 +1005,14 @@ class TUI():
 
     def set_vim_insert(self, value):
         """Set insert mode for vim mode"""
-        if self.vim_mode:
-            self.insert_mode = value
+        if not self.vim_mode:
+            return
+        self.insert_mode = value
+        if self.bar_cursor:
+            if value:
+                set_cursor(6)
+            else:
+                set_cursor(2)
 
 
     def set_fun(self, fun_lvl):
@@ -1447,13 +1485,13 @@ class TUI():
                     # swap so start is always left side
                     selected_start_screen, selected_end_screen = selected_end_screen, selected_start_screen
 
-            # if not line_text:   # only needed if cursor drawing is disabled
-            #     line_text = " "
+            if self.bar_cursor and not line_text:   # clear previous character
+                line_text = " "
 
             # draw
             character = " "
             pos = 0
-            cursor_drawn = False
+            cursor_drawn = bool(self.bar_cursor)
             for pos, character in enumerate(line_text):
                 # cursor in the string
                 if not cursor_drawn and self.cursor_pos == pos:
@@ -1473,7 +1511,7 @@ class TUI():
                         safe_insch(self.win_input_line, 0, pos, character, curses.color_pair(14) | self.attrib_map[14])
             self.win_input_line.insch(0, pos + 1, "\n", curses.color_pair(0))
             # cursor at the end of string
-            if not cursor_drawn and self.cursor_pos >= len(line_text):
+            if (not cursor_drawn and self.cursor_pos >= len(line_text)) or self.bar_cursor:
                 self.show_cursor()
             self.win_input_line.noutrefresh()
             self.need_update.set()
@@ -2120,6 +2158,18 @@ class TUI():
                 self.need_update.set()
 
 
+    def draw_bar_cursor(self, color_id):
+        """Draw hardware cursor '|' or block"""
+        with self.lock:
+            w = self.input_hw[1]
+            if self.cursor_pos < w:
+                if uses_gtkcurses:
+                    curses.curs_set((6 if self.insert_mode else 2) if color_id == 15 else 0)
+                else:
+                    curses.curs_set(1 if color_id == 15 else 0)
+                self.win_input_line.move(0, self.cursor_pos)
+
+
     def blink_cursor(self):
         """Thread that makes cursor blink, hibernates after some time"""
         self.hibernate_cursor = 0
@@ -2712,6 +2762,8 @@ class TUI():
                     self.assist_start = -1
                 if self.vim_mode and self.insert_mode:
                     self.insert_mode = False
+                    if self.bar_cursor:
+                        set_cursor(2)
                     return self.return_input_code(26)
                 return self.return_input_code(5)
 
@@ -3063,6 +3115,8 @@ class TUI():
 
             elif self.vim_mode and key == 525:   # insert_mode for vim mode
                 self.insert_mode = True
+                if self.bar_cursor:
+                    set_cursor(6)
                 return self.return_input_code(28)
 
             # keys that only return a value to app.py

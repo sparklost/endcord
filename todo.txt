@@ -1,11 +1,11 @@
-Add | cursor (and to gtkcurses)
+Fix gtkcurses scrollbar dragging
 Add line_left, line_right, end_right and end_left bindings
 Add select_ line/end left/right bindings
 
 Optimize gtkcurses
 Fix gtkcurses build with nuitka and add to workflow
 Add (block and full) inline images to gtkcurses
-Add emoji to gtkcurses
+Add image emoji to gtkcurses
 Add pfp to gtkcurses
 
 Patch python 3.14 using python 3.16 curses module to enable 255+ colors

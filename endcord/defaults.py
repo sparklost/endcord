@@ -27,6 +27,7 @@ settings = {
     "reply_mention": True,
     "cache_typed": True,
     "show_pending_messages": True,
+    "cursor_bar": True,
     "cursor_on_time": 0.7,
     "cursor_off_time": 0.5,
     "tab_spaces": 4,
