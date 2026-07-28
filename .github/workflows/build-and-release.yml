@@ -89,6 +89,7 @@ jobs:
       - name: Install macOS system dependencies
         if: matrix.platform == 'macos'
         run: |
+          brew untap aws/tap 2>/dev/null || true
           brew install ccache
           echo "SDKROOT=$(xcrun --sdk macosx --show-sdk-path)" >> $GITHUB_ENV
 
