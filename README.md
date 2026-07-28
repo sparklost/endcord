@@ -13,7 +13,7 @@
 <img src="./.github/screenshots/01.png" alt="Screenshot 1" width="864">
 </div>
 
-Endcord is a third-party feature rich Discord client, running entirely in terminal.  
+Endcord is a third-party feature rich Discord client, running entirely in terminal (or in its own GTK3 window).  
 It is built with Python (this [doesn't mean its slow](#note-on-python-performance-misconceptions)) and ncurses library, to deliver lightweight yet feature rich experience.  
 [More screenshots](https://github.com/sparklost/endcord/blob/main/.github/screenshots.md).  
 Official endcord will always stay **purely human project**.  
@@ -298,7 +298,7 @@ But there is also setting in config to open media in external app (cross-system,
 "endcord-lite" (without voice calls and ASCII media support), can be built by specifying `--lite` flag to build script. Lite version is significantly smaller, cant make voice calls, but still can open media in external app.  
 
 ### Windowed mode
-This mode entirely replaces curses and the need for terminal emulator with GTK window, but UI remains terminal-like.  
+This mode entirely replaces curses and the need for terminal emulator, using GTK3 window, UI still remains terminal-like.  
 Tray icon will also be enabled, so closing window will only minimize it to tray.  
 If using external editor, use editor with graphical interface. TUI editors will not work, as this is no longer in terminal.  
 Also, endcord built-in media player will not work because its standalone TUI thats not using curses. All media will be opened in native player.  

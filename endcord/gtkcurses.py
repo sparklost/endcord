@@ -140,7 +140,7 @@ A_BOLD = 0x00200000
 A_ITALIC = 0x80000000
 A_EMOJI = 0x40000000   # bit 30 should be free
 ALL_MOUSE_EVENTS = 0
-REPORT_MOUSE_POSITION = 0
+REPORT_MOUSE_POSITION = 1
 COLORS = 255
 COLOR_PAIRS = 1000000
 
@@ -156,6 +156,7 @@ run = True
 toggle_window = False
 focused = True
 cursor_type = 1
+mouse_pos_reporting = 0
 event_queue = queue.Queue()
 color_map = [DEFAULT_PAIR] * (COLORS + 1)
 icon = None
@@ -336,9 +337,15 @@ class GtkTerminalWindow(Gtk.Window):
         self.drawing_area = Gtk.DrawingArea()
         self.drawing_area.connect("draw", self.on_draw)
         self.drawing_area.connect("configure-event", self.on_configure)
-        self.drawing_area.add_events(Gdk.EventMask.BUTTON_PRESS_MASK | Gdk.EventMask.SCROLL_MASK | Gdk.EventMask.SMOOTH_SCROLL_MASK)
+        self.drawing_area.add_events(
+            Gdk.EventMask.BUTTON_PRESS_MASK | Gdk.EventMask.BUTTON_RELEASE_MASK |
+            Gdk.EventMask.SCROLL_MASK | Gdk.EventMask.SMOOTH_SCROLL_MASK |
+            Gdk.EventMask.POINTER_MOTION_MASK,
+        )
         self.drawing_area.connect("scroll-event", self.on_scroll)
         self.drawing_area.connect("button-press-event", self.on_button_press)
+        self.drawing_area.connect("button-release-event", self.on_button_release)
+        self.drawing_area.connect("motion-notify-event", self.on_motion_notify)
         self.add(self.drawing_area)
         self.connect("key-press-event", self.on_key_press)
         self.connect("delete-event", self.on_delete_event)
@@ -346,6 +353,7 @@ class GtkTerminalWindow(Gtk.Window):
         self.connect("focus-in-event", lambda *_: event_queue.put("FOCUS_IN"))
         self.connect("focus-out-event", lambda *_: event_queue.put("FOCUS_OUT"))
         self.font_desc = Pango.FontDescription.from_string(f"{FONT_NAME} {FONT_SIZE}")
+        self.last_mouse_cell = (None, None)
         self.scroll_buffer = 0.0   # for touchpad
 
         # calculate font height and width and set it in curses class
@@ -401,7 +409,11 @@ class GtkTerminalWindow(Gtk.Window):
                         i += 1
                         draw_x += 1
                         if flags & A_EMOJI:
+                            if i < self.curses_window.ncols:
+                                i += 1
+                                draw_x += 1
                             break   # not grouping emoji because they have slightly wider font
+
                     text = "".join(span_text)
                     fg_idx = span_attr & 0xFFFF
                     if fg_idx >= len(color_map):
@@ -414,7 +426,7 @@ class GtkTerminalWindow(Gtk.Window):
                     px_y = y * self.char_height
 
                     # draw bg
-                    if rgb_to_cairo(bg_color) != rgb_to_cairo(bg):
+                    if bg_color != bg and text:
                         cr.set_source_rgb(*rgb_to_cairo(bg_color))
                         cr.rectangle(px_x, px_y, bg_px_width, self.char_height)
                         cr.fill()
@@ -573,9 +585,9 @@ class GtkTerminalWindow(Gtk.Window):
 
 
     def on_button_press(self, widget, event):   # noqa
-        """Mouse click events"""
-        x_col = int(event.x // self.char_width)
-        y_col = int(event.y // self.char_height)
+        """Mouse button press events"""
+        x = int(event.x // self.char_width)
+        y = int(event.y // self.char_height)
         btn = 0
         if event.button == 1:
             btn = 0
@@ -583,21 +595,36 @@ class GtkTerminalWindow(Gtk.Window):
             btn = 1
         elif event.button == 3:
             btn = 2
-        event_queue.put((y_col, x_col, btn, True))
+        event_queue.put((y, x, btn, True))
+        return False
+
+
+    def on_button_release(self, widget, event):   # noqa
+        """Mouse button release events"""
+        x = int(event.x // self.char_width)
+        y = int(event.y // self.char_height)
+        btn = 0
+        if event.button == 1:
+            btn = 0
+        elif event.button == 2:
+            btn = 1
+        elif event.button == 3:
+            btn = 2
+        event_queue.put((y, x, btn, False))
         return False
 
 
     def on_scroll(self, widget, event):   # noqa
         """Mouse and touchpad scroll events"""
-        x_col = int(event.x // self.char_width)
-        y_col = int(event.y // self.char_height)
+        x = int(event.x // self.char_width)
+        y = int(event.y // self.char_height)
 
         # mouse
         if event.direction == Gdk.ScrollDirection.UP:
-            event_queue.put((y_col, x_col, 64, True))   # up
+            event_queue.put((y, x, 64, True))   # up
             return True
         if event.direction == Gdk.ScrollDirection.DOWN:
-            event_queue.put((y_col, x_col, 65, True))   # down
+            event_queue.put((y, x, 65, True))   # down
             return True
 
         # touchpad
@@ -606,13 +633,27 @@ class GtkTerminalWindow(Gtk.Window):
             if success and dy != 0:
                 self.scroll_buffer += dy
                 while self.scroll_buffer <= -1.0:
-                    event_queue.put((y_col, x_col, 64, True))   # up
+                    event_queue.put((y, x, 64, True))   # up
                     self.scroll_buffer += 1.0
                 while self.scroll_buffer >= 1.0:
-                    event_queue.put((y_col, x_col, 65, True))   # down
+                    event_queue.put((y, x, 65, True))   # down
                     self.scroll_buffer -= 1.0
             return True
 
+        return False
+
+
+    def on_motion_notify(self, widget, event):   # noqa
+        """Mouse movement events"""
+        if not mouse_pos_reporting:
+            return False
+        x = int(event.x // self.char_width)
+        y = int(event.y // self.char_height)
+        if 0 <= y < self.curses_window.nlines and 0 <= x < self.curses_window.ncols:
+            current_cell = (y, x)
+            if current_cell != self.last_mouse_cell:   # send only when mouse changes cell
+                self.last_mouse_cell = current_cell
+                event_queue.put((y, x, 32, True))
         return False
 
 
@@ -846,14 +887,25 @@ def wrapper(func, *args, **kwargs):   # noqa
         logger.warning("Pystray not installed")
 
     def user_thread():
-        func(window, *args, **kwargs)
-        GLib.idle_add(Gtk.main_quit)
+        try:
+            func(window, *args, **kwargs)
+        finally:
+            def clean_quit():
+                if gtk_window:
+                    gtk_window.destroy()
+                Gtk.main_quit()
+                return False
+            GLib.idle_add(clean_quit, priority=GLib.PRIORITY_HIGH)
 
     threading.Thread(target=user_thread, daemon=True).start()
+
     if MAXIMIZED:
         gtk_window.maximize()
     gtk_window.show_all()
-    Gtk.main()
+    try:
+        Gtk.main()
+    finally:
+        os._exit(0)   # forced exit in case there are some threads still running
 
 
 def ungetch(ch):
@@ -890,9 +942,14 @@ def curs_set(value):
         cursor_type = 0
 
 
+def mousemask(value):
+    """Only toggle report movement reporting"""
+    global mouse_pos_reporting
+    mouse_pos_reporting = value
+
+
 def start_color(): pass   # noqa
 def use_default_colors(): time.sleep(0.2)   # noqa
-def mousemask(x): pass   # noqa
 def mouseinterval(x): pass   # noqa
 def nocbreak(): pass   # noqa
 def echo(): pass   # noqa

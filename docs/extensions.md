@@ -1,6 +1,8 @@
 ## Installing extensions
-Extensions can be installed in `Extensions` directory located in endcord config directory.  
+You can search extensions either on github with **[endcord-extension topic](https://github.com/topics/endcord-extension)**, or using endcord `search_extensions` command.  
+Extensions are installed in `Extensions` directory located in endcord config directory.  
 Installation can be done by simply git cloning extension repo into the extensions directory or by running `endcord -i [url]`.  
+Note that if youre installing manually, if extension has `setup.py`, it has to be manually executed, like `python setup.py`.  
 There is also client command available: `install_extension [url]`. Running it without url will update all installed extensions.  
 Instead `url` can also be used `repo_owner/repo_name` which assumes github.  
 Extension loading can be toggled in config and is ON by default.  
