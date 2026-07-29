@@ -51,9 +51,7 @@ def prepare_embeds(embeds, message_content):
                 skip_main_url = True
 
         if "name" in embed.get("author", {}) and not any(domain in url for domain in GIF_PROVIDERS):
-            name = embed["author"]["name"]
-            if name not in embed.get("title", "") and name not in embed.get("description", ""):
-                author = quote(f"*— By: {name}*")
+            author = quote(f"*— By: {embed["author"]["name"]}*")
         if "title" in embed:
             if main_url:
                 content = [" ", quote(f"[{embed["title"]}]({main_url})")]
