@@ -42,6 +42,7 @@ def prepare_embeds(embeds, message_content):
         media = []
         embed_type = embed.get("type", "unknown")
         url = embed.get("url", "")
+        author = None
 
         if url and not any(domain in url for domain in GIF_PROVIDERS):
             # dont repeat unless its not discord attachment and handle x=twitter
@@ -52,7 +53,7 @@ def prepare_embeds(embeds, message_content):
         if "name" in embed.get("author", {}) and not any(domain in url for domain in GIF_PROVIDERS):
             name = embed["author"]["name"]
             if name not in embed.get("title", "") and name not in embed.get("description", ""):
-                content.append(quote(name))
+                author = quote(f"*— By: {name}*")
         if "title" in embed:
             if main_url:
                 content = [" ", quote(f"[{embed["title"]}]({main_url})")]
@@ -103,6 +104,8 @@ def prepare_embeds(embeds, message_content):
         if "footer" in embed and "text" in embed["footer"]:
             content.append(quote(embed["footer"]["text"]))
             media += [False] * len(re.findall(match_url, embed["footer"]["text"]))
+        if author and content[-1].startswith("> "):
+            content.append(author)
         content = "\n".join(content)
         if content:
             if content == message_content:

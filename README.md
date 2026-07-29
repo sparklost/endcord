@@ -124,8 +124,9 @@ Manager can be re-opened using `--manager` flag.
 - Scan QR code - note that some terminals may fail to render QR code
 - Token - used to access Discord through your account without logging-in
 - Token as an argument: `endcord -t [YOUR_TOKEN]`, but note that it might get saved in your terminal history file  
+
 Email or QR code login may fail because captcha is requested by Discord. In that case first login and complete captcha through official client, from same IP address, then try again. If it still fails, then you'll have to use token method.  
-If you want to verify what is happening with credentials, look in profile_manager.py and auth.py.  
+If you want to check what is endcord doing with credentials, look in profile_manager.py and auth.py.  
 **Do not share your token!**  
 
 ### Configuring keybindings

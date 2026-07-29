@@ -3792,7 +3792,7 @@ def generate_tree(dms, guilds, threads, read_state, guild_folders, activities, c
     # add unsorted guilds
     for num, guild in enumerate(guilds):
         if num not in guilds_used_index:
-            guilds_sorted.append(guild)
+            guilds_sorted.insert(0, guild)
 
     # generator loop
     in_folder = None
