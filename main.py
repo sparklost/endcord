@@ -27,8 +27,8 @@ uses_gtkcurses = hasattr(curses, "GTKCURSES")
 log_file_path = os.path.join(os.path.expanduser(log_path), APP_NAME + ".log")
 run = True
 
-# if os.path.exists(log_file_path):
-#     os.rename(log_file_path, log_file_path[:-4] + "-prev.log")
+if os.path.exists(log_file_path):
+    os.rename(log_file_path, log_file_path[:-4] + "-prev.log")
 logger = logging
 logging.basicConfig(
     level="INFO",
