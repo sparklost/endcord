@@ -266,6 +266,8 @@ def get_key_fallback(screen, backspace_code=127):
     key = get_key_code(screen)
     if key == -1:
         return -1
+    if isinstance(key, str):
+        return key
 
     # ascii
     if 32 <= key <= 126:
