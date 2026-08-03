@@ -13,9 +13,12 @@ Add video, stage and stream calls
 Add localization
 
 GTKCURSES:
+Fix gtkcurses crash wwhen typing non-ascii characters
+Add qrcode drawing to gtkcurses
+Add ascii media drawing to gtkcurses
 Optimize gtkcurses
 Fix gtkcurses build with nuitka and add to workflow
-Add (block and full) inline images to gtkcurses
+Add inline images to gtkcurses
 Add image emoji to gtkcurses
 Add pfp to gtkcurses
 

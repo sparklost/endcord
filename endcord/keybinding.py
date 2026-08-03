@@ -49,7 +49,8 @@ def get_key(screen, backspace_code=127):
         screen.timeout(250)   # restore previous setting
 
         if len(sequence_list) > 1:
-            sequence = "".join(chr(b) for b in sequence_list)
+            raw_bytes = bytes(sequence_list)
+            sequence = raw_bytes.decode("utf-8", errors="replace")
 
             # SGR 1006 mouse parsing
             if sequence.startswith("\x1b[<") and (sequence.endswith("m") or sequence.endswith("M")):
@@ -121,8 +122,9 @@ def get_key(screen, backspace_code=127):
                 return f"PASTE {sequence[6:-6]}"
 
             # 2-byte escape sequences
-            if len(sequence_list) == 2:
-                payload = sequence_list[1]
+            if len(sequence) == 2:
+                char = sequence[1]
+                payload = ord(char)
                 if 1 <= payload <= 26:
                     return f"C-M-{chr(payload + 96)}"
                 if payload == 0:
@@ -135,11 +137,9 @@ def get_key(screen, backspace_code=127):
                     return "C-M-^"
                 if payload == 31:
                     return "C-M-/"
-                if 32 <= payload <= 126:
-                    char = chr(payload)
-                    if char.isupper():
-                        return f"M-S-{char.lower()}"
-                    return f"M-{char}"
+                if char.isupper():
+                    return f"M-S-{char.lower()}"
+                return f"M-{char}"
 
             return repr(sequence)
 
@@ -298,6 +298,8 @@ def get_key_fallback(screen, backspace_code=127):
             payload = sequence_list[1]
             if payload == 10:
                 return "M-ENTER"
+            if isinstance(payload, str):
+                return f"M-{payload}"
             if 1 <= payload <= 26:
                 return f"C-M-{chr(payload + 96)}"
             if payload == 0:
@@ -316,13 +318,15 @@ def get_key_fallback(screen, backspace_code=127):
                     return f"M-S-{char.lower()}"
                 return f"M-{char}"
         if sequence_list[:6] == [27, 91, 50, 48, 48, 126]:   # bracket paste
-            return f"PASTE {"".join(chr(b) for b in sequence_list[6:-6])}"
+            return f"PASTE {"".join(b if isinstance(b, str) else chr(b) for b in sequence_list[6:-6])}"
         if sequence_list[-1] == 27:   # holding escape key
             return "ESC"
         return "ESC"
 
     if sys.platform == "win32":
         # alt+number
+        if isinstance(key, str):
+            return f"M-{key}"
         if 407 <= key <= 416:
             return f"M-{key - 407}"
         # alt+letters
