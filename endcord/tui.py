@@ -1714,7 +1714,7 @@ class TUI():
                             above_mention = True
                         continue
                     y = max(num - skipped - self.tree_index, 0)
-                    if y >= h:   # bellow visible area
+                    if y >= h:   # below visible area
                         break
                     second_digit = (code % 100) // 10
                     color = curses.color_pair(3)
@@ -1769,7 +1769,7 @@ class TUI():
                     # this is prevented by vertically alternating space and alt_space character (U+2800 - braille pattern blank)
                     self.win_tree.insstr(y, 0, f"{" " if y % 2 else ALT_SPACE}\n", curses.color_pair(1))
                     y += 1
-                while num < len(self.tree_format):   # continue loop to detect mentions bellow visible area
+                while num < len(self.tree_format):   # continue loop to detect mentions below visible area
                     if (self.tree_format[num] % 100) // 10 == 2:
                         self.win_tree.insstr(h-1, 0, " Mentions down ".center(w, self.hline), curses.color_pair(8) | self.attrib_map[8])
                         break

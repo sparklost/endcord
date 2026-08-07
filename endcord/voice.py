@@ -27,9 +27,8 @@ from endcord import socks
 # safely import soundcard, in case there is no sound system
 try:
     import soundcard
-    have_soundcard = True
 except (AssertionError, RuntimeError):
-    have_soundcard = False
+    soundcard = False
 
 DISCORD_HOST = "discord.com"
 BASE_SOUND_GAIN = 2.0
@@ -38,6 +37,7 @@ UDP_TIMEOUT = 10
 OPUS_SILENCE = bytes([0xF8, 0xFF, 0xFE])
 SILENCE_BUFFER = 5
 MAX_SILENCE = 10
+MAX_LATENCY_FRAMES = 5
 MIXER_BUFFER = 3
 RTCP_SEND_DELAY = 5   # set to 0 to disable RTCP SR
 CODECS = [
@@ -53,7 +53,7 @@ logger = logging.getLogger(__name__)
 rtp_unpacker = struct.Struct(">xxHII")
 
 # get speaker
-if have_soundcard:
+if soundcard:
     try:
         speaker = soundcard.default_speaker()
         have_sound = True
@@ -105,7 +105,7 @@ def detect_silence(data, threshold=0.03):
 class Gateway():
     """Methods for fetching and sending data to Discord voice gateway through websocket"""
 
-    def __init__(self, voice_gateway_data, my_id, volume_input, volume_output, user_agent, proxy=None, custom_mic=None, silence=-30, opus_mode="voip", fast_mixer=False):
+    def __init__(self, voice_gateway_data, my_id, volume_input, volume_output, user_agent, proxy=None, custom_mic=None, silence=-30, opus_mode="voip", fast_mixer=False, denoise=True):
         self.voice_gateway_data = voice_gateway_data
         self.guild_id = voice_gateway_data["guild_id"]
         self.channel_id = voice_gateway_data["channel_id"]
@@ -146,6 +146,7 @@ class Gateway():
         self.silence_threshold = silence
         self.opus_mode = opus_mode
         self.fast_mixer = fast_mixer
+        self.denoise = denoise
 
         self.connect()
 
@@ -213,6 +214,7 @@ class Gateway():
                 silence=self.silence_threshold,
                 opus_mode=self.opus_mode,
                 fast_mixer=self.fast_mixer,
+                denoise=self.denoise,
             )
             self.voice_handler.start()
 
@@ -581,12 +583,12 @@ class Gateway():
         })
 
 
-    def send_speaking(self):
+    def send_speaking(self, speaking=True):
         """Send SPEAKING event"""
         payload = {
             "op": 5,
             "d": {
-                "speaking": 1,
+                "speaking": 1 if speaking else 0,
                 "delay": 0,
                 "ssrc": self.ssrc,
             },
@@ -674,7 +676,7 @@ class Gateway():
 class VoiceHandler:
     """Voice call sound receiver, transmitter, player and recorder"""
 
-    def __init__(self, gateway, my_id, my_ssrc, udp, secret_key, encryption_mode, volume_input, volume_output, custom_mic=None, silence=-30, opus_mode="voip", fast_mixer=False):
+    def __init__(self, gateway, my_id, my_ssrc, udp, secret_key, encryption_mode, volume_input, volume_output, custom_mic=None, silence=-30, opus_mode="voip", fast_mixer=False, denoise=True):
         self.gateway = gateway
         self.my_id = my_id
         self.my_ssrc = my_ssrc
@@ -712,6 +714,17 @@ class VoiceHandler:
         self.gain_output = volume_to_gain(volume_output, boost=BASE_SOUND_GAIN)
         self.silence_threshold = 10 ** (silence / 20)
         self.fast_mixer = fast_mixer
+        if denoise:
+            from endcord import rnnoise
+            try:
+                self.denoiser = rnnoise.RNNoise()
+                silence_frame = np.zeros(480, dtype=np.int16)
+                self.denoiser.process_frame(silence_frame)
+            except OSError as e:
+                self.denoiser = None
+                logger.warn(e)
+        else:
+            self.denoiser = None
 
         self.run = False
         self.recording = False
@@ -916,7 +929,19 @@ class VoiceHandler:
         skipped_samples = 0
         silence_counter = 0
         max_silence_packets = MAX_SILENCE + SILENCE_BUFFER
+        is_speaking = False
+
         while self.run:
+            qsize = self.audio_queue_in.qsize()
+            if qsize > MAX_LATENCY_FRAMES:  # drain acumulated latency
+                dropped = 0
+                while self.audio_queue_in.qsize() > 1:
+                    try:
+                        self.audio_queue_in.get_nowait()
+                        dropped += 1
+                    except queue.Empty:
+                        break
+                skipped_samples += dropped * 960
             payload = None
             try:
                 audio_data = self.audio_queue_in.get(timeout=0.02)
@@ -929,6 +954,9 @@ class VoiceHandler:
 
             if (not payload and self.silence_threshold and detect_silence(audio_data, threshold=self.silence_threshold)) or payload == OPUS_SILENCE:
                 if silence_counter > max_silence_packets:
+                    if is_speaking:
+                        is_speaking = False
+                        self.gateway.send_speaking(False)
                     skipped_samples += 960
                     continue   # drop packet to save bandwidth
                 silence_counter += 1
@@ -936,6 +964,9 @@ class VoiceHandler:
                     payload = OPUS_SILENCE
             else:
                 silence_counter = 0
+                if not is_speaking:
+                    is_speaking = True
+                    self.gateway.send_speaking(True)
                 if skipped_samples > 0:   # catch up rtp timeline
                     self.rtp_timestamp += skipped_samples
                     skipped_samples = 0
@@ -1004,12 +1035,16 @@ class VoiceHandler:
             # send
             try:
                 self.udp.send(payload)
+            except BlockingIOError:
+                pass
             except Exception:
                 break
             self.packets_sent += 1
             self.bytes_sent += opus_payload_size
 
         self.gateway.disconnect()
+        if is_speaking:
+            self.gateway.send_speaking(False)
 
 
     def rtcp_sender_report_loop(self):
@@ -1178,10 +1213,12 @@ class VoiceHandler:
 
 
     def audio_recorder(self, samplerate, channels):
-        """Record audio and add frames to the queue"""
+        """Record audio, denoise, and add frames to the queue"""
         with self.microphone.recorder(samplerate=samplerate, channels=channels) as rec:
             while self.run and self.recording:
                 audio_data = rec.record(numframes=960)
+                if self.denoiser:
+                    audio_data = self.denoise(audio_data)
                 if self.active_file_queues:
                     if self.mix_mic:
                         try:
@@ -1326,3 +1363,26 @@ class VoiceHandler:
     def get_rtt(self):
         """Get rtt value in ms"""
         return self.rtt_ms
+
+
+    def denoise(self, audio_data):
+        """Process 20ms of stereo audio, downmix to mono, run RNNoise across two 10ms subframes, and send clean mono to both channels"""
+        if audio_data.dtype == np.int16:
+            audio_float = audio_data.astype("float32") / 32768.0
+        else:
+            audio_float = audio_data.astype("float32")
+        if audio_float.ndim == 1:
+            audio_float = audio_float.reshape(960, 2)
+        elif audio_float.shape == (2, 960):
+            audio_float = audio_float.T
+
+        out = np.empty_like(audio_float)
+        for frame_index in range(2):
+            start = frame_index * 480
+            end = start + 480
+            mono = (audio_float[start:end, 0] + audio_float[start:end, 1]) * 0.5   # downmix to mono
+            _, cleaned_float = self.denoiser.process_frame(mono)
+            out[start:end, 0] = cleaned_float
+            out[start:end, 1] = cleaned_float
+
+        return out

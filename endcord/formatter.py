@@ -1446,7 +1446,7 @@ class ChatGenerator:
 
             elif change_type in (2, 20):   # fully delete message / delete when remove pending
                 self.remove_message(change_id)   # change_id is msg_num in this case
-                if change_id != 0 and change_type == 2:   # have to reconstruct the message bellow, to update separator lines
+                if change_id != 0 and change_type == 2:   # have to reconstruct the message below, to update separator lines
                     # skipped when pending because its simple message update
                     message_index = change_id - 1
                     line_index = self.remove_message(message_index, shift_chat_map=False)

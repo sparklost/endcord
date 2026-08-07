@@ -6,6 +6,7 @@ import curses
 import importlib.util
 import logging
 import os
+import shutil
 import signal
 import sys
 import threading
@@ -28,7 +29,7 @@ log_file_path = os.path.join(os.path.expanduser(log_path), APP_NAME + ".log")
 run = True
 
 if os.path.exists(log_file_path):
-    os.rename(log_file_path, log_file_path[:-4] + "-prev.log")
+    shutil.copy2(log_file_path, log_file_path[:-4] + "-prev.log")
 logger = logging
 logging.basicConfig(
     level="INFO",

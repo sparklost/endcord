@@ -74,7 +74,7 @@ GUILD_UPLOAD_LIMITS = (10*MB, 10*MB, 50*MB, 100*MB)   # premium tier 0, 1, 2, 3
 LIMIT_MSG_LEN = 2000
 LIMIT_MSG_LEN_PREMIUM = 4000
 FORUM_COMMANDS = (1, 2, 7, 13, 14, 15, 17, 20, 22, 25, 27, 29, 30, 31, 32, 40, 42, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 61, 62, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 79, 81, 83, 84)
-COLLAPSE_ALL_EXCEPT_OPTIONS = ("current", "selected", "above", "bellow")
+COLLAPSE_ALL_EXCEPT_OPTIONS = ("current", "selected", "above", "below")
 STANDING_TYPES = ("All Good", "Limited", "Very Limited", "At risk", "Suspended")
 ASSISTED_COMMANDS = ("set ", "string_select ", "set_notifications ", "game_detection_blacklist ", "switch_tab ", "goto ", "collapse_all_except ", "insert_timestamp ", "voice_set_input_device ", "switch_profile ", "gif ")
 STATS_COMMAND_TEXT = ("Run time", "Gateway events/h", "Gateway messages/h", "Gateway ping time", "Message buffer size", "Total API requests", "API response time", "Cache sizes", "  Cached members", "  Deleted messages", "  Summaries", "  Image cache")
@@ -8117,6 +8117,7 @@ class Endcord:
             silence=self.config["call_silence_threshold"],
             opus_mode=self.config["call_opus_mode"],
             fast_mixer=self.config["call_fast_mixer"],
+            denoise=self.config["call_mic_noise_supression"],
         )
         self.in_call = {"guild_id": guild_id, "channel_id": channel_id}
         for _ in range(100):   # wait for 10s

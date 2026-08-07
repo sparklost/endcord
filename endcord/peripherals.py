@@ -489,7 +489,7 @@ def native_select_files(file_filter=None, multiple=True, auto=False):
 
     elif filedialog == "mac":
         command = f"""
-        set files to choose file default location "{init_dir}" with prompt "Import File" with multiple selections allowed true
+        set files to choose file default location "{init_dir}" with prompt "Import File" with multiple selections allowed
         set out to ""
         repeat with f in files
             set out to out & (POSIX path of f) & linefeed

@@ -221,6 +221,32 @@ except ImportError:
     pass
 
 
+def glib_log_bridge(domain, level, message, user_data=None):   # noqa
+    """Logger bridge for gobject"""
+    if level & GLib.LogLevelFlags.LEVEL_CRITICAL:
+        logger.critical(f"[{domain}] {message}")
+    if level & GLib.LogLevelFlags.LEVEL_ERROR:
+        logger.error(f"[{domain}] {message}")
+    elif level & GLib.LogLevelFlags.LEVEL_WARNING:
+        logger.warning(f"[{domain}] {message}")
+    else:
+        logger.info(f"[{domain}] {message}")
+
+
+def no_log(domain, level, message, user_data=None):   # noqa
+    pass
+
+
+for domain in ("GLib", "GLib-GIO", "Gtk", "Gdk"):
+    GLib.log_set_handler(domain, GLib.LogLevelFlags.LEVEL_MASK | GLib.LogLevelFlags.FLAG_FATAL, glib_log_bridge, None)
+GLib.log_set_handler(
+    "libayatana-appindicator",
+    GLib.LogLevelFlags.LEVEL_MASK | GLib.LogLevelFlags.FLAG_FATAL,
+    glib_log_bridge if logger.getEffectiveLevel() == logging.DEBUG else no_log,
+    None,
+)
+
+
 # tray stuff
 
 def load_tray_image(path=None, color=None):
@@ -325,6 +351,7 @@ def set_nice_exit(value):
 
 # gtk stuff
 
+
 class GtkTerminalWindow(Gtk.Window):
     """GTK window interface"""
 
@@ -366,7 +393,6 @@ class GtkTerminalWindow(Gtk.Window):
         self.char_height = rect.height / Pango.SCALE
         self.curses_window.char_width = self.char_width
         self.curses_window.char_height = self.char_height
-
 
 
     def on_configure(self, widget, event):   # noqa
@@ -896,6 +922,8 @@ def wrapper(func, *args, **kwargs):   # noqa
                 Gtk.main_quit()
                 return False
             GLib.idle_add(clean_quit, priority=GLib.PRIORITY_HIGH)
+            time.sleep(0.2)
+            os._exit(0)   # failsafe if gtk.main fails to stop for any reason
 
     threading.Thread(target=user_thread, daemon=True).start()
 

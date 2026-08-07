@@ -139,7 +139,7 @@
 - `resize_popup_window [num/-1/+1]`  
     Resize popup window to specified number or incrementally by +/- 1. Use `extra_window_height` theme setting to persist it.
 - `collapse_all_except *[option]`  
-    Collapse all servers in tree except specific `[option]`: `current` (default), `selected`, `above`, `bellow`.  
+    Collapse all servers in tree except specific `[option]`: `current` (default), `selected`, `above`, `below`.  
 - `tree_select *[server/channel], *next/prev`  
     Select next or previous server or channel in tree. Default is next channel.  
 - `check_standing`  

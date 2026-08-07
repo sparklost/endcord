@@ -158,6 +158,17 @@ def restore_file(file_path, backup_path):
     os.replace(backup_path, file_path)
 
 
+def check_avx2():
+    """Check if AVX2 is supported, can only check on linux"""
+    if sys.platform == "linux":
+        try:
+            with open("/proc/cpuinfo", "r", encoding="utf-8") as f:
+                return "avx2" in f.read().lower()
+        except FileNotFoundError:
+            return False
+    return False
+
+
 def is_gil_enabled():
     """Safely check if GIL is enabled"""
     try:
@@ -347,6 +358,14 @@ def get_cython_bins(directory="endcord_cython", startswith=None):
         if (not startswith or file.startswith(startswith)) and (file.endswith(".pyd") or file.endswith(".so")):
             bins.append(file)
     return bins
+
+
+def get_rnnoise(directory="endcord"):
+    """Get relative path of rnnoise library in given directory"""
+    for filename in ("librnnoise.so", "librnnoise.dll", "librnnoise.dylib"):
+        path = os.path.join(directory, filename)
+        if os.path.exists(path):
+            return path
 
 
 def find_file_in_venv(lib_name, file_name, silent=False, recurse=False, startswith=False):
@@ -583,12 +602,13 @@ def enable_extensions(enable=True, check_only=False, silent=False):
         fprint(f"Extensions are {"enabled" if enable else "disabled"}!")
 
 
-def setup_compiler(clang, clear=False, overwrite=False, cflags=[], ldflags=[], cxxflags=[], safe=False):
+def setup_compiler(clang, clear=False, overwrite=False, cflags=[], ldflags=[], cxxflags=[], safe=False, lld=True):
     """Set compiler and its flags in environment variables"""
     if clang:
         os.environ["CC"] = "clang"
         os.environ["CXX"] = "clang++"
-        os.environ["LD"] = "lld"
+        if shutil.which("lld") and lld:
+            os.environ["LD"] = "lld"
     if clear:
         os.environ["CFLAGS"] = CFLAGS_OLD
         os.environ["CXXFLAGS"] = CXXFLAGS_OLD
@@ -598,11 +618,13 @@ def setup_compiler(clang, clear=False, overwrite=False, cflags=[], ldflags=[], c
     cflags = ([] if overwrite else CFLAGS_OLD.split(" ")) + custom_cflags + cflags
     cxxflags = ([] if overwrite else CXXFLAGS_OLD.split(" ")) + CUSTOM_CXXFLAGS + cxxflags
     ldflags = ([] if overwrite else LDFLAGS_OLD.split(" ")) + CUSTOM_LDFLAGS + ldflags
-    if shutil.which("lld") and clang:
+    if shutil.which("lld") and clang and lld:
         ldflags.append("-fuse-ld=lld")
     os.environ["CFLAGS"] = " ".join(cflags)
     os.environ["CXXFLAGS"] = " ".join(cxxflags)
     os.environ["LDFLAGS"] = " ".join(ldflags)
+    if not lld:
+        os.environ["LD"] = ""
     return cflags, cxxflags, ldflags
 
 
@@ -718,7 +740,7 @@ def build_generic_package(package, clang, safe=False):
         subprocess.run([python, "-m", "pip", "uninstall", "--yes", package], check=False, capture_output=True)
         run_pip_build_command([python, "-m", "pip", "install", "--no-cache-dir", "--no-binary=:all:", package])
     except subprocess.CalledProcessError as e:   # fallback
-        iprint(e, flush=True)
+        iprint(e)
         fprint(f"Failed building {package}, falling back to default prebuilt version", color=RED, prefix="")
         subprocess.run(["uv", "-q", "pip", "install", package], check=True)
     subprocess.run(["uv", "-q", "pip", "uninstall", "pip"], check=True)
@@ -752,13 +774,43 @@ def build_numpy_lite(clang):
             "--config-settings=setup-args=-Dallow-noblas=true",
         ])
     except subprocess.CalledProcessError as e:   # fallback
-        print(e, flush=True)
+        print(e)
         fprint("Failed building numpy-lite, faling back to default numpy", color=RED, prefix="")
         subprocess.run(["uv", "-q", "pip", "install", "numpy"], check=True)
     value = subprocess.run(check_openblas_cmd, capture_output=True, text=True, check=False).stdout.strip()
     if value and int(value):
         iprint("Verification failed: numpy after building is still linked to openblas!", color=RED)
     subprocess.run(["uv", "-q", "pip", "uninstall", "pip"], check=True)
+
+
+def build_rnnoise(clang):
+    """Build rnnoise library and move it to ./endcord"""
+    fprint("Building RNNoise with custom compiler args")
+    if any(
+        os.path.exists(os.path.join("endcord", filename))
+        for filename in ("librnnoise.so", "librnnoise.dll", "librnnoise.dylib")
+    ):
+        iprint("RNNoise is already built")
+        return
+    for dep in ("autoreconf", "make"):
+        if not shutil.which(dep):
+            iprint(f"{dep} is missing", color=RED)
+    os.makedirs("build", exist_ok=True)
+    setup_compiler(clang)
+    from tools.build_rnnoise import build_rnnoise
+    try:
+        lib_path = build_rnnoise(
+            "build",
+            build_config.get("rnnoise_tag", "v0.2"),
+            avx2=check_avx2(),
+        )
+    except Exception as e:
+        iprint(f"Error building RNNoise: {e}")
+        return
+    if lib_path and os.path.exists(lib_path):
+        shutil.copy2(lib_path, os.path.join("endcord", os.path.basename(lib_path)))
+    else:
+        iprint("Failed building RNNoise")
 
 
 def build_cython(clang, mingw):
@@ -781,7 +833,7 @@ def build_cython(clang, mingw):
     for line in process.stdout:
         line_clean = line.rstrip("\n")
         if len(line_clean) < 100 and not any(s in line_clean for s in ("Cythonizing", "Compiling", "creating", "  warn(", "build_ext")):
-            fprint(line_clean.capitalize(), flush=True)
+            iprint(line_clean.capitalize())
     process.wait()
     if process.returncode != 0:
         raise subprocess.CalledProcessError(process.returncode, cmd)
@@ -803,23 +855,27 @@ def build_with_pyinstaller(level, onedir, print_cmd=False):
         "--exclude-module=zstandard",
     ]
     package_data = []
+    add_data = []
     if level not in ("MINI", "MICRO"):
         package_data += ["--collect-data=soundcard"]
+    rnnoise = get_rnnoise()
+    if rnnoise:
+        add_data += [f"--add-binary={rnnoise}{";" if sys.platform == "win32" else ":"}endcord"]
 
     # platform-specific
     if sys.platform == "linux":
         options = []
         if level not in ("MINI", "MICRO"):
             hidden_imports += ["--hidden-import=soundcard.pulseaudio"]
-        add_data = [f"--add-data={emoji_path}:."]
+        add_data += [f"--add-data={emoji_path}:."]
     elif sys.platform == "win32":
         options = ["--console"]
         hidden_imports += ["--hidden-import=win32timezone"]
-        add_data = [f"--add-data={emoji_path};."]
+        add_data += [f"--add-data={emoji_path};."]
     elif sys.platform == "darwin":
         options = []
         package_data += ["--collect-data=certifi"]
-        add_data = [f"--add-data={emoji_path}:."]
+        add_data += [f"--add-data={emoji_path}:."]
 
     # prepare command and run it
     cmd = [
@@ -893,6 +949,10 @@ def build_with_nuitka(level, onedir, clang, mingw, compile_deps, print_cmd=False
     ]
     package_data = []
     add_data = [f"--include-data-files={emoji_path}=emoji.json"]
+
+    rnnoise = get_rnnoise()
+    if rnnoise:
+        add_data.append(f"--include-data-files={rnnoise}={rnnoise}")
 
     setup_compiler(clang)
 
@@ -1026,6 +1086,11 @@ def parser():
         help="use mingw instead msvc on windows, has no effect on Linux and macOS or with --clang flag",
     )
     parser.add_argument(
+        "--bundle-rnnoise",
+        action="store_true",
+        help="Build RNNoise library and include it in endcord binary, only has effect in FULL level",
+    )
+    parser.add_argument(
         "--toggle-windowed",
         action="store_true",
         help="toggle windowed mode and exit",
@@ -1081,6 +1146,9 @@ if __name__ == "__main__":
     if os.path.exists("build"):   # ensure clean build env
         shutil.rmtree("build")
 
+    if not shutil.which("lld"):
+        fprint("WARNING: lld is not found on system, consider installing it", color=RED)
+
     if args.custom_python:
         ensure_custom_python(args.safe, clang, compile_deps)
 
@@ -1127,6 +1195,8 @@ if __name__ == "__main__":
         build_third_party_licenses(exclude)
 
     if not args.nobuild:
+        if args.level == "FULL" and args.bundle_rnnoise:
+            build_rnnoise(clang)
         if args.nuitka:
             build_with_nuitka(args.level, args.onedir, clang, args.mingw, compile_deps, windowed=windowed)
         else:

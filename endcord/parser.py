@@ -1058,7 +1058,7 @@ def command_string(text):
             cmd_args = {"value": 0}
         elif value_part == "above":
             cmd_args = {"value": 1}
-        elif value_part == "bellow":
+        elif value_part == "below":
             cmd_args = {"value": -1}
 
     # 70 - TREE_SELECT

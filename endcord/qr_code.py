@@ -406,7 +406,7 @@ def calculate_line_penalty(line):
     return penalty
 
 
-def gen_qr_terminal_string(text, text_above="", text_bellow=""):
+def gen_qr_terminal_string(text, text_above="", text_below=""):
     """Convert string to QR code string ready to be printed to terminal and check for terminal size"""
     import shutil
     fg_white = "\x1b[38;5;15m"
@@ -421,14 +421,16 @@ def gen_qr_terminal_string(text, text_above="", text_bellow=""):
     screen_width = term.columns
 
     text_above = [x.center(screen_width) for x in text_above.split("\n")]
-    text_bellow = [x.center(screen_width) for x in text_bellow.split("\n")]
-    screen_height -= len(text_above) + len(text_bellow)
+    text_below = [x.center(screen_width) for x in text_below.split("\n")]
+    screen_height -= len(text_above) + len(text_below)
 
     # check terminal size
     height_real = (height + 1) // 2
     if screen_width < width or screen_height < height_real:
+        pad_top = [bg_black + (" " * screen_width) + reset] * ((screen_height - 3 // 2) // 2)
+        pad_bot = [bg_black + (" " * screen_width) + reset] * (height_real - 3 - ((screen_height - 3 // 2) // 2))
         text = ["Terminal too small:", f"Need: {width}x{height_real}.", f"Have: {screen_width}x{screen_height}."]
-        return 0, "\n".join([x.center(screen_width) for x in text])
+        return "\n".join(pad_top) + "\n" + "\n".join([x.center(screen_width) for x in text]) + "\n" + "\n".join(pad_bot)
 
     # build string
     out_lines = []
@@ -476,6 +478,77 @@ def gen_qr_terminal_string(text, text_above="", text_bellow=""):
     while len(out_lines) < screen_height + 1:
         out_lines.append(bg_black + (" " * screen_width) + reset)
 
-    out_lines.append(bg_black + fg_white + "\n".join(text_bellow) + reset)
+    out_lines.append(bg_black + fg_white + "\n".join(text_below) + reset)
 
-    return 1, "\n".join(out_lines)
+    return "\n".join(out_lines)
+
+
+def draw_qr_curses(screen, text, text_above="", text_below="", color_id=0):
+    """Render a QR matrix with text above and below on curses screen"""
+    import curses
+    screen_height, screen_width = screen.getmaxyx()
+    screen.bkgd(" ", color_id)
+    text_above = [x.center(screen_width) for x in text_above.split("\n")]
+    text_below = [x.center(screen_width) for x in text_below.split("\n")]
+    matrix = generate_qr(text)
+    height = len(matrix)
+    width = len(matrix[0])
+    available_height = screen_height - len(text_above) - len(text_below)
+
+    height_real = (height + 1) // 2
+    if screen_width < width or available_height < height_real:
+        screen.clear()
+        text = ["Terminal too small:", f"Need: {width}x{height_real}", f"Have: {screen_width}x{available_height}"]
+        start_y = max(0, (screen_height - len(text)) // 2)
+        for idx, line in enumerate(text):
+            if start_y + idx < screen_height:
+                screen.addstr(start_y + idx, max(0, (screen_width - len(line)) // 2), line, color_id)
+        screen.refresh()
+        return
+
+    current_y = 0
+    for line in text_above:
+        if current_y < screen_height:
+            screen.insstr(current_y, 0, line[:screen_width], color_id)
+            current_y += 1
+
+    padding_h = (available_height - height_real) // 2
+    padding_w = (screen_width - width) // 2
+
+    for y in range(0, height, 2):
+        top_line = matrix[y]
+        bottom_line = matrix[y + 1] if y + 1 < height else [False] * width
+        draw_y = current_y + padding_h + (y // 2)
+        if draw_y >= screen_height:
+            break
+
+        qr_chars = []
+        for x in range(width):
+            top = top_line[x]
+            bottom = bottom_line[x]
+            if top and bottom:
+                char = "█"
+            elif top and not bottom:
+                char = "▀"
+            elif not top and bottom:
+                char = "▄"
+            else:
+                char = " "
+            qr_chars.append(char)
+        left_padding = " " * max(0, padding_w)
+        right_padding_len = max(0, screen_width - (padding_w + width))
+        right_padding = " " * right_padding_len
+        full_line = left_padding + "".join(qr_chars) + right_padding
+        full_line = full_line[:screen_width]
+        try:
+            screen.insstr(draw_y, 0, full_line, color_id)
+        except curses.error:
+            pass
+
+    start_below_y = screen_height - len(text_below)
+    for idx, line in enumerate(text_below):
+        draw_y = start_below_y + idx
+        if 0 <= draw_y < screen_height:
+            screen.insstr(draw_y, 0, line[:screen_width], color_id)
+
+    screen.refresh()

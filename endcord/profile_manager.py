@@ -352,6 +352,14 @@ def init_auth(config):
     )
 
 
+def esc_detector_thread(screen):
+    """A thread that waits until ESCAPE is pressed"""
+    while True:
+        key = screen.getch()
+        if key in (27, "ESC"):
+            return
+
+
 def main_tui(screen, profiles_enc, profiles_plain, selected, have_keyring, config):
     """Main profile manager tui"""
     curses.use_default_colors()
@@ -691,7 +699,7 @@ def manage_profile(screen, have_keyring, config, editing_profile=None):
                 key_prompt(screen, FAILED_AUTH_INIT_TEXT)
                 set_step(2, mem=False)
                 continue
-            from endcord import auth, client_properties, qr_code, terminal_utils
+            from endcord import auth, client_properties, qr_code
             if config["custom_user_agent"]:
                 user_agent = config["custom_user_agent"]
             else:
@@ -706,17 +714,21 @@ def manage_profile(screen, have_keyring, config, editing_profile=None):
             run = True
             drawing = False
             esc_detector = None
+            content_changed = True
+            prev_timeout = True
             while run:
                 if drawing and not esc_detector.is_alive():
                     set_step(2, mem=False)
                     break
                 state = gateway_auth.get_state()
                 timeout = gateway_auth.get_remaining_time()
-                timeout_text = f"Session will timeout in: {f"{(timeout) // 60}m {timeout % 60} s"}"
+                if int(timeout) != prev_timeout:
+                    prev_timeout = timeout
+                    content_changed = True
+                timeout_text = f"Session will timeout in: {f"{(timeout) // 60}m {timeout % 60}s"}"
                 if state != 1 and drawing:
-                    terminal_utils.stop_esc_detector()
-                    terminal_utils.leave_tui()
-                    resume_curses(screen)
+                    if esc_detector and esc_detector.is_alive():
+                        curses.ungetch(27)
                     drawing = False
                 if state == 0:   # wait
                     pass
@@ -724,10 +736,8 @@ def manage_profile(screen, have_keyring, config, editing_profile=None):
                     fingerprint = gateway_auth.get_fingerprint()
                     url = f"https://{discord_auth.host}/ra/{fingerprint}"
                     if not drawing:
-                        pause_curses()
-                        terminal_utils.enter_tui()
                         if not esc_detector or not esc_detector.is_alive():
-                            esc_detector = threading.Thread(target=terminal_utils.esc_detector, daemon=True)
+                            esc_detector = threading.Thread(target=esc_detector_thread, daemon=True, args=(screen, ))
                             esc_detector.start()
                         drawing = True
                 elif state == 2:   # pending ticket
@@ -766,13 +776,14 @@ def manage_profile(screen, have_keyring, config, editing_profile=None):
                     gateway_auth.disconnect_ws()
                     set_step(2, mem=False)
                     break
-                if drawing:
+                if drawing and content_changed:
+                    content_changed = False
                     text_above = "Scan this QR code with your phone to login:"
-                    text_bellow = url + "\n\n" + timeout_text + "\nEsc to go back."
-                    _, string = qr_code.gen_qr_terminal_string(url, text_above, text_bellow)
-                    terminal_utils.draw(string)
+                    text_below = url + "\n\n" + timeout_text + "\nEsc to go back."
+                    qr_code.draw_qr_curses(screen, url, text_above, text_below, color_id=0)
                 time.sleep(0.1)
-            terminal_utils.stop_esc_detector()
+            if esc_detector and esc_detector.is_alive():
+                curses.ungetch(27)
 
         elif step == 900:   # save method
             if not have_keyring or editing_profile:   # skip asking for source
@@ -1033,20 +1044,6 @@ def draw_buttons(screen, selected, y, w):
         else:
             screen.addstr(y, x, button)
         x += len(button) + 2
-
-
-def pause_curses():
-    """Pause curses, releasing terminal"""
-    curses.def_prog_mode()
-    curses.endwin()
-
-
-def resume_curses(screen):
-    """Resume curses, capturing terminal"""
-    curses.reset_prog_mode()
-    curses.curs_set(0)
-    curses.flushinp()
-    screen.refresh()
 
 
 def update_time(profiles_enc, profiles_plain, profile_name):

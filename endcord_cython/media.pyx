@@ -139,7 +139,7 @@ cpdef img_to_term_block(
     return "\n".join(out_lines)
 
 
-# ~3x faster than bellow commented function
+# ~3x faster than below commented function
 # this is using only C, removing all python overhead
 
 from libc.stdlib cimport malloc, free

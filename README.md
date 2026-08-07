@@ -353,6 +353,7 @@ Optional dependencies:
 - `libappindicator-gtk3` - Tray support under wayland, for [windowed mode](#windowed-mode) only.
 - `imagemagick` - To make notification images round; only needed for endcord-lite.
 - `source-highlight` or `python-pygments` - Code block syntax highlighting (Alternatively use [this extension](https://github.com/sparklost/endcord-pygments-syntax)).
+- `rnnoise` - Noise suppression in voice calls (or use `--bundle-rnnoise` build.py arg)
 
 ### Windows
 - Pre-built binaries (built with nuitka) are available in releases
@@ -533,7 +534,7 @@ RAM usage greatly depends on multiple factors:
 - Full binary version uses few MB more than lite.
 - Number of servers and channels: each avg server is ~1MB.
 - If using terminal media player it will permanently increase RAM usage by ~20MB on firs media play.
-- Voice calls will also permanently increase RAM usage by ~5MB on first connected/initialized call (+ ~20MB for media if not already).
+- Voice calls will also permanently increase RAM usage by ~5MB on first connected/initialized call (+ ~20MB for media if not already). With few extra MB if using noise supression with RNNoise.
 
 ### Adding desktop launcher on Linux
 Simply make the launcher execute `endcord` or `endcord-lite`, endcord will deal with starting terminal. It will prefer `$TERMINAL` environment variable, then fallback to some most popular terminal emulators.

@@ -1,4 +1,5 @@
 CORE:
+Fix stuttering when using rnnoise
 Patch python 3.14 using python 3.16 curses module to enable 255+ colors
 Update tui.py to support 255+ colors
 Add inbox
@@ -13,12 +14,10 @@ Add video, stage and stream calls
 Add localization
 
 GTKCURSES:
-Fix gtkcurses crash wwhen typing non-ascii characters
-Add qrcode drawing to gtkcurses
-Add ascii media drawing to gtkcurses
-Optimize gtkcurses
 Fix gtkcurses build with nuitka and add to workflow
-Add inline images to gtkcurses
+Add ascii/block media drawing and and inline to gtkcurses
+Optimize gtkcurses
+Add full image viewer and inline to gtkcurses
 Add image emoji to gtkcurses
 Add pfp to gtkcurses
 

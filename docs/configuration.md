@@ -179,6 +179,8 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
 - `call_fast_mixer = False`  
     This option only has effect on mixing received audio from multiple users speaking at the same time.  
     If True, call will use faster mixer that uses less CPU but might result in lower audio quality.  
+- `call_mic_noise_supression = False`  
+    Run noise supression on audio recorded from microphone. Audio will be downmixed to mono. To use this, either install rnnoise onthe system, or build endcord with `--bundle-rnnoise` build.py script argument.
 - `downloads_path = None`  
     Path to custom downloads directory. Set to `None` to use system default.
 - `notifications_pfp = True`  
@@ -251,6 +253,8 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
     Default capabilities: `30717`, default intents: `50364033`.  
 - `easter_eggs = True`  
     In case some easter egg is annoying.
+- `do_not_turn_off = True`  
+    ALWAYS LEAVE ON! NEVER TURN OFF!  
 - `debug = False`  
     Enable debug mode.
 
@@ -272,7 +276,7 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
 - `format_reply = " ╭──🡲 [%timestamp] <%global_name>: %content"`  
     Formatting for replied message string. It is above message base. See [format_reply](#format_reply) for more info.
 - `format_reactions = " ╰──⤙ %reactions"`  
-    Formatting for message reactions string. It is bellow last newline string. See [format_reactions](#format_reactions) for more info.
+    Formatting for message reactions string. It is below last newline string. See [format_reactions](#format_reactions) for more info.
 - `format_reactions_newline = "      %reactions"`  
     Formatting for each next reactions string. Uses same [format_reactions](#format_reactions).
 - `format_interaction = " ╭──⤙ %global_name used [%command]"`  
@@ -291,7 +295,7 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
 - `format_title_line_r = None`  
     Formatting for right side of title line. See [format_status](#format_status) for more info.
 - `format_subtitle_line = "─%tabs"`  
-    Formatting for subtitle line - drawn bellow title line, only if there is content. See [format_status](#format_status) for more info.
+    Formatting for subtitle line - drawn below title line, only if there is content. See [format_status](#format_status) for more info.
 - `format_title_tree = " endcord  %task"`  
     Formatting for channel tree title line. See [format_status](#format_status) for more info. Set to `None` to disable.
 - `format_rich = "%type %name - %state - %details"`  

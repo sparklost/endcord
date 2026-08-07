@@ -39,6 +39,7 @@ python_max = "3.14.6"
 python_freethreaded = "3.14.6"
 python_last_safe = "3.13.14"
 curses_tag = "v6_6_20260725"
+rnnoise_tag = "main"
 mini_exclude_deps = ["numpy", "soundfile", "soundcard"]
 micro_exclude_deps = ["numpy", "soundfile", "soundcard", "orjson", "pycryptodome"]
 medium_deps = ["pillow"]
