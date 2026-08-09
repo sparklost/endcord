@@ -48,8 +48,8 @@ MAXIMIZED = False
 FONT_SIZE = 12
 FONT_NAME = "Monospace"
 GTK_DARK_THEME = True
-BG_ALPHA = 1
-BG_ALPHA_COLOR = 1
+BG_ALPHA = 1.0
+BG_ALPHA_COLOR = 1.0
 try:
     import __main__
     APP_NAME = getattr(__main__, "APP_NAME", "endcord")

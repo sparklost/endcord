@@ -602,6 +602,10 @@ Note: everything after `%content` may be pushed to newline.
     Path to tray icon file shown when there are unread messages. Set to `null` to disable.
 - `tray_icon_unread: null`  
     Path to tray icon file shown when there are unread messages that are mentioning this user. Set to `null` to disable.
+- `bg_alpha: 1.0`  
+    Alpha value for window background transparency. Set to `1.0` to disable transparency.
+- `bg_alpha_color: 1.0`  
+    Separate alpha setting for colored solid background, eg. for selected line. Set to `1.0` to disable transparency.
 - `default_color_pair: [...]`  
     Default color pair used for drawing, first color is foreground, and second is background, colors are in `[R, G, B]` format.
 - `color_palette: [...]`  
