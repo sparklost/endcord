@@ -31,7 +31,7 @@ try:
     logger.info(APP_NAME)
 except (AttributeError, NameError):
     APP_NAME = "endcord"
-VERSION = "1.5.3"
+VERSION = "1.5.4"
 NO_NOTIFY_SOUND_DE = ("kde", "plasma")   # linux desktops without notification sound
 
 # platform specific code
@@ -403,13 +403,16 @@ def paste_clipboard_files(save_path=None):
 
 def pillow_paste_image():
     """If there is image in clipboard, save it to temp path using pillow"""
-    from PIL import Image, ImageGrab
-    img = ImageGrab.grabclipboard()
-    if isinstance(img, Image.Image):
-        save_path = os.path.join(os.path.expanduser(temp_path), f"clipboard_image_{int(time.time())}.png")
-        img.save(save_path)
-        return [save_path]
-    return []
+    try:
+        from PIL import Image, ImageGrab
+        img = ImageGrab.grabclipboard()
+        if isinstance(img, Image.Image):
+            save_path = os.path.join(os.path.expanduser(temp_path), f"clipboard_image_{int(time.time())}.png")
+            img.save(save_path)
+            return [save_path]
+        return []
+    except Exception:
+        return []
 
 
 def native_select_files(file_filter=None, multiple=True, auto=False):

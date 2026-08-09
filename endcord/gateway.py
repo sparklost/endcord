@@ -2226,7 +2226,6 @@ class Gateway():
                             },
                         },
                     }
-                    logger.debug(payload)
                     self.send(payload)
                     break
             else:
@@ -2250,7 +2249,6 @@ class Gateway():
                         },
                     },
                 }
-                logger.debug(payload)
                 self.send(payload)
         else:   # for DMs
             payload = {
@@ -2259,7 +2257,6 @@ class Gateway():
                     "channel_id": channel_id,
                 },
             }
-            logger.debug(payload)
             self.send(payload)
 
 
