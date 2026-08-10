@@ -10,7 +10,7 @@ dependencies = [
     "orjson>=3.11.9",
     "soundcard>=0.4.6",
     "soundfile>=0.14.0",
-    "numpy>=2.5.0",
+    "numpy>=2.5.2",
     "pycryptodome>=3.23.0",
     "pywin32>=312; sys_platform == 'win32'",
     "pywin32-ctypes>=0.2.3; sys_platform == 'win32'",
@@ -24,12 +24,12 @@ dependencies = [
 build = [
     "cython>=3.2.9",
     "nuitka[onefile]>=4.1.3",
-    "pyinstaller>=6.21.0",
+    "pyinstaller>=6.22.0",
     "setuptools>=82.0.0",
 ]
 media = [
     "av>=18.0.0",
-    "dave-py>=0.1.2",
+    "dave-py>=0.2.0",
     "pillow>=12.3.0",
     "pynacl>=1.6.2",
 ]
@@ -38,7 +38,7 @@ media = [
 python_max = "3.14.6"
 python_freethreaded = "3.14.6"
 python_last_safe = "3.13.14"
-curses_tag = "v6_6_20260725"
+curses_tag = "v6_6_20260808"
 rnnoise_tag = "main"
 mini_exclude_deps = ["numpy", "soundfile", "soundcard"]
 micro_exclude_deps = ["numpy", "soundfile", "soundcard", "orjson", "pycryptodome"]
