@@ -484,9 +484,9 @@ class Gateway():
             time.sleep(0.5)
             sleep_time += 5
         heartbeat_interval_rand = self.heartbeat_interval * (0.8 - 0.6 * random.random()) / 1000
-        heartbeat_sent_time = time.time()
+        heartbeat_sent_time = time.monotonic()
         while self.run:
-            if time.time() - heartbeat_sent_time >= heartbeat_interval_rand:
+            if time.monotonic() - heartbeat_sent_time >= heartbeat_interval_rand:
                 self.send({
                     "op": 3,
                     "d": {
@@ -494,7 +494,7 @@ class Gateway():
                         "seq_ack": self.sequence,
                     },
                 })
-                heartbeat_sent_time = time.time()
+                heartbeat_sent_time = time.monotonic()
                 logger.debug("Heartbeat sent")
                 if not self.heartbeat_received:
                     logger.warning("Heartbeat reply not received")

@@ -169,15 +169,15 @@ class Gateway():
         self.member_query_results = []
         self.resumable = False
         self.consecutive_errors = 0
-        self.gateway_events_per_h = 0
-        self.gateway_msg_per_h = 0
-        self.last_gateway_events_per_h = 0
-        self.last_gateway_msg_per_h = 0
+        self.buckets_evph = {}
+        self.buckets_msgph = {}
+        self.last_cleaned_bucket_evph = 0
+        self.last_cleaned_bucket_msgph = 0
         self.gateway_ping_time = 0
         if self.bot:
             self.interactions_buffer = []
+        self.start_time = time.monotonic()
         threading.Thread(target=self.thread_guard, daemon=True, args=()).start()
-        threading.Thread(target=self.stats_rotator, daemon=True, args=()).start()
 
 
     def clear_ready_vars(self):
@@ -274,18 +274,6 @@ class Gateway():
                     self.reconnect_thread = threading.Thread(target=self.reconnect, daemon=True, args=())
                     self.reconnect_thread.start()
             time.sleep(0.5)
-
-
-    def stats_rotator(self):
-        """Rotate stats every 1h"""
-        last_rotation = int(time.time())
-        while self.run and not self.stop_event.wait(30):
-            if int(time.time()) > last_rotation + 3600:
-                last_rotation = int(time.time())
-                self.last_gateway_events_per_h = self.gateway_events_per_h
-                self.last_gateway_msg_per_h = self.gateway_msg_per_h
-                self.gateway_events_per_h = 0
-                self.gateway_msg_per_h = 0
 
 
     def connect_ws(self, resume=False):
@@ -791,6 +779,7 @@ class Gateway():
         """Receive and handle all traffic from gateway, should be run in a thread"""
         logger.debug("Receiver started")
         self.resumable = False
+        start_time = time.monotonic()
         while self.run and not self.wait:
             try:
                 ws_opcode, data = self.ws.recv_data()
@@ -833,7 +822,17 @@ class Gateway():
                 logger.warning(f"Receiver error: {e}")
                 self.resumable = True
                 break
-            self.gateway_events_per_h += 1
+
+            now = int(time.monotonic())
+            bucket_key = int(now) // 60
+            if (bucket_key) > self.last_cleaned_bucket_evph:
+                oldest_valid_bucket = (now - 3600) // 60
+                stale_keys = [k for k in self.buckets_evph if k <= oldest_valid_bucket]
+                for k in stale_keys:
+                    del self.buckets_evph[k]
+                self.last_cleaned_bucket_evph = bucket_key
+            self.buckets_evph[bucket_key] = self.buckets_evph.get(bucket_key, 0) + 1
+
             logger.debug(f"Received: opcode={opcode}, optext={response["t"] if (response and "t" in response and response["t"]) else "None"}")
             # debug_events
             # if response.get("t"):
@@ -851,12 +850,14 @@ class Gateway():
                 self.execute_extensions_method_nochain("on_gateway_event", data, cache=True)
 
                 if optext == "READY":
-                    ready_time_start = time.time()
+                    ready_time_start = time.monotonic()
                     self.consecutive_errors = 0
                     self.resume_gateway_url = data["resume_gateway_url"]
                     self.session_id = data["session_id"]
                     self.clear_ready_vars()
                     time_log_string = "READY event time profile:\n"
+                    if start_time:
+                        time_log_string += f"    download - {round((ready_time_start - start_time) * 1000, 3)} ms\n"
                     last_messages = []
                     # get my user data
                     self.set_my_user_data(data["user"])
@@ -887,8 +888,8 @@ class Gateway():
                                     "message_id": thread.get("last_message_id", 0),   # really last message id
                                     "channel_id": thread["id"],
                                 })
-                    time_log_string += f"    guilds - {round((time.time() - ready_time_start) * 1000, 3)} ms\n"
-                    ready_time_mid = time.time()
+                    time_log_string += f"    guilds - {round((time.monotonic() - ready_time_start) * 1000, 3)} ms\n"
+                    ready_time_mid = time.monotonic()
                     # DM channels
                     for dm in data["private_channels"]:
                         self.add_dm(dm, data)
@@ -903,8 +904,8 @@ class Gateway():
                         dm.pop("last_message_id")
                     for dm in self.dms:
                         self.dms_id.append(dm["id"])
-                    time_log_string += f"    DMs - {round((time.time() - ready_time_mid) * 1000, 3)} ms\n"
-                    ready_time_mid = time.time()
+                    time_log_string += f"    DMs - {round((time.monotonic() - ready_time_mid) * 1000, 3)} ms\n"
+                    ready_time_mid = time.monotonic()
                     # unread messages and pings
                     for channel in double_get(data, "read_state", "entries", default=[]):
                         # last_message_id in unread_state is actually last_ACKED_message_id
@@ -925,8 +926,8 @@ class Gateway():
                             if not last_message_id or int(unseen_channel["last_acked_message_id"]) < int(last_message_id):
                                 unseen_channel["last_acked_unreads_line"] = unseen_channel["last_acked_message_id"]
                             self.read_state[channel_id] = unseen_channel
-                    time_log_string += f"    read state ({len(self.read_state)} channels) - {round((time.time() - ready_time_mid) * 1000, 3)} ms\n"
-                    ready_time_mid = time.time()
+                    time_log_string += f"    read state ({len(self.read_state)} channels) - {round((time.monotonic() - ready_time_mid) * 1000, 3)} ms\n"
+                    ready_time_mid = time.monotonic()
                     # guild and dm settings
                     for guild in double_get(data, "user_guild_settings", "entries", default=[]):
                         if guild["guild_id"]:
@@ -960,13 +961,13 @@ class Gateway():
                                 })
                     self.process_hidden_channels()
                     self.guilds_changed = True
-                    time_log_string += f"    channel settings - {round((time.time() - ready_time_mid) * 1000, 3)} ms\n"
-                    ready_time_mid = time.time()
+                    time_log_string += f"    channel settings - {round((time.monotonic() - ready_time_mid) * 1000, 3)} ms\n"
+                    ready_time_mid = time.monotonic()
                     for user in data["relationships"]:
                         if user["type"] == 2 or user.get("user_ignored"):
                             self.blocked.append(user["id"])
-                    time_log_string += f"    blocked users - {round((time.time() - ready_time_mid) * 1000, 3)} ms\n"
-                    ready_time_mid = time.time()
+                    time_log_string += f"    blocked users - {round((time.monotonic() - ready_time_mid) * 1000, 3)} ms\n"
+                    ready_time_mid = time.monotonic()
                     # get user settings
                     if "user_settings_proto" in data and not self.legacy:
                         self.user_settings_proto = protobuf.parse_message(base64.b64decode(data["user_settings_proto"]), protobuf_schemata.USER_SETTINGS)
@@ -985,8 +986,8 @@ class Gateway():
                         if old_user_settings.get("custom_status"):
                             self.user_settings_proto["status"]["custom_status"] = old_user_settings["custom_status"]
                     self.proto_changed = True
-                    time_log_string += f"    protobuf - {round((time.time() - ready_time_mid) * 1000, 3)} ms\n"
-                    ready_time_mid = time.time()
+                    time_log_string += f"    protobuf - {round((time.monotonic() - ready_time_mid) * 1000, 3)} ms\n"
+                    ready_time_mid = time.monotonic()
                     # get my roles
                     if self.guilds:
                         for num, guild in enumerate(data["merged_members"]):
@@ -1000,15 +1001,15 @@ class Gateway():
                                 "roles": roles,
                             })
                     self.merged_users = data.get("users", [])   # this is for ready_supplemental
-                    time_log_string += f"    roles - {round((time.time() - ready_time_mid) * 1000, 3)} ms\n"
-                    ready_time_mid = time.time()
+                    time_log_string += f"    roles - {round((time.monotonic() - ready_time_mid) * 1000, 3)} ms\n"
+                    ready_time_mid = time.monotonic()
                     # write debug data
                     if logger.getEffectiveLevel() == logging.DEBUG:
                         debug.save_json(debug.anonymize_guilds(self.guilds), "guilds.json")
                     # blocked users
-                    time_log_string += f"    debug data - {round((time.time() - ready_time_mid) * 1000, 3)} ms\n"
+                    time_log_string += f"    debug data - {round((time.monotonic() - ready_time_mid) * 1000, 3)} ms\n"
                     self.ready = True
-                    time_log_string += f"    total - {round((time.time() - ready_time_start) * 1000, 3)} ms"
+                    time_log_string += f"    total - {round((time.monotonic() - ready_time_start) * 1000, 3)} ms"
                     logger.debug(time_log_string)
                     # READY is huge so lets save some memory
                     del (response, data, guild, guild_channels, role, guild_roles, last_messages, time_log_string)
@@ -1099,7 +1100,15 @@ class Gateway():
                     gc.collect()
 
                 elif optext == "MESSAGE_CREATE" and "content" in response["d"]:
-                    self.gateway_msg_per_h += 1
+                    now = int(time.monotonic())
+                    bucket_key = int(now) // 60
+                    if (bucket_key) > self.last_cleaned_bucket_msgph:
+                        oldest_valid_bucket = (now - 3600) // 60
+                        stale_keys = [k for k in self.buckets_msgph if k <= oldest_valid_bucket]
+                        for k in stale_keys:
+                            del self.buckets_msgph[k]
+                        self.last_cleaned_bucket_msgph = bucket_key
+                    self.buckets_msgph[bucket_key] = self.buckets_msgph.get(bucket_key, 0) + 1
                     message = response["d"]
                     # saving roles to cache
                     if message["channel_id"] in self.subscribed_channels and "member" in message and "roles" in message["member"]:
@@ -1976,7 +1985,7 @@ class Gateway():
 
             elif opcode == 11:
                 self.heartbeat_received = True
-                self.gateway_ping_time = round(time.time() - self.heartbeat_sent_time, 3)
+                self.gateway_ping_time = round(time.monotonic() - self.heartbeat_sent_time, 3)
 
         self.state = 0
         logger.debug("Receiver stopped")
@@ -1998,10 +2007,10 @@ class Gateway():
             time.sleep(0.5)
             sleep_time += 5
         heartbeat_interval_rand = int(self.heartbeat_interval * (0.8 - 0.6 * random.random()) / 1000)
-        self.heartbeat_sent_time = int(time.time())
-        time_spent_event_time = int(time.time()) - 1990   # send it 10s after start, then every 30min
+        self.heartbeat_sent_time = int(time.monotonic())
+        time_spent_event_time = int(time.monotonic()) - 1990   # send it 10s after start, then every 30min
         while self.run and not self.wait and self.heartbeat_running:
-            send_time_spent_event = not self.legacy and int(time.time()) - time_spent_event_time >= 1800
+            send_time_spent_event = not self.legacy and int(time.monotonic()) - time_spent_event_time >= 1800
             if send_time_spent_event:
                 self.send({
                     "op": 41,
@@ -2012,8 +2021,8 @@ class Gateway():
                     },
                 })
                 logger.debug("Sent Time Spent event")
-                time_spent_event_time = int(time.time())
-            if time.time() - self.heartbeat_sent_time >= heartbeat_interval_rand or send_time_spent_event:
+                time_spent_event_time = int(time.monotonic())
+            if time.monotonic() - self.heartbeat_sent_time >= heartbeat_interval_rand or send_time_spent_event:
                 if QOS_HEARTBEAT and not self.legacy:
                     self.send({
                         "op": 1,
@@ -2024,7 +2033,7 @@ class Gateway():
                     })
                 else:
                     self.send({"op": 1, "d": self.sequence})
-                self.heartbeat_sent_time = int(time.time())
+                self.heartbeat_sent_time = int(time.monotonic())
                 logger.debug("Sent heartbeat")
                 if not self.heartbeat_received:
                     logger.warning("Heartbeat reply not received")
@@ -2610,14 +2619,30 @@ class Gateway():
 
     def get_stats(self):
         """Get gateway stats"""
+        def get_bucket_per_hour(self, attribute):
+            now = time.monotonic()
+            oldest_valid_bucket = (int(now) - 3600) // 60
+            stale_keys = [k for k in attribute if k <= oldest_valid_bucket]
+            for k in stale_keys:   # clean up stale buckets
+                del attribute[k]
+            raw_count = sum(attribute.values())
+            elapsed = now - self.start_time
+            if elapsed >= 3600:
+                return raw_count
+            # extrapolate
+            effective_elapsed = max(elapsed, 10)   # prevent spikes
+            extrapolated_rate = (raw_count / effective_elapsed) * 3600   # scale
+            return round(extrapolated_rate)
+
         members_count = 0
         for guild in self.member_roles:
             members_count += len(guild["members"])
         return (
-            self.last_gateway_events_per_h or self.gateway_events_per_h,
-            self.last_gateway_msg_per_h or self.gateway_msg_per_h,
+            get_bucket_per_hour(self, self.buckets_evph),
+            get_bucket_per_hour(self, self.buckets_msgph),
             self.gateway_ping_time,
-            len(self.messages_buffer), members_count,
+            len(self.messages_buffer),
+            members_count,
         )
 
 

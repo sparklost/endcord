@@ -491,7 +491,7 @@ class TerminalMedia():
         loop = bool(gif.info.get("loop", 1))
         frame = 0
         while self.playing:
-            start_time = time.time()
+            start_time = time.monotonic()
 
             h, w = terminal_utils.get_size()
             if self.screen_height != h or self.screen_width != w:
@@ -520,7 +520,7 @@ class TerminalMedia():
                 if loop:
                     break
                 frame = 0
-            time.sleep(max(frame_duration - (time.time() - start_time), 0))
+            time.sleep(max(frame_duration - (time.monotonic() - start_time), 0))
 
 
     def play_audio(self, path, loop=False, loop_delay=0.7, loop_max=60):
@@ -540,7 +540,7 @@ class TerminalMedia():
         audio_stream = all_audio_streams[0]
 
         with speaker.player(samplerate=audio_stream.rate, channels=audio_stream.channels, blocksize=1152) as stream:
-            start = int(time.time())
+            start = int(time.monotonic())
             while self.playing:
                 for frame in container.decode(audio=0):
                     if not self.playing:
@@ -551,7 +551,7 @@ class TerminalMedia():
                     audio *= self.gain
                     stream.play(audio)
                 if loop:
-                    if int(time.time()) - start > loop_max:
+                    if int(time.monotonic()) - start > loop_max:
                         break
                     time.sleep(loop_delay)
                     container.seek(0)
@@ -609,7 +609,7 @@ class TerminalMedia():
             if frame is None:
                 break
             if audio_queue.qsize() >= 1 or no_audio:
-                start_time = time.time()
+                start_time = time.monotonic()
                 self.img = frame.to_image()
                 try:
                     self.pil_img_to_term(self.img, remove_alpha=False)
@@ -619,7 +619,7 @@ class TerminalMedia():
                 if self.screen_height != h or self.screen_width != w:
                     self.calculate_image_size()
             if audio_queue.qsize() >= 3 or no_audio:
-                time.sleep(max(frame_duration - (time.time() - start_time), 0))
+                time.sleep(max(frame_duration - (time.monotonic() - start_time), 0))
             while self.pause:
                 time.sleep(0.1)
 

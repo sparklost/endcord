@@ -89,7 +89,7 @@ class Endcord:
         self.screen = screen
         self.config = config
         self.keybindings = keybindings
-        self.init_time = time.time()
+        self.init_time = time.monotonic()
         self.profiles = profiles
 
         # select profile
@@ -207,7 +207,7 @@ class Endcord:
         self.running_tasks = []
         self.cached_downloads = []
         self.deleted_cache = []
-        self.last_summary_save = time.time() - SUMMARY_SAVE_INTERVAL - 1
+        self.last_summary_save = time.monotonic() - SUMMARY_SAVE_INTERVAL - 1
         self.new_version = None
 
         # load state
@@ -349,6 +349,7 @@ class Endcord:
         self.prev_volume_out = 100
         self.prev_volume_in = 100
         self.bg_chanel = None
+        self.stats_data = None
         # threading.Thread(target=self.profiling_auto_exit, daemon=True).start()
 
         # init sigint handler - replaces handler from main.py
@@ -370,7 +371,7 @@ class Endcord:
         self.exit()
 
 
-    def exit(self, fast=True, force=True):
+    def exit(self, fast=True, force=True, message=None):
         """End current session allowing main thread to return to main.py, if not fast wait for all running threads to stop"""
         try:
             if not force:
@@ -378,7 +379,7 @@ class Endcord:
             if logger.getEffectiveLevel() == logging.DEBUG:
                 text = "Threads:\n"
                 for thread in threading.enumerate():
-                    text += f"[{"Alive" if thread.is_alive() else "Ended"}] {thread.name} id={thread.ident}\n"
+                    text += f"  [{"Alive" if thread.is_alive() else "Ended"}] {thread.name} id={thread.ident}\n"
                 logger.debug(text)
             self.tui.stop()   # highest priority to restore terminal
             self.cancel_upload()
@@ -409,9 +410,13 @@ class Endcord:
                 pass
             if not fast:
                 time.sleep(1)
-            if force:
+            if force or message:
+                if message:
+                    sys.exit(message)
                 sys.exit(0)
         except Exception:   # failsafe
+            if message:
+                sys.exit(message)
             sys.exit(0)
 
 
@@ -621,7 +626,7 @@ class Endcord:
                 self.notify_queue.task_done()
 
 
-    def idle_timer(self):
+    def idle_stats_timer(self):
         """Thread that waits for idle timeout to finish and set idle status"""
         self.stop_idle_event.clear()
         if self.stop_idle_event.wait(self.idle_timeout):
@@ -646,8 +651,8 @@ class Endcord:
         if self.my_user_data:
             self.update_prompt()
         self.typing = []
-        self.typing_sent = int(time.time())
-        self.sent_ack_time = time.time() - self.ack_throttling
+        self.typing_sent = int(time.monotonic())
+        self.sent_ack_time = time.monotonic() - self.ack_throttling
         self.ack_version = 0
         self.pending_acks = []
         self.last_message_id = 0
@@ -692,8 +697,7 @@ class Endcord:
         self.command = False
         self.app_command_autocomplete = ""
         self.app_command_autocomplete_resp = []
-        self.app_command_sent_time = time.time()
-        self.app_command_last_keypress = time.time()
+        self.app_command_sent_time = time.monotonic()
         self.allow_app_command_autocomplete = False
         self.ignore_typing = False
         self.incoming_calls = []
@@ -1585,7 +1589,7 @@ class Endcord:
         }
         self.going_to_ch = None
         self.ignore_typing = False
-        self.tui.typing = time.time() - 5
+        self.tui.typing = time.monotonic() - 5
         self.update_status_line()
 
 
@@ -2648,7 +2652,7 @@ class Endcord:
             elif action == 2001:
                 self.restore_input_text = (input_text, "command" if self.command else "standard extra")   # prevents closing extra window
                 if self.idle_timeout and self.my_status["status"] == "online":
-                    threading.Thread(target=self.idle_timer, daemon=True).start()
+                    threading.Thread(target=self.idle_stats_timer, daemon=True).start()
             elif action == 2000:
                 self.restore_input_text = (input_text, "command" if self.command else "standard extra")
                 if not self.idle_timeout:
@@ -4247,13 +4251,13 @@ class Endcord:
                 for channel in guild["channels"]:
                     summaries_count += len(channel["summaries"])
             imgs_count, imgs_size = utils.get_dir_size(os.path.expanduser(peripherals.cache_path), mb=True)
-            data = (
+            self.stats_data = (
                 run_time, g_events_per_h, g_msg_per_h, str(g_ping_time) + "s", msg_buffer_size,
                 total_requests, str(api_ping_time) + "s", None, members_count, deleted_msg_count, summaries_count, (imgs_count, str(imgs_size) + "MB"),
             )
             self.stop_assist(close=False)
             max_w = self.tui.get_dimensions()[2][1]
-            extra_title, extra_body, extra_format = formatter.generate_extra_window_stats(data, STATS_COMMAND_TEXT, self.colors, max_w)
+            extra_title, extra_body, extra_format = formatter.generate_extra_window_stats(self.stats_data, STATS_COMMAND_TEXT, self.colors, max_w)
             self.tui.draw_extra_window(extra_title, extra_body, extra_format, reset_scroll=reset)
             self.extra_window_open = True
 
@@ -6235,10 +6239,10 @@ class Endcord:
             )
             if autocomplete:
                 query = assist_word.lower()
-                if self.allow_app_command_autocomplete and self.app_command_autocomplete != query and time.time() - self.app_command_sent_time > INTERACTION_THROTTLING:
+                if self.allow_app_command_autocomplete and self.app_command_autocomplete != query and time.monotonic() - self.app_command_sent_time > INTERACTION_THROTTLING:
                     self.app_command_autocomplete = assist_word.lower()
                     self.execute_app_command(query, autocomplete=True)
-                    self.app_command_sent_time = time.time()
+                    self.app_command_sent_time = time.monotonic()
                 elif self.app_command_autocomplete_resp:
                     for choice in self.app_command_autocomplete_resp:
                         self.assist_found.append((choice["name"], choice["value"]))
@@ -6326,7 +6330,7 @@ class Endcord:
         self.close_extra_window()
         if self.search or self.search_gif or self.command:
             self.ignore_typing = False
-            self.tui.typing = time.time() - 5
+            self.tui.typing = time.monotonic() - 5
         self.search = False
         self.search_gif = False
         self.search_ext = False
@@ -6335,6 +6339,7 @@ class Endcord:
         self.search_results = []
         self.command = False
         self.uploading = False
+        self.stats_data = None
         if update:
             if really_close:
                 self.update_status_line()
@@ -7323,14 +7328,14 @@ class Endcord:
                 self.pending_acks.append((channel_id, message_id))
 
         # try to send
-        if self.pending_acks and time.time() - self.sent_ack_time > self.ack_throttling:
+        if self.pending_acks and time.monotonic() - self.sent_ack_time > self.ack_throttling:
             success = self.discord.ack(*self.pending_acks.pop(0), manual=manual)
             if success:
                 self.ack_version += 1
             elif success is None:
                 self.gateway.set_offline()
                 self.update_extra_line("Network error", color=20)
-            self.sent_ack_time = time.time()
+            self.sent_ack_time = time.monotonic()
 
 
     def compute_permissions(self):
@@ -8270,9 +8275,9 @@ class Endcord:
                 "channel_id": new_summary["channel_id"],
                 "summaries": [summary],
             })
-        if time.time() - self.last_summary_save > SUMMARY_SAVE_INTERVAL:
+        if time.monotonic() - self.last_summary_save > SUMMARY_SAVE_INTERVAL:
             utils.save_json(self.summaries, "summaries.json")
-            self.last_summary_save = time.time()
+            self.last_summary_save = time.monotonic()
 
 
     def update_presence_from_proto(self):
@@ -8470,14 +8475,15 @@ class Endcord:
         logger.info("Waiting for ready signal from gateway")
         self.my_status["client_state"] = "connecting"
         self.start_time = int(time.time())
+        stats_timer = int(time.monotonic())
 
         # wait for gateway and load data from it
         while not self.gateway.get_ready():
             if self.gateway.error:
                 if self.gateway.error.startswith("Failed"):
-                    sys.exit(self.gateway.error)
+                    self.exit(message=self.gateway.error)
                 logger.fatal(f"Gateway error: \n {self.gateway.error}")
-                sys.exit(self.gateway.error + ERROR_TEXT)
+                self.exit(message=self.gateway.error + ERROR_TEXT)
             if self.gateway.get_state() == 3:
                 self.my_status["client_state"] = "ERROR"
                 self.update_extra_line("Failed initializing a session: There is probably a server-side error", timed=False, color=20)
@@ -8690,7 +8696,7 @@ class Endcord:
         self.execute_extensions_methods("on_main_start")
 
         call_last_update = 0
-        logger.info(f"Main loop started after {round((time.time() - self.init_time) * 1000, 3)} ms")
+        logger.info(f"Main loop started after {round((time.monotonic() - self.init_time) * 1000, 3)} ms")
         del self.init_time
 
         while self.run:
@@ -8881,9 +8887,9 @@ class Endcord:
             if self.send_my_typing and not self.disable_sending:
                 my_typing = self.tui.get_my_typing()
                 # typing indicator on server expires in 10s, so lest stay safe with 7s
-                if not self.ignore_typing and my_typing and time.time() >= self.typing_sent + 7:
+                if not self.ignore_typing and my_typing and time.monotonic() >= self.typing_sent + 7:
                     slowmode_time = self.discord.send_typing(self.active_channel["channel_id"])
-                    self.typing_sent = int(time.time())
+                    self.typing_sent = int(time.monotonic())
                     # check for slowmode
                     if slowmode_time and slowmode_time != 1 and self.active_channel["channel_id"] not in self.slowmode_times:
                         self.slowmode_times[self.active_channel["channel_id"]] = slowmode_time
@@ -8904,7 +8910,7 @@ class Endcord:
                     self.update_status_line()
 
             # send pending ack
-            if self.pending_acks and time.time() - self.sent_ack_time > self.ack_throttling:
+            if self.pending_acks and time.monotonic() - self.sent_ack_time > self.ack_throttling:
                 self.send_ack()
 
             # check gateway state
@@ -9105,7 +9111,7 @@ class Endcord:
                                     self.current_channel.get("perms_computed", 0),
                                 )
                         self.assist(assist_word, assist_type)
-                    elif not self.allow_app_command_autocomplete and time.time() - self.app_command_last_keypress >= APP_COMMAND_AUTOCOMPLETE_DELAY:
+                    elif not self.allow_app_command_autocomplete:
                         self.allow_app_command_autocomplete = True
                     app_command_autocomplete_resp = self.gateway.get_app_command_autocomplete_resp()
                     if app_command_autocomplete_resp:
@@ -9124,18 +9130,34 @@ class Endcord:
             elif self.assist_type == 8 and not assist_word and self.assist_word:
                 self.assist("", 8)
 
-
             # check member assist query results
             if self.assist_type == 2:
                 query_results = self.gateway.get_member_query_results()
                 if query_results:
                     self.assist(self.assist_word, self.assist_type, query_results=query_results)
 
+            # update stats display
+            if self.stats_data and self.extra_window_open and time.monotonic() - stats_timer > 2:
+                stats_timer = time.monotonic()
+                run_time = formatter.format_seconds(int(time.time()) - self.start_time, nice=True)
+                g_events_per_h, g_msg_per_h, g_ping_time, msg_buffer_size, members_count = self.gateway.get_stats()
+                total_requests, _ = self.discord.get_stats(ping=False)
+                deleted_msg_count = 0
+                for channel in self.deleted_cache:
+                    deleted_msg_count += len(channel["messages"])
+                self.stats_data = (
+                    run_time, g_events_per_h, g_msg_per_h, str(g_ping_time) + "s", msg_buffer_size,
+                    total_requests, self.stats_data[6], None, members_count, deleted_msg_count, self.stats_data[10], self.stats_data[11],
+                )
+                max_w = self.tui.get_dimensions()[2][1]
+                extra_title, extra_body, extra_format = formatter.generate_extra_window_stats(self.stats_data, STATS_COMMAND_TEXT, self.colors, max_w)
+                self.tui.draw_extra_window(extra_title, extra_body, extra_format, reset_scroll=False)
+
             # check gateway for errors
             if self.gateway.error:
                 if self.gateway.error.startswith("Failed"):
-                    sys.exit(self.gateway.error)
+                    self.exit(message=self.gateway.error)
                 logger.fatal(f"Gateway error: \n {self.gateway.error}")
-                sys.exit(self.gateway.error + ERROR_TEXT)
+                self.exit(message=self.gateway.error + ERROR_TEXT)
 
             time.sleep(MAIN_LOOP_POLL_DELAY)

@@ -498,21 +498,21 @@ class Gateway():
         logger.debug(f"Heartbeater started, interval={self.heartbeat_interval/1000} s")
         self.heartbeat_running = True
         self.heartbeat_received = True
-        start_time = int(time.time())
+        start_time = int(time.monotonic())
         heartbeat_interval_rand = int(self.heartbeat_interval * (0.8 - 0.6 * random.random()) / 1000)
-        heartbeat_sent_time = int(time.time())
+        heartbeat_sent_time = int(time.monotonic())
         while self.run and self.heartbeat_running:
-            if time.time() - heartbeat_sent_time >= heartbeat_interval_rand:
+            if time.monotonic() - heartbeat_sent_time >= heartbeat_interval_rand:
                 self.send({"op": "heartbeat"})
-                heartbeat_sent_time = int(time.time())
+                heartbeat_sent_time = int(time.monotonic())
                 logger.debug("Sent heartbeat")
                 if not self.heartbeat_received:
                     logger.warning("Heartbeat reply not received")
                     break
                 self.heartbeat_received = False
                 heartbeat_interval_rand = int(self.heartbeat_interval * (0.8 - 0.6 * random.random()) / 1000)
-            self.remaining_til_timeout = int(max(self.timeout - (time.time() - start_time), 0))
-            if heartbeat_sent_time - time.time() >= self.timeout:
+            self.remaining_til_timeout = int(max(self.timeout - (time.monotonic() - start_time), 0))
+            if heartbeat_sent_time - time.monotonic() >= self.timeout:
                 self.state = 5
                 self.disconnect_ws(timeout=0)
                 logger.warn("Auth gateway timeout")

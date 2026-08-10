@@ -143,7 +143,7 @@ class Discord():
         self.connection_pool_lock = threading.Lock()
         self.cdn_connection = None
         self.cdn_connection_lock = threading.Lock()
-        self.cdn_connection_last_use = time.time()
+        self.cdn_connection_last_use = time.monotonic()
         self.total_requests = 0
 
         self.my_id = self.get_my_id(exit_on_error=True)
@@ -230,7 +230,7 @@ class Discord():
         self.total_requests += 1
         entry = None
         connection = None
-        now = int(time.time())
+        now = int(time.monotonic())
 
         # get first free connection or create new one
         with self.connection_pool_lock:
@@ -1867,12 +1867,14 @@ class Discord():
         return None, etag
 
 
-    def get_stats(self):
+    def get_stats(self, ping=True):
         """Get API stats"""
-        ping_time = time.time()
-        self.get_my_id()
-        ping_time = round(time.time() - ping_time, 3)
-        return self.total_requests, ping_time
+        if ping:
+            ping_time = time.monotonic()
+            self.get_my_id()
+            ping_time = round(time.monotonic() - ping_time, 3)
+            return self.total_requests, ping_time
+        return self.total_requests, None
 
 
     def get_pfp(self, user_id, avatar_id, size=None, img_type="webp", save_path=None, keepalive=False, retry=True):
@@ -2060,7 +2062,7 @@ class Discord():
         """Download file from discord with proper header, using keepalive connection"""
         # get connection and do request
         with self.cdn_connection_lock:
-            now = int(time.time())
+            now = int(time.monotonic())
             if not self.cdn_connection:
                 self.cdn_connection = self.get_connection(host, port, timeout=timeout)
             if now - self.cdn_connection_last_use > MAX_CONNECTION_AGE or self.cdn_connection.sock is None or host != self.cdn_connection.host:
@@ -2069,6 +2071,7 @@ class Discord():
                 except Exception:
                     pass
                 self.cdn_connection = self.get_connection(host, port, timeout=timeout)
+            self.cdn_connection_last_use = time.monotonic()
             try:
                 try:
                     self.cdn_connection.request(method, path, body, headers)

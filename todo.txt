@@ -22,6 +22,10 @@ Add full image viewer and inline to gtkcurses
 Add image emoji to gtkcurses
 Add pfp to gtkcurses
 
+MORE COLORS:
+Add colors to status sign in tree for selected and active dm
+Add color to embed quote line
+
 EXTENSIONS:
 endcord-kitty-media
 endcord-p2p-network (name subject to change)

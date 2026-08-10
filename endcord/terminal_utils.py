@@ -160,9 +160,9 @@ def read_key():
 
     # escape sequences
     seq = first
-    start = time.time()
+    start = time.monotonic()
     while True:
-        time_left = 0.01 - (time.time() - start)
+        time_left = 0.01 - (time.monotonic() - start)
         if time_left <= 0:
             break
         ready, _, _ = select.select([fd], [], [], time_left)

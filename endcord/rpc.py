@@ -232,7 +232,7 @@ class RPC:
             if rpc_data and rpc_assets:
                 logger.info(f"RPC client connected: {rpc_data["name"]}")
                 send_data(connection, 1, self.dispatch)
-                sent_time = time.time() - (GATEWAY_RATE_LIMIT + 1)
+                sent_time = time.monotonic() - (GATEWAY_RATE_LIMIT + 1)
                 prev_activity = None
                 while self.run:
                     op, data = receive_data(connection)
@@ -245,11 +245,11 @@ class RPC:
                             continue
                         # prevent sending presences too often
                         delay = GATEWAY_RATE_LIMIT_SAME if data["args"]["activity"] == prev_activity else GATEWAY_RATE_LIMIT
-                        if time.time() - sent_time < delay:
+                        if time.monotonic() - sent_time < delay:
                             response = self.build_response(data)
                             send_data(connection, op, response)
                             prev_activity = data["args"]["activity"]
-                            sent_time = time.time()
+                            sent_time = time.monotonic()
 
                         activity = data["args"]["activity"]
                         if not activity:

@@ -667,7 +667,7 @@ class SpellCheck():
         if self.aspell:
             return
         try:
-            start = time.time()
+            start = time.monotonic()
             self.aspell = subprocess.Popen(
                 [self.aspell_path, "-a", "--sug-mode", self.aspell_mode, "--lang", self.aspell_language],
                 stdin=subprocess.PIPE,
@@ -679,7 +679,7 @@ class SpellCheck():
                 bufsize=1,
             )
             self.aspell.stdout.readline()
-            logger.info(f"Aspell initialized in {round((time.time() - start)*1000, 3)} ms")
+            logger.info(f"Aspell initialized in {round((time.monotonic() - start)*1000, 3)} ms")
         except Exception as e:
             if self.aspell.poll() is not None:
                 aspell_error = self.aspell.stderr.read()
@@ -840,13 +840,13 @@ class Player():
                     channels = sound.channels
                     block_size = sample_rate // 20
                     speaker = soundcard.default_speaker()
-                    start = time.time()
+                    start = time.monotonic()
                     sleep_time = block_size / sample_rate
                     with speaker.player(samplerate=sample_rate, channels=channels) as stream:
                         sound.seek(0)
                         while self.playing:
                             read_start = time.perf_counter()
-                            if time.time() - start >= loop_max:
+                            if time.monotonic() - start >= loop_max:
                                 self.playing = False
                                 break
                             if sound.tell() >= len(sound):
