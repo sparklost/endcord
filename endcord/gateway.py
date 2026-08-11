@@ -447,6 +447,8 @@ class Gateway():
             if channel_g["type"] in (0, 2, 4, 5, 15, 16):
                 flags = int(channel.get("flags", 0))
                 hidden = not perms.decode_flag(flags, 12)   # manually hidden
+                if perms.decode_flag(flags, 11):   # pinned
+                    self.guilds[guild_num]["channels"][channel_num]["pinned"] = True
             else:
                 hidden = False
             self.guilds[guild_num]["channels"][channel_num].update({
@@ -454,6 +456,7 @@ class Gateway():
                 "muted": channel["muted"],
                 "hidden": hidden,
                 "collapsed": channel.get("collapsed", False),   # spacebar_fix - get
+                "flags": flags,
             })
 
         # second pass to process message_notifications for categories
@@ -1579,11 +1582,16 @@ class Gateway():
                             if channel["type"] in (0, 2, 4, 5, 15, 16):
                                 flags = int(channel.get("flags", 0))
                                 hidden = not perms.decode_flag(flags, 12)   # manually hidden
+                                if perms.decode_flag(flags, 11):   # pinned
+                                    self.guilds[guild_num]["channels"][channel_num]["pinned"] = True
+                                elif self.guilds[guild_num]["channels"][channel_num].get("pinned"):
+                                    self.guilds[guild_num]["channels"][channel_num].pop("pinned", None)
                             else:
                                 hidden = False
                             self.guilds[guild_num]["channels"][channel_num]["hidden"] = hidden
                             self.guilds[guild_num]["channels"][channel_num]["muted"] = False
                             self.guilds[guild_num]["channels"][channel_num]["message_notifications"] = 3
+                            self.guilds[guild_num]["channels"][channel_num]["flags"] = flags
                         self.process_one_guild_channel_overrides(data["channel_overrides"], guild_num, data["message_notifications"])
                         self.process_hidden_channels()
                     else:   # dm

@@ -135,7 +135,9 @@
     Generate invite to current server with custom expiration `duration` and uses `limit`. Set to 0 for infinite. Invite URL will be copied to clipboard.
     `duration` can be: `4w3d5h30m10s` where `w`is weeks, `d` is days..., can be used partially and mixed: `5h1w`. Default is 7 days and infinite uses.
 - `rename_folder [name]`  
-    Locally rename currently selected folder in tree. Custom names are kept in state_profile_name.json in config dir.
+    Locally rename selected folder in tree. Custom names are kept in state_profile_name.json in config dir.
+- `toggle_pinned` / `toggle_pinned <#[channel_id]>`
+    Togle pinned state for selected channel in tree.
 - `resize_popup_window [num/-1/+1]`  
     Resize popup window to specified number or incrementally by +/- 1. Use `extra_window_height` theme setting to persist it.
 - `collapse_all_except *[option]`  

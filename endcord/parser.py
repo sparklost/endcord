@@ -510,6 +510,7 @@ def command_string(text):
     cmd_type = 0
     cmd_args = {}
     text_lower = text.lower()
+    forum = True
 
     # 1 - SET
     if text_lower.startswith("set "):
@@ -535,10 +536,12 @@ def command_string(text):
     # 3 - GOTO_REPLY
     elif text_lower.startswith("goto_reply"):
         cmd_type = 3
+        forum = False
 
     # 4 - DOWNLOAD
     elif text_lower.startswith("download"):
         cmd_type = 4
+        forum = False
         try:
             num = int(text.split(" ")[1])
             cmd_args = {"num": num}
@@ -548,6 +551,7 @@ def command_string(text):
     # 5 - OPEN_LINK
     elif text_lower.startswith("open_link"):
         cmd_type = 5
+        forum = False
         try:
             num = int(text.split(" ")[1])
             cmd_args = {"num": num}
@@ -557,6 +561,7 @@ def command_string(text):
     # 6 - PLAY
     elif text_lower.startswith("play") and text_lower[4:5] != "_":
         cmd_type = 6
+        forum = False
         try:
             num = int(text.split(" ")[1])
             cmd_args = {"num": num}
@@ -578,6 +583,7 @@ def command_string(text):
     # 8 - COPY_MESSAGE
     elif text_lower.startswith("copy_message"):
         cmd_type = 8
+        forum = False
 
     # 9 - UPLOAD
     elif text_lower.startswith("upload"):
@@ -587,6 +593,7 @@ def command_string(text):
     # 10 - SPOIL
     elif text_lower.startswith("spoil"):
         cmd_type = 10
+        forum = False
         try:
             num = int(text.split(" ")[1])
             cmd_args = {"num": num}
@@ -596,10 +603,12 @@ def command_string(text):
     # 11 - TOGGLE_THREAD_TREE
     elif text_lower.startswith("toggle_thread_tree"):
         cmd_type = 11
+        forum = False
 
     # 12 - PROFILE
     elif text_lower.startswith("profile"):
         cmd_type = 12
+        forum = False
         match = re.search(match_profile, text)
         if match:
             cmd_args = {"user_id": match.group(1)}
@@ -628,6 +637,7 @@ def command_string(text):
     # 16 - SEARCH
     elif text_lower.startswith("search "):
         cmd_type = 16
+        forum = False
         search_text = text[7:].strip(" ")
         cmd_args = {"search_text": search_text}
 
@@ -641,10 +651,12 @@ def command_string(text):
     # 18 - COPY_MESSAGE_LINK
     elif text_lower.startswith("copy_message_link"):
         cmd_type = 18
+        forum = False
 
     # 19 - GOTO_MENTION
     elif text_lower.startswith("goto_mention"):
         cmd_type = 19
+        forum = False
         try:
             num = int(text.split(" ")[1])
             cmd_args = {"num": num}
@@ -668,6 +680,7 @@ def command_string(text):
     # 21 - RECORD_VOICE_MESSAGE
     elif text_lower.startswith("record_voice_message"):
         cmd_type = 21
+        forum = False
         text += " "
         cmd_args = {"cancel": text.split(" ")[1].lower() == "cancel"}
 
@@ -678,11 +691,13 @@ def command_string(text):
     # 23 - REACT
     elif text_lower.startswith("react"):
         cmd_type = 23
+        forum = False
         cmd_args = {"text": text[6:].strip(" ")}
 
     # 24 - SHOW_REACTIONS
     elif text_lower.startswith("show_reactions"):
         cmd_type = 24
+        forum = False
 
     # 25 - GOTO
     elif text_lower.startswith(("goto", "xyzzy")):
@@ -699,6 +714,7 @@ def command_string(text):
     # 26 - VIEW_PFP
     elif text_lower.startswith("view_pfp"):
         cmd_type = 26
+        forum = False
         match = re.search(match_profile, text)
         if match:
             cmd_args = {"user_id": match.group(1)}
@@ -766,6 +782,7 @@ def command_string(text):
     # 34 - VOTE
     elif text_lower.startswith("vote"):
         cmd_type = 34
+        forum = False
         try:
             num = int(text.split(" ")[1])
             cmd_args = {"num": num}
@@ -776,14 +793,17 @@ def command_string(text):
     # 35 - SHOW_PINNED
     elif text_lower.startswith("show_pinned"):
         cmd_type = 35
+        forum = False
 
     # 36 - PIN_MESSAGE
     elif text_lower.startswith("pin_message"):
         cmd_type = 36
+        forum = False
 
     # 37 - PUSH_BUTTON
     elif text_lower.startswith("push_button"):
         cmd_type = 37
+        forum = False
         try:
             num = int(text.split(" ")[1])
             cmd_args = {"num": num}
@@ -797,6 +817,7 @@ def command_string(text):
     # 38 - STRING_SELECT
     elif text_lower.startswith("string_select"):
         cmd_type = 38
+        forum = False
         match = re.search(match_string_select, text_lower)
         if match:
             num = match.group(1)
@@ -809,6 +830,7 @@ def command_string(text):
     # 39 - DUMP_CHAT
     elif text_lower.startswith("dump_chat"):
         cmd_type = 39
+        forum = False
 
     # 40 - SET_NOTIFICATIONS
     elif text_lower.startswith("set_notifications"):
@@ -842,9 +864,10 @@ def command_string(text):
     elif text_lower.startswith("external_edit"):
         cmd_type = 43
 
-    # 44 - CUSTOM_STATUS/EMOJI/REMOVE
+    # 44 - CUSTOM_STATUS/-EMOJI/-REMOVE
     elif text_lower.startswith("custom_status"):
         cmd_type = 44
+        forum = False
         if text_lower.startswith("custom_status_emoji"):
             cmd_args = {"emoji": text[20:]}
             if len(text) <= 20:
@@ -861,6 +884,7 @@ def command_string(text):
     # 45 - BLOCK
     elif text_lower.startswith("block"):
         cmd_type = 45
+        forum = False
         match = re.search(match_profile, text)
         if match:
             cmd_args = {
@@ -874,10 +898,12 @@ def command_string(text):
     # 47 - TOGGLE_BLOCKED_MESSAGES
     elif text_lower.startswith("toggle_blocked_messages"):
         cmd_type = 47
+        forum = False
 
     # 48 - VOICE_START_CALL
     elif text_lower.startswith("voice_start_call"):
         cmd_type = 48
+        forum = False
 
     # 49 - VOICE_ACCEPT_CALL
     elif text_lower.startswith("voice_accept_call"):
@@ -958,10 +984,12 @@ def command_string(text):
     # 59 - MARK_AS_UNREAD
     elif text_lower.split(" ")[0] == "mark_as_unread":
         cmd_type = 59
+        forum = False
 
     # 60 - TOGGLE_THREAD
     elif text_lower.split(" ")[0] == "toggle_thread":
         cmd_type = 60
+        forum = False
 
     # 61 - GAME_DETECTION_BLACKLIST
     elif text_lower.split(" ")[0] == "game_detection_blacklist":
@@ -1026,6 +1054,7 @@ def command_string(text):
     # 64 - COPY_LINK
     elif text_lower.startswith("copy_link"):
         cmd_type = 64
+        forum = False
         try:
             num = int(text.split(" ")[1])
             cmd_args = {"num": num}
@@ -1109,6 +1138,7 @@ def command_string(text):
     # 78 - GENERATE_INVITE
     elif text_lower.startswith("generate_invite"):
         cmd_type = 78
+        forum = False
         max_age = 604800
         max_uses = 0
         text_split = text_lower.split(" ")
@@ -1135,6 +1165,7 @@ def command_string(text):
     # 80 - COPY_ATTACHMENT
     elif text_lower.startswith("copy_attachment"):
         cmd_type = 80
+        forum = False
 
     # 81 - RENAME_FOLDER
     elif text_lower.startswith("rename_folder"):
@@ -1149,6 +1180,7 @@ def command_string(text):
     # 82 - SEND_AS_FILE
     elif text_lower.startswith("send_as_file"):
         cmd_type = 82
+        forum = False
 
     # 83 - SWITCH_PROFILE
     elif text_lower.startswith("switch_profile"):
@@ -1171,6 +1203,7 @@ def command_string(text):
     # 85 - PLAY_IN_NATIVE
     elif text_lower.startswith("play_in_native"):
         cmd_type = 85
+        forum = False
         try:
             num = int(text.split(" ")[1])
             cmd_args = {"num": num}
@@ -1180,5 +1213,15 @@ def command_string(text):
     # 86 - ABOUT
     elif text_lower.startswith("about"):
         cmd_type = 86
+
+    # 87 - TOGGLE_PINNED
+    elif text_lower.startswith("toggle_pinned"):
+        cmd_type = 87
+        match = re.search(match_channel, text)
+        if match:
+            cmd_args = {"channel_id": match.group(1)}
+
+    if not forum:
+        cmd_type += 1000
 
     return cmd_type, cmd_args

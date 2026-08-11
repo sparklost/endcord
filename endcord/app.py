@@ -73,7 +73,6 @@ USER_UPLOAD_LIMITS = (10*MB, 50*MB, 500*MB, 50*MB)   # premium tier 0, 1, 2, 3 (
 GUILD_UPLOAD_LIMITS = (10*MB, 10*MB, 50*MB, 100*MB)   # premium tier 0, 1, 2, 3
 LIMIT_MSG_LEN = 2000
 LIMIT_MSG_LEN_PREMIUM = 4000
-FORUM_COMMANDS = (1, 2, 7, 13, 14, 15, 17, 20, 22, 25, 27, 29, 30, 31, 32, 40, 42, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 61, 62, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 79, 81, 83, 84)
 COLLAPSE_ALL_EXCEPT_OPTIONS = ("current", "selected", "above", "below")
 STANDING_TYPES = ("All Good", "Limited", "Very Limited", "At risk", "Suspended")
 ASSISTED_COMMANDS = ("set ", "string_select ", "set_notifications ", "game_detection_blacklist ", "switch_tab ", "goto ", "collapse_all_except ", "insert_timestamp ", "voice_set_input_device ", "switch_profile ", "gif ")
@@ -412,7 +411,8 @@ class Endcord:
                 time.sleep(1)
             if force or message:
                 if message:
-                    sys.exit(message)
+                    print(message)
+                    sys.exit(1)
                 sys.exit(0)
         except Exception:   # failsafe
             if message:
@@ -1497,8 +1497,6 @@ class Endcord:
                     if channel["id"] == channel_id:
                         break
                 break
-        if channel and channel["type"] in (15, 16):   # skip forums
-            return
 
         pinned = 0
         for channel in self.channel_cache:
@@ -2572,7 +2570,7 @@ class Endcord:
                             self.restore_input_text = (None, None)
                         break
 
-            # double click on subtitle line
+            # double click and middle click on subtitle line
             elif action in (52, 53):
                 self.restore_input_text = (input_text, "standard")
                 if "%tabs" not in self.format_subtitle_line or not self.tab_string_map:
@@ -3120,14 +3118,6 @@ class Endcord:
                 self.reset_states()
 
 
-    def can_run_command(self, cmd_type):
-        """Check if this command can be run in current scope"""
-        if self.forum:
-            if cmd_type not in FORUM_COMMANDS:
-                return False
-        return True
-
-
     def execute_command(self, cmd_type, cmd_args, cmd_text, chat_sel, tree_sel, reset=True):
         """Execute client command"""
         logger.debug(f"Executing command, type: {cmd_type}, args: {cmd_args}")
@@ -3144,11 +3134,13 @@ class Endcord:
 
             return
 
-        if not self.can_run_command(cmd_type):
+        if self.forum and cmd_type > 1000:
             self.reset_states()
             self.update_status_line()
             self.update_extra_line("This command can't be executed in forum", color=19)
             return
+        if cmd_type > 1000:
+            cmd_type -= 1000
 
         if cmd_type == 1:   # SET
             key = cmd_args["key"]
@@ -3351,7 +3343,13 @@ class Endcord:
             channel_id = cmd_args.get("channel_id", None)
             channel_sel = None
             if channel_id:
-                _, _, guild_id, _, _ = self.find_parents_from_id(channel_id)
+                for guild in self.guilds:
+                    if guild["guild_id"] == guild_id:
+                        for channel in guild["channels"]:
+                            if channel["id"] == channel_id:
+                                channel_sel = channel
+                                break
+                        break
             else:
                 channel_sel = self.tree_metadata[tree_sel]["type"]
             if channel_sel and channel_sel["type"] not in (-1, 1, 11, 12):
@@ -4399,6 +4397,27 @@ class Endcord:
             self.tui.chat_index = max(len(self.chat) - self.tui.chat_hw[0], 0)
             self.tui.update_chat(self.chat, self.chat_format)
             del about
+
+        elif cmd_type == 87:   # TOGGLE_PINNED
+            channel_id = cmd_args.get("channel_id", None)
+            if not channel_id:
+                channel_id = self.tree_metadata[tree_sel]["id"]
+            channel_sel = None
+            for guild in self.guilds:
+                for channel in guild["channels"]:
+                    if channel["id"] == channel_id:
+                        channel_sel = channel
+                        break
+                if channel_sel:
+                    guild_id = guild["guild_id"]
+                    break
+            if channel_sel and channel_sel["type"] in (0, 2, 5, 15, 16):
+                flags = channel_sel.get("flags", 0)
+                if channel_sel.get("pinned"):
+                    value = flags & ~(1 << 11)
+                else:
+                    value = flags | (1 << 11)
+                self.discord.set_channel_flags(value, channel_id, guild_id)
 
         if success is None:
             self.gateway.set_offline()
