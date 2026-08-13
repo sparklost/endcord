@@ -45,7 +45,7 @@ jobs:
       actions: write
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       ## uncomment to enable caching with artifacts
       # - name: Set CCACHE_DIR environment variable
@@ -62,7 +62,7 @@ jobs:
 
       ## uncomment to enable caching with artifacts
       # - name: Download ccache artifact from previous run
-      #   uses: dawidd6/action-download-artifact@v18
+      #   uses: dawidd6/action-download-artifact@v21
       #   if: ${{ matrix.clang }}
       #   with:
       #     github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -79,7 +79,8 @@ jobs:
           sudo apt update --fix-missing
           sudo apt install -y patchelf ccache lld build-essential libssl-dev zlib1g-dev \
             libbz2-dev libreadline-dev libsqlite3-dev wget curl libncursesw5-dev \
-            xz-utils tk-dev libffi-dev liblzma-dev
+            xz-utils tk-dev libffi-dev liblzma-dev \
+            pkg-config libgirepository-2.0-dev libcairo2-dev gir1.2-gtk-3.0 gir1.2-pango-1.0
 
       - name: Install Windows system dependencies
         if: matrix.platform == 'windows'
@@ -131,7 +132,7 @@ jobs:
 
       - name: Install Python (Windows/MacOS)
         if: matrix.platform != 'linux'
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -150,11 +151,11 @@ jobs:
           ./tools/build_python.sh "${args[@]}" curses "$CURSES_VERSION"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@v10
         with:
           enable-cache: false
 
-      - name: Run build script
+      - name: Run build script [FULL]
         shell: bash
         run: |
             if [[ "${{ matrix.platform }}" == "linux" ]]; then
@@ -166,7 +167,7 @@ jobs:
             [[ "${{ runner.os }}" == "Linux" ]] && args+=("--custom-python")
             uv run build.py --level=FULL "${args[@]}"
 
-      - name: Run build lite script
+      - name: Run build script [LITE]
         shell: bash
         run: |
             args=()
@@ -174,6 +175,17 @@ jobs:
             [[ "${{ matrix.clang }}" != "true" ]] && args+=("--noclang")
             [[ "${{ runner.os }}" == "Linux" ]] && args+=("--custom-python")
             uv run build.py --level=LITE "${args[@]}"
+
+      - name: Run build script [GUI] (Linux)
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: |
+            args=()
+            [[ "${{ matrix.nuitka }}" == "true" ]] && args+=("--nuitka")
+            [[ "${{ matrix.clang }}" != "true" ]] && args+=("--noclang")
+            [[ "${{ runner.os }}" == "Linux" ]] && args+=("--custom-python")
+            uv run build.py --toggle-windowed
+            uv run build.py --level=FULL "${args[@]}"
 
       - name: Make binaries executable
         if: matrix.platform == 'macos' || matrix.platform == 'linux'
@@ -191,9 +203,11 @@ jobs:
           if [[ "${{ matrix.platform }}" == "linux" ]]; then
             tar -czf "endcord-$version-${{ matrix.platform }}.tar.gz" endcord $extra
             tar -czf "endcord-lite-$version-${{ matrix.platform }}.tar.gz" endcord-lite $extra
+            tar -czf "endcord-gui-$version-${{ matrix.platform }}.tar.gz" endcord-gui $extra
           elif [[ "${{ matrix.platform }}" == "windows" ]]; then
             7z a "endcord-$version-${{ matrix.platform }}.zip" endcord.exe $extra
             7z a "endcord-lite-$version-${{ matrix.platform }}.zip" endcord-lite.exe $extra
+            7z a "endcord-gui-$version-${{ matrix.platform }}.zip" endcord-gui.exe $extra
           elif [[ "${{ matrix.os }}" == "macos-15-intel" ]]; then
             zip "endcord-$version-${{ matrix.platform }}-x86_64.zip" endcord $extra
             zip "endcord-lite-$version-${{ matrix.platform }}-x86_64.zip" endcord-lite $extra
@@ -230,7 +244,7 @@ jobs:
       contents: write
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Download artifacts
         uses: actions/download-artifact@v8

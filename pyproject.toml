@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "websocket-client>=1.9.0",
-    "python-socks>=2.8.2",
+    "python-socks>=3.0.0",
     "orjson>=3.11.9",
     "soundcard>=0.4.6",
     "soundfile>=0.14.0",
@@ -28,8 +28,8 @@ build = [
     "setuptools>=82.0.0",
 ]
 media = [
-    "av>=18.0.0",
-    "dave-py>=0.2.0",
+    "av>=18.1.0",
+    "dave-py>=1.0.0",
     "pillow>=12.3.0",
     "pynacl>=1.6.2",
 ]

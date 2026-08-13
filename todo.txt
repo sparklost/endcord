@@ -1,4 +1,5 @@
 CORE:
+Add windows gui build to workflow
 Fix stuttering when using rnnoise
 Fix bad received voice call sound
 Add push to talk button to call UI
@@ -13,7 +14,6 @@ Add video, stage and stream calls
 Add localization
 
 GTKCURSES:
-Fix gtkcurses build with nuitka and add to workflow
 Add ascii/block media drawing and and inline to gtkcurses
 Optimize gtkcurses
 Add full image viewer and inline to gtkcurses

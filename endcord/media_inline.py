@@ -12,7 +12,10 @@ import time
 
 from PIL import Image, ImageEnhance
 
-from endcord import peripherals, terminal_utils, utils, xterm256
+from endcord import peripherals, utils, xterm256
+
+# like this so build.by can switch terminal_utils and gtkcurses
+from endcord import terminal_utils as terminal_utils
 
 logger = logging.getLogger(__name__)
 ESC = "\x1b"

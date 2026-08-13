@@ -369,7 +369,8 @@ class GtkTerminalWindow(Gtk.Window):
     """GTK window interface"""
 
     def __init__(self, curses_window):
-        super().__init__(title=APP_NAME)
+        super().__init__()
+        self.set_title(APP_NAME)
 
         # enable transparency
         if BG_ALPHA is not None:
@@ -407,10 +408,8 @@ class GtkTerminalWindow(Gtk.Window):
         self.scroll_buffer = 0.0   # for touchpad
 
         # calculate font height and width and set it in curses class
-        context = self.drawing_area.get_pango_context()
-        layout = Pango.Layout(context)
+        layout = self.drawing_area.create_pango_layout("▒")
         layout.set_font_description(self.font_desc)
-        layout.set_text("▒", -1)
         _, rect = layout.get_extents()
         self.char_width = rect.width / Pango.SCALE
         self.char_height = rect.height / Pango.SCALE
@@ -1052,3 +1051,40 @@ ACS_GEQUAL = "≥"
 ACS_PI = "π"
 ACS_NEQUAL = "≠"
 ACS_STERLING = "£"
+
+
+
+# for terminal_utils.py
+
+def query_terminal(query):   # noqa
+    """Assuming it is kitty protocol check"""
+    return "FAILED"   # set to OK to enable image drawing
+
+
+def get_font_size():
+    """Get font size in px"""
+    return gtk_window.char_width, gtk_window.char_height
+
+
+def get_size():
+    """Get window size in character rows/columns"""
+    return gtk_window.curses_window.nlines, gtk_window.curses_window.ncols
+
+
+def read_key():
+    """Blocking get key event"""
+    return event_queue.get()
+
+
+def draw_over_curses(text, y, x):
+    """Currently unimplemented"""
+    pass
+
+
+def draw(text):
+    """Currently unimplemented"""
+    pass
+
+
+def leave_tui(): pass   # noqa
+def enter_tui(): pass   # noqa

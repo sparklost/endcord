@@ -32,7 +32,9 @@ try:
 except (AssertionError, RuntimeError):
     have_soundcard = False
 
-from endcord import terminal_utils, xterm256
+# like this so build.by can switch terminal_utils and gtkcurses
+from endcord import terminal_utils as terminal_utils
+from endcord import xterm256
 
 BASE_SOUND_GAIN = 1.0
 ESC = "\x1b"

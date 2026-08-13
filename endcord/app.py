@@ -37,10 +37,12 @@ from endcord import (
     perms,
     rpc,
     search,
-    terminal_utils,
     tui,
     utils,
 )
+
+# like this so build.by can switch terminal_utils and gtkcurses
+from endcord import terminal_utils as terminal_utils
 from endcord.assist_data import ABOUT, COMMAND_ASSISTS, SEARCH_HELP_TEXT
 from endcord.message import GIF_PROVIDERS
 

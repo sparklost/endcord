@@ -82,7 +82,7 @@ Any third party endcord forks may add features that can lead to account ban, con
 - Proxy support
 - Profile manager for multiple accounts
 - Store token in system keyring
-- GTK windowed mode with tray icon
+- GTK3 windowed mode with tray icon and transparency
 - Works in termux, with android notifications
 - Auto endcord and extensions check for updates
 - Run bots, with interactions
@@ -298,8 +298,9 @@ All the visual media is converted to ASCII art that can be additionally configur
 But there is also setting in config to open media in external app (cross-system, will use default system app for that file format).  
 "endcord-lite" (without voice calls and ASCII media support), can be built by specifying `--lite` flag to build script. Lite version is significantly smaller, cant make voice calls, but still can open media in external app.  
 
-### Windowed mode
+### GUI (Windowed) mode
 This mode entirely replaces curses and the need for terminal emulator, using GTK3 window, UI still remains terminal-like.  
+As as dependency, GTK3 must be installed.  
 Tray icon will also be enabled, so closing window will only minimize it to tray.  
 If using external editor, use editor with graphical interface. TUI editors will not work, as this is no longer in terminal.  
 Also, endcord built-in media player will not work because its standalone TUI thats not using curses. All media will be opened in native player.  
@@ -307,6 +308,7 @@ Building with pyinstaller is not recommended because it generates huge binary.
 You can toggle windowed mode by running: `python build.py --toggle-windowed`.  
 Then run endcord from source: `uv run main.py`.  
 After first run in windowed mode, extra config will be generated in endcord config path, a file called `gtkcurses.json`. More info in [configuration](docs/configuration.md).  
+All keybindings will work in windowed mode, even those not available in terminal (eg. `Shift+Enter`, `Ctrl+Z`).  
 Note: To have tray icon on Linux, [ayatana appindicator](https://github.com/AyatanaIndicators/libayatana-appindicator) must be installed.  
 
 ### Custom hosts
@@ -332,6 +334,7 @@ To prevent extension injection (malware can modify endcord config and inject ext
 - Arch Linux (AUR):
     - `yay -S endcord` - full version with media support, larger executable
     - `yay -S endcord-lite` - lite version without voice calls and media support
+    - `yay -S endcord-gui` - "gui" windowed version using GTK3
     - `-git` versions will build from source, with latest changes
 - [Build](#building) endcord, then copy built executable to system:  
     `sudo cp dist/endcord /usr/local/bin/`
@@ -354,6 +357,7 @@ Optional dependencies:
 - `imagemagick` - To make notification images round; only needed for endcord-lite.
 - `source-highlight` or `python-pygments` - Code block syntax highlighting (Alternatively use [this extension](https://github.com/sparklost/endcord-pygments-syntax)).
 - `rnnoise` - Noise suppression in voice calls (or use `--bundle-rnnoise` build.py arg)
+- `GTK3` - Only required for `endcord-gui` (windowed mode)
 
 ### Windows
 - Pre-built binaries (built with nuitka) are available in releases

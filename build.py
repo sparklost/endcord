@@ -522,11 +522,17 @@ def toggle_windowed(check_only=False):
                 lines[num] = "from endcord import gtkcurses as curses\n"
                 changed = True
                 enable = True
-                break
             elif line.startswith("from endcord import gtkcurses as curses"):
                 lines[num] = "import curses\n"
                 changed = True
                 enable = False
+            elif line.startswith("from endcord import terminal_utils as terminal_utils"):
+                lines[num] = "from endcord import gtkcurses as terminal_utils\n"
+                changed = True
+            elif line.startswith("from endcord import gtkcurses as terminal_utils"):
+                lines[num] = "from endcord import terminal_utils as terminal_utils\n"
+                changed = True
+            if num > 100:
                 break
         if changed and not check_only:
             with open(path, "w", encoding="utf-8") as f:
@@ -846,7 +852,10 @@ def build_cython(clang, mingw):
 
 def build_with_pyinstaller(level, onedir, print_cmd=False):
     """Build with pyinstaller"""
+    windowed = toggle_windowed(check_only=True)
     pkgname = PKGNAME if level == "FULL" else f"{PKGNAME}-{level.lower()}"
+    if windowed:
+        pkgname = f"{pkgname}-gui"
     emoji_path = compress_emoji() if not print_cmd else "endcord/emoji.json"
     mode = "--onedir" if onedir else "--onefile"
     hidden_imports = ["--hidden-import=uuid"]
@@ -861,19 +870,20 @@ def build_with_pyinstaller(level, onedir, print_cmd=False):
     rnnoise = get_rnnoise()
     if rnnoise:
         add_data += [f"--add-binary={rnnoise}{";" if sys.platform == "win32" else ":"}endcord"]
+    options = []
 
     # platform-specific
     if sys.platform == "linux":
-        options = []
         if level not in ("MINI", "MICRO"):
             hidden_imports += ["--hidden-import=soundcard.pulseaudio"]
         add_data += [f"--add-data={emoji_path}:."]
     elif sys.platform == "win32":
-        options = ["--console"]
+        if not windowed:
+            options += ["--console"]
         hidden_imports += ["--hidden-import=win32timezone"]
         add_data += [f"--add-data={emoji_path};."]
     elif sys.platform == "darwin":
-        options = []
+        options += []
         package_data += ["--collect-data=certifi"]
         add_data += [f"--add-data={emoji_path}:."]
 
@@ -912,10 +922,13 @@ def build_with_pyinstaller(level, onedir, print_cmd=False):
     fprint(f"Finished building {pkgname}")
 
 
-def build_with_nuitka(level, onedir, clang, mingw, compile_deps, print_cmd=False, windowed=False):
+def build_with_nuitka(level, onedir, clang, mingw, compile_deps, print_cmd=False):
     """Build with nuitka"""
     clang = clang or os.environ.get("CC") == "clang"
+    windowed = toggle_windowed(check_only=True)
     pkgname = PKGNAME if level == "FULL" else f"{PKGNAME}-{level.lower()}"
+    if windowed:
+        pkgname = f"{pkgname}-gui"
     emoji_path = compress_emoji() if not print_cmd else "endcord/emoji.json"
     if not print_cmd:
         if compile_deps and level not in ("MINI", "MICRO"):
@@ -926,10 +939,10 @@ def build_with_nuitka(level, onedir, clang, mingw, compile_deps, print_cmd=False
                 fprint("Building pycryptodome with custom compiler args")
                 iprint("Pycryptodome is already built locally")
             if level == "FULL":
-                if check_venv_file_size("pynacl", "_sodium.", 1000000):
-                    fprint("Building pycryptodome with custom compiler args")
+                if check_venv_file_size("nacl", "_sodium.", 1000000):
                     build_generic_package("pynacl", clang)
                 else:
+                    fprint("Building pycryptodome with custom compiler args")
                     iprint("PyNaCl is already built locally")
         patch_soundcard()
     static_python = False   # might be useful with custom python build
@@ -957,6 +970,7 @@ def build_with_nuitka(level, onedir, clang, mingw, compile_deps, print_cmd=False
     setup_compiler(clang)
 
     # options
+    options = []
     if level == "FULL":
         hidden_imports += [
             "--include-module=av.sidedata.encparams",
@@ -967,12 +981,11 @@ def build_with_nuitka(level, onedir, clang, mingw, compile_deps, print_cmd=False
 
     # platform-specific
     if sys.platform == "linux":
-        options = []
         if windowed:
             options += ["--include-package=gi._enum"]
             hidden_imports += ["--include-package=ctypes.util"]
     elif sys.platform == "win32":
-        options = ["--assume-yes-for-downloads"]
+        options += ["--assume-yes-for-downloads"]
         hidden_imports += [
             "--include-package=winrt.windows.foundation",
             "--include-package=winrt.windows.ui.notifications",
@@ -981,7 +994,7 @@ def build_with_nuitka(level, onedir, clang, mingw, compile_deps, print_cmd=False
         ]
         package_data += ["--include-package-data=winrt"]
     elif sys.platform == "darwin":
-        options = [
+        options += [
             f"--macos-app-name={PKGNAME}",
             f"--macos-app-version={get_version_number()}",
             "--macos-app-protected-resource=NSMicrophoneUsageDescription:Microphone access for recording voice message.",
@@ -1170,6 +1183,12 @@ if __name__ == "__main__":
 
     windowed = toggle_windowed(check_only=True)
     if windowed:
+        # remove this after nuitka 4.2.0 release
+        nuitka_ver = subprocess.run(["uv", "run", "nuitka", "--version"], check=True, capture_output=True).stdout.decode()[:3].split(".")
+        if int(nuitka_ver[0]) <= 4 and int(nuitka_ver[1]) < 2:
+            subprocess.run(["uv", "pip", "uninstall", "nuitka"], check=True, capture_output=True)
+            subprocess.run(["uv", "pip", "install", "git+https://github.com/Nuitka/Nuitka.git"], check=True)
+
         subprocess.run(["uv", "pip", "install"] + load_build_config().get("windowed_deps", []), check=True)
         fprint("Windowed mode enabled!")
 
@@ -1198,7 +1217,7 @@ if __name__ == "__main__":
         if args.level == "FULL" and args.bundle_rnnoise:
             build_rnnoise(clang)
         if args.nuitka:
-            build_with_nuitka(args.level, args.onedir, clang, args.mingw, compile_deps, windowed=windowed)
+            build_with_nuitka(args.level, args.onedir, clang, args.mingw, compile_deps)
         else:
             build_with_pyinstaller(args.level, args.onedir)
 
