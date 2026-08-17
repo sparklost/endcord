@@ -261,6 +261,43 @@ def ensure_python(freethreaded, safe=False):
     return version, have_freethreaded or freethreaded
 
 
+def ensure_gtk():
+    """Check if gtk is installed and properly configured on this system (linux/windows), on windows configure correct wheels"""
+    if sys.platform == "win32":
+        if "gtk\\bin" not in os.environ.get("PATH", ""):
+            fprint("GTK3 could not be found on system", color=RED)
+            iprint("GTK3 could not be found in PATH", color=RED)
+            iprint("Make sure you followed setup instructions provided at https://github.com/wingtk/gvsbuild", color=RED)
+            return False
+        gtk_path = os.environ.get("GTK_ROOT")
+        wheels_path = os.path.join(gtk_path, "wheels")
+        if not wheels_path or not os.path.exists(wheels_path):
+            wheels_path = "C:\\gtk\\wheels"   # assumption
+        if os.path.exists(wheels_path):
+            return wheels_path
+        fprint("GTK3 could not be found on system", color=RED)
+        if gtk_path:
+            iprint(f"Provided GTK_ROOT={gtk_path} does not exist")
+        else:
+            iprint("Use gvsbuild: https://github.com/wingtk/gvsbuild to install it", color=RED)
+            iprint("Endcord build script expects GTK3 to be installed at 'C:\\gtk'", color=RED)
+            iprint("If it is installed elsewhere, set that path to 'GTK_ROOT' environment variable", color=RED)
+        return False
+    if sys.platform == "linux":
+        try:
+            result = subprocess.run(["pkg-config", "--exists", "gtk+-3.0"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+            return result.returncode == 0
+        except FileNotFoundError:
+            try:
+                output = subprocess.check_output(["ldconfig", "-p"], text=True, stderr=subprocess.DEVNULL)
+                return "libgtk-3.so" in output
+            except (subprocess.SubprocessError, FileNotFoundError):
+                fprint("GTK3 could not be found on system", color=RED)
+                iprint("Install GTK3 with your package manager", color=RED)
+                return False
+    return True
+
+
 def check_patchelf():
     """Patchelf is required for nuitka, so check early if its installed"""
     if sys.platform != "linux":
@@ -393,6 +430,16 @@ def check_venv_file_size(lib_name, file_name, min_file_size):
     return os.stat(path).st_size > min_file_size
 
 
+def install_local_wheels(wheels_dir):
+    """Find and install all wheels from specified directory"""
+    if not os.path.exists(wheels_dir):
+        return
+    wheel_files = [os.path.join(wheels_dir, f) for f in os.listdir(wheels_dir) if f.lower().endswith(".whl")]
+    if not wheel_files:
+        return
+    subprocess.run(["uv", "pip", "install"] + wheel_files, check=True)
+
+
 def patch_soundcard():
     """
     Search for soundcard/mediafoundation.py in .venv
@@ -502,6 +549,10 @@ def compress_emoji():
 
 def toggle_windowed(check_only=False):
     """Toggle windowed mode"""
+    have_gtk = ensure_gtk()
+    if not have_gtk:
+        return
+
     whitelist = ("endcord" + os.sep, "endcord_cython" + os.sep, "main.py")
     file_list = []
     for path, subdirs, files in os.walk(os.getcwd()):
@@ -579,6 +630,8 @@ def toggle_windowed(check_only=False):
     if enable:
         subprocess.run(["uv", "pip", "install"] + windowed_deps, check=True)
         patch_pystray()
+        if sys.platform == "win32":
+            install_local_wheels(have_gtk)
         fprint("Windowed mode enabled!")
     else:
         subprocess.run(["uv", "pip", "uninstall"] + windowed_deps, check=True)
@@ -620,7 +673,11 @@ def setup_compiler(clang, clear=False, overwrite=False, cflags=[], ldflags=[], c
         os.environ["CXXFLAGS"] = CXXFLAGS_OLD
         os.environ["LDFLAGS"] = LDFLAGS_OLD
         return [], [], []
-    custom_cflags = [item for item in CUSTOM_CFLAGS if item not in UNSAFE_FLAGS] if safe else CUSTOM_CFLAGS
+    unsafe_flags = UNSAFE_FLAGS
+    if sys.platform == "win32" and not clang:   # unsupported flags in cl
+        unsafe_flags += ["-g0", "-O3", "-mtune=generic", "-fno-semantic-interposition", "-fno-strict-overflow"]
+        safe = True
+    custom_cflags = [item for item in CUSTOM_CFLAGS if item not in unsafe_flags] if safe else CUSTOM_CFLAGS
     cflags = ([] if overwrite else CFLAGS_OLD.split(" ")) + custom_cflags + cflags
     cxxflags = ([] if overwrite else CXXFLAGS_OLD.split(" ")) + CUSTOM_CXXFLAGS + cxxflags
     ldflags = ([] if overwrite else LDFLAGS_OLD.split(" ")) + CUSTOM_LDFLAGS + ldflags
@@ -1143,7 +1200,7 @@ def parser():
 
 if __name__ == "__main__":
     args = parser()
-    clang = not (args.noclang or args.mingw)
+    clang = not args.noclang and not args.mingw and shutil.which("clang")
     compile_deps = not args.nocompile_deps
 
     if args.nuitka:
@@ -1159,7 +1216,7 @@ if __name__ == "__main__":
     if os.path.exists("build"):   # ensure clean build env
         shutil.rmtree("build")
 
-    if not shutil.which("lld"):
+    if clang and not shutil.which("lld"):
         fprint("WARNING: lld is not found on system, consider installing it", color=RED)
 
     if args.custom_python:
@@ -1190,6 +1247,8 @@ if __name__ == "__main__":
             subprocess.run(["uv", "pip", "install", "git+https://github.com/Nuitka/Nuitka.git"], check=True)
 
         subprocess.run(["uv", "pip", "install"] + load_build_config().get("windowed_deps", []), check=True)
+        if sys.platform == "win32":
+            install_local_wheels(ensure_gtk())
         fprint("Windowed mode enabled!")
 
     enable_extensions(enable=(not args.disable_extensions))

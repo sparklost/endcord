@@ -5,76 +5,65 @@ on:
     tags:
       - '[0-9]*.[0-9]*.[0-9]*'
 
+  workflow_dispatch:
+    inputs:
+      build_linux:
+        description: 'Build Linux'
+        type: boolean
+        default: true
+      build_windows:
+        description: 'Build Windows'
+        type: boolean
+        default: true
+      build_macos_arm:
+        description: 'Build macOS ARM'
+        type: boolean
+        default: true
+      build_macos_intel:
+        description: 'Build macOS Intel'
+        type: boolean
+        default: true
+      create_release:
+        description: 'Draft Release'
+        type: boolean
+        default: true
+
 env:
   PYTHONUNBUFFERED: "1"
+  # Linux
+  LINUX_PYTHON_VERSION: "3.14.6"
+  LINUX_CLANG_VERSION: "22.1.3"
+  LINUX_USE_NUITKA: "true"
+  LINUX_USE_CLANG: "true"
+  # Windows
+  WIN_PYTHON_VERSION: "3.14"
+  WIN_USE_NUITKA: "true"
+  WIN_USE_CLANG: "false"   # https://github.com/Nuitka/Nuitka/issues/3621
+  # macOS ARM
+  MAC_ARM_PYTHON_VERSION: "3.14"
+  MAC_ARM_CLANG_VERSION: "21.1.8"
+  MAC_ARM_USE_NUITKA: "false"
+  MAC_ARM_USE_CLANG: "true"
+  # macOS Intel
+  MAC_INTEL_PYTHON_VERSION: "3.14"
+  MAC_INTEL_CLANG_VERSION: "21.1.8"
+  MAC_INTEL_USE_NUITKA: "false"
+  MAC_INTEL_USE_CLANG: "true"
+
+
 
 jobs:
-  build:
-    name: Build (${{ matrix.os }}, ${{ matrix.python-version }}${{ matrix.clang && format(', {0}', matrix.clang-version) || '' }})
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-15, macos-15-intel]
-        include:
-          - os: ubuntu-latest
-            platform: linux
-            python-version: 3.14.6
-            nuitka: true
-            clang: true
-            clang-version: 22.1.3
-          - os: windows-latest
-            platform: windows
-            python-version: 3.14
-            nuitka: true
-            clang: False   # https://github.com/Nuitka/Nuitka/issues/3621
-            clang-version: 21.1.8
-          - os: macos-15
-            platform: macos
-            python-version: 3.14
-            nuitka: false
-            clang: true
-            clang-version: 21.1.8
-          - os: macos-15-intel
-            platform: macos
-            python-version: 3.14
-            nuitka: false
-            clang: true
-            clang-version: 21.1.8
-    runs-on: ${{ matrix.os }}
+  build-linux:
+    name: Build (Linux)
+    if: github.event_name == 'push' || inputs.build_linux
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       actions: write
-
     steps:
       - uses: actions/checkout@v7
 
-      ## uncomment to enable caching with artifacts
-      # - name: Set CCACHE_DIR environment variable
-      #   if: ${{ matrix.clang }}
-      #   shell: bash
-      #   run: |
-      #     if [[ "${{ runner.os }}" == "Windows" ]]; then
-      #       echo "CCACHE_DIR=${LOCALAPPDATA}\\clcache" >> $GITHUB_ENV
-      #     elif [[ "${{ runner.os }}" == "macOS" ]]; then
-      #       echo "CCACHE_DIR=$HOME/Library/Caches/ccache" >> $GITHUB_ENV
-      #     else
-      #       echo "CCACHE_DIR=$HOME/.cache/ccache" >> $GITHUB_ENV
-      #     fi
-
-      ## uncomment to enable caching with artifacts
-      # - name: Download ccache artifact from previous run
-      #   uses: dawidd6/action-download-artifact@v21
-      #   if: ${{ matrix.clang }}
-      #   with:
-      #     github_token: ${{ secrets.GITHUB_TOKEN }}
-      #     workflow: build-and-release.yml
-      #     name: ccache-${{ runner.os }}
-      #     workflow_conclusion: success
-      #     path: ${{ env.CCACHE_DIR }}
-      #     if_no_artifact_found: warn
-      #   continue-on-error: true
-
-      - name: Install Linux system dependencies
-        if: matrix.platform == 'linux'
+      - name: Install system dependencies
         run: |
           sudo apt update --fix-missing
           sudo apt install -y patchelf ccache lld build-essential libssl-dev zlib1g-dev \
@@ -82,29 +71,16 @@ jobs:
             xz-utils tk-dev libffi-dev liblzma-dev \
             pkg-config libgirepository-2.0-dev libcairo2-dev gir1.2-gtk-3.0 gir1.2-pango-1.0
 
-      - name: Install Windows system dependencies
-        if: matrix.platform == 'windows'
-        run: choco install ccache -y
-        shell: powershell
-
-      - name: Install macOS system dependencies
-        if: matrix.platform == 'macos'
-        run: |
-          brew untap aws/tap 2>/dev/null || true
-          brew install ccache
-          echo "SDKROOT=$(xcrun --sdk macosx --show-sdk-path)" >> $GITHUB_ENV
-
-      - name: Ensure no BLAS/LAPACK (Linux)
-        if: ${{ matrix.platform == 'linux' }}
+      - name: Ensure no BLAS/LAPACK
         run: |
           sudo apt-get purge -y libopenblas-dev libopenblas0 libblas-dev liblapack-dev
           sudo apt-get autoremove -y
 
-      - name: Install LLVM and Clang (Linux)
-        if: ${{ matrix.platform == 'linux' && matrix.clang == true }}
+      - name: Install LLVM and Clang
+        if: env.LINUX_USE_CLANG == 'true'
         shell: bash
         run: |
-          MAJOR_VERSION=$(echo "${{ matrix.clang-version }}" | cut -d. -f1)
+          MAJOR_VERSION=$(echo "${LINUX_MACOS_INTEL}" | cut -d. -f1)
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
           sudo ./llvm.sh $MAJOR_VERSION
@@ -124,20 +100,7 @@ jobs:
             sudo sed -i -E 's/(\+[0-9a-f~exp]+[-[0-9a-f~exp\.]*)//g' "$VERSION_FILE"
           fi
 
-      - name: Install LLVM and Clang (Windows/MacOS)
-        uses: KyleMayes/install-llvm-action@v2
-        if: ${{ matrix.clang && matrix.os != 'macos-15-intel' && matrix.platform != 'linux' }}
-        with:
-          version: ${{ matrix.clang-version }}
-
-      - name: Install Python (Windows/MacOS)
-        if: matrix.platform != 'linux'
-        uses: actions/setup-python@v7
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Build Custom Python (Linux)
-        if: matrix.platform == 'linux'
+      - name: Build custom Python
         shell: bash
         run: |
           chmod +x ./tools/build_python.sh
@@ -146,49 +109,42 @@ jobs:
             echo "Error: Could not extract curses_tag from pyproject.toml"
             exit 1
           fi
-          args=("${{ matrix.python-version }}")
-          [[ "${{ matrix.clang }}" == "true" ]] && args+=("clang")
+          args=("${LINUX_PYTHON_VERSION}")
+          [[ "${LINUX_USE_CLANG}" == "true" ]] && args+=("clang")
           ./tools/build_python.sh "${args[@]}" curses "$CURSES_VERSION"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v10
+        uses: astral-sh/setup-uv@v10.0.1
         with:
           enable-cache: false
 
       - name: Run build script [FULL]
         shell: bash
         run: |
-            if [[ "${{ matrix.platform }}" == "linux" ]]; then
-                uv venv --clear --python .cpython/bin/python3
-            fi
-            args=()
-            [[ "${{ matrix.nuitka }}" == "true" ]] && args+=("--nuitka")
-            [[ "${{ matrix.clang }}" != "true" ]] && args+=("--noclang")
-            [[ "${{ runner.os }}" == "Linux" ]] && args+=("--custom-python")
-            uv run build.py --level=FULL "${args[@]}"
+          uv venv --clear --python .cpython/bin/python3
+          args=("--custom-python")
+          [[ "${LINUX_USE_NUITKA}" == "true" ]] && args+=("--nuitka")
+          [[ "${LINUX_USE_CLANG}" != "true" ]] && args+=("--noclang")
+          uv run build.py --level=FULL "${args[@]}"
 
       - name: Run build script [LITE]
         shell: bash
         run: |
-            args=()
-            [[ "${{ matrix.nuitka }}" == "true" ]] && args+=("--nuitka")
-            [[ "${{ matrix.clang }}" != "true" ]] && args+=("--noclang")
-            [[ "${{ runner.os }}" == "Linux" ]] && args+=("--custom-python")
-            uv run build.py --level=LITE "${args[@]}"
+          args=("--custom-python")
+          [[ "${LINUX_USE_NUITKA}" == "true" ]] && args+=("--nuitka")
+          [[ "${LINUX_USE_CLANG}" != "true" ]] && args+=("--noclang")
+          uv run build.py --level=LITE "${args[@]}"
 
-      - name: Run build script [GUI] (Linux)
-        if: matrix.platform == 'linux'
+      - name: Run build script [GUI]
         shell: bash
         run: |
-            args=()
-            [[ "${{ matrix.nuitka }}" == "true" ]] && args+=("--nuitka")
-            [[ "${{ matrix.clang }}" != "true" ]] && args+=("--noclang")
-            [[ "${{ runner.os }}" == "Linux" ]] && args+=("--custom-python")
-            uv run build.py --toggle-windowed
-            uv run build.py --level=FULL "${args[@]}"
+          args=("--custom-python")
+          [[ "${LINUX_USE_NUITKA}" == "true" ]] && args+=("--nuitka")
+          [[ "${LINUX_USE_CLANG}" != "true" ]] && args+=("--noclang")
+          uv run build.py --toggle-windowed
+          uv run build.py --level=FULL "${args[@]}"
 
       - name: Make binaries executable
-        if: matrix.platform == 'macos' || matrix.platform == 'linux'
         run: chmod +x ./dist/endcord ./dist/endcord-lite || true
 
       - name: Archive files
@@ -196,47 +152,249 @@ jobs:
         run: |
           version=${GITHUB_REF#refs/tags/}
           extra="README.md LICENSE docs/commands.md docs/configuration.md docs/extensions.md docs/keybindings.md"
-          cd dist
-          mkdir -p docs
-          cp ../README.md ../LICENSE .
-          cp ../docs/{commands.md,configuration.md,extensions.md,keybindings.md} docs/
-          if [[ "${{ matrix.platform }}" == "linux" ]]; then
-            tar -czf "endcord-$version-${{ matrix.platform }}.tar.gz" endcord $extra
-            tar -czf "endcord-lite-$version-${{ matrix.platform }}.tar.gz" endcord-lite $extra
-            tar -czf "endcord-gui-$version-${{ matrix.platform }}.tar.gz" endcord-gui $extra
-          elif [[ "${{ matrix.platform }}" == "windows" ]]; then
-            7z a "endcord-$version-${{ matrix.platform }}.zip" endcord.exe $extra
-            7z a "endcord-lite-$version-${{ matrix.platform }}.zip" endcord-lite.exe $extra
-            7z a "endcord-gui-$version-${{ matrix.platform }}.zip" endcord-gui.exe $extra
-          elif [[ "${{ matrix.os }}" == "macos-15-intel" ]]; then
-            zip "endcord-$version-${{ matrix.platform }}-x86_64.zip" endcord $extra
-            zip "endcord-lite-$version-${{ matrix.platform }}-x86_64.zip" endcord-lite $extra
-          else
-            zip "endcord-$version-${{ matrix.platform }}-arm64.zip" endcord $extra
-            zip "endcord-lite-$version-${{ matrix.platform }}-arm64.zip" endcord-lite $extra
-          fi
-          cd ..
+          cd dist && mkdir -p docs && cp ../README.md ../LICENSE . && cp ../docs/*.md docs/
+          tar -czf "endcord-$version-linux.tar.gz" endcord $extra
+          tar -czf "endcord-lite-$version-linux.tar.gz" endcord-lite $extra
+          tar -czf "endcord-gui-$version-linux.tar.gz" endcord-gui $extra
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v7
         with:
-          name: dist-${{ matrix.os }}
-          path: |
-            ./dist/*.zip
-            ./dist/*.tar.gz
+          name: dist-linux
+          path: ./dist/*.tar.gz
           compression-level: 0
 
-      ## uncomment to enable caching with artifacts
-      # - name: Upload ccache artifact
-      #   uses: actions/upload-artifact@v7
-      #   if: ${{ matrix.clang }}
-      #   with:
-      #     name: ccache-${{ matrix.os }}
-      #     path: ${{ env.CCACHE_DIR }}
+
+  build-windows:
+    name: Build (Windows)
+    if: github.event_name == 'push' || inputs.build_windows
+    runs-on: windows-latest
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install system dependencies
+        shell: bash
+        run: |
+            choco install ccache -y
+            echo UV_LINK_MODE=copy >> $GITHUB_ENV
+
+      - name: Install Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.WIN_PYTHON_VERSION }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.0.1
+        with:
+          enable-cache: false
+
+      - name: Install gvsbuild GTK3
+        shell: bash
+        run: |
+          DOWNLOAD_URL=$(curl -s "https://api.github.com/repos/wingtk/gvsbuild/releases/latest" | jq -r '.assets[] | select(.name | startswith("GTK3_Gvsbuild_") and endswith("_x64.zip")) | .browser_download_url')
+          curl -L "$DOWNLOAD_URL" -o gtk3.zip
+          mkdir -p /c/gtk
+          unzip -q gtk3.zip -d /c/gtk
+          echo 'C:\gtk\bin' >> $GITHUB_PATH
+          echo 'LIB=C:\gtk\lib;'$LIB >> $GITHUB_ENV
+          echo 'INCLUDE=C:\gtk\include;C:\gtk\include\cairo;C:\gtk\include\glib-2.0;C:\gtk\include\gobject-introspection-1.0;C:\gtk\lib\glib-2.0\include;'$INCLUDE >> $GITHUB_ENV
+          echo "GTK_ROOT=C:\gtk" >> $GITHUB_ENV
+
+      - name: Install LLVM and Clang
+        uses: KyleMayes/install-llvm-action@v2
+        if: env.WIN_USE_CLANG == 'true'
+        with:
+          version: ${{ matrix.clang-version }}
+
+      - name: Run build script [FULL]
+        shell: bash
+        run: |
+          args=()
+          [[ "${WIN_USE_NUITKA}" == "true" ]] && args+=("--nuitka")
+          [[ "${WNDOWS_USE_CLANG}" != "true" ]] && args+=("--noclang")
+          uv run build.py --level=FULL "${args[@]}"
+
+      - name: Run build script [LITE]
+        shell: bash
+        run: |
+          args=()
+          [[ "${WIN_USE_NUITKA}" == "true" ]] && args+=("--nuitka")
+          [[ "${WNDOWS_USE_CLANG}" != "true" ]] && args+=("--noclang")
+          uv run build.py --level=LITE "${args[@]}"
+
+      # - name: Run build script [GUI]
+      #   shell: bash
+      #   run: |
+      #     args=()
+      #     [[ "${WIN_USE_NUITKA}" == "true" ]] && args+=("--nuitka")
+      #     [[ "${WNDOWS_USE_CLANG}" != "true" ]] && args+=("--noclang")
+      #     uv run build.py --toggle-windowed
+      #     uv run build.py --level=FULL "${args[@]}"
+
+      - name: Archive artifacts
+        shell: bash
+        run: |
+          version=${GITHUB_REF#refs/tags/}
+          version=${version#refs/heads/}
+          extra="README.md LICENSE docs/commands.md docs/configuration.md docs/extensions.md docs/keybindings.md"
+          cd dist && mkdir -p docs && cp ../README.md ../LICENSE . && cp ../docs/*.md docs/
+          7z a "endcord-$version-windows.zip" endcord.exe $extra
+          7z a "endcord-lite-$version-windows.zip" endcord-lite.exe $extra
+          # 7z a "endcord-gui-$version-windows.zip" endcord-gui.exe $extra
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: dist-windows
+          path: ./dist/*.zip
+          compression-level: 0
+
+
+  build-macos-arm:
+    name: Build (macOS ARM)
+    if: github.event_name == 'push' || inputs.build_macos_arm
+    runs-on: macos-15
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install system dependencies
+        run: |
+          brew untap aws/tap 2>/dev/null || true
+          brew install ccache
+          echo "SDKROOT=$(xcrun --sdk macosx --show-sdk-path)" >> $GITHUB_ENV
+
+      - name: Install LLVM and Clang
+        uses: KyleMayes/install-llvm-action@v2
+        if: env.MAC_ARM_USE_CLANG == 'true'
+        with:
+          version: ${{ env.MAC_ARM_MACOS_INTEL }}
+
+      - name: Install Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.MAC_ARM_PYTHON_VERSION }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.0.1
+        with:
+          enable-cache: false
+
+      - name: Run build script [FULL]
+        shell: bash
+        run: |
+          args=()
+          [[ "${MAC_ARM_USE_NUITKA}" == "true" ]] && args+=("--nuitka")
+          [[ "${MAC_ARM_USE_CLANG}" != "true" ]] && args+=("--noclang")
+          uv run build.py --level=FULL "${args[@]}"
+
+      - name: Run build script [LITE]
+        shell: bash
+        run: |
+          args=()
+          [[ "${MAC_ARM_USE_NUITKA}" == "true" ]] && args+=("--nuitka")
+          [[ "${MAC_ARM_USE_CLANG}" != "true" ]] && args+=("--noclang")
+          uv run build.py --level=LITE "${args[@]}"
+
+      - name: Make binaries executable
+        run: chmod +x ./dist/endcord ./dist/endcord-lite || true
+
+      - name: Archive files
+        shell: bash
+        run: |
+          version=${GITHUB_REF#refs/tags/}
+          version=${version#refs/heads/}
+          extra="README.md LICENSE docs/commands.md docs/configuration.md docs/extensions.md docs/keybindings.md"
+          cd dist && mkdir -p docs && cp ../README.md ../LICENSE . && cp ../docs/*.md docs/
+          zip "endcord-$version-macos-arm64.zip" endcord $extra
+          zip "endcord-lite-$version-macos-arm64.zip" endcord-lite $extra
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: dist-macos
+          path: ./dist/*.zip
+          compression-level: 0
+
+
+  build-macos-intel:
+    name: Build (macOS Intel)
+    if: github.event_name == 'push' || inputs.build_macos_intel
+    runs-on: macos-15-intel
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install system dependencies
+        run: |
+          brew untap aws/tap 2>/dev/null || true
+          brew install ccache
+          echo "SDKROOT=$(xcrun --sdk macosx --show-sdk-path)" >> $GITHUB_ENV
+
+      - name: Install LLVM and Clang
+        uses: KyleMayes/install-llvm-action@v2
+        if: env.MAC_INTEL_USE_CLANG == 'true'
+        with:
+          version: ${{ env.MAC_INTEL_MACOS_INTEL }}
+
+      - name: Install Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.MAC_INTEL_PYTHON_VERSION }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.0.1
+        with:
+          enable-cache: false
+
+      - name: Run build script [FULL]
+        shell: bash
+        run: |
+          args=()
+          [[ "${MAC_INTEL_USE_NUITKA}" == "true" ]] && args+=("--nuitka")
+          [[ "${MAC_INTEL_USE_CLANG}" != "true" ]] && args+=("--noclang")
+          uv run build.py --level=FULL "${args[@]}"
+
+      - name: Run build script [LITE]
+        shell: bash
+        run: |
+          args=()
+          [[ "${MAC_INTEL_USE_NUITKA}" == "true" ]] && args+=("--nuitka")
+          [[ "${MAC_INTEL_USE_CLANG}" != "true" ]] && args+=("--noclang")
+          uv run build.py --level=LITE "${args[@]}"
+
+      - name: Make binaries executable
+        run: chmod +x ./dist/endcord ./dist/endcord-lite || true
+
+      - name: Archive files
+        shell: bash
+        run: |
+          version=${GITHUB_REF#refs/tags/}
+          version=${version#refs/heads/}
+          extra="README.md LICENSE docs/commands.md docs/configuration.md docs/extensions.md docs/keybindings.md"
+          cd dist && mkdir -p docs && cp ../README.md ../LICENSE . && cp ../docs/*.md docs/
+          zip "endcord-$version-macos-x86_64.zip" endcord $extra
+          zip "endcord-lite-$version-macos-x86_64.zip" endcord-lite $extra
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: dist-macos-intel
+          path: ./dist/*.zip
+          compression-level: 0
+
 
   draft-release:
     name: Draft GitHub Release
-    needs: build
+    needs: [build-linux, build-windows, build-macos-arm, build-macos-intel]
+    if: always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') && (github.event_name == 'push' || inputs.create_release)
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -252,9 +410,12 @@ jobs:
           path: ./dist
           merge-multiple: true
 
-      - name: Extract version from tag
+      - name: Extract version from tag/branch
         id: extract_version
-        run: echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        run: |
+          version=${GITHUB_REF#refs/tags/}
+          version=${version#refs/heads/}
+          echo "version=$version" >> $GITHUB_OUTPUT
 
       - name: Generate release attestation
         uses: actions/attest-build-provenance@v4

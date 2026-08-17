@@ -300,8 +300,8 @@ But there is also setting in config to open media in external app (cross-system,
 
 ### GUI (Windowed) mode
 This mode entirely replaces curses and the need for terminal emulator, using GTK3 window, UI still remains terminal-like.  
-As as dependency, GTK3 must be installed.  
-Tray icon will also be enabled, so closing window will only minimize it to tray.  
+As as dependency, GTK3 must be installed. It is NOT required to run prebuilt binaries ONLY on windows.  
+Tray icon will be enabled, so closing window will only minimize it to tray.  
 If using external editor, use editor with graphical interface. TUI editors will not work, as this is no longer in terminal.  
 Also, endcord built-in media player will not work because its standalone TUI thats not using curses. All media will be opened in native player.  
 Building with pyinstaller is not recommended because it generates huge binary.  
@@ -344,24 +344,10 @@ To prevent extension injection (malware can modify endcord config and inject ext
     - Append ` -- --uninstall` to uninstall  
 Note: official means installations from these sources are coming from endcord developer and will always be up-to-date.
 
-Optional dependencies:
-- `xclip` - Clipboard support on X11
-- `wl-clipboard` - Clipboard support on Wayland
-- `yazi` / `zenity` / `kdialog` - File dialog when uploading
-- `aspell` - Spellchecking (and `aspell-en` dictionary)
-- `git` - Install and update extensions from other sources than github
-- `yt-dlp` - youtube support
-- `mpv` - Play youtube videos in native player (non-ascii)
-- `libsecret` - Store token in system keyring (secret service provider is also required (eg. `gnome-keyring`, `KWallet`, `KeePassXC`), with `dbus` as dependency)
-- `libappindicator-gtk3` - Tray support under wayland, for [windowed mode](#windowed-mode) only.
-- `imagemagick` - To make notification images round; only needed for endcord-lite.
-- `source-highlight` or `python-pygments` - Code block syntax highlighting (Alternatively use [this extension](https://github.com/sparklost/endcord-pygments-syntax)).
-- `rnnoise` - Noise suppression in voice calls (or use `--bundle-rnnoise` build.py arg)
-- `GTK3` - Only required for `endcord-gui` (windowed mode)
-
 ### Windows
 - Pre-built binaries (built with nuitka) are available in releases
-- [Build](#building) endcord, standalone executable can be found in `./dist/endcord.exe`  
+- [Build](#building) endcord, standalone executable can be found in `./dist/endcord.exe`
+- If youre trying to run endcord-gui (windowed) from source or build it, youll need GTK3. Install it using [gvsbuild](https://github.com/wingtk/gvsbuild).
 
 Install [WezTerm](https://wezterm.org/) (recommended), [windows terminal](https://github.com/microsoft/terminal), [cmder](https://github.com/cmderdev/cmder), or any other modern terminal. And run exe from there. If built with windowed mode, terminal is not required to use endcord.  
 WezTerm proved to introduce the least drawing issues.  
@@ -380,6 +366,22 @@ Optional dependency for spellchecking: `aspell`. Can be installed with: `brew as
 
 ### BSD
 - [Build](#building) endcord, standalone executable can be found in `./dist/endcord`
+
+### Optional dependencies:
+- `xclip` - Clipboard support on X11
+- `wl-clipboard` - Clipboard support on Wayland
+- `yazi` / `zenity` / `kdialog` - File dialog when uploading
+- `aspell` - Spellchecking (and `aspell-en` dictionary)
+- `git` - Install and update extensions from other sources than github
+- `yt-dlp` - youtube support
+- `mpv` - Play youtube videos in native player (non-ascii)
+- `libsecret` - Store token in system keyring (secret service provider is also required (eg. `gnome-keyring`, `KWallet`, `KeePassXC`), with `dbus` as dependency)
+- `libappindicator-gtk3` - Tray support under wayland, for [windowed mode](#windowed-mode) only.
+- `imagemagick` - To make notification images round; only needed for endcord-lite.
+- `source-highlight` or `python-pygments` - Code block syntax highlighting (Alternatively use [this extension](https://github.com/sparklost/endcord-pygments-syntax)).
+- `rnnoise` - Noise suppression in voice calls (or use `--bundle-rnnoise` build.py arg)
+- `GTK3` - Only required for `endcord-gui` (windowed mode), not needed for prebuilt binaries only on windows
+
 
 ## Disclaimer
 > [!WARNING]
