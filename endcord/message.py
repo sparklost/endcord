@@ -108,7 +108,7 @@ def prepare_embeds(embeds, message_content):
         if content:
             if content == message_content:
                 message_content = ""
-            if message_content.startswith("https://") and " " not in message_content and "\n" not in message_content and any(domain in content for domain in GIF_PROVIDERS):
+            if message_content.startswith("https://") and " " not in message_content and "\n" not in message_content and (main_url in message_content or any(domain in content for domain in GIF_PROVIDERS)):
                 message_content = ""
             ready_data = {
                 "type": embed_type,

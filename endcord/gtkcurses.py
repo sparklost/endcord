@@ -12,6 +12,19 @@ import threading
 import time
 from functools import lru_cache
 
+# support for gvsbuild
+if sys.platform == "win32":
+    if "__compiled__" in globals():   # nuitka binary
+        os.add_dll_directory(os.path.dirname(sys.executable))
+    else:
+        gtk_path = f"{os.path.dirname(os.path.abspath(sys.argv[0]))}\\.gtk"
+        if not os.path.exists(gtk_path) and os.path.exists("C:\\gtk\\bin"):
+            os.add_dll_directory("C:\\gtk\\bin")
+        os.add_dll_directory(f"{gtk_path}\\bin")
+        if "gtk\\bin" not in os.environ.get("PATH", ""):
+            os.environ["Path"] = f"{gtk_path}\\bin;" + os.environ.get("Path", "")
+            os.environ["LIB"] = f"{gtk_path}\\lib;" + os.environ.get("LIB", "")
+
 import cairo
 import gi
 
@@ -409,12 +422,15 @@ class GtkTerminalWindow(Gtk.Window):
 
         # calculate font height and width and set it in curses class
         layout = self.drawing_area.create_pango_layout("▒")
+        PangoCairo.context_set_resolution(layout.get_context(), 96)
         layout.set_font_description(self.font_desc)
         _, rect = layout.get_extents()
         self.char_width = rect.width / Pango.SCALE
         self.char_height = rect.height / Pango.SCALE
         self.curses_window.char_width = self.char_width
         self.curses_window.char_height = self.char_height
+        self.layout = self.drawing_area.create_pango_layout("")
+        PangoCairo.context_set_resolution(self.layout.get_context(), 96)
 
 
     def on_configure(self, widget, event):   # noqa
@@ -444,7 +460,8 @@ class GtkTerminalWindow(Gtk.Window):
             cr.set_source_rgb(*rgb_to_cairo(bg))
             cr.paint()
 
-        layout = PangoCairo.create_layout(cr)
+        layout = self.layout
+        PangoCairo.update_layout(cr, layout)
 
         with self.curses_window.buffer_lock:
             for y in range(self.curses_window.nlines):

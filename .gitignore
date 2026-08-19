@@ -5,6 +5,7 @@ THIRD_PARTY_LICENSES.txt
 .cpython
 .pyproject.toml.bak
 *_cython/*.c
+.gtk/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -225,14 +225,14 @@ jobs:
           [[ "${WNDOWS_USE_CLANG}" != "true" ]] && args+=("--noclang")
           uv run build.py --level=LITE "${args[@]}"
 
-      # - name: Run build script [GUI]
-      #   shell: bash
-      #   run: |
-      #     args=()
-      #     [[ "${WIN_USE_NUITKA}" == "true" ]] && args+=("--nuitka")
-      #     [[ "${WNDOWS_USE_CLANG}" != "true" ]] && args+=("--noclang")
-      #     uv run build.py --toggle-windowed
-      #     uv run build.py --level=FULL "${args[@]}"
+      - name: Run build script [GUI]
+        shell: bash
+        run: |
+          args=()
+          [[ "${WIN_USE_NUITKA}" == "true" ]] && args+=("--nuitka")
+          [[ "${WNDOWS_USE_CLANG}" != "true" ]] && args+=("--noclang")
+          uv run build.py --toggle-windowed
+          uv run build.py --level=FULL "${args[@]}"
 
       - name: Archive artifacts
         shell: bash
@@ -243,7 +243,7 @@ jobs:
           cd dist && mkdir -p docs && cp ../README.md ../LICENSE . && cp ../docs/*.md docs/
           7z a "endcord-$version-windows.zip" endcord.exe $extra
           7z a "endcord-lite-$version-windows.zip" endcord-lite.exe $extra
-          # 7z a "endcord-gui-$version-windows.zip" endcord-gui.exe $extra
+          7z a "endcord-gui-$version-windows.zip" endcord-gui.exe $extra
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v7

@@ -120,9 +120,13 @@ PYTHON_PATCH = int(build_config.get("python_max", "3.14.6").split(".")[2])
 PYTHON_FREETHREADED = int(build_config.get("python_freethreaded", "3.14").split(".")[1])
 PYTHON_LAST_SAFE = int(build_config.get("python_last_safe", "3.13").split(".")[1])
 CURSES_TAG = build_config.get("curses_tag", "v6_6_20260627")
+WINDOWED_DEPS = load_build_config().get("windowed_deps", [])
+GVSBUILD_RELEASE = load_build_config().get("gvsbuild_release", [])
 PKGNAME = get_app_name()
 PKGVER = get_version_number()
 USE_COLOR = supports_color()
+if sys.platform == "win32":
+    WINDOWED_DEPS = [x for x in WINDOWED_DEPS if ("pygobject" not in x.lower() and "pycairo" not in x.lower())]
 
 
 def fprint(text, color=PURPLE, prefix=f"[{PKGNAME.capitalize()} Build Script]: ", file=sys.stdout):
@@ -262,27 +266,22 @@ def ensure_python(freethreaded, safe=False):
 
 
 def ensure_gtk():
-    """Check if gtk is installed and properly configured on this system (linux/windows), on windows configure correct wheels"""
+    """Check if gtk is installed and properly configured on this system (linux/windows), on windows setup gvsbuild"""
     if sys.platform == "win32":
-        if "gtk\\bin" not in os.environ.get("PATH", ""):
-            fprint("GTK3 could not be found on system", color=RED)
-            iprint("GTK3 could not be found in PATH", color=RED)
-            iprint("Make sure you followed setup instructions provided at https://github.com/wingtk/gvsbuild", color=RED)
+        gtk_path = f"{os.path.dirname(os.path.abspath(__file__))}\\.gtk"
+        if not os.path.exists(gtk_path):
+            setup_gvsbuild(GVSBUILD_RELEASE)
+        if not os.path.exists(gtk_path):
             return False
-        gtk_path = os.environ.get("GTK_ROOT")
+        os.add_dll_directory(gtk_path)
+        if "gtk\\bin" not in os.environ.get("PATH", ""):
+            os.environ["Path"] = f"{gtk_path}\\bin;" + os.environ.get("Path", "")
+            os.environ["LIB"] = f"{gtk_path}\\lib;" + os.environ.get("LIB", "")
         wheels_path = os.path.join(gtk_path, "wheels")
-        if not wheels_path or not os.path.exists(wheels_path):
-            wheels_path = "C:\\gtk\\wheels"   # assumption
         if os.path.exists(wheels_path):
             return wheels_path
-        fprint("GTK3 could not be found on system", color=RED)
-        if gtk_path:
-            iprint(f"Provided GTK_ROOT={gtk_path} does not exist")
-        else:
-            iprint("Use gvsbuild: https://github.com/wingtk/gvsbuild to install it", color=RED)
-            iprint("Endcord build script expects GTK3 to be installed at 'C:\\gtk'", color=RED)
-            iprint("If it is installed elsewhere, set that path to 'GTK_ROOT' environment variable", color=RED)
         return False
+
     if sys.platform == "linux":
         try:
             result = subprocess.run(["pkg-config", "--exists", "gtk+-3.0"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
@@ -363,10 +362,38 @@ def setup_dependencies(level, set_dev):
 
 
 def force_ujson():
-    """Remove orjson and force installing ujson instead"""
+    """Remove orjson and install ujson instead"""
     subprocess.run(["uv", "-q", "pip", "uninstall", "orjson"], check=False, capture_output=True)
     subprocess.run(["uv", "-q", "pip", "install", "ujson"], check=True)
     fprint("Switched orjson -> ujson")
+
+
+def setup_gvsbuild(gvsbuild_release):
+    """Download gvsbuild and set it up in ./.gtk dir"""
+    import urllib.request
+    import zipfile
+    fprint("Setting up GTK3")
+    url = f"https://github.com/wingtk/gvsbuild/releases/download/{gvsbuild_release}/GTK3_Gvsbuild_{gvsbuild_release}_x64.zip"
+    project_dir = os.getcwd()
+    target_dir = os.path.join(project_dir, ".gtk")
+    zip_path = os.path.join(project_dir, "gtk_temp.zip")
+    try:
+        os.makedirs(target_dir, exist_ok=True)
+        iprint(f"Downloading gvsbuild GTK3 release {gvsbuild_release}...")
+        urllib.request.urlretrieve(url, zip_path)
+        iprint(f"Extracting to {target_dir}...")
+        with zipfile.ZipFile(zip_path, "r") as zip_ref:
+            for file_info in zip_ref.infolist():
+                if file_info.is_dir():
+                    continue
+                _, ext = os.path.splitext(file_info.filename)
+                if ext.lower() in (".dll", ".whl", ".typelib") and "python" not in file_info.filename.split("/"):
+                    zip_ref.extract(file_info, path=target_dir)
+        os.remove(zip_path)
+    except Exception as e:
+        iprint(f"Error setting up gvsbuild: {e}", color=RED)
+        return False
+    return True
 
 
 def build_third_party_licenses(exclude=[]):
@@ -626,15 +653,14 @@ def toggle_windowed(check_only=False):
                     os.rename(old_name, new_name)
 
     # toggle dependencies
-    windowed_deps = load_build_config().get("windowed_deps", [])
     if enable:
-        subprocess.run(["uv", "pip", "install"] + windowed_deps, check=True)
+        subprocess.run(["uv", "pip", "install"] + WINDOWED_DEPS, check=True)
         patch_pystray()
         if sys.platform == "win32":
             install_local_wheels(have_gtk)
         fprint("Windowed mode enabled!")
     else:
-        subprocess.run(["uv", "pip", "uninstall"] + windowed_deps, check=True)
+        subprocess.run(["uv", "pip", "uninstall"] + load_build_config().get("windowed_deps", []), check=True)
         fprint("Windowed mode disabled!")
     return not enable
 
@@ -1010,7 +1036,11 @@ def build_with_nuitka(level, onedir, clang, mingw, compile_deps, print_cmd=False
         compiler = "--clang"
     elif mingw:
         compiler = "--mingw64"
-    python_flags = ["--python-flag=-OO"]
+    python_flags = [
+        "--python-flag=no_asserts",
+        "--python-flag=no_docstrings",
+        "--python-flag=no_site",
+    ]
     hidden_imports = ["--include-module=uuid"]
     exclude_imports = [
         "--nofollow-import-to=cython",
@@ -1043,6 +1073,8 @@ def build_with_nuitka(level, onedir, clang, mingw, compile_deps, print_cmd=False
             hidden_imports += ["--include-package=ctypes.util"]
     elif sys.platform == "win32":
         options += ["--assume-yes-for-downloads"]
+        if windowed:
+            options += ["--windows-console-mode=disable"]
         hidden_imports += [
             "--include-package=winrt.windows.foundation",
             "--include-package=winrt.windows.ui.notifications",
@@ -1051,6 +1083,8 @@ def build_with_nuitka(level, onedir, clang, mingw, compile_deps, print_cmd=False
         ]
         package_data += ["--include-package-data=winrt"]
     elif sys.platform == "darwin":
+        if not windowed:
+            options += ["--macos-app-console-mode=force"]
         options += [
             f"--macos-app-name={PKGNAME}",
             f"--macos-app-version={get_version_number()}",
@@ -1072,6 +1106,7 @@ def build_with_nuitka(level, onedir, clang, mingw, compile_deps, print_cmd=False
         "--static-libpython=yes" if static_python else "",
         "--no-deployment-flag=self-execution",   # -c and -m flags are safely handled by argparser
         "--no-prefer-source-code",
+        "--onefile-tempdir-spec={TEMP}/endcord_{PID}",
         "--remove-output",
         "--output-dir=dist",
         f"--output-filename={pkgname}",
@@ -1244,9 +1279,9 @@ if __name__ == "__main__":
         nuitka_ver = subprocess.run(["uv", "run", "nuitka", "--version"], check=True, capture_output=True).stdout.decode()[:3].split(".")
         if int(nuitka_ver[0]) <= 4 and int(nuitka_ver[1]) < 2:
             subprocess.run(["uv", "pip", "uninstall", "nuitka"], check=True, capture_output=True)
-            subprocess.run(["uv", "pip", "install", "git+https://github.com/Nuitka/Nuitka.git"], check=True)
+            subprocess.run(["uv", "pip", "install", "git+https://github.com/Nuitka/Nuitka.git@4.2"], check=True)
 
-        subprocess.run(["uv", "pip", "install"] + load_build_config().get("windowed_deps", []), check=True)
+        subprocess.run(["uv", "pip", "install"] + WINDOWED_DEPS, check=True)
         if sys.platform == "win32":
             install_local_wheels(ensure_gtk())
         fprint("Windowed mode enabled!")

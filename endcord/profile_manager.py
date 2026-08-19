@@ -405,7 +405,8 @@ def main_tui(screen, profiles_enc, profiles_plain, selected, have_keyring, confi
         draw_buttons(screen, selected_button, h-1, w)
 
         key = screen.getch()
-        if key in (27, "ESC"):
+        logger.info(key)
+        if key in (27, "ESC", "C-c"):
             break
         if key in (10, "ENTER"):
             if selected_button == 0 and profiles:   # LOAD

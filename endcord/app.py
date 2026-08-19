@@ -5266,7 +5266,7 @@ class Endcord:
             if new_chunk:
                 self.update_chat(keep_selected=None)
                 # when messages are trimmed, keep same selected position
-                if len(self.messages) != all_msg:
+                if len(self.messages) != all_msg and selected_msg:
                     selected_msg_new = selected_msg - (all_msg - len(self.messages))
                     selected_line = self.msg_to_lines(selected_msg_new) - remainder
                 self.tui.allow_chat_selected_hide(self.get_chat_last_message_id() == self.last_message_id)
