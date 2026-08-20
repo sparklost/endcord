@@ -191,18 +191,6 @@ jobs:
         with:
           enable-cache: false
 
-      - name: Install gvsbuild GTK3
-        shell: bash
-        run: |
-          DOWNLOAD_URL=$(curl -s "https://api.github.com/repos/wingtk/gvsbuild/releases/latest" | jq -r '.assets[] | select(.name | startswith("GTK3_Gvsbuild_") and endswith("_x64.zip")) | .browser_download_url')
-          curl -L "$DOWNLOAD_URL" -o gtk3.zip
-          mkdir -p /c/gtk
-          unzip -q gtk3.zip -d /c/gtk
-          echo 'C:\gtk\bin' >> $GITHUB_PATH
-          echo 'LIB=C:\gtk\lib;'$LIB >> $GITHUB_ENV
-          echo 'INCLUDE=C:\gtk\include;C:\gtk\include\cairo;C:\gtk\include\glib-2.0;C:\gtk\include\gobject-introspection-1.0;C:\gtk\lib\glib-2.0\include;'$INCLUDE >> $GITHUB_ENV
-          echo "GTK_ROOT=C:\gtk" >> $GITHUB_ENV
-
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v2
         if: env.WIN_USE_CLANG == 'true'

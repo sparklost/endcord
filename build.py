@@ -390,6 +390,22 @@ def setup_gvsbuild(gvsbuild_release):
                 if ext.lower() in (".dll", ".whl", ".typelib") and "python" not in file_info.filename.split("/"):
                     zip_ref.extract(file_info, path=target_dir)
         os.remove(zip_path)
+        # remove unused dlls
+        for item in os.listdir(os.path.join(target_dir, "lib")):
+            item_path = os.path.join(os.path.join(target_dir, "lib"), item)
+            if os.path.isdir(item_path) and "girepository" not in item:
+                shutil.rmtree(item_path)
+        to_delete = (
+            "rsvg", "libcrypto", "gtk-4", "gtkmm", "giomm", "gettext", "xml2", "libssl", "sigc",
+            "cairo-script", "glibmm", "gtksourceview", "gdkmm", "pcre2-16", "pcre2-32", "turbojpeg",
+            "atkmm", "pangomm", "cairomm", "girepository-1", "graphene", "pkgconf", "pcre2-posix",
+            "gailutil", "asprintf", "gthread", "teextstyle", "harfbuzz-cairo", "harfbuzz-gpu"
+            "harfbuzz-subset", "harfbuzz-gobject", "harfbuzz-vector", "harfbuzz-raster",
+
+        )
+        for filename in os.listdir(os.path.join(target_dir, "bin")):
+            if filename.startswith(to_delete):
+                os.remove(os.path.join(os.path.join(target_dir, "bin"), filename))
     except Exception as e:
         iprint(f"Error setting up gvsbuild: {e}", color=RED)
         return False
@@ -1074,6 +1090,10 @@ def build_with_nuitka(level, onedir, clang, mingw, compile_deps, print_cmd=False
     elif sys.platform == "win32":
         options += ["--assume-yes-for-downloads"]
         if windowed:
+            add_data += [
+                "--include-data-dir=.gtk/lib=gtk/lib",
+                "--include-raw-dir=.gtk/bin=gtk/bin",
+            ]
             options += ["--windows-console-mode=disable"]
         hidden_imports += [
             "--include-package=winrt.windows.foundation",

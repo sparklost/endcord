@@ -15,7 +15,9 @@ from functools import lru_cache
 # support for gvsbuild
 if sys.platform == "win32":
     if "__compiled__" in globals():   # nuitka binary
-        os.add_dll_directory(os.path.dirname(sys.executable))
+        gtk_path = f"{os.path.dirname(sys.executable)}\\gtk"
+        os.add_dll_directory(f"{gtk_path}\\bin")
+        os.environ["Path"] = f"{gtk_path}\\bin;" + os.environ.get("Path", "")
     else:
         gtk_path = f"{os.path.dirname(os.path.abspath(sys.argv[0]))}\\.gtk"
         if not os.path.exists(gtk_path) and os.path.exists("C:\\gtk\\bin"):
@@ -23,7 +25,6 @@ if sys.platform == "win32":
         os.add_dll_directory(f"{gtk_path}\\bin")
         if "gtk\\bin" not in os.environ.get("PATH", ""):
             os.environ["Path"] = f"{gtk_path}\\bin;" + os.environ.get("Path", "")
-            os.environ["LIB"] = f"{gtk_path}\\lib;" + os.environ.get("LIB", "")
 
 import cairo
 import gi

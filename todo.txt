@@ -1,8 +1,14 @@
-CORE:
 Add windows gui build to workflow
+    make nuitka include dlls
+
+Fix emoji redering in gtkcurses
+Add error handler to gtkcurses
 Fix stuttering when using rnnoise
 Fix bad received voice call sound
 Add push to talk button to call UI
+When double click on voice channel ask to confirm to join and switch to that channel chat
+
+CORE:
 Add inbox
 Add spellcheck corrections assist
 Make build.py work with and without uv
