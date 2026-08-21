@@ -189,6 +189,7 @@ current_icon_index = None
 nice_exit = False
 is_quitting = False
 gtk_window = None
+use_tray = False
 
 
 @lru_cache(maxsize=64)
@@ -275,6 +276,14 @@ GLib.log_set_handler(
 
 
 # tray stuff
+
+def enable_tray():
+    """Enable tray icon setup"""
+    global use_tray
+    use_tray = True
+    if not icon:   # tray not yet initialized
+        threading.Thread(target=tray_thread, daemon=True).start()
+
 
 def load_tray_image(path=None, color=None):
     """Load image from path, fallback to circle drawn with pillow"""
@@ -623,6 +632,21 @@ class GtkTerminalWindow(Gtk.Window):
         if keyval in (Gdk.KEY_Page_Down, Gdk.KEY_KP_Page_Down):
             event_queue.put(mod_prefix + "PGDN")
             return True
+        if keyval in (Gdk.KEY_Control_L, Gdk.KEY_Control_R):
+            modifiers.append("C")
+            modifiers = ["CTRL" if mod == "C" else "ALT" if mod == "M" else "SHIFT" for mod in ["C", "M", "S"] if mod in modifiers]
+            event_queue.put("-".join(modifiers))
+            return True
+        if keyval in (Gdk.KEY_Alt_L, Gdk.KEY_Alt_R):
+            modifiers.append("M")
+            modifiers = ["CTRL" if mod == "C" else "ALT" if mod == "M" else "SHIFT" for mod in ["C", "M", "S"] if mod in modifiers]
+            event_queue.put("-".join(modifiers))
+            return True
+        if keyval in (Gdk.KEY_Shift_L, Gdk.KEY_Shift_R):
+            modifiers.append("S")
+            modifiers = ["CTRL" if mod == "C" else "ALT" if mod == "M" else "SHIFT" for mod in ["C", "M", "S"] if mod in modifiers]
+            event_queue.put("-".join(modifiers))
+            return True
 
         # arrows
         if keyval in ARROW_KEYS:
@@ -743,7 +767,7 @@ class GtkTerminalWindow(Gtk.Window):
         """X button click"""
         global is_quitting, run
 
-        if have_tray and ENABLE_TRAY:
+        if have_tray and use_tray and ENABLE_TRAY:
             self.hide()
             return True
 
@@ -956,7 +980,7 @@ def wrapper(func, *args, **kwargs):   # noqa
     global gtk_window
     window = initscr()
 
-    if have_tray and ENABLE_TRAY:
+    if have_tray and use_tray and ENABLE_TRAY:
         threading.Thread(target=tray_thread, daemon=True).start()
     elif tray_error:
         logger.error(f"Failed to start tray: {tray_error}")

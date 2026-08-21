@@ -359,6 +359,10 @@ class Endcord:
         except ValueError:
             pass   # error when ran in gtkcurses
 
+        # for gtkcurses
+        if uses_gtkcurses:
+            curses.enable_tray()
+
         # init extensions
         if config["extensions"] and ENABLE_EXTENSIONS:
             self.load_extensions(version)
