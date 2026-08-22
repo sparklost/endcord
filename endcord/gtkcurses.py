@@ -10,6 +10,7 @@ import queue
 import sys
 import threading
 import time
+import traceback
 from functools import lru_cache
 
 # support for gvsbuild
@@ -809,6 +810,39 @@ class GtkTerminalWindow(Gtk.Window):
             self.present()
 
 
+def error_handler(message, unblock_event, report=False):
+    """Spawn GTK window with the error and unblock the thread when closed"""
+    if report:
+        report = "\n\nYou can report this here:\nhttps://github.com/sparklost/endcord/issues"
+    def build_and_show():   # noqa
+        win = Gtk.Window()
+        win.set_title(f"{APP_NAME} Error Report")
+        win.set_default_size(800, 500)
+        win.set_position(Gtk.WindowPosition.CENTER)
+        scroll = Gtk.ScrolledWindow()
+        scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        textview = Gtk.TextView()
+        textview.set_editable(False)
+        textview.set_cursor_visible(False)
+        textview.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
+        font_desc = Pango.FontDescription("Monospace 11")
+        textview.modify_font(font_desc)
+        buf = textview.get_buffer()
+        buf.set_text(f"{message}{report if report else ""}\n\n[Press any key to exit]")
+        scroll.add(textview)
+        win.add(scroll)
+        def on_key_press(widget, event):   # noqa
+            win.destroy()
+            return True
+        def on_destroy(widget):   # noqa
+            unblock_event.set()
+        win.connect("key-press-event", on_key_press)
+        win.connect("destroy", on_destroy)
+        win.show_all()
+        return False
+    GLib.idle_add(build_and_show)
+
+
 # curses stuff
 
 class Window:
@@ -988,8 +1022,20 @@ def wrapper(func, *args, **kwargs):   # noqa
         logger.warning("Pystray not installed")
 
     def user_thread():
+        error_event = threading.Event()
         try:
             func(window, *args, **kwargs)
+        except SystemExit as e:
+            if e.code:
+                exit_message = str(e.code)
+                logger.warning(f"Exit with message: {exit_message}")
+                error_handler(exit_message, error_event)
+                error_event.wait()
+        except Exception as e:
+            error_traceback = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+            logger.error(f"Exit with error:\n{error_traceback}")
+            error_handler(error_traceback, error_event, report=True)
+            error_event.wait()
         finally:
             def clean_quit():
                 if gtk_window:
