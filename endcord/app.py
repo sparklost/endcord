@@ -4004,19 +4004,28 @@ class Endcord:
                     self.update_extra_line(permanent=True)
 
         elif cmd_type == 52:   # VOICE_SET_VOLUME_INPUT
-            value = min(max(cmd_args["value"], 0), 200)
-            if cmd_args["increment"] == 1:
-                value = min(self.state["volume_in"] + value, 200)
-            elif cmd_args["increment"] == -1:
-                value = max(self.state["volume_in"] - value, 0)
-            if self.state["volume_in"] and not value:
-                self.update_voice_mute_in_call(True)
-            elif not self.state["volume_in"] and value:
-                self.update_voice_mute_in_call(False)
-            self.state["volume_in"] = value
-            self.prev_volume_in = value
-            if cmd_args["value"] > 200:
-                self.update_extra_line("Sorry, ONE LOUDER mode is not yet implemented :(")
+            if value is None:
+                if self.state["volume_in"]:
+                    self.prev_volume_in = self.state["volume_in"]
+                    self.state["volume_in"] = 0
+                    self.update_voice_mute_in_call(True)
+                else:
+                    self.state["volume_in"] = self.prev_volume_in
+                    self.update_voice_mute_in_call(False)
+            else:
+                value = min(max(cmd_args["value"], 0), 200)
+                if cmd_args["increment"] == 1:
+                    value = min(self.state["volume_in"] + value, 200)
+                elif cmd_args["increment"] == -1:
+                    value = max(self.state["volume_in"] - value, 0)
+                if self.state["volume_in"] and not value:
+                    self.update_voice_mute_in_call(True)
+                elif not self.state["volume_in"] and value:
+                    self.update_voice_mute_in_call(False)
+                self.state["volume_in"] = value
+                self.prev_volume_in = value
+                if cmd_args["value"] > 200:
+                    self.update_extra_line("Sorry, ONE LOUDER mode is not yet implemented :(")
             if self.voice_gateway:
                 self.voice_gateway.set_volumes(self.state["volume_in"], self.state["volume_out"])
                 if cmd_args["value"] > 200:
@@ -4025,13 +4034,20 @@ class Endcord:
             utils.save_json(self.state, f"state_{self.profiles["selected"]}.json")
 
         elif cmd_type == 53:   # VOICE_SET_VOLUME_OUTPUT
-            value = min(max(cmd_args["value"], 0), 200)
-            if cmd_args["increment"] == 1:
-                value = min(self.state["volume_out"] + value, 200)
-            elif cmd_args["increment"] == -1:
-                value = max(self.state["volume_out"] - value, 0)
-            self.state["volume_out"] = value
-            self.prev_volume_out = value
+            if value is None:
+                if self.state["volume_out"]:
+                    self.prev_volume_out = self.state["volume_out"]
+                    self.state["volume_out"] = 0
+                else:
+                    self.state["volume_out"] = self.prev_volume_out
+            else:
+                value = min(max(cmd_args["value"], 0), 200)
+                if cmd_args["increment"] == 1:
+                    value = min(self.state["volume_out"] + value, 200)
+                elif cmd_args["increment"] == -1:
+                    value = max(self.state["volume_out"] - value, 0)
+                self.state["volume_out"] = value
+                self.prev_volume_out = value
             if self.voice_gateway:
                 self.voice_gateway.set_volumes(self.state["volume_in"], self.state["volume_out"])
                 self.update_call_extra_line()

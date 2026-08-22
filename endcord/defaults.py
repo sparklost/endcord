@@ -307,6 +307,7 @@ command_bindings = {
     "S-DOWN": "tree_select server; collapse_all_except selected",
     "C-y UP": "resize_popup_window +1",
     "C-y DOWN": "resize_popup_window -1",
+    "M-q": "voice_set_volume_input",
 }
 
 

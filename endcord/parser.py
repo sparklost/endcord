@@ -921,13 +921,17 @@ def command_string(text):
     elif text_lower.startswith("voice_set_volume_input"):
         cmd_type = 52
         try:
-            num_piece = text.split(" ")[1]
-            num = abs(int(num_piece))
-            increment = 0
-            if "+" in num_piece:
-                increment = 1
-            if "-" in num_piece:
-                increment = -1
+            parts = text.split()
+            if len(parts):
+                num_piece = parts[1]
+                num = abs(int(num_piece))
+                increment = 0
+                if "+" in num_piece:
+                    increment = 1
+                if "-" in num_piece:
+                    increment = -1
+            else:
+                num, increment = None, None
             cmd_args = {"value": num, "increment": increment}
         except (IndexError, ValueError):
             cmd_type = 0
@@ -937,13 +941,17 @@ def command_string(text):
     elif text_lower.startswith("voice_set_volume_output"):
         cmd_type = 53
         try:
-            num_piece = text.split(" ")[1]
-            num = abs(int(num_piece))
-            increment = 0
-            if "+" in num_piece:
-                increment = 1
-            if "-" in num_piece:
-                increment = -1
+            parts = text.split()
+            if len(parts):
+                num_piece = parts[1]
+                num = abs(int(num_piece))
+                increment = 0
+                if "+" in num_piece:
+                    increment = 1
+                if "-" in num_piece:
+                    increment = -1
+            else:
+                num, increment = None, None
             cmd_args = {"value": num, "increment": increment}
         except (IndexError, ValueError):
             cmd_type = 0

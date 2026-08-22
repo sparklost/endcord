@@ -91,6 +91,8 @@
     Select next server in tree and collapse all other servers except it.
 - `Ctrl+Y Up/Down` - `"C-y UP" = "resize_popup_window +1"` and `"C-y DOWN" = "resize_popup_window -1"`  
     Increase/Decrease vertical size of popup window by 1.
+- `Alt+Q` - `"M-q" = "voice_set_volume_input"`  
+    Toggle voice call input volume. Something like push-to-talk.
 
 ### OS specific keybindings
 Some keybindings are used by terminals or OS itself, so they are by default rebound to something else.
