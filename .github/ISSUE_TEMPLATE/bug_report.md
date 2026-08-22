@@ -12,7 +12,8 @@ assignees: ''
 <!-- DO NOT try to explain to me what is the root cause, nor how to fix it. That is my job and MY ONLY. -->
 
 **Describe the bug**
-A clear and concise description of what happened.  <--NOT what happened internally, just what you observed-->
+<!-- NOT what happened internally, only what you observed. -->
+A clear and concise description of what happened.
 
 **Environment** <!--Please complete the following information-->
  - Platform: [e.g. Linux x86_64]
