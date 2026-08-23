@@ -305,8 +305,8 @@ class Discord():
             data = json.loads(data)
             return data["id"]
         if status in (400, 401):   # bad request or unauthorized
-            logger.error("unauthorized access. Probably invalid token. Exiting...")
-            raise SystemExit("unauthorized access. Probably invalid token. Exiting...")
+            logger.error("Unauthorized access. Probably invalid token. Exiting...")
+            raise SystemExit("Unauthorized access. Probably invalid token. Exiting..." + "\nLaunch endcord with -a or --manager to change it.")
         log_api_error(data, status, "get_my_id")
         raise SystemExit(f"Network error: {"See log for more info"}")
 

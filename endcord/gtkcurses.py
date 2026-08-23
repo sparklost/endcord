@@ -160,6 +160,7 @@ KEY_UP = None
 KEY_LEFT = None
 KEY_RIGHT = None
 KEY_RESIZE = None
+KEY_MOUSE = None
 A_STANDOUT = 0x00010000
 A_UNDERLINE = 0x00020000
 A_BOLD = 0x00200000
@@ -981,6 +982,7 @@ class Window:
     def vline(self, y, x, ch, n, attr=0):   # noqa
         for i in range(n):
             self.insch(y + i, x, ch, attr)
+    def erase(self): self.clear()   # noqa
     def render(self): self.refresh()   # noqa
     def redrawwin(self): self.refresh()   # noqa
     def noutrefresh(self): self.refresh()   # noqa

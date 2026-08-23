@@ -162,14 +162,31 @@ def extract_colors_formatted(config):
     )
 
 
-def color_palette_internal(screen):
+def draw_border(screen, corners, color):
+    """Draw border at screen borders with custom corners"""
+    h, w = screen.getmaxyx()
+    try:
+        screen.hline(0, 1, curses.ACS_HLINE, w - 2, curses.color_pair(color))
+        screen.hline(h - 1, 1, curses.ACS_HLINE, w - 2, curses.color_pair(color))
+        screen.vline(1, 0, curses.ACS_VLINE, h - 2, curses.color_pair(color))
+        screen.vline(1, w - 1, curses.ACS_VLINE, h - 2, curses.color_pair(color))
+        screen.addstr(0, 0, corners[0], curses.color_pair(color))
+        screen.addstr(0, w - 1, corners[2], curses.color_pair(color))
+        screen.addstr(h - 1, 0, corners[1], curses.color_pair(color))
+        screen.addstr(h - 1, w - 1, corners[3], curses.color_pair(color))
+    except curses.error:   # errors randomly when resizing
+        pass
+
+
+def color_palette_internal(screen, corners):
     """Show all available colors and their codes, wait for input, then exit"""
     curses.use_default_colors()
     curses.curs_set(0)
+    if corners:
+        draw_border(screen, corners, 0)
     draw_bg = False
     while True:
 
-        # drawing
         for i in range(0, curses.COLORS):
             if draw_bg:
                 curses.init_pair(i, 232, i)
@@ -177,18 +194,17 @@ def color_palette_internal(screen):
                 curses.init_pair(i, i, -1)
         screen.addstr(1, 1, "Press Space to toggle fg/bg, any other key to close")
         h, w = screen.getmaxyx()
-        x = 1
+        x = 1 + bool(corners)
         y = 3
         for i in range(0, curses.COLORS):
             screen.addstr(y, x, "0" * (3 - len(str(i))) + str(i), curses.color_pair(i))
             x += 5
-            if x + 3 > w:
+            if x + 3 + bool(corners) > w:
                 y += 1
-                x = 1
+                x = 1 + bool(corners)
             if y >= h:
                 break
 
-        # chkeck key
         key_code = screen.getch()
         if key_code in (32, "SPACE"):
             draw_bg = not draw_bg
@@ -196,10 +212,11 @@ def color_palette_internal(screen):
             break
 
 
-def color_palette():
+def color_palette(config):
     """Show all available colors and their codes, wait for input, then exit"""
+    corners = None if config["compact"] else config["border_corners"]
     try:
-        curses.wrapper(color_palette_internal)
+        curses.wrapper(color_palette_internal, corners)
     except curses.error as e:
         if str(e) != "endwin() returned ERR":
             sys.exit("Curses error")

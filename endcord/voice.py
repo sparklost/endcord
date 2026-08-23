@@ -1366,22 +1366,26 @@ class VoiceHandler:
 
 
     def denoise(self, audio_data):
-        """Process 20ms of stereo audio, downmix to mono, run RNNoise across two 10ms subframes, and send clean mono to both channels"""
+        """Process 20ms of audio, downmix to mono if needed, run RNNoise across two 10ms subframes, and return clean stereo"""
         if audio_data.dtype == np.int16:
             audio_float = audio_data.astype("float32") / 32768.0
         else:
             audio_float = audio_data.astype("float32")
-        if audio_float.ndim == 1:
-            audio_float = audio_float.reshape(960, 2)
-        elif audio_float.shape == (2, 960):
-            audio_float = audio_float.T
 
-        out = np.empty_like(audio_float)
+        if audio_float.ndim == 1:
+            mono = audio_float
+        elif audio_float.shape[0] == 2 and audio_float.shape[1] == 960:
+            mono = (audio_float[0, :] + audio_float[1, :]) * 0.5
+        elif audio_float.shape[1] == 1:
+            mono = audio_float[:, 0]
+        else:
+            mono = (audio_float[:, 0] + audio_float[:, 1]) * 0.5
+
+        out = np.empty((960, 2), dtype=np.float32)
         for frame_index in range(2):
             start = frame_index * 480
             end = start + 480
-            mono = (audio_float[start:end, 0] + audio_float[start:end, 1]) * 0.5   # downmix to mono
-            _, cleaned_float = self.denoiser.process_frame(mono)
+            _, cleaned_float = self.denoiser.process_frame(mono[start:end])
             out[start:end, 0] = cleaned_float
             out[start:end, 1] = cleaned_float
 

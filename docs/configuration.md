@@ -170,9 +170,10 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
     If disabled, wont be able to receive nor start calls and calls wont ring.
 - `call_silence_threshold = -30`  
     This is silence detection threshold for sound transmitted in voice calls. Value is in dB.  
+    This can be conviniently tuned by using `endcord --vumeter` launch flag.  
     If system mic volume is too low, actual sound may be detected as silence, so decrease this value until voice can be heard properly.  
     Increase it if endcord is constantly sending noise when its silence. Or decrease mic volume and increase input volume in endcord.  
-    Set to `0` to disable silence detection (sound will be constantly sent and will use more bandwidth).
+    Set to `0` to disable silence detection (sound will be constantly sent and will use more bandwidth).  
 - `call_opus_mode = "voip"`  
     This setting changes quality of the sent audio, higher quality means more network usage and higher sound delay. Options: `lowdelay`, `voip`, `audio`.  
     Lowdelay has the worst quality. Voip is good for voice calls. Audio mode is useful when streaming music.  

@@ -34,20 +34,16 @@ def parser(app_name, version, default_config_path, log_path):
         Default config is in {default_config_path}",
     )
     parser.add_argument(
-        "-x",
-        "--proxy",
-        type=str,
-        action="store",
-        help="\
-        proxy URL to use, it must be this format: 'protocol://host:port'; \
-        Supported proxy protocols: http, socks5; \
-        Be careful, using proxy might make you more suspicious to discord",
+        "-a",
+        "--manager",
+        action="store_true",
+        help="launch profile manager",
     )
     parser.add_argument(
         "-k",
         "--keybinding",
         action="store_true",
-        help="activate keybinding mode, will print key combination number in terminal",
+        help="launch keybinding resolver",
     )
     parser.add_argument(
         "-o",
@@ -56,11 +52,17 @@ def parser(app_name, version, default_config_path, log_path):
         help="show all available colors and their codes",
     )
     parser.add_argument(
-        "-t",
-        "--token",
+        "-u",
+        "--vumeter",
+        action="store_true",
+        help="launch vumeter used to configure voice call silence detection",
+    )
+    parser.add_argument(
+        "-i",
+        "--install-extension",
         type=str,
         action="store",
-        help="Discord user authentication token, it is recommended to provide it in profile manager",
+        help="git url to extension to install (must have git installed to use)",
     )
     parser.add_argument(
         "-p",
@@ -70,10 +72,11 @@ def parser(app_name, version, default_config_path, log_path):
         help="Name of selected profile to load, profiles are managed in profile manager",
     )
     parser.add_argument(
-        "-a",
-        "--manager",
-        action="store_true",
-        help="show profile manager",
+        "-t",
+        "--token",
+        type=str,
+        action="store",
+        help="Discord user authentication token, it is recommended to provide it in profile manager",
     )
     parser.add_argument(
         "-m",
@@ -92,11 +95,14 @@ def parser(app_name, version, default_config_path, log_path):
         help="custom host to connect to; overrides custom_host in config",
     )
     parser.add_argument(
-        "-i",
-        "--install-extension",
+        "-x",
+        "--proxy",
         type=str,
         action="store",
-        help="git url to extension to install (must have git installed to use)",
+        help="\
+        proxy URL to use, it must be this format: 'protocol://host:port'; \
+        Supported proxy protocols: http, socks5; \
+        Be careful, using proxy might make you more suspicious to discord",
     )
     parser.add_argument(
         "-d",

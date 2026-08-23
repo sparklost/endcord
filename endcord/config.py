@@ -131,7 +131,7 @@ def merge_configs(custom_config_path, theme_path):
 
 def update_config(config, key, value):
     """Update and save config"""
-    if not value:
+    if value is None:
         value = ""
     else:
         try:
@@ -141,17 +141,23 @@ def update_config(config, key, value):
     config[key] = value
     config_path = config["config_path"]
     saved_config = ConfigParser(interpolation=None)
-    if os.path.exists(config_path):
+    if os.path.exists(os.path.expanduser(config_path)):
         with open(os.path.expanduser(config_path), "r", encoding="utf-8") as f:
             saved_config.read_file(f)
     new_config = {}
     new_theme = {}
-    # split config and theme
-    for key_all, value_all in config.items():
-        if key_all in defaults.settings:
-            new_config[key_all] = value_all
-        elif key_all in defaults.theme:
-            new_theme[key_all] = value_all
+    if saved_config.has_section("main"):
+        for k in saved_config.options("main"):
+            if k in config:
+                new_config[k] = config[k]
+    if saved_config.has_section("theme"):
+        for k in saved_config.options("theme"):
+            if k in config:
+                new_theme[k] = config[k]
+    if key in defaults.settings:
+        new_config[key] = value
+    elif key in defaults.theme:
+        new_theme[key] = value
     save_config(config_path, new_config, "main")
     save_config(config_path, new_theme, "theme")
     return config

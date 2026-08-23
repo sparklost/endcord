@@ -105,13 +105,17 @@ def main(args):
         from endcord import color
         if uses_gtkcurses:
             curses.enable_tray = False
-        color.color_palette()
+        color.color_palette(config_data)
         sys.exit(0)
     elif args.keybinding:
         from endcord import keybinding
         if uses_gtkcurses:
             curses.enable_tray = False
-        keybinding.picker(keybindings, command_bindings, config_data["fallback_keybinding_parser"])
+        keybinding.picker(keybindings, command_bindings, config_data)
+        sys.exit(0)
+    elif args.vumeter:
+        from endcord import vumeter
+        vumeter.vumeter_runner(config_data)
         sys.exit(0)
     elif args.media:
         if not (
