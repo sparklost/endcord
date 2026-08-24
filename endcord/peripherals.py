@@ -38,8 +38,12 @@ NO_NOTIFY_SOUND_DE = ("kde", "plasma")   # linux desktops without notification s
 have_termux_notify = False
 if sys.platform == "win32":
     import win32clipboard
-    from windows_toasts import Toast, ToastDisplayImage, WindowsToaster
-    toaster = WindowsToaster(APP_NAME)
+    try:
+        from windows_toasts import Toast, ToastDisplayImage, WindowsToaster
+        toaster = WindowsToaster(APP_NAME)
+    except OSError:
+        toaster = None
+        logger.warn("Failed initializing notification system")
 elif sys.platform == "linux":
     have_gdbus = shutil.which("gdbus")
     have_notify_send = shutil.which("notify-send")
@@ -205,7 +209,7 @@ def notify_send(title, message, sound="message", image_path=None, custom_sound=N
             except ValueError:
                 return None
         return None
-    if sys.platform == "win32":
+    if sys.platform == "win32" and toaster:
         if custom_sound:
             threading.Thread(target=play_audio, daemon=True, args=(custom_sound, )).start()
         notification = Toast()
