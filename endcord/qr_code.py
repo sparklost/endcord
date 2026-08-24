@@ -483,7 +483,7 @@ def gen_qr_terminal_string(text, text_above="", text_below=""):
     return "\n".join(out_lines)
 
 
-def draw_qr_curses(screen, text, text_above="", text_below="", color_id=0):
+def draw_qr_curses(screen, text, text_above="", text_below="", color_id=0, margin=False):
     """Render a QR matrix with text above and below on curses screen"""
     import curses
     screen_height, screen_width = screen.getmaxyx()
@@ -496,7 +496,7 @@ def draw_qr_curses(screen, text, text_above="", text_below="", color_id=0):
     available_height = screen_height - len(text_above) - len(text_below)
 
     height_real = (height + 1) // 2
-    if screen_width < width or available_height < height_real:
+    if screen_width < (width + margin*2) or available_height < (height_real + margin*2):
         screen.clear()
         text = ["Terminal too small:", f"Need: {width}x{height_real}", f"Have: {screen_width}x{available_height}"]
         start_y = max(0, (screen_height - len(text)) // 2)

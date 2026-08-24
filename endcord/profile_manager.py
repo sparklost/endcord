@@ -31,6 +31,9 @@ try:
 except (AttributeError, NameError):
     APP_NAME = "endcord"
 
+bordered = True
+border_corners = "╭╰╮╯"
+
 PART_HINT = "Enter to confirm, Esc to go back."
 FULL_HINT = PART_HINT[:-1] + ", Up/Down to select."
 CHECK_LOG = " Check log for more info."
@@ -132,6 +135,13 @@ TOTP_PROMPT_TEXT = f""" Enter the code from your TOTP authenticator app here.
 CAPTCHA_REQUIRED_TEXT = (UNABLE_LOGIN_TEXT, "Captcha is required.", "Login with official client first over this IP, then try again.", "", ANY_KEY_TEXT)
 FAILED_AUTH_INIT_TEXT = ("Failed starting authentication gateway.", 'Either use "Paste token" method or use endcord level=MINI or above.', "", ANY_KEY_TEXT)
 logger = logging.getLogger(__name__)
+
+
+def patch_texts(n):
+    """Ensure there is constant number of spaces to all lines in text constants"""
+    global MANAGER_TEXT, NO_KEYRING_TEXT
+    MANAGER_TEXT = "\n".join((" " * n) + line.lstrip(" ") for line in MANAGER_TEXT.split("\n"))
+    NO_KEYRING_TEXT = "\n".join((" " * n) + line.lstrip(" ") for line in NO_KEYRING_TEXT.split("\n"))
 
 
 def setup_secret_service():
@@ -362,15 +372,26 @@ def esc_detector_thread(screen):
 
 def main_tui(screen, profiles_enc, profiles_plain, selected, have_keyring, config):
     """Main profile manager tui"""
+    global bordered, border_corners
     curses.use_default_colors()
     curses.curs_set(0)
-    curses.init_pair(1, -1, -1)
     curses.init_pair(2, -1, 241)
+
+    bordered = not (config["compact"])
+    border_corners = config["border_corners"]
+    if config["color_default"] != [-1, -1]:
+        curses.init_pair(1, config["color_default"][0], config["color_default"][1])
+    else:
+        curses.init_pair(1, -1, -1)
+    if bordered:
+        patch_texts(2)
 
     screen.bkgd(" ", curses.color_pair(1))
     screen.addstr(1, 0, MANAGER_TEXT, curses.color_pair(1))
     if not have_keyring:
         screen.addstr(3, 0, NO_KEYRING_TEXT, curses.color_pair(1))
+    if bordered:
+        draw_border(screen, 1)
 
     profiles = [
         {**p, "source": "keyring"} for p in profiles_enc
@@ -389,23 +410,24 @@ def main_tui(screen, profiles_enc, profiles_plain, selected, have_keyring, confi
 
     run = True
     proceed = False
+    x0 = int(bordered)
+    draw_buttons(screen, selected_button, screen.getmaxyx()[0] - 1, screen.getmaxyx()[1])
     while run:
         regenerate = False
         h, w = screen.getmaxyx()
+        w -= 2 * x0
         title_text = pad_name("Name", "Last used", "Save method", w)
-        screen.addstr(4, 0, title_text, curses.color_pair(1) | curses.A_STANDOUT)
+        screen.addstr(4, x0, title_text, curses.color_pair(1) | curses.A_STANDOUT)
 
         for num, profile in enumerate(profiles):
             date = convert_time(profile["time"])
             text = pad_name(profile["name"], date, profile["source"], w)
             if num == selected_num:
-                screen.addstr(num + 5, 0, text, curses.color_pair(1) | curses.A_STANDOUT)
+                screen.addstr(num + 5, x0, text, curses.color_pair(1) | curses.A_STANDOUT)
             else:
-                screen.addstr(num + 5, 0, text, curses.color_pair(1))
-        draw_buttons(screen, selected_button, h-1, w)
+                screen.addstr(num + 5, x0, text, curses.color_pair(1))
 
         key = screen.getch()
-        logger.info(key)
         if key in (27, "ESC", "C-c"):
             break
         if key in (10, "ENTER"):
@@ -466,6 +488,7 @@ def main_tui(screen, profiles_enc, profiles_plain, selected, have_keyring, confi
             if selected_button < 4:
                 selected_button += 1
         elif key in (curses.KEY_RESIZE, "RESIZE"):
+            screen.clear()
             regenerate = True
 
         if regenerate:
@@ -480,8 +503,10 @@ def main_tui(screen, profiles_enc, profiles_plain, selected, have_keyring, confi
             ]
             profiles = sorted(profiles, key=lambda x: x["name"])
 
+        if bordered:
+            draw_border(screen, 1)
+        draw_buttons(screen, selected_button, h - 1, w + 2*x0)
         screen.refresh()
-
     screen.clear()
     screen.refresh()
 
@@ -781,7 +806,9 @@ def manage_profile(screen, have_keyring, config, editing_profile=None):
                     content_changed = False
                     text_above = "Scan this QR code with your phone to login:"
                     text_below = url + "\n\n" + timeout_text + "\nEsc to go back."
-                    qr_code.draw_qr_curses(screen, url, text_above, text_below, color_id=0)
+                    qr_code.draw_qr_curses(screen, url, text_above, text_below, color_id=0, margin=bordered)
+                    draw_border(screen, 1)
+                    screen.refresh()
                 time.sleep(0.1)
             if esc_detector and esc_detector.is_alive():
                 curses.ungetch(27)
@@ -813,7 +840,9 @@ def delete_profile(screen, profiles_enc, profiles_plain, selected_profile):
         h, w = screen.getmaxyx()
         text = f"Are you sure you want to delete {profile["name"]} profile? Enter/Y / Esc/N"
         text = text.center(w)
-        screen.addstr(int(h/2), 0, text, curses.color_pair(1) | curses.A_STANDOUT)
+        screen.addstr(int(h/2), 0, text, curses.color_pair(1) | curses.A_STANDOUT | curses.A_BOLD)
+        if bordered:
+            draw_border(screen, 1)
 
         key = screen.getch()
         if key in (27, 110, "ESC", "n"):
@@ -839,9 +868,14 @@ def text_prompt(screen, description_text, prompts, init=None, mask=None, prompt_
 
     screen.clear()
     screen.bkgd(" ", curses.color_pair(1))
+    description_text = "\n".join((" " * 2) + line.lstrip(" ") for line in description_text.split("\n"))
     screen.addstr(1, 0, description_text, curses.color_pair(1))
+    if bordered:
+        draw_border(screen, 1)
 
     _, w = screen.getmaxyx()
+    if bordered:
+        w -= 3
     base_y = get_prompt_y(w, description_text, prompt_idx_back)
     input_index = len(texts[selected])
 
@@ -860,11 +894,13 @@ def text_prompt(screen, description_text, prompts, init=None, mask=None, prompt_
                 screen_input_index = input_index - shift
             line += " " * (w - len(line) - 1)
             if i == selected:
-                screen.addstr(y, 1, line, curses.color_pair(1) | curses.A_STANDOUT)
+                screen.addstr(y, 1 + bordered, line, curses.color_pair(1) | curses.A_STANDOUT)
                 if screen_input_index + prompt_len - 1 < w:
-                    screen.addch(y, screen_input_index + prompt_len - 1, line[screen_input_index + prompt_len - 2], curses.color_pair(2))
+                    screen.addch(y, screen_input_index + prompt_len - 1 + bordered, line[screen_input_index + prompt_len - 2], curses.color_pair(2))
             else:
-                screen.addstr(y, 1, line, curses.color_pair(2))    # gray
+                screen.addstr(y, 1 + bordered, line, curses.color_pair(2))    # gray
+        if bordered:
+            draw_border(screen, 1)
         screen.refresh()
 
     draw()
@@ -947,6 +983,8 @@ def select_prompt(screen, description_text, options, y_offset):
     screen.clear()
     screen.bkgd(" ", curses.color_pair(1))
     h, w = screen.getmaxyx()
+    if bordered:
+        w -= 2
     for num, line in enumerate(description_text):
         screen.addstr(num+1, 0, line.center(w), curses.color_pair(1))
     run = True
@@ -956,6 +994,9 @@ def select_prompt(screen, description_text, options, y_offset):
     while run:
         y = len(description_text) + y_offset
         h, w = screen.getmaxyx()
+        if bordered:
+            draw_border(screen, 1)
+            w -= 2
         for num, option in enumerate(options):
             text = option.center(longest)
             x_gap = (w - longest) // 2
@@ -983,6 +1024,9 @@ def select_prompt(screen, description_text, options, y_offset):
                 selected_num += 1
 
         _, w = screen.getmaxyx()
+        if bordered:
+            draw_border(screen, 1)
+            w -= 2
         screen.refresh()
 
     screen.clear()
@@ -995,6 +1039,8 @@ def key_prompt(screen, description_text, enter=False):
     """Prompt to press enter/esc or any key"""
     screen.clear()
     screen.bkgd(" ", curses.color_pair(1))
+    if bordered:
+        draw_border(screen, 1)
     _, w = screen.getmaxyx()
     for num, line in enumerate(description_text):
         screen.addstr(num+1, 0, line.center(w), curses.color_pair(1))
@@ -1022,7 +1068,9 @@ def draw_text(screen, text, center=False):
         if center:
             screen.addstr(num+1, 0, line.center(w), curses.color_pair(1))
         else:
+            text = "\n".join((" " * 2) + line.lstrip(" ") for line in text.split("\n"))
             screen.addstr(num+1, 0, line, curses.color_pair(1))
+
     screen.refresh()
 
 
@@ -1043,8 +1091,24 @@ def draw_buttons(screen, selected, y, w):
         if num == selected:
             screen.addstr(y, x, button, curses.color_pair(1) | curses.A_STANDOUT)
         else:
-            screen.addstr(y, x, button)
+            screen.addstr(y, x, button, curses.color_pair(1))
         x += len(button) + 2
+
+
+def draw_border(screen, color):
+    """Draw border at screen borders with custom corners"""
+    h, w = screen.getmaxyx()
+    try:
+        screen.hline(0, 1, curses.ACS_HLINE, w - 2, curses.color_pair(color))
+        screen.hline(h - 1, 1, curses.ACS_HLINE, w - 2, curses.color_pair(color))
+        screen.vline(1, 0, curses.ACS_VLINE, h - 2, curses.color_pair(color))
+        screen.vline(1, w - 1, curses.ACS_VLINE, h - 2, curses.color_pair(color))
+        screen.addstr(0, 0, border_corners[0], curses.color_pair(color))
+        screen.addstr(0, w - 1, border_corners[2], curses.color_pair(color))
+        screen.addstr(h - 1, 0, border_corners[1], curses.color_pair(color))
+        screen.addstr(h - 1, w - 1, border_corners[3], curses.color_pair(color))
+    except curses.error:   # errors randomly when resizing
+        pass
 
 
 def update_time(profiles_enc, profiles_plain, profile_name):

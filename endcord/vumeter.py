@@ -14,10 +14,10 @@ BAR_WIDTH = 50
 MIN_DB = -60
 MAX_DB = 0
 
-CONTROLS_TEXT = """Controls:
+CONTROLS_TEXT = """ Controls:
  [Space] Cycle devices | [Arrows/Scroll] Move threshold
  [D] Toggle denoise | [Q/Esc] Quit | [Enter] Save and quit"""
-HOWTO_TEXT = """How to configure:
+HOWTO_TEXT = """ How to configure:
  2. While its silence, move knob until it's just above (right) of current input level
  3. Start speaking, move knob more right, few dB bellow current input level
  4. Make threshold knob be somewhere between these 2 levels
@@ -33,10 +33,10 @@ def detect_silence(data, threshold=0.03):
 
 
 def patch_texts(n):
-    """Prepend spaces to lines of constant texts texts"""
+    """Ensure there is constant number of spaces to all lines in text constants"""
     global HOWTO_TEXT, CONTROLS_TEXT
-    HOWTO_TEXT = "\n".join((" " * n) + line for line in HOWTO_TEXT.split("\n"))
-    CONTROLS_TEXT = "\n".join((" " * n) + line for line in CONTROLS_TEXT.split("\n"))
+    HOWTO_TEXT = "\n".join((" " * n) + line.strip(" ") for line in HOWTO_TEXT.split("\n"))
+    CONTROLS_TEXT = "\n".join((" " * n) + line.strip(" ") for line in CONTROLS_TEXT.split("\n"))
 
 
 def draw_border(screen, corners, color):
@@ -79,10 +79,10 @@ class VUMeter:
         self.bordered = not (config["compact"])
         self.border_corners = config["border_corners"]
         if config["color_default"] != [-1, -1]:
-            self.ui_color = 7
             curses.init_pair(7, config["color_default"][0], config["color_default"][1])
         else:
-            self.ui_color = 0
+            curses.init_pair(7, -1, -1)
+
         self.threshold_db = config["call_silence_threshold"]
         self.threshold_rms = self.silence_threshold = 10 ** (self.threshold_db / 20)
         self.do_denoise = config["call_mic_noise_supression"]
@@ -94,7 +94,7 @@ class VUMeter:
         self.mic_changed = False
         self.mics = soundcard.all_microphones()
         if self.bordered:
-            patch_texts(1)
+            patch_texts(2)
 
         from endcord import rnnoise
         try:
@@ -177,10 +177,10 @@ class VUMeter:
             x = 1 + self.bordered
             dev_name = self.mics[self.mic_index].name
             device_text = f"Device [{self.mic_index + 1}/{len(self.mics)}]: "
-            self.screen.addstr(1, x, device_text, curses.color_pair(self.ui_color) | curses.A_BOLD)
+            self.screen.addstr(1, x, device_text, curses.color_pair(7) | curses.A_BOLD)
             left_w = max(0, self.screen.getmaxyx()[1] - len(device_text))
-            self.screen.addstr(1, x + len(device_text), f"{dev_name[:left_w]}{" " * (left_w - len(dev_name[:left_w]))}", curses.color_pair(self.ui_color))
-            self.screen.addstr(3, x, f"Input Level: {current_db:5.1f} dB  |  Threshold: {self.threshold_db:5.1f} dB", curses.color_pair(self.ui_color))
+            self.screen.addstr(1, x + len(device_text), f"{dev_name[:left_w]}{" " * (left_w - len(dev_name[:left_w]))}", curses.color_pair(7))
+            self.screen.addstr(3, x, f"Input Level: {current_db:5.1f} dB  |  Threshold: {self.threshold_db:5.1f} dB", curses.color_pair(7))
             empty_len = max(0, BAR_WIDTH - bar_len)
             self.screen.addstr(4, x, " " * bar_len, curses.color_pair(1))
             self.screen.addstr(4, x + bar_len, " " * empty_len, curses.color_pair(2))
@@ -196,10 +196,10 @@ class VUMeter:
                 self.screen.addstr(6, x + 13, "DENOISE ON ", curses.color_pair(5) | curses.A_BOLD)
             else:
                 self.screen.addstr(6, x + 13, "DENOISE OFF", curses.color_pair(6))
-            self.screen.addstr(8, 1, CONTROLS_TEXT + "\n", curses.color_pair(self.ui_color))
-            self.screen.addstr(11, 1, HOWTO_TEXT, curses.color_pair(self.ui_color))
+            self.screen.addstr(8, 0, CONTROLS_TEXT, curses.color_pair(7))
+            self.screen.addstr(12, 0, HOWTO_TEXT, curses.color_pair(7))
             if self.bordered:
-                draw_border(self.screen, self.border_corners, self.ui_color)
+                draw_border(self.screen, self.border_corners, 7)
         except curses.error:
             pass
         self.screen.refresh()
@@ -252,6 +252,7 @@ class VUMeter:
         """Main app method"""
         if not self.mics:
             sys.exit("No audio input devices found")
+        self.screen.bkgd(" ", curses.color_pair(7))
 
         audio_thread = threading.Thread(target=self.audio_recorder, daemon=True)
         audio_thread.start()

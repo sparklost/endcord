@@ -400,7 +400,7 @@ All colors starting with `color_format` are formatted like this:
 First `[fg, bg, attr]` is base color for whole context. If `bg` is -1, `bg` from `color_chat_default` and `color_chat_mention` is used. Same for `fg`.  
 Every next list has additional `start` and `end`- indexes on a line where color is applied. If `bg` is -2, `bg` from base color is used. -1 is terminal default color. Same for `fg`.  
 - `color_default = [-1, -1]`  
-    Base color formatting for text. No attribute.
+    Base color formatting for text and UI. No attribute.
 - `color_green = [46, -1]`  
 - `color_orange = [208, -1]`  
 - `color_red = [196, -1]`  
