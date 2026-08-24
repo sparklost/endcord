@@ -1928,8 +1928,6 @@ class ChatGenerator:
                         urls.append([pre_embed_len + url_range[0], pre_embed_len + url_range[1], 0])
                 if embed_type.startswith("gif") and embed_url.startswith("["):
                     pass
-                elif self.placeholder_images and embed_type not in ("article", "link"):
-                    embed_url = ""
                 elif embed["main_url"] == embed_url and self.trim_embed_url_size:
                     embed_url = trim_string(embed_url, self.trim_embed_url_size)
                 embed_marker_ranges.append([len(content), len(content) + len(embed_type) + 9])
