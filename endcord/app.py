@@ -3137,7 +3137,6 @@ class Endcord:
                 pass
             else:
                 self.update_extra_line("Unknown command", color=19)
-
             return
 
         if self.forum and cmd_type > 1000:

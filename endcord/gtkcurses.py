@@ -826,7 +826,7 @@ def error_handler(message, unblock_event, report=False):
         textview.set_editable(False)
         textview.set_cursor_visible(False)
         textview.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
-        font_desc = Pango.FontDescription("Monospace 11")
+        font_desc = Pango.FontDescription.from_string("Monospace 11")
         textview.modify_font(font_desc)
         buf = textview.get_buffer()
         buf.set_text(f"{message}{report if report else ""}\n\n[Press any key to exit]")

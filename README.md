@@ -316,8 +316,9 @@ Connecting to other discord-like instance can be configured in `config.ini` by s
 But endcord may crash at any time. Further, each host may have different spam filters, so **use at your own risk** still applies.  
 Whether endcord will work or crash depends on hosts api implementation, the more different from discord it is, greater is the risk of a crash. If endcord crashes - its hosts fault. Do not report bugs related to this.
 
-### Termux
-Endcord cant be built in termux, so to run it: first install python >= 3.12 and `uv`, then clone this repo, setup env to "MICRO" level: `python --nobuild --level=MICRO` (one time), and run it: `uv run main.py`.  
+### Termux (android)
+Endcord can be run on android through termux app, but ot cant be built.  
+To run it: first install python >= 3.12 and `uv`, then clone this repo, setup env to "MICRO" level: `python --nobuild --level=MICRO` (one time), and run it: `uv run main.py`.  
 Setting up environment for higher levels will probably fail because these dependencies will have to be built for arm architecture.  
 To enable android notifications simply run `pkg install termux-api` and install Termux:API app. Vibration is disabled by default, to enable it: run endcord at least once, then in Termux:Api notification settings enable vibration for endcord notifications.  
 Notifications will work as ling as endcord is running, so it might be necessary for termux to "Acquire wakelock".  

@@ -10,6 +10,7 @@ Add settings UI
 Add commands for other tools
 Add inbox
 Add spellcheck corrections assist
+Provide static binaries built on muslinux
 Make build.py work with and without uv
 Make custom json parser - remove orjson
 Fix issues with wide characters in input line
@@ -19,6 +20,7 @@ Add video, stage and stream calls
 Add localization
 
 GTKCURSES:
+Add notification floating number to desktop icon to gtkcurses
 Add ascii/block media drawing and inline to gtkcurses
 Optimize gtkcurses
 Add full image viewer and inline to gtkcurses
