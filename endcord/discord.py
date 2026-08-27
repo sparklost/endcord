@@ -710,7 +710,7 @@ class Discord():
         return False
 
 
-    def send_message(self, channel_id, message_content, reply_id=None, reply_channel_id=None, reply_guild_id=None, reply_ping=True, attachments=None, stickers=None, nonce=None):
+    def send_message(self, channel_id, message_content, reply_id=None, reply_channel_id=None, reply_guild_id=None, reply_ping=True, attachments=None, stickers=None, embeds=None, nonce=None):
         """Send a message in the channel with reply with or without ping"""
         if not nonce:
             nonce = generate_nonce()
@@ -754,6 +754,8 @@ class Discord():
                     })
         if stickers:
             message_dict["sticker_ids"] = stickers
+        if embeds and self.bot:
+            message_dict["embeds"] = embeds
         message_data = json.dumps(message_dict)
         url = f"/api/v9/channels/{channel_id}/messages"
         data, status = self.request("POST", url, message_data, self.header)
@@ -793,9 +795,12 @@ class Discord():
         return False
 
 
-    def update_message(self, channel_id, message_id, message_content):
+    def update_message(self, channel_id, message_id, message_content, embeds=None):
         """Update the message in the channel"""
-        message_data = json.dumps({"content": message_content})
+        message_dict = {"content": message_content}
+        if embeds and self.bot:
+            message_dict["embeds"] = embeds
+        message_data = json.dumps(message_dict)
         url = f"/api/v9/channels/{channel_id}/messages/{message_id}"
         data, status = self.request("PATCH", url, message_data, self.header)
         if not status:
