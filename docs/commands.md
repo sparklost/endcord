@@ -88,7 +88,7 @@
     Start/stop/cancel recording voice message, will send when stopped.
 - `insert_timestamp [time]`  
     Insert timestamp in input line, `[time]/[timestamp]` can be of formats: `YYYY-MM-DD-HH-mm`, `YYYY-MM-DD`, `HH:mm`, `HH:mm:SS` or a timestamp from assist.  
-    Assist will accept time formats similar to `@time`. Eg.: `tomorrow 2PM`, `2 days ago 03:42 AM`, `in 2 w`...
+    Assist will accept time formats similar to discord. Eg.: `tomorrow 2PM`, `2 days ago 03:42 AM`, `in 2 w`...
 - `set_notifications ...` / `set_notifications <#[channel_id]> ...`  
     Show and modify server/channel notification settings.
 - `custom_status [text]`  

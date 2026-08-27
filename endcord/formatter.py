@@ -3043,7 +3043,7 @@ def generate_extra_window_profile(user_data, user_roles, presence, colors, max_l
         lines = split_long_line(text, max_len)
         body.extend(lines)
         color_status = 18 if status == "Online" else 19 if status == "Idle" else 20 if status == "DnD" else color_low
-        body_format.extend(([(color_standout, 0, 0, 6), (color_status, 1, 8, len(status) + 8)],), *[None] * (len(lines) - 1))
+        body_format.extend([([(color_standout, 0, 0, 6), (color_status, 1, 8, len(status) + 8)],), *[None] * (len(lines) - 1)])
     else:
         body.append("Status: Offline")
         body_format.append(([(color_standout, 0, 0, 6), (color_low, 1, 8, max_len)]))
