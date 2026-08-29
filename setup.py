@@ -12,6 +12,7 @@ extra_compile_args = [
     "-funroll-loops",
     "-fvisibility=hidden",
     "-DNDEBUG",
+    "-w",
 ]
 extra_link_args = [
     "-Wl,-O3",

@@ -1295,12 +1295,6 @@ if __name__ == "__main__":
 
     windowed = toggle_windowed(check_only=True)
     if windowed:
-        # remove this after nuitka 4.2.0 release
-        nuitka_ver = subprocess.run(["uv", "run", "nuitka", "--version"], check=True, capture_output=True).stdout.decode()[:3].split(".")
-        if int(nuitka_ver[0]) <= 4 and int(nuitka_ver[1]) < 2:
-            subprocess.run(["uv", "pip", "uninstall", "nuitka"], check=True, capture_output=True)
-            subprocess.run(["uv", "pip", "install", "git+https://github.com/Nuitka/Nuitka.git@4.2"], check=True)
-
         subprocess.run(["uv", "pip", "install"] + WINDOWED_DEPS, check=True)
         if sys.platform == "win32":
             install_local_wheels(ensure_gtk())

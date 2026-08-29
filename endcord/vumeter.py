@@ -133,7 +133,7 @@ class VUMeter:
             config.update_config(self.config, "call_mic_noise_supression", self.do_denoise)
             self.run = False
 
-        elif key in (ord(" "), "SPACE") and len(self.mics) > 1:
+        elif key in (32, "SPACE") and len(self.mics) > 1:
             self.mic_index = (self.mic_index + 1) % len(self.mics)
             self.mic_changed = True
 
