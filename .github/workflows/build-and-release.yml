@@ -70,6 +70,7 @@ jobs:
             libbz2-dev libreadline-dev libsqlite3-dev wget curl libncursesw5-dev \
             xz-utils tk-dev libffi-dev liblzma-dev \
             pkg-config libgirepository-2.0-dev libcairo2-dev gir1.2-gtk-3.0 gir1.2-pango-1.0
+          echo "SKIP_GTK=1" >> $GITHUB_ENV
 
       - name: Ensure no BLAS/LAPACK
         run: |
@@ -141,7 +142,6 @@ jobs:
           args=("--custom-python")
           [[ "${LINUX_USE_NUITKA}" == "true" ]] && args+=("--nuitka")
           [[ "${LINUX_USE_CLANG}" != "true" ]] && args+=("--noclang")
-          echo "SKIP_GTK=1" >> $GITHUB_ENV
           uv run build.py --toggle-windowed
           uv run build.py --level=FULL "${args[@]}"
 
