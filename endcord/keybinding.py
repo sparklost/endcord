@@ -525,8 +525,9 @@ def picker_internal(screen, keybindings, command_bindings, config):
     curses.curs_set(0)
     curses.mousemask(curses.ALL_MOUSE_EVENTS)
     curses.mouseinterval(0)
-    sys.stdout.write("\x1b[?2004h")
-    sys.stdout.flush()
+    if not uses_gtkcurses:
+        sys.stdout.write("\x1b[?2004h")
+        sys.stdout.flush()
 
     fallback = config["fallback_keybinding_parser"]
     bordered = not (config["compact"])

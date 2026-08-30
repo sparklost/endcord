@@ -186,8 +186,7 @@ def color_palette_internal(screen, corners):
         draw_border(screen, corners, 0)
     draw_bg = False
     while True:
-
-        for i in range(0, curses.COLORS):
+        for i in range(1, curses.COLORS):
             if draw_bg:
                 curses.init_pair(i, 232, i)
             else:
@@ -208,7 +207,7 @@ def color_palette_internal(screen, corners):
         key_code = screen.getch()
         if key_code in (32, "SPACE"):
             draw_bg = not draw_bg
-        elif key_code not in ("RESIZE", "FOCUS_IN", "FOCUS_OUT") and not isinstance(key_code, tuple):
+        elif key_code not in ("RESIZE", "FOCUS_IN", "FOCUS_OUT", "CTRL", "ALT", "SHIFT") and not isinstance(key_code, tuple):
             break
 
 

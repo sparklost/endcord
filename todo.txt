@@ -1,4 +1,3 @@
-Fix gtkcurses crash on windows
 Fix gtkcurses emoji rendering
 Fix sound stuttering when using rnnoise
 Fix bad received voice call sound

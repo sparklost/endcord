@@ -117,8 +117,10 @@ class RPC:
         self.activities = []
         self.not_exist = []
         self.connections = []
+        self.server = None
         if user["bot"]:
             logger.warning("RPC server cannot be started for bot accounts")
+            self.run = False
             return
         self.run = True
 

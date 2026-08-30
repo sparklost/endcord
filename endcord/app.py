@@ -421,6 +421,11 @@ class Endcord:
                     sys.exit(1)
                 sys.exit(0)
         except Exception:   # failsafe
+            self.message_send_queue.put((None, None, None))
+            self.notify_queue.put((None, None))
+            self.run = False
+            self.stop_event.set()
+            self.timed_extra_line.set()
             if message:
                 sys.exit(message)
             sys.exit(0)
