@@ -267,6 +267,10 @@ def ensure_python(freethreaded, safe=False):
 
 def ensure_gtk():
     """Check if gtk is installed and properly configured on this system (linux/windows), on windows setup gvsbuild"""
+    if os.environ.get("SKIP_GTK"):
+        # SKIP_GTK comes from gh workflow that has gi instaalled but not gtk (since gtk is not needed to build)
+        return True
+
     if sys.platform == "win32":
         gtk_path = f"{os.path.dirname(os.path.abspath(__file__))}\\.gtk"
         if not os.path.exists(gtk_path):
@@ -283,16 +287,22 @@ def ensure_gtk():
         return False
 
     if sys.platform == "linux":
+        def not_installed():
+            fprint("GTK3 could not be found on system", color=RED)
+            iprint("Install GTK3 with your package manager", color=RED)
         try:
             result = subprocess.run(["pkg-config", "--exists", "gtk+-3.0"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+            if result.returncode != 0:
+                not_installed()
             return result.returncode == 0
         except FileNotFoundError:
             try:
                 output = subprocess.check_output(["ldconfig", "-p"], text=True, stderr=subprocess.DEVNULL)
+                if "libgtk-3.so" not in output:
+                    not_installed()
                 return "libgtk-3.so" in output
             except (subprocess.SubprocessError, FileNotFoundError):
-                fprint("GTK3 could not be found on system", color=RED)
-                iprint("Install GTK3 with your package manager", color=RED)
+                not_installed()
                 return False
     return True
 

@@ -141,11 +141,12 @@ jobs:
           args=("--custom-python")
           [[ "${LINUX_USE_NUITKA}" == "true" ]] && args+=("--nuitka")
           [[ "${LINUX_USE_CLANG}" != "true" ]] && args+=("--noclang")
+          echo "SKIP_GTK=1" >> $GITHUB_ENV
           uv run build.py --toggle-windowed
           uv run build.py --level=FULL "${args[@]}"
 
       - name: Make binaries executable
-        run: chmod +x ./dist/endcord ./dist/endcord-lite || true
+        run: chmod +x ./dist/endcord ./dist/endcord-lite ./dist/endcord-gui || true
 
       - name: Archive files
         shell: bash
@@ -290,7 +291,7 @@ jobs:
           uv run build.py --level=LITE "${args[@]}"
 
       - name: Make binaries executable
-        run: chmod +x ./dist/endcord ./dist/endcord-lite || true
+        run: chmod +x ./dist/endcord ./dist/endcord-lite ./dist/endcord-gui || true
 
       - name: Archive files
         shell: bash
@@ -359,7 +360,7 @@ jobs:
           uv run build.py --level=LITE "${args[@]}"
 
       - name: Make binaries executable
-        run: chmod +x ./dist/endcord ./dist/endcord-lite || true
+        run: chmod +x ./dist/endcord ./dist/endcord-lite ./dist/endcord-gui || true
 
       - name: Archive files
         shell: bash
