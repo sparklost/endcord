@@ -814,6 +814,10 @@ def error_handler(message, unblock_event, report=False):
         scroll.add(textview)
         win.add(scroll)
         def on_key_press(widget, event):   # noqa
+            if event.keyval in (Gdk.KEY_Control_L, Gdk.KEY_Control_R, Gdk.KEY_Shift_L, Gdk.KEY_Shift_R, Gdk.KEY_Alt_L, Gdk.KEY_Alt_R):
+                return False
+            if (event.state & Gdk.ModifierType.CONTROL_MASK) and event.keyval in (Gdk.KEY_c, Gdk.KEY_C):
+                return False
             win.destroy()
             return True
         def on_destroy(widget):   # noqa
@@ -837,6 +841,7 @@ class Window:
         self.ncols = ncols
         self.nlines = nlines
         self.nodelay_state = False
+        self.timeout_s = None
 
         if parent is None:   # root window
             self.buffer = [[(" ", 0) for _ in range(self.ncols)] for _ in range(self.nlines)]
@@ -870,6 +875,11 @@ class Window:
         if self.nodelay_state:
             try:
                 return event_queue.get_nowait()
+            except queue.Empty:
+                return -1
+        elif self.timeout_s is not None:
+            try:
+                return event_queue.get(timeout=self.timeout_s)
             except queue.Empty:
                 return -1
         else:
@@ -971,7 +981,8 @@ class Window:
         if gtk_window:
             GLib.idle_add(gtk_window.drawing_area.queue_draw)
     def nodelay(self, flag): self.nodelay_state = flag   # noqa
-    def timeout(self, value): pass   # noqa
+    def timeout(self, value):   # noqa
+        self.timeout_s = value / 1000 if value >= 0 else None
     def keypad(self, x): pass   # noqa
     def bkgd(self, ch, color_id): pass   # noqa
 
