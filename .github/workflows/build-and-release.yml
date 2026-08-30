@@ -148,10 +148,11 @@ jobs:
       - name: Make binaries executable
         run: chmod +x ./dist/endcord ./dist/endcord-lite ./dist/endcord-gui || true
 
-      - name: Archive files
+      - name: Archive artifacts
         shell: bash
         run: |
           version=${GITHUB_REF#refs/tags/}
+          version=${version#refs/heads/}
           extra="README.md LICENSE docs/commands.md docs/configuration.md docs/extensions.md docs/keybindings.md"
           cd dist && mkdir -p docs && cp ../README.md ../LICENSE . && cp ../docs/*.md docs/
           tar -czf "endcord-$version-linux.tar.gz" endcord $extra
@@ -293,7 +294,7 @@ jobs:
       - name: Make binaries executable
         run: chmod +x ./dist/endcord ./dist/endcord-lite ./dist/endcord-gui || true
 
-      - name: Archive files
+      - name: Archive artifacts
         shell: bash
         run: |
           version=${GITHUB_REF#refs/tags/}
@@ -362,7 +363,7 @@ jobs:
       - name: Make binaries executable
         run: chmod +x ./dist/endcord ./dist/endcord-lite ./dist/endcord-gui || true
 
-      - name: Archive files
+      - name: Archive artifacts
         shell: bash
         run: |
           version=${GITHUB_REF#refs/tags/}
