@@ -679,6 +679,8 @@ class Endcord:
         self.current_my_roles = []
         self.member_roles = []
         self.current_member_roles = []
+        if self.my_user_data:
+            self.my_user_data["nick"] = None
         self.threads = []
         self.activities = []
         self.search_results = []
@@ -761,9 +763,12 @@ class Endcord:
         self.select_current_member_roles()
         self.my_roles = self.gateway.get_my_roles()
         self.current_my_roles = []   # user has no roles in dm
+        if self.my_user_data:
+            self.my_user_data["nick"] = None
         for roles in self.my_roles:
             if roles["guild_id"] == self.active_channel["guild_id"]:
                 self.current_my_roles = roles["roles"]
+                self.my_user_data["nick"] = roles["nick"]
                 break
         self.compute_permissions()
         self.select_current_channels()
@@ -1050,9 +1055,12 @@ class Endcord:
                 self.current_roles = roles["roles"]
                 break
         self.current_my_roles = []   # user has no roles in dm
+        if self.my_user_data:
+            self.my_user_data["nick"] = None
         for roles in self.my_roles:
             if roles["guild_id"] == guild_id:
                 self.current_my_roles = roles["roles"]
+                self.my_user_data["nick"] = roles["nick"]
                 break
         self.select_current_member_roles()
 
@@ -1152,6 +1160,8 @@ class Endcord:
         self.current_roles = []
         self.current_my_roles = []
         self.current_member_roles = []
+        if self.my_user_data:
+            self.my_user_data["nick"] = None
 
         self.chat = []
         self.chat_format = []
@@ -7888,15 +7898,14 @@ class Endcord:
                 self.limit_msg_len = LIMIT_MSG_LEN_PREMIUM if self.premium else LIMIT_MSG_LEN
                 if self.rpc.run:
                     self.rpc.generate_dispatch(new_user_data)
-            else:   # its guild_member_update
-                self.my_user_data["nick"] = new_user_data["nick"]
-            if changed_guild:   # its my roles update from guild_member_update
+            if changed_guild:   # its guild_member_update
                 self.my_roles = self.gateway.get_my_roles()
                 self.clean_permissions(changed_guild)
                 self.compute_permissions()
                 for roles in self.my_roles:
                     if roles["guild_id"] == changed_guild:
                         self.current_my_roles = roles["roles"]
+                        self.my_user_data["nick"] = roles["nick"]
                         break
                 for guild in self.member_roles:
                     if guild["guild_id"] == self.active_channel["guild_id"]:

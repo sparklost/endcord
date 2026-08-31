@@ -10,6 +10,7 @@ Add commands for other tools
 Add inbox
 Add spellcheck corrections assist
 Automatically convert @name or @role if sent as plaintext
+Allow client to run with invalid token but stay offline
 Provide static binaries built on muslinux
 Make build.py work with and without uv
 Make custom json parser - remove orjson

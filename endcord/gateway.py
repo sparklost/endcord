@@ -1002,6 +1002,7 @@ class Gateway():
                             self.my_roles.append({
                                 "guild_id": guild_id,
                                 "roles": roles,
+                                "nick": member["nick"],
                             })
                     self.merged_users = data.get("users", [])   # this is for ready_supplemental
                     time_log_string += f"    roles - {round((time.monotonic() - ready_time_mid) * 1000, 3)} ms\n"
@@ -1499,16 +1500,17 @@ class Gateway():
                 elif optext == "GUILD_MEMBER_UPDATE":
                     if data["user"]["id"] == self.my_id:
                         nick = data.get("nick")
-                        roles_changed = None
+                        changed_guild = None
                         for num, guild in enumerate(self.my_roles):
                             if guild["guild_id"] == data["guild_id"]:
                                 self.my_roles[num]["roles"] = data["roles"]
-                                roles_changed = data["guild_id"]
+                                self.my_roles[num]["nick"] = nick
+                                changed_guild = data["guild_id"]
                                 break
                         self.user_update = ({
                             "id": data["user"]["id"],
                             "nick": nick,
-                        }, roles_changed)
+                        }, changed_guild)
 
                 elif optext == "THREAD_LIST_SYNC":
                     threads = []
@@ -1864,6 +1866,7 @@ class Gateway():
                                 self.my_roles.append({
                                     "guild_id": guild_id,
                                     "roles": member["roles"],
+                                    "nick": member["nick"],
                                 })
                                 break
                         self.guilds_changed = True

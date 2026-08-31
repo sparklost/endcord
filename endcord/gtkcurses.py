@@ -794,6 +794,9 @@ class GtkTerminalWindow(Gtk.Window):
 
 def error_handler(message, unblock_event, report=False):
     """Spawn GTK window with the error and unblock the thread when closed"""
+    if message == 1:
+        message = "Exited with return code 1.\nThere might be more info in the log."
+        report = True
     if report:
         report = "\n\nYou can report this here:\nhttps://github.com/sparklost/endcord/issues"
     def build_and_show():   # noqa
