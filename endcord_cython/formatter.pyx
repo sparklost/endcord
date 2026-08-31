@@ -118,52 +118,52 @@ cdef inline Py_ssize_t bisect_left_c(list arr, Py_ssize_t x):
 
 cpdef list fix_line_format(list line_format, str text):
     cdef list wide_positions, corrected
-    cdef Py_ssize_t i, pos
-    cdef Py_ssize_t start, end, start_shift, end_shift
-    cdef int color, codepoint
-    cdef object ch
+    cdef Py_ssize_t i, start, end, start_shift, end_shift
+    cdef int color
+    cdef Py_UCS4 codepoint
+    cdef list item
 
     if len(line_format) <= 1:
         return line_format
 
     wide_positions = []
-    for i, ch in enumerate(text):
-        codepoint = ord(ch)
+    for i, codepoint in enumerate(text):
         if (codepoint < 0x20 or codepoint >= 0x7f) and binary_search(codepoint):
             wide_positions.append(i)
     if not wide_positions:
         return line_format
 
     corrected = [line_format[0]]
-    for color, start, end in line_format[1:]:
+    for item in line_format[1:]:
+        color, start, end = item
         start_shift = bisect_left_c(wide_positions, start)
         end_shift = bisect_left_c(wide_positions, end)
-        corrected.append([color, start + start_shift, end + end_shift])
+        corrected.append((color, start + start_shift, end + end_shift))
 
     return corrected
 
 
 cpdef list fix_map_ranges(list map_ranges, str text):
-    cdef list wide_positions, corrected
-    cdef Py_ssize_t i, pos
-    cdef Py_ssize_t start, end, start_shift, end_shift
-    cdef int codepoint
-    cdef object ch
+    cdef list wide_positions, corrected, item
+    cdef Py_ssize_t i, start, end, start_shift, end_shift
+    cdef Py_UCS4 codepoint
     cdef object data
 
     if not map_ranges:
         return map_ranges
 
     wide_positions = []
-    for i, ch in enumerate(text):
-        codepoint = ord(ch)
+    for i, codepoint in enumerate(text):
         if (codepoint < 0x20 or codepoint >= 0x7f) and binary_search(codepoint):
             wide_positions.append(i)
     if not wide_positions:
         return map_ranges
 
     corrected = []
-    for start, end, data in map_ranges:
+    for item in map_ranges:
+        start = item[0]
+        end = item[1]
+        data = item[2]
         start_shift = bisect_left_c(wide_positions, start)
         end_shift = bisect_left_c(wide_positions, end)
         corrected.append([start + start_shift, end + end_shift, data])

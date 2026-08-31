@@ -2744,7 +2744,7 @@ class TUI():
                 self.keybinding_chain = key
                 continue
             if self.keybinding_chain:
-                key = f"{self.keybinding_chain} {"SPC" if key == " " else key}"
+                key = f"{self.keybinding_chain} {"SPACE" if key == " " else key}"
                 self.keybinding_chain = None
 
             if key.startswith("PASTE"):

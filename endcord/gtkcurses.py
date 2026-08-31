@@ -662,7 +662,7 @@ class GtkTerminalWindow(Gtk.Window):
         unicode_code = Gdk.keyval_to_unicode(keyval)
         if unicode_code != 0:
             ch = chr(unicode_code)
-            if ch == " ":
+            if ch == " " and mod_prefix:
                 event_queue.put(mod_prefix + "SPACE")
                 return True
             if not ctrl and not alt:

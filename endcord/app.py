@@ -1366,9 +1366,9 @@ class Endcord:
             self.my_current_role_color = None
 
 
-    def add_to_store(self, channel_id, text):
+    def add_to_store(self, channel_id, text, force=False):
         """Adds entry to input line store"""
-        if not text or text == "\n":
+        if (not text or text == "\n") and not force:
             return
         if self.cache_typed:
             for num, channel in enumerate(self.input_store):
@@ -4706,18 +4706,21 @@ class Endcord:
         active_channel_id = self.active_channel["channel_id"]
         for num, channel in enumerate(self.input_store):
             if channel["id"] == active_channel_id:
-                input_text = self.input_store[num]["content"]
-                if len(paths) < self.limit_msg_len:
-                    input_index = self.input_store[num]["index"]
-                    self.input_store[num]["content"] = input_text[:input_index] + paths + input_text[input_index:]
-                    self.input_store[num]["index"] = input_index + len(paths)
-                else:
-                    temp_message_path = os.path.join(os.path.expanduser(peripherals.temp_path), "message.txt")
-                    with open(temp_message_path, "w", encoding="utf-8") as file:
-                        file.write(paths)
-                    self.upload_threads.append(threading.Thread(target=self.upload, daemon=True, args=(temp_message_path, None, True)))
-                    self.upload_threads[-1].start()
                 break
+        else:
+            self.add_to_store(active_channel_id, "", force=True)
+            num = len(self.input_store) - 1
+        input_text = self.input_store[num]["content"]
+        if len(paths) < self.limit_msg_len:
+            input_index = self.input_store[num]["index"]
+            self.input_store[num]["content"] = input_text[:input_index] + paths + input_text[input_index:]
+            self.input_store[num]["index"] = input_index + len(paths)
+        else:
+            temp_message_path = os.path.join(os.path.expanduser(peripherals.temp_path), "message.txt")
+            with open(temp_message_path, "w", encoding="utf-8") as file:
+                file.write(paths)
+            self.upload_threads.append(threading.Thread(target=self.upload, daemon=True, args=(temp_message_path, None, True)))
+            self.upload_threads[-1].start()
 
 
     def get_chat_last_message_id(self):
