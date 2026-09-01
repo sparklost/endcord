@@ -39,7 +39,7 @@ gi.require_version("PangoCairo", "1.0")
 if sys.platform == "linux":
     gi.require_version("GioUnix", "2.0")
 
-from gi.repository import Gdk, GLib, Gtk, Pango, PangoCairo   # noqa
+from gi.repository import Gdk, GLib, Gtk, Gio, Pango, PangoCairo   # noqa
 have_tray = False
 tray_error = None
 if importlib.util.find_spec("pystray"):
@@ -425,6 +425,13 @@ class GtkTerminalWindow(Gtk.Window):
         self.drawing_area.connect("button-press-event", self.on_button_press)
         self.drawing_area.connect("button-release-event", self.on_button_release)
         self.drawing_area.connect("motion-notify-event", self.on_motion_notify)
+        self.drawing_area.drag_dest_set(Gtk.DestDefaults.ALL, [
+            Gtk.TargetEntry.new("text/uri-list", 0, 1),
+            Gtk.TargetEntry.new("UTF8_STRING", 0, 2),
+            Gtk.TargetEntry.new("STRING", 0, 2),
+            Gtk.TargetEntry.new("text/plain", 0, 2),
+        ], Gdk.DragAction.COPY)
+        self.drawing_area.connect("drag-data-received", self.on_drag_data_received)
         self.add(self.drawing_area)
         self.connect("key-press-event", self.on_key_press)
         self.connect("delete-event", self.on_delete_event)
@@ -790,6 +797,80 @@ class GtkTerminalWindow(Gtk.Window):
         else:
             self.show()
             self.present()
+
+
+    def on_drag_data_received(self, widget, drag_context, x, y, data, info, time):   # noqa
+        """Handle drag-and-dropped files and text"""
+        success = False
+        try:
+            if info == 1:   # file paths
+                uris = data.get_uris()
+                if uris:
+                    paths = []
+                    for uri in uris:
+                        gfile = Gio.File.new_for_uri(uri)
+                        path = gfile.get_path()
+                        if path:
+                            paths.append(path)
+                    if paths:
+                        event_queue.put(f"PASTE_FILE {json.dumps(paths)}")
+                        success = True
+            elif info == 2:   # text
+                text = data.get_text()
+                if text:
+                    event_queue.put(f"PASTE_TEXT {text}")
+                    success = True
+        except Exception as e:
+            logger.error(f"Drag and drop error: {e}")
+        finally:
+            Gtk.drag_finish(drag_context, success, False, time)   # ack the drop
+
+
+def paste_clipboard(save_path=None):
+    """Paste list of file paths, images or text from clipboard"""
+    result = []
+    fetch_event = threading.Event()
+
+    def fetch_on_main_thread():
+        nonlocal result
+        clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
+
+        # file paths
+        if clipboard.wait_is_uris_available():
+            uris = clipboard.wait_for_uris()
+            if uris:
+                for uri in uris:
+                    gfile = Gio.File.new_for_uri(uri)
+                    path = gfile.get_path()
+                    if path:
+                        result.append(path)
+
+        # binary image
+        elif clipboard.wait_is_image_available():
+            pixbuf = clipboard.wait_for_image()
+            if pixbuf:
+                if not save_path:
+                    return []
+                try:
+                    file_path = os.path.join(save_path, f"clipboard_image_{int(time.time())}.png")
+                    pixbuf.savev(file_path, "png", [], [])
+                    result = [file_path]
+                except Exception:
+                    pass
+
+        # text
+        elif clipboard.wait_is_text_available():
+            text = clipboard.wait_for_text()
+            if text:
+                result = text
+        fetch_event.set()
+        return False
+
+    GLib.idle_add(fetch_on_main_thread)
+    fetch_event.wait()
+    logger.info(result)
+
+    return result
 
 
 def error_handler(message, unblock_event, report=False):

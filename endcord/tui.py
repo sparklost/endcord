@@ -3,6 +3,7 @@
 # Redistribution of modified versions is not permitted.
 
 import curses
+import json
 import logging
 import os
 import re
@@ -400,6 +401,7 @@ class TUI():
         self.pressed_num_key = None
         self.insert_mode = not self.vim_mode   # leave it true to enable input
         self.inline_media = None
+        self.dropped_paths = None
 
         # lock for thread-safe drawing with curses
         self.lock = threading.RLock()
@@ -827,6 +829,13 @@ class TUI():
     def get_chat_scrolled_top(self):
         """Check whether chat scrolling hit the top end"""
         return self.chat_scrolled_top
+
+
+    def get_dropped(self):
+        """Get dropped files from drag-and-drop"""
+        cache = self.dropped_paths
+        self.dropped_paths = None
+        return cache
 
 
     def reset_chat_scrolled_top(self):
@@ -2748,6 +2757,12 @@ class TUI():
                 self.keybinding_chain = None
 
             if key.startswith("PASTE"):
+                if key.startswith("PASTE_FILE"):
+                    self.dropped_paths = json.loads(key[11:])   # list
+                    return self.return_input_code(54)
+                if key.startswith("PASTE_TEXT"):
+                    self.dropped_paths = key[11:]   # string
+                    return self.return_input_code(54)
                 self.paste_text(key[6:])
 
             if key == "QUIT":   # special for gtkcurses window X button

@@ -3,6 +3,7 @@
 # Redistribution of modified versions is not permitted.
 
 import ast
+import ctypes
 import http.client
 import importlib.util
 import logging
@@ -17,6 +18,7 @@ import threading
 import time
 import urllib.parse
 import webbrowser
+from ctypes import wintypes
 
 if sys.platform.startswith("android"):
     sys.platform = "linux"
@@ -34,7 +36,7 @@ except (AttributeError, NameError):
 VERSION = "1.5.4"
 NO_NOTIFY_SOUND_DE = ("kde", "plasma")   # linux desktops without notification sound
 
-# platform specific code
+# windows specific init
 have_termux_notify = False
 if sys.platform == "win32":
     import win32clipboard
@@ -44,6 +46,21 @@ if sys.platform == "win32":
     except OSError:
         toaster = None
         logger.warn("Failed initializing notification system")
+    # for pasting
+    user32 = ctypes.windll.user32
+    user32.OpenClipboard.argtypes = [wintypes.HWND]
+    user32.IsClipboardFormatAvailable.argtypes = [wintypes.UINT]
+    user32.IsClipboardFormatAvailable.restype = wintypes.BOOL
+    user32.GetClipboardData.argtypes = [wintypes.UINT]
+    user32.GetClipboardData.restype = wintypes.HANDLE
+    kernel32 = ctypes.windll.kernel32
+    kernel32.GlobalLock.argtypes = [wintypes.HANDLE]
+    kernel32.GlobalLock.restype = wintypes.LPVOID
+    kernel32.GlobalUnlock.argtypes = [wintypes.HANDLE]
+    shell32 = ctypes.windll.shell32
+    shell32.DragQueryFileW.argtypes = [wintypes.HANDLE, wintypes.UINT, wintypes.LPWSTR, wintypes.UINT]
+
+# linux specific init
 elif sys.platform == "linux":
     have_gdbus = shutil.which("gdbus")
     have_notify_send = shutil.which("notify-send")
@@ -338,8 +355,8 @@ def copy_file_to_clipboard(path):
         proc.communicate(input=f"file://{urllib.parse.quote(path)}".encode("utf-8"))
 
 
-def paste_clipboard_files(save_path=None):
-    """Get files paths from clipboard, linux only, needs xclip or wl-clipboard"""
+def paste_clipboard(save_path=None):
+    """Get files paths, images, or text from clipboard, linux only, needs xclip or wl-clipboard"""
     if save_path:
         save_path = os.path.expanduser(save_path)
     if sys.platform == "linux":
@@ -405,15 +422,47 @@ def paste_clipboard_files(save_path=None):
     return []
 
 
-def pillow_paste_image():
+def paste_clipboard_win(save_path=None):
+    """Paste list of file paths text from clipboard"""
+    if sys.platform != "win32" or not user32.OpenClipboard(0):
+        return []
+    try:
+        # file paths
+        if user32.IsClipboardFormatAvailable(15):
+            hdrop = user32.GetClipboardData(15)
+            paths = []
+            if hdrop:
+                count = shell32.DragQueryFileW(hdrop, 0xFFFFFFFF, None, 0)
+                for i in range(count):
+                    length = shell32.DragQueryFileW(hdrop, i, None, 0)
+                    buf = ctypes.create_unicode_buffer(length + 1)
+                    shell32.DragQueryFileW(hdrop, i, buf, length + 1)
+                    paths.append(buf.value)
+            return paths
+        # text
+        if user32.IsClipboardFormatAvailable(13):
+            handle = user32.GetClipboardData(13)
+            if handle:
+                ptr = kernel32.GlobalLock(handle)
+                if ptr:
+                    try:
+                        return ctypes.wstring_at(ptr)
+                    finally:
+                        kernel32.GlobalUnlock(handle)
+    finally:
+        user32.CloseClipboard()   # must be closed
+    return pillow_paste_image(save_path)
+
+
+def pillow_paste_image(save_path):
     """If there is image in clipboard, save it to temp path using pillow"""
     try:
         from PIL import Image, ImageGrab
         img = ImageGrab.grabclipboard()
         if isinstance(img, Image.Image):
-            save_path = os.path.join(os.path.expanduser(temp_path), f"clipboard_image_{int(time.time())}.png")
-            img.save(save_path)
-            return [save_path]
+            file_path = os.path.join(os.path.expanduser(save_path), f"clipboard_image_{int(time.time())}.png")
+            img.save(file_path)
+            return [file_path]
         return []
     except Exception:
         return []

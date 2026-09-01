@@ -2564,7 +2564,7 @@ class Endcord:
                     self.toggle_tab(channel_id, guild_id, add_tab=True)
 
             # leave/enter insert mode (when in vim mode)
-            elif self.vim_mode and (action == 26 or action == 28):
+            elif self.vim_mode and action in (26, 28):
                 # insert_mode already toggled in tui
                 self.restore_input_text = (input_text, "standard")
                 self.update_status_line()
@@ -2615,6 +2615,11 @@ class Endcord:
                         guild_id = self.find_parents_from_id(channel_id)[2]
                         self.toggle_tab(channel_id, guild_id)
                     break
+
+            # drag and drop from gtkcurses
+            elif action == 54:
+                files = self.tui.get_dropped()
+                self.smart_paste(data=files)   # offload work to smart_paste
 
             # escape in main UI
             elif action == 5:
@@ -4685,15 +4690,21 @@ class Endcord:
         return False
 
 
-    def smart_paste(self):
+    def smart_paste(self, data=None):
         """Paste text and files and add them as attachments, paste too long text as attachment"""
         if self.forum:
             return
         paths = []
-        if shutil.which("xclip") or shutil.which("wl-paste"):
-            paths = peripherals.paste_clipboard_files(peripherals.temp_path)
+        if data:
+            paths = data
+        if sys.platform == "win32":
+            paths = peripherals.paste_clipboard_win(peripherals.temp_path)
+        elif uses_gtkcurses:
+            paths = curses.paste_clipboard(peripherals.temp_path)
+        elif shutil.which("xclip") or shutil.which("wl-paste"):
+            paths = peripherals.paste_clipboard(peripherals.temp_path)
         elif support_image:
-            paths = peripherals.pillow_paste_image()
+            paths = peripherals.pillow_paste_image(peripherals.temp_path)
         else:
             self.update_extra_line("No media support", color=20)
         if not paths:
