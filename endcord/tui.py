@@ -149,7 +149,6 @@ def draw_chat(win_chat, h, w, chat_buffer, chat_format, chat_index, chat_selecte
     """Draw chat with applied color formatting"""
     y = h
     # drawing from down to up
-    chat_format = chat_format[chat_index:]
     for num in range(len(chat_buffer) - chat_index):
         line_idx = chat_index + num
         if line_idx >= len(chat_buffer):
@@ -159,30 +158,30 @@ def draw_chat(win_chat, h, w, chat_buffer, chat_format, chat_index, chat_selecte
             break
 
         line = chat_buffer[line_idx]
-        if num == chat_selected - chat_index and not any(a <= chat_selected <= b for a, b in exclude_selection):
-            fill_len = w - len(line)
-            win_chat.insstr(y, 0, line + (" " * fill_len) + "\n", curses.color_pair(16))
-        else:
-            line_format = chat_format[num]
-            default_color_id = line_format[0][0]
-            # filled with spaces so background is drawn all the way
-            default_color = curses.color_pair(default_color_id) | attrib_map[default_color_id]
-            win_chat.insstr(y, 0, (line[:w]).ljust(w) + "\n", default_color)
-            for format_part in line_format[1:]:
-                color = format_part[0]
-                start = format_part[1]
-                end = min(format_part[2], w)
-                if start >= end:
-                    continue
-                # assuming never to have id > 65536, if value is that large its definitely attribute
-                if color >= 0x00010000:
-                    # using base color because it is in message content anyway
-                    color_ready = curses.color_pair(default_color_id) | color
-                else:
-                    if color > 255:   # set all colors after 255 to default color
-                        color = color_default
-                    color_ready = curses.color_pair(color) | attrib_map[color]
-                win_chat.chgat(y, start, end - start, color_ready)
+        selected = num == chat_selected - chat_index and not any(a <= chat_selected <= b for a, b in exclude_selection)
+        line_format = chat_format[line_idx]
+        default_color_id = line_format[0][0]
+
+        # filled with spaces so background is drawn all the way
+        default_color = curses.color_pair(default_color_id if not selected else 16) | attrib_map[default_color_id]
+        win_chat.insstr(y, 0, (line[:w]).ljust(w), default_color)
+
+        # apply formatting in chunks
+        for format_part in line_format[1:]:
+            color = format_part[0]
+            start = format_part[1]
+            end = min(format_part[2], w)
+            if start >= end:
+                continue
+            # assuming never to have id > 65536, if value is that large its definitely attribute
+            if color >= 0x00010000:
+                # using base color because it is in message content anyway
+                color_ready = curses.color_pair(default_color_id if not selected else 16) | color
+            else:
+                if color > 255:   # set all colors after 255 to default color
+                    color = color_default
+                color_ready = curses.color_pair(color if not selected else 16) | attrib_map[color]
+            win_chat.chgat(y, start, end - start, color_ready)
 
     # fill empty lines with spaces so background is drawn all the way
     y -= 1

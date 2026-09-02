@@ -593,8 +593,8 @@ Note: everything after `%content` may be pushed to newline.
     Whether to use dark GTK theme for the window.
 - `app_name: "Endcord"`  
     Only changes title of the window.
-- `ctrl_v_paste: false`  
-    If `true` will use `Ctrl+V` instead `Ctrl+Shift+V` for pasting.
+- `ctrl_shift_v_paste: false`  
+    If `true` will enable `Ctrl+Shift+V` for pasting TEXT ONLY. Ctrl+V is already gtk-natively handling smart-paste.
 - `enable_tray: true`  
     Enable tray icon. closing window will minimize to tray.
 - `tray_icon_normal: null`  

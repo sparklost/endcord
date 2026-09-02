@@ -1,4 +1,4 @@
-Fix gtkcurses emoji rendering
+Add notification floating number to desktop icon to gtkcurses
 Fix sound stuttering when using rnnoise
 Fix bad received voice call sound
 When double click on voice channel ask to confirm to join and switch to that channel chat
@@ -21,7 +21,6 @@ Add video, stage and stream calls
 Add localization
 
 GTKCURSES:
-Add notification floating number to desktop icon to gtkcurses
 Add ascii/block media drawing and inline to gtkcurses
 Optimize gtkcurses
 Add full image viewer and inline to gtkcurses

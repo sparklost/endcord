@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.5.4
+Type=Application
+Name=Endcord
+GenericName=Internet messenger
+Comment=The most feature rich third party Discord TUI client
+Icon=endcord
+Exec=endcord
+Terminal=false
+Categories=InstantMessaging;Network;

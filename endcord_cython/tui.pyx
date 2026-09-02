@@ -9,13 +9,13 @@ import threading
 cimport cython
 
 
-cpdef inline bint in_any_range(short x, list ranges):
+cpdef inline bint in_any_range(int x, list ranges):
     """Check if x is in any of given ranges"""
     cdef tuple r
-    cdef short a, b
+    cdef int a, b
     for r in ranges:
-        a = <short>r[0]
-        b = <short>r[1]
+        a = r[0]
+        b = r[1]
         if a <= x <= b:
             return True
     return False
@@ -40,11 +40,10 @@ cpdef void draw_chat(
     cdef object character, format_slice
     cdef int start, end
     cdef int fill_len
+    cdef bint selected
 
     cdef int y = h
 
-    # drawing from down to up
-    chat_format = chat_format[chat_index:]
     for num in range(len(chat_buffer) - chat_index):
         line_idx = chat_index + num
         if line_idx >= len(chat_buffer):
@@ -54,35 +53,27 @@ cpdef void draw_chat(
             break
 
         line = chat_buffer[line_idx]
-        if num == chat_selected - chat_index and not in_any_range(chat_selected, exclude_selection):
-            fill_len = w - len(line)
-            win_chat.insstr(y, 0, line + (" " * fill_len) + "\n", curses.color_pair(16))
-        else:
-            line_format = chat_format[num]
-            default_color_id = line_format[0][0]
-            # filled with spaces so background is drawn all the way
-            default_color = curses.color_pair(default_color_id) | attrib_map[default_color_id]
-            win_chat.insstr(y, 0, (line[:w]).ljust(w) + "\n", default_color)
+        selected = num == chat_selected - chat_index and not in_any_range(chat_selected, exclude_selection)
+        line_format = chat_format[line_idx]
+        default_color_id = line_format[0][0]
 
-            for format_part in line_format[1:]:
-                color = format_part[0]
-                start = format_part[1]
-                end = format_part[2]
-                if end > w:
-                    end = w
-                if start >= end:
-                    continue
-                # assuming never to have id > 65536, if value is that large its definitely attribute
-                if color >= 0x00010000:
-                    # using base color because it is in message content anyway
-                    color_ready = (<unsigned int>curses.color_pair(default_color_id)) | (<unsigned int>color)
-                else:
-                    if color > 255:   # set all colors after 255 to default color
-                        color = color_default
-                    color_ready = (<unsigned int>curses.color_pair(color)) | (<unsigned int>attrib_map[color])
-                win_chat.chgat(y, start, end - start, color_ready)
+        default_color = curses.color_pair(default_color_id if not selected else 16) | attrib_map[default_color_id]
+        win_chat.insstr(y, 0, (line[:w]).ljust(w), default_color)
 
-    # fill empty lines with spaces so background is drawn all the way
+        for format_part in line_format[1:]:
+            color = format_part[0]
+            start = format_part[1]
+            end = min(format_part[2], w)
+            if start >= end:
+                continue
+            if color >= 0x00010000:
+                color_ready = (<unsigned int>curses.color_pair(default_color_id if not selected else 16)) | color
+            else:
+                if color > 255:
+                    color = color_default
+                color_ready = (<unsigned int>curses.color_pair(color if not selected else 16)) | (<unsigned int>attrib_map[color])
+            win_chat.chgat(y, start, end - start, color_ready)
+
     y -= 1
     while y >= 0:
         win_chat.insstr(y, 0, "\n", curses.color_pair(0))

@@ -68,7 +68,7 @@ try:
 except Exception:
     APP_NAME = "endcord"
 
-CTRL_V_PASTE = False   # use Ctrl+V instead Ctrl+Shift+V to paste
+CTRL_SHIFT_V_PASTE = False   # enable Ctrl+Shift+V pasting
 ENABLE_TRAY = True
 TRAY_ICON_NORMAL = None
 TRAY_ICON_UNREAD = None
@@ -111,7 +111,7 @@ if config_path:
             FONT_NAME = config.get("font_name", FONT_NAME)
             GTK_DARK_THEME = config.get("gtk_dark_theme", GTK_DARK_THEME)
             APP_NAME = config.get("app_name", APP_NAME)
-            CTRL_V_PASTE = config.get("ctrl_v_paste", CTRL_V_PASTE)
+            CTRL_SHIFT_V_PASTE = config.get("ctrl_shift_v_paste", CTRL_SHIFT_V_PASTE)
             ENABLE_TRAY = config.get("enable_tray", ENABLE_TRAY)
             TRAY_ICON_NORMAL = config.get("tray_icon_normal", TRAY_ICON_NORMAL)
             TRAY_ICON_UNREAD = config.get("tray_icon_unread", TRAY_ICON_UNREAD)
@@ -129,7 +129,7 @@ if config_path:
             "font_name": FONT_NAME,
             "gtk_dark_theme": GTK_DARK_THEME,
             "app_name": APP_NAME,
-            "ctrl_v_paste": CTRL_V_PASTE,
+            "ctrl_shift_v_paste": CTRL_SHIFT_V_PASTE,
             "enable_tray": ENABLE_TRAY,
             "tray_icon_normal": TRAY_ICON_NORMAL,
             "tray_icon_unread": TRAY_ICON_UNREAD,
@@ -600,7 +600,7 @@ class GtkTerminalWindow(Gtk.Window):
         shift = bool(state & Gdk.ModifierType.SHIFT_MASK)
 
         # clipboard paste
-        if (ctrl and keyval == Gdk.KEY_v) if CTRL_V_PASTE else (ctrl and shift and keyval == Gdk.KEY_V):
+        if CTRL_SHIFT_V_PASTE and (ctrl and shift and keyval == Gdk.KEY_V):
             clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
             clipboard.request_text(self.on_clipboard_received, None)
             return True
@@ -1022,8 +1022,8 @@ class Window:
                 row_buffer = self.buffer[abs_y]
                 abs_end = min(abs_end, len(row_buffer))
                 for i in range(abs_x, abs_end):
-                    ch, _ = row_buffer[i]
-                    row_buffer[i] = (ch, attr)
+                    ch, old_attr = row_buffer[i]
+                    row_buffer[i] = (ch, attr | (old_attr & A_EMOJI))
 
 
     def clear(self):   # noqa
