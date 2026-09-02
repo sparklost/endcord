@@ -1316,6 +1316,11 @@ if __name__ == "__main__":
         fprint(f"This platform is not supported: {sys.platform}", color=RED, prefix="", file=sys.stderr)
         sys.exit(1)
 
+    if CFLAGS_OLD or LDFLAGS_OLD:
+        fprint("System environment variables:")
+        iprint(f'CFLAGS="{CFLAGS_OLD}"')
+        iprint(f'LDFLAGS="{LDFLAGS_OLD}"')
+
     if args.nocython:
         bins = get_cython_bins(directory="endcord_cython")
         for file in bins:
