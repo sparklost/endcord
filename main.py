@@ -24,6 +24,7 @@ VERSION = "1.5.4"
 default_config_path = peripherals.config_path
 log_path = peripherals.log_path
 threading.stack_size(512 * 1024)
+threading.excepthook = utils.thread_exception_handler
 uses_gtkcurses = hasattr(curses, "GTKCURSES")
 log_file_path = os.path.join(os.path.expanduser(log_path), APP_NAME + ".log")
 run = True
@@ -132,7 +133,7 @@ def main(args):
         except curses.error as e:
             if str(e) != "endwin() returned ERR":
                 logger.error(traceback.format_exc())
-                sys.exit("Curses error, see log for more info")
+                sys.exit("Curses error, see log for more info", file=sys.stderr)
         sys.exit(0)
     elif args.install_extension:
         from endcord import git
@@ -160,7 +161,8 @@ def main(args):
             selected = None
         profiles, selected, proceed = profile_manager.manage(profiles_path, selected, config_data, force_open=args.manager)
         if not profiles:
-            print("Token not provided in profile manager nor as argument")
+            print("Token not provided in profile manager nor as argument", file=sys.stderr)
+            utils.wait_term()
             sys.exit(0)
     if not proceed:
         sys.exit(0)
@@ -176,7 +178,14 @@ def main(args):
     except curses.error as e:
         if str(e) != "endwin() returned ERR":
             logger.error(traceback.format_exc())
-            sys.exit("Curses error, see log for more info")
+            print("Curses error, see log for more info", file=sys.stderr)
+            utils.wait_term()
+    except BaseException as e:
+        logger.info("CAUGHT")
+        error = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+        logger.critical(f"Exit with error:\n{error}")
+        print(f"{error}\n\nPlease report this error here:\nhttps://github.com/sparklost/endcord/issues", file=sys.stderr)
+        utils.wait_term()
     sys.exit(0)
 
 

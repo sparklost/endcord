@@ -12,7 +12,6 @@ import struct
 import sys
 import threading
 import time
-import traceback
 import urllib.parse
 import zlib
 
@@ -353,25 +352,12 @@ class Gateway():
             sys.exit(f"Failed to get gateway url. Error: {error}. Exiting...")
         self.state = 1
         self.heartbeat_interval = int(json.loads(zlib_decompress(self.ws.recv()))["d"]["heartbeat_interval"])
-        self.receiver_thread = threading.Thread(target=self.safe_function_wrapper, daemon=True, args=(self.receiver, ))
+        self.receiver_thread = threading.Thread(target=self.receiver, daemon=True)
         self.receiver_thread.start()
         self.heartbeat_thread = threading.Thread(target=self.send_heartbeat, daemon=True)
         self.heartbeat_thread.start()
         self.reconnect_thread = threading.Thread()
         self.authenticate()
-
-
-    def safe_function_wrapper(self, function, args=()):
-        """
-        Wrapper for a function running in a thread that captures error and stores it for later use.
-        Error can be accessed from main loop and handled there.
-        """
-        try:
-            function(*args)
-        except SystemExit as e:
-            self.error = str(e)
-        except BaseException as e:
-            self.error = "".join(traceback.format_exception(e))
 
 
     def send(self, request):
@@ -2138,7 +2124,7 @@ class Gateway():
             self.wait = False
             # restarting threads
             if not self.receiver_thread.is_alive():
-                self.receiver_thread = threading.Thread(target=self.safe_function_wrapper, daemon=True, args=(self.receiver, ))
+                self.receiver_thread = threading.Thread(target=self.receiver, daemon=True)
                 self.receiver_thread.start()
             if not self.heartbeat_thread.is_alive():
                 self.heartbeat_thread = threading.Thread(target=self.send_heartbeat, daemon=True)

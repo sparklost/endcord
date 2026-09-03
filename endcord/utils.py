@@ -13,6 +13,7 @@ import shutil
 import subprocess
 import sys
 import time
+import traceback
 
 from endcord import minimagic, peripherals
 
@@ -26,6 +27,7 @@ logger = logging.getLogger(__name__)
 match_youtube = re.compile(r"(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)[a-zA-Z0-9_-]{11}")
 match_emoji = re.compile(r"(?<!\\):[^:\s]+:")
 EMOJI_DATA = {}   # delayed load for faster startup
+THREAD_EXCEPTION = ""
 
 
 def get_executable():
@@ -40,7 +42,7 @@ def ensure_terminal():
     Ensure that app is running inside a terminal emulator, launch inside terminal if not.
     Prefer $TERMINAL env var, fallback to few common terminal emulators.
     """
-    if sys.stdout.isatty():
+    if sys.stdout.isatty() or os.environ.get("ENDCORD_STARTED_TERM"):
         return
 
     terminals = []
@@ -71,10 +73,12 @@ def ensure_terminal():
         print("No terminal emulator found.", file=sys.stderr)
         sys.exit(1)
 
+    env = os.environ.copy()
+    env["ENDCORD_STARTED_TERM"] = "1"
     if terminal in ("gnome-terminal", "kgx"):
-        subprocess.Popen([terminal, "--"] + get_executable())
+        subprocess.Popen([terminal, "--"] + get_executable(), env=env)
     else:
-        subprocess.Popen([terminal, "-e"] + get_executable())
+        subprocess.Popen([terminal, "-e"] + get_executable(), env=env)
     sys.exit(0)
 
 
@@ -92,6 +96,27 @@ def ensure_ssl_certificates():
     elif sys.platform == "darwin" and importlib.util.find_spec("certifi") is not None:
         import certifi
         os.environ["SSL_CERT_FILE"] = certifi.where()
+
+
+def wait_term():
+    """If endcord is running in dedicated terminal, wait and prompt user to press key"""
+    if not os.environ.get("ENDCORD_STARTED_TERM"):
+        return
+    try:
+        input("\n[Press Enter to exit]")
+    except (KeyboardInterrupt, EOFError):
+        return
+
+
+def thread_exception_handler(args):
+    """Handle exceptions in all threads, set exceptions to env var so main loop can check it and exit"""
+    global THREAD_EXCEPTION
+    if args.exc_type is SystemExit:
+        code = args.exc_value.code if args.exc_value.code is not None else 0
+        if code != 0:
+            THREAD_EXCEPTION = "".join(traceback.format_exception(args.exc_type, args.exc_value, args.exc_traceback))
+        return
+    THREAD_EXCEPTION = "".join(traceback.format_exception(args.exc_type, args.exc_value, args.exc_traceback))
 
 
 def collapseuser(path):

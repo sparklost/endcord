@@ -30,6 +30,7 @@ if sys.platform == "win32":
 import cairo
 import gi
 
+from endcord import utils
 from endcord.wide_ranges import WIDE_RANGES
 
 gi.require_version("Gtk", "3.0")
@@ -1107,13 +1108,16 @@ def wrapper(func, *args, **kwargs):   # noqa
             func_result = func(window, *args, **kwargs)
         except SystemExit as e:
             if e.code:
-                exit_message = str(e.code)
+                if utils.THREAD_EXCEPTION:
+                    exit_message = utils.THREAD_EXCEPTION
+                else:
+                    exit_message = str(e.code)
                 logger.warning(f"Exit with message: {exit_message}")
                 error_handler(exit_message, error_event)
                 error_event.wait()
         except Exception as e:
             error_traceback = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            logger.error(f"Exit with error:\n{error_traceback}")
+            logger.critical(f"Exit with error:\n{error_traceback}")
             error_handler(error_traceback, error_event, report=True)
             error_event.wait()
         finally:

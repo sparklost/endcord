@@ -62,7 +62,6 @@ ENABLE_EXTENSIONS = True
 MESSAGE_UPDATE_ELEMENTS = ("id", "content", "mentions", "mention_roles", "mention_everyone", "embeds", "edited")
 MEDIA_EMBEDS = ("image", "gifv", "video", "audio", "rich")
 STATUS_STRINGS = ("online", "idle", "dnd", "invisible")
-ERROR_TEXT = "\nUnhandled exception occurred. Please report here: https://github.com/sparklost/endcord/issues"
 MSG_MIN = 3   # minimum number of messages that must be sent in official client
 SUMMARY_SAVE_INTERVAL = 300   # 5min
 LIMIT_SUMMARIES = 5   # max number of summaries per channel
@@ -395,39 +394,43 @@ class Endcord:
                 self.leave_call()
             if self.ringer:
                 self.ringer.stop_playback()
-            if self.enable_rpc:
+            if self.enable_rpc and hasattr(self, "rpc"):
                 self.rpc.stop()
-            if self.enable_game_detection:
+            if self.enable_game_detection and hasattr(self, "game_detection"):
                 self.game_detection.stop()
             if self.inline_media:
                 self.inline_media_drawer.stop()
             self.message_send_queue.put((None, None, None))
             self.notify_queue.put((None, None))
             self.run = False
-            self.stop_event.set()
+            if hasattr(self, "stop_event"):
+                self.stop_event.set()
             self.timed_extra_line.set()
             try:
                 # in case curses.wrapper doesnt restore terminal
                 curses.nocbreak()
                 curses.echo()
-                curses.endwin()
+                if not message:   # ensure error propagates to main.py
+                    curses.endwin()
             except curses.error:
                 pass
             if not fast:
                 time.sleep(1)
             if force or message:
                 if message:
-                    print(message)
+                    print(message, file=sys.stderr)
                     sys.exit(1)
                 sys.exit(0)
         except Exception:   # failsafe
             self.message_send_queue.put((None, None, None))
             self.notify_queue.put((None, None))
             self.run = False
-            self.stop_event.set()
+            if hasattr(self, "stop_event"):
+                self.stop_event.set()
             self.timed_extra_line.set()
             if message:
-                sys.exit(message)
+                print(message, file=sys.stderr)
+                sys.exit(1)
             sys.exit(0)
 
 
@@ -8558,11 +8561,8 @@ class Endcord:
 
         # wait for gateway and load data from it
         while not self.gateway.get_ready():
-            if self.gateway.error:
-                if self.gateway.error.startswith("Failed"):
-                    self.exit(message=self.gateway.error)
-                logger.fatal(f"Gateway error: \n {self.gateway.error}")
-                self.exit(message=self.gateway.error + ERROR_TEXT)
+            if utils.THREAD_EXCEPTION:
+                self.exit(message=utils.THREAD_EXCEPTION)
             if self.gateway.get_state() == 3:
                 self.my_status["client_state"] = "ERROR"
                 self.update_extra_line("Failed initializing a session: There is probably a server-side error", timed=False, color=20)
@@ -9233,10 +9233,7 @@ class Endcord:
                 self.tui.draw_extra_window(extra_title, extra_body, extra_format, reset_scroll=False)
 
             # check gateway for errors
-            if self.gateway.error:
-                if self.gateway.error.startswith("Failed"):
-                    self.exit(message=self.gateway.error)
-                logger.fatal(f"Gateway error: \n {self.gateway.error}")
-                self.exit(message=self.gateway.error + ERROR_TEXT)
+            if utils.THREAD_EXCEPTION:
+                self.exit(message=utils.THREAD_EXCEPTION)
 
             time.sleep(MAIN_LOOP_POLL_DELAY)
