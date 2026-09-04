@@ -317,7 +317,7 @@ But endcord may crash at any time. Further, each host may have different spam fi
 Whether endcord will work or crash depends on hosts api implementation, the more different from discord it is, greater is the risk of a crash. If endcord crashes - its hosts fault. Do not report bugs related to this.
 
 ### Termux (android)
-Endcord can be run on android through termux app, but ot cant be built.  
+Endcord can be run on android through termux app, but it cant be built.  
 To run it: first install python >= 3.12 and `uv`, then clone this repo, setup env to "MICRO" level: `python --nobuild --level=MICRO` (one time), and run it: `uv run main.py`.  
 Setting up environment for higher levels will probably fail because these dependencies will have to be built for arm architecture.  
 To enable android notifications simply run `pkg install termux-api` and install Termux:API app. Vibration is disabled by default, to enable it: run endcord at least once, then in Termux:Api notification settings enable vibration for endcord notifications.  
@@ -348,7 +348,7 @@ Note: official means installations from these sources are coming from endcord de
 ### Windows
 - Pre-built binaries (built with nuitka) are available in releases
 - [Build](#building) endcord, standalone executable can be found in `./dist/endcord.exe`
-- If youre trying to run endcord-gui (windowed) from source or build it, youll need GTK3. Install it using [gvsbuild](https://github.com/wingtk/gvsbuild).
+- If your'e trying to run endcord-gui (windowed) from source or build it, you'll need GTK3. Install it using [gvsbuild](https://github.com/wingtk/gvsbuild).
 
 Install [WezTerm](https://wezterm.org/) (recommended), [windows terminal](https://github.com/microsoft/terminal), [cmder](https://github.com/cmderdev/cmder), or any other modern terminal. And run exe from there. If built with windowed mode, terminal is not required to use endcord.  
 WezTerm proved to introduce the least drawing issues.  
@@ -483,7 +483,7 @@ You can write to Discord Support team: https://dis.gd/request.
 If you did something particular with endcord that caused the ban, open an issue describing what that is. Maybe that can be prevented or other users can be warned.  
 
 ### Debug files
-Anonymized data that might help in debugging is saved in `Debug` directory, see [Configuration](#configuration) for path.  
+Anonymized data that might help in debugging is saved in `Debug` directory, see [Configuration](#configuration) for path. It is never automatically uploaded.  
 All channel and server names, topics, descriptions are replaced. All channel and server IDs are added to random number and hashed, so they are irreversible changed, and will be different on each run.
 
 ### Note on Python performance misconceptions
@@ -541,7 +541,7 @@ RAM usage greatly depends on multiple factors:
 - Full binary version uses few MB more than lite.
 - Number of servers and channels: each avg server is ~1MB.
 - If using terminal media player it will permanently increase RAM usage by ~20MB on firs media play.
-- Voice calls will also permanently increase RAM usage by ~5MB on first connected/initialized call (+ ~20MB for media if not already). With few extra MB if using noise supression with RNNoise.
+- Voice calls will also permanently increase RAM usage by ~5MB on first connected/initialized call (+ ~20MB for media if not already). With few extra MB if using noise suppression with RNNoise.
 
 ### Adding desktop launcher on Linux
 Simply make the launcher execute `endcord` or `endcord-lite`, endcord will deal with starting terminal. It will prefer `$TERMINAL` environment variable, then fallback to some most popular terminal emulators.

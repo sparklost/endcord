@@ -139,7 +139,7 @@
 - `rename_folder [name]`  
     Locally rename selected folder in tree. Custom names are kept in state_profile_name.json in config dir.
 - `toggle_pinned` / `toggle_pinned <#[channel_id]>`
-    Togle pinned state for selected channel in tree.
+    Toggle pinned state for selected channel in tree.
 - `resize_popup_window [num/-1/+1]`  
     Resize popup window to specified number or incrementally by +/- 1. Use `extra_window_height` theme setting to persist it.
 - `collapse_all_except *[option]`  
