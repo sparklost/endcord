@@ -6876,7 +6876,7 @@ class Endcord:
                     if not last_message_id:
                         self.unread_count = len(self.messages)
                         found = -1
-                    elif last_acked_message_id <= int(last_message_id):
+                    elif last_acked_message_id <= int(last_message_id) and self.messages:
                         if last_acked_message_id < int(self.messages[-1]["id"]):
                             self.unread_count = len(self.messages)
                             found = -1

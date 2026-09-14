@@ -49,6 +49,32 @@ if "bsd" in sys.platform:
     sys.platform = "linux"
 
 
+class Tee:
+    """Class that splits stdout and stderr to terminal stdout and log file"""
+    ANSI_ESCAPE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+
+    def __init__(self, filename):
+        self.terminal = sys.stdout
+        self.file = open(filename, "w", encoding="utf-8")
+
+    def write(self, message):   # noqa
+        self.terminal.write(message)
+        clean_message = self.ANSI_ESCAPE.sub("", message)
+        self.file.write(clean_message)
+        self.flush()
+
+    def flush(self):   # noqa
+        self.terminal.flush()
+        self.file.flush()
+
+    def isatty(self):   # noqa
+        return self.terminal.isatty()
+
+
+sys.stdout = Tee("build.log")
+sys.stderr = sys.stdout
+
+
 def load_build_config():
     """Load build config from pyproject.toml"""
     if os.path.exists("pyproject.toml"):
@@ -215,13 +241,6 @@ def check_python():
     if os.environ.get("UV", ""):
         if sys.version_info.minor < 12 or sys.version_info.minor > PYTHON_MAX_MINOR:
             fprint(f'WARNING: Python {sys.version_info.major}.{sys.version_info.minor} is not supported but build may succeed. Run "python build.py" to let uv download and setup recommended temporary python interpreter.', color=RED)
-        else:
-            try:
-                version = subprocess.run(["uv", "--version"], capture_output=True, text=True, check=True)
-                fprint(f"Using {version.stdout.strip()}")
-            except Exception:
-                pass
-            fprint(f"Using Python {get_nice_python_version()}")
         if not is_gil_enabled():
             if sys.version_info.minor == PYTHON_FREETHREADED:
                 fprint("WARNING: While endcord works with freethreaded python, final binary is much larger. Nuitka doesnt yet support freethreaded python, so build is likely to fail.", color=RED)
@@ -230,7 +249,7 @@ def check_python():
         return False
 
     try:
-        version = subprocess.run(["uv", "--version"], capture_output=True, text=True, check=True)
+        subprocess.run(["uv", "--version"], capture_output=True, text=True, check=True)
     except subprocess.CalledProcessError as e:
         fprint(f"uv error: {e}", color=RED, prefix="", file=sys.stderr)
         sys.exit(1)
@@ -325,6 +344,47 @@ def check_patchelf():
             fprint("Patchelf version 0.18.0 is a known buggy release, nuitka will likely refuse to use it! Please upgrade or downgrade it.", color=RED)
     except Exception:
         pass
+
+
+def get_bin_version(binary):
+    """Try to get version of given binary executable"""
+    executable_path = shutil.which(binary)
+    if not executable_path:
+        return "Not installed"
+    try:
+        result = subprocess.run([executable_path, "--version"], capture_output=True, text=True, check=True)
+        return f"{result.stdout.splitlines()[0].strip()} [{executable_path}]"
+    except Exception:
+        return "Failed to query version"
+
+
+def print_env_info():
+    """Print relevant environment information to build process"""
+    import platform
+    fprint("Environment information")
+    iprint(f"OS/Platform  : {platform.system()} {platform.release()}")
+    iprint(f"Architecture : {platform.machine()}")
+    iprint(f"CPU Cores    : {os.cpu_count()}")
+    try:
+        version = subprocess.run(["uv", "--version"], capture_output=True, text=True, check=True)
+        iprint(f"uv           : {version.stdout.strip().removeprefix("uv ")}")
+    except Exception:
+        iprint("uv           : Not installed", color=RED)
+    iprint(f"Python       : {get_nice_python_version()}")
+    iprint(f"GCC          : {get_bin_version("gcc")}")
+    iprint(f"Clang        : {get_bin_version("clang")}")
+    if platform.system() == "Windows":
+        cl_path = shutil.which("cl")
+        iprint(f"MSVC         : {cl_path if cl_path else "Not in PATH"}")
+    try:
+        commit = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+        branch = subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"], text=True).strip()
+        status = subprocess.check_output(["git", "status", "--porcelain"], text=True).strip()
+        iprint(f"Git Commit   : {commit}")
+        iprint(f"Git Branch   : {branch}")
+        iprint(f"Modified     : {"Yes" if status else "No"}")
+    except Exception:
+        iprint("Git Info     : Not a git repository or git command missing")
 
 
 def check_deps(*deps):
@@ -684,9 +744,12 @@ def toggle_windowed(check_only=False):
         patch_pystray()
         if sys.platform == "win32":
             install_local_wheels(have_gtk)
+        download_font("https://github.com/adobe-fonts/source-code-pro/blob/release/TTF/SourceCodePro-Regular.ttf", "endcord")
         fprint("Windowed mode enabled!")
     else:
         subprocess.run(["uv", "pip", "uninstall"] + load_build_config().get("windowed_deps", []), check=True)
+        if os.path.exists("./endcord/SourceCodePro-Regular.ttf"):
+            os.remove("./endcord/SourceCodePro-Regular.ttf")
         fprint("Windowed mode disabled!")
     return not enable
 
@@ -711,6 +774,18 @@ def enable_extensions(enable=True, check_only=False, silent=False):
             f.writelines(lines)
     if not check_only and not silent:
         fprint(f"Extensions are {"enabled" if enable else "disabled"}!")
+
+
+def download_font(url, save_dir):
+    """Download font to current dir from given url"""
+    import urllib.request
+    from urllib.parse import urlparse
+    if "github.com" in url and "/blob/" in url:
+        url = url.replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/")
+    parsed_url = urlparse(url)
+    save_path = os.path.join(save_dir, os.path.basename(parsed_url.path))
+    if not os.path.exists(save_path):
+        urllib.request.urlretrieve(url, save_path)
 
 
 def setup_compiler(clang, clear=False, overwrite=False, cflags=[], ldflags=[], cxxflags=[], safe=False, lld=True):
@@ -876,7 +951,7 @@ def build_numpy_lite(clang):
         iprint("Numpy-lite (no openblas) is already built locally")
         return
     setup_compiler(clang)
-    subprocess.run(["uv", "-q", "pip", "install", "pip"], check=True)   # because uv wont work with --config-settings as it should
+    subprocess.run(["uv", "-q", "pip", "install", "pip"], check=True, capture_output=True)   # because uv wont work with --config-settings as it should
     try:
         python = ".venv/bin/python" if sys.platform != "win32" else r".venv\Scripts\python.exe"
         subprocess.run([python, "-m", "pip", "uninstall", "--yes", "numpy"], check=False, capture_output=True)
@@ -895,7 +970,7 @@ def build_numpy_lite(clang):
     value = subprocess.run(check_openblas_cmd, capture_output=True, text=True, check=False).stdout.strip()
     if value and int(value):
         iprint("Verification failed: numpy after building is still linked to openblas!", color=RED)
-    subprocess.run(["uv", "-q", "pip", "uninstall", "pip"], check=True)
+    subprocess.run(["uv", "-q", "pip", "uninstall", "pip"], check=True, capture_output=True)
 
 
 def build_rnnoise(clang):
@@ -1075,10 +1150,12 @@ def build_with_nuitka(level, onedir, clang, mingw, compile_deps, print_cmd=False
     ]
     package_data = []
     add_data = [f"--include-data-files={emoji_path}=emoji.json"]
+    if windowed:
+        add_data += ["--include-data-files=endcord/SourceCodePro-Regular.ttf=SourceCodePro-Regular.ttf"]
 
     rnnoise = get_rnnoise()
     if rnnoise:
-        add_data.append(f"--include-data-files={rnnoise}={rnnoise}")
+        add_data += [f"--include-data-files={rnnoise}={rnnoise}"]
 
     setup_compiler(clang)
 
@@ -1280,6 +1357,12 @@ if __name__ == "__main__":
 
     if os.path.exists("build"):   # ensure clean build env
         shutil.rmtree("build")
+
+    if not os.environ.get("FIRST_RUN"):
+        print_env_info()
+        os.environ["FIRST_RUN"] = get_nice_python_version()
+    elif os.environ["FIRST_RUN"] != get_nice_python_version():
+        fprint(f"Switched to Python {get_nice_python_version()}")
 
     if clang and not shutil.which("lld"):
         fprint("WARNING: lld is not found on system, consider installing it", color=RED)

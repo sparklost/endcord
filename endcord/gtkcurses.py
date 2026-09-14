@@ -260,6 +260,18 @@ except ImportError:
     pass
 
 
+def load_default_dont():
+    """Load default font if it can be found"""
+    if FONT_NAME.lower() == "source code pro":
+        path = os.path.join(utils.get_base_path(), "SourceCodePro-Regular.ttf")
+        if os.path.exists(path):
+            try:
+                font_map = PangoCairo.FontMap.get_default()
+                font_map.add_font_file(path)
+            except Exception as e:
+                logger.warning(f"Failed loading builtin font: {e}")
+
+
 def glib_log_bridge(domain, level, message, user_data=None):   # noqa
     """Logger bridge for gobject"""
     if level & GLib.LogLevelFlags.LEVEL_CRITICAL:
@@ -494,6 +506,9 @@ class GtkTerminalWindow(Gtk.Window):
         self.connect("destroy", self.on_destroy)
         self.connect("focus-in-event", lambda *_: event_queue.put("FOCUS_IN"))
         self.connect("focus-out-event", lambda *_: event_queue.put("FOCUS_OUT"))
+
+        # load fonts
+        load_default_dont()
         self.on_windows = sys.platform == "win32"
         if self.on_windows:
             self.font_desc = Pango.FontDescription.from_string(f"{FONT_NAME}, Segoe UI Symbol, {FONT_SIZE}")
@@ -957,8 +972,6 @@ def paste_clipboard(save_path=None):
 
     GLib.idle_add(fetch_on_main_thread)
     fetch_event.wait()
-    logger.info(result)
-
     return result
 
 

@@ -6,6 +6,7 @@ THIRD_PARTY_LICENSES.txt
 .pyproject.toml.bak
 *_cython/*.c
 .gtk/
+SourceCodePro-Regular.ttf
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

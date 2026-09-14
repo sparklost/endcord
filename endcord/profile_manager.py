@@ -31,6 +31,7 @@ try:
 except (AttributeError, NameError):
     APP_NAME = "endcord"
 
+uses_gtkcurses = hasattr(curses, "GTKCURSES")
 bordered = True
 border_corners = "╭╰╮╯"
 
@@ -930,9 +931,17 @@ def text_prompt(screen, description_text, prompts, init=None, mask=None, prompt_
                 break
         elif key == "ESC":
             break
-        elif isinstance(key, str) and key.startswith("PASTE"):
-            texts[selected] = texts[selected][:input_index] + key[6:] + texts[selected][input_index:]
-            input_index += len(key) - 6
+
+        elif isinstance(key, str) and key.startswith("PASTE_TEXT"):
+            pasted = key[11:].replace("\n", " ")
+            texts[selected] = texts[selected][:input_index] + pasted + texts[selected][input_index:]
+            input_index += len(pasted)
+        elif key in ("C-v", "C-S-v") and uses_gtkcurses:
+            res = curses.paste_clipboard()
+            if isinstance(res, str):
+                pasted = res.replace("\n", " ")
+                texts[selected] = texts[selected][:input_index] + pasted + texts[selected][input_index:]
+                input_index += len(pasted)
 
         elif key in (10, "ENTER"):
             try:
