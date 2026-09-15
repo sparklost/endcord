@@ -45,7 +45,7 @@ if [[ "$3" = "curses" ]]; then
         -DNDEBUG \
         -g0 \
         -O3 \
-        -mtune=generic \
+        $( [[ "${OLD_CFLAGS}" =~ -mtune= ]] || echo "-mtune=generic" ) \
         -fvisibility=hidden \
         -ffat-lto-objects"
     LDFLAGS="${LDFLAGS} \
@@ -105,7 +105,7 @@ CFLAGS="${CFLAGS} \
     -g0 \
     -O3 \
     -D_Py_TIER2=3 \
-    -mtune=generic \
+    $( [[ "${OLD_CFLAGS}" =~ -mtune= ]] || echo "-mtune=generic" ) \
     -fvisibility=hidden \
     -I/usr/include"
 LDFLAGS="${LDFLAGS} \

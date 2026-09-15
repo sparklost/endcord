@@ -1,9 +1,7 @@
-Capture subprocess output in build.py
 Add executable icon
 Add icon to build.py (include in workflow linux build)
 Update install script to install icon and .desktop
 Make install script more interactive
-# Update aur packages to install icon and .desktop
 
 VOICE CALLS:
 When double click on voice channel switch to that channel chat then ask to join

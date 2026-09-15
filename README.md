@@ -82,11 +82,17 @@ Any third party endcord forks may add features that can lead to account ban, con
 - Proxy support
 - Profile manager for multiple accounts
 - Store token in system keyring
-- GTK3 windowed mode with tray icon and transparency
 - Works in termux, with android notifications
 - Auto endcord and extensions check for updates
 - Run bots, with interactions
 - Lots of easter eggs
+- Endcord-GUI features
+    - Customizable tray icons, window can be minimized to tray
+    - All bindings work, Ctrl+C, Ctrl+Z, Shift+Enter
+    - Window can be transparent, and background colors can also have alpha value
+    - Uses only 15MB (linux) more RAM (vs most terminals using 20-100MB)
+    - GTK-native pasting and drag n' drop (text and files)
+    - Linux desktop integration: app icon, notification count badge, click on notification
 
 
 ## Configuration
