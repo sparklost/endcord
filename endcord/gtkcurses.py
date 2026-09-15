@@ -40,8 +40,8 @@ gi.require_version("Pango", "1.0")
 gi.require_version("PangoCairo", "1.0")
 if sys.platform == "linux":
     gi.require_version("GioUnix", "2.0")
+from gi.repository import Gdk, Gio, GLib, Gtk, Pango, PangoCairo   # noqa
 
-from gi.repository import Gdk, GLib, Gtk, Gio, Pango, PangoCairo   # noqa
 have_tray = False
 tray_error = None
 if importlib.util.find_spec("pystray"):
@@ -260,9 +260,9 @@ except ImportError:
     pass
 
 
-def load_default_dont():
+def load_default_font():
     """Load default font if it can be found"""
-    if FONT_NAME.lower() == "source code pro":
+    if not FONT_NAME or FONT_NAME.lower() == "source code pro":
         path = os.path.join(utils.get_base_path(), "SourceCodePro-Regular.ttf")
         if os.path.exists(path):
             try:
@@ -299,6 +299,19 @@ GLib.log_set_handler(
 )
 
 
+def load_svg_with_gtk(path, size=(64, 64)):
+    """Render svg to PIL image using gtk GdkPixbuf loader"""
+    gi.require_version("GdkPixbuf", "2.0")
+    from gi.repository import GdkPixbuf
+    try:
+        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(os.path.expanduser(path), size[0], size[1], True)
+        mode = "RGBA" if pixbuf.get_has_alpha() else "RGB"
+        wh = (pixbuf.get_width(), pixbuf.get_height())
+        return Image.frombytes(mode, wh, pixbuf.get_pixels(), "raw", mode, pixbuf.get_rowstride())
+    except Exception:
+        return None
+
+
 # tray stuff
 
 def enable_tray():
@@ -306,13 +319,27 @@ def enable_tray():
     global use_tray
     use_tray = True
     if not icon:   # tray not yet initialized
-        threading.Thread(target=tray_thread, daemon=True).start()
+        init_tray()
+
+
+def get_default_tray_icon(filename):
+    """Get builtin tray icon"""
+    icons = os.path.join(utils.get_base_path(), "icons")
+    if os.path.exists(icons):
+        return os.path.join(icons, filename)
+    return os.path.normpath(os.path.join(utils.get_base_path(), "..", "tools", "icons", filename))
+
 
 
 def load_tray_image(path=None, color=None):
     """Load image from path, fallback to circle drawn with pillow"""
     if path and os.path.exists(os.path.expanduser(path)):
-        return Image.open(os.path.expanduser(path)).convert("RGBA")
+        expanded_path = os.path.expanduser(path)
+        if expanded_path.lower().endswith(".svg"):
+            img = load_svg_with_gtk(expanded_path)
+            if img:
+                return img
+        return Image.open(expanded_path).convert("RGBA")
     image = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
     dc = ImageDraw.Draw(image)
     dc.ellipse((16, 16, 48, 48), fill=color)
@@ -320,11 +347,17 @@ def load_tray_image(path=None, color=None):
 
 
 if have_tray:
-    tray_icons = [load_tray_image(path, color) for path, color in (
-        (TRAY_ICON_NORMAL, (200, 200, 200, 255)),
-        (TRAY_ICON_UNREAD, (255, 120, 0, 255)),
-        (TRAY_ICON_MENTION, (200, 30, 40, 255)),
-    )]
+    TRAY_ICON_NORMAL = get_default_tray_icon("endcord-tray.png") if not TRAY_ICON_NORMAL else TRAY_ICON_NORMAL
+    TRAY_ICON_UNREAD = get_default_tray_icon("endcord-tray.png") if not TRAY_ICON_UNREAD else TRAY_ICON_UNREAD
+    TRAY_ICON_MENTION = get_default_tray_icon("endcord-tray-mention.png") if not TRAY_ICON_MENTION else TRAY_ICON_MENTION
+    tray_icons = [
+        load_tray_image(path, color)
+        for path, color in (
+            (TRAY_ICON_NORMAL, (200, 200, 200, 255)),
+            (TRAY_ICON_UNREAD, (255, 120, 0, 255)),
+            (TRAY_ICON_MENTION, (200, 30, 40, 255)),
+        )
+    ]
 
 
 def set_tray_icon(icon_index):
@@ -398,8 +431,8 @@ def quit_app(instant=False):
     GLib.timeout_add(50, poll_exit)
 
 
-def tray_thread():
-    """Thread that runs tray icon handler"""
+def init_tray():
+    """Start tray icon handler"""
     global icon
     time.sleep(1)   # delay for window to init
     menu = Menu(
@@ -407,7 +440,7 @@ def tray_thread():
         MenuItem(f"Quit {APP_NAME.capitalize()}", lambda x, y: quit_app()),   # noqa
     )
     icon = Icon(f"{APP_NAME.lower()}-tray", tray_icons[0], APP_NAME, menu)
-    icon.run()
+    icon.run_detached()
 
 
 def set_nice_exit(value):
@@ -438,7 +471,7 @@ class GtkDesktopApp(Gtk.Application):
                 if not app_info:
                     logger.warning(f"No .desktop file found for '{APP_ID}', desktop integration will not work")
                     desktop_integration = False
-            except TypeError:
+            except (TypeError, AttributeError):
                 logger.warning(f"No .desktop file found for '{APP_ID}', desktop integration will not work")
                 desktop_integration = False
         notify_action = Gio.SimpleAction.new("notify-click", GLib.VariantType.new("s"))
@@ -508,7 +541,7 @@ class GtkTerminalWindow(Gtk.Window):
         self.connect("focus-out-event", lambda *_: event_queue.put("FOCUS_OUT"))
 
         # load fonts
-        load_default_dont()
+        load_default_font()
         self.on_windows = sys.platform == "win32"
         if self.on_windows:
             self.font_desc = Pango.FontDescription.from_string(f"{FONT_NAME}, Segoe UI Symbol, {FONT_SIZE}")
@@ -1257,7 +1290,7 @@ def wrapper(func, *args, **kwargs):   # noqa
     func_result = None
 
     if have_tray and use_tray and ENABLE_TRAY:
-        threading.Thread(target=tray_thread, daemon=True).start()
+        init_tray()
     elif tray_error:
         logger.error(f"Failed to start tray: {tray_error}")
     if not have_tray:

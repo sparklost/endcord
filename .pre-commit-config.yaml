@@ -28,3 +28,12 @@ repos:
         language: system
         types: [python]
         pass_filenames: false
+
+  - repo: local
+    hooks:
+      - id: scour
+        name: Optimize SVG with Scour
+        entry: python3 -c "import sys, pathlib, scour.scour as s; opts = s.parse_args(['--remove-metadata', '--enable-comment-stripping', '--indent=space', '--nindent=2']); [p.write_text(s.scourString(p.read_text(), opts)) for f in sys.argv[1:] if (p := pathlib.Path(f))]"
+        language: python
+        types: [svg]
+        additional_dependencies: ['scour']

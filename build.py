@@ -306,13 +306,16 @@ def ensure_gtk():
         return False
 
     if sys.platform == "linux":
-        def not_installed():
-            fprint("GTK3 could not be found on system", color=RED)
-            iprint("Install GTK3 with your package manager", color=RED)
+        def not_installed(dependency):
+            fprint(f"{dependency} could not be found on system", color=RED)
+            iprint(f"Install {dependency} with your package manager", color=RED)
         try:
             result = subprocess.run(["pkg-config", "--exists", "gtk+-3.0"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
             if result.returncode != 0:
-                not_installed()
+                not_installed("GTK3")
+            result = subprocess.run(["pkg-config", "--exists", "girepository-2.0"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+            if result.returncode != 0:
+                not_installed("libgirepository")
             return result.returncode == 0
         except FileNotFoundError:
             try:
@@ -1151,7 +1154,11 @@ def build_with_nuitka(level, onedir, clang, mingw, compile_deps, print_cmd=False
     package_data = []
     add_data = [f"--include-data-files={emoji_path}=emoji.json"]
     if windowed:
-        add_data += ["--include-data-files=endcord/SourceCodePro-Regular.ttf=SourceCodePro-Regular.ttf"]
+        add_data += [
+            "--include-data-files=endcord/SourceCodePro-Regular.ttf=SourceCodePro-Regular.ttf",
+            "--include-data-files=tools/icons/endcord-tray.png=icons/endcord-tray.png",
+            "--include-data-files=tools/icons/endcord-tray-mention.png=icons/endcord-tray-mention.png",
+        ]
 
     rnnoise = get_rnnoise()
     if rnnoise:

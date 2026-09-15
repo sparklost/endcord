@@ -600,7 +600,7 @@ Note: everything after `%content` may be pushed to newline.
 - `enable_tray: true`  
     Enable tray icon. closing window will minimize to tray.
 - `tray_icon_normal: null`  
-    Path to tray icon file. Its supposed to be png with size of 32x32 or 64x64, but other formats and sizes should work too. Set to `null` to use default icons.
+    Path to tray icon file. Its supposed to be png with size of 32x32 or 64x64, but other formats should work (svg too). Set to `null` to use default icons.
 - `tray_icon_unread: null`  
     Path to tray icon file shown when there are unread messages. Set to `null` to disable.
 - `tray_icon_unread: null`  

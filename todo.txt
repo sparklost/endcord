@@ -1,19 +1,12 @@
 Capture subprocess output in build.py
-When double click on voice channel switch to that channel chat then ask to join
-    Switch to channel
-    ask to join/start call
-
-Write script to manage endcord: start, stop, restart, run update
-Write these commands to core bot
-
 Add executable icon
-Add tray icons
 Add icon to build.py (include in workflow linux build)
 Update install script to install icon and .desktop
 Make install script more interactive
 # Update aur packages to install icon and .desktop
 
 VOICE CALLS:
+When double click on voice channel switch to that channel chat then ask to join
 Add option to locally mute users in voice call
 Use libopus instead of pyav
 Add voice call normalization option
