@@ -83,7 +83,8 @@ Any third party endcord forks may add features that can lead to account ban, con
 - Profile manager for multiple accounts
 - Store token in system keyring
 - Works in termux, with android notifications
-- Auto endcord and extensions check for updates
+- Automatic endcord and extensions check for updates
+- Headless mode
 - Run bots, with interactions
 - Lots of easter eggs
 - Endcord-GUI features

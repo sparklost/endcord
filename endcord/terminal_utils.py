@@ -24,7 +24,11 @@ else:
     import termios
     import tty
     STDIN_FD = sys.stdin.fileno()
-    OLD_TERM = termios.tcgetattr(STDIN_FD)
+    try:
+        OLD_TERM = termios.tcgetattr(STDIN_FD)
+    except termios.error:
+        OLD_TERM = None
+not_terminal = not sys.stdin.isatty()
 
 
 KEY_CODES = {
@@ -111,6 +115,8 @@ def leave_tui_win():
 
 def get_size():
     """Get size of terminal in characters (h, w)"""
+    if not_terminal:
+        return 30, 90
     size = shutil.get_terminal_size()
     return size.lines, size.columns
 
@@ -259,7 +265,7 @@ if sys.platform == "win32":
 
 def query_terminal(query, timeout=0.1, read_bytes=1024):
     """Query terminal with specific sequence, wait for response and return decoded response bytes"""
-    if sys.platform == "win32":
+    if sys.platform == "win32" or not_terminal:
         return None
     stdin_fd = sys.stdin.fileno()
     old_term = termios.tcgetattr(stdin_fd)
@@ -287,12 +293,15 @@ def query_terminal(query, timeout=0.1, read_bytes=1024):
 def get_font_size():
     """Query font size from terminal"""
     response = query_terminal(b"\033[14t")
-    if not response:
+    if not response or not_terminal:
         return None, None
     parts = response.lstrip("\033[").rstrip("t").split(";")
     if len(parts) != 3:
         return None, None
-    cols, rows = os.get_terminal_size()
+    try:
+        cols, rows = os.get_terminal_size()
+    except OSError:
+        return None, None
     height = int(parts[1]) // rows
     width = int(parts[2]) // cols
     return width, height
