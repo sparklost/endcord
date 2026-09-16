@@ -156,7 +156,7 @@ class Endcord:
         self.vim_mode = config["vim_mode"]
         self.notifications_pfp = config["notifications_pfp"]
         self.font_ratio = config["media_font_aspect_ratio"]
-        self.inline_media = config["inline_media"] and importlib.util.find_spec("PIL") is not None and sys.platform != "win32" and not uses_gtkcurses
+        self.inline_media = config["inline_media"] and importlib.util.find_spec("PIL") is not None and sys.platform != "win32" and not uses_gtkcurses and self.screen
         self.placeholder_emoji = False   # for extensions
         self.placeholder_images = self.inline_media   # keeping this separated so extension can toggle it
         self.premium_override_commands = []   # for extensions
@@ -267,7 +267,10 @@ class Endcord:
             proxy=config["proxy"],
             user_agent=self.user_agent,
         )
-        self.tui = tui.TUI(self.screen, self.config, keybindings, command_bindings, draw_tree, draw_member_list)
+        if self.screen:
+            self.tui = tui.TUI(self.screen, self.config, keybindings, command_bindings, draw_tree, draw_member_list)
+        else:
+            self.tui = tui.DummyTUI(self.config)
         if self.fun:
             today = (time.localtime().tm_mon, time.localtime().tm_mday)
             self.fun = 2 if (10, 25) <= today <= (11, 8) else self.fun
@@ -1090,7 +1093,7 @@ class Endcord:
             self.tui.inline_media.clear_images(force=True)
         if not guild_id:   # no member list in dms
             self.tui.remove_member_list()
-        elif self.get_members:
+        elif self.get_members and self.screen:
             if (self.state["member_list"] and self.screen.getmaxyx()[1] - self.config["tree_width"] - self.member_list_width - 2 >= 32) or self.member_list_auto_open:
                 self.update_member_list(reset=True)
             else:
@@ -5480,7 +5483,7 @@ class Endcord:
         if self.state["member_list"]:
             self.tui.set_member_list_width(-1)
             self.state["member_list"] = False
-        elif self.screen.getmaxyx()[1] - self.config["tree_width"] - self.member_list_width - 2 >= 32:
+        elif self.screen and self.screen.getmaxyx()[1] - self.config["tree_width"] - self.member_list_width - 2 >= 32:
             self.tui.set_member_list_width(-1)
             self.update_member_list()
             self.state["member_list"] = True
@@ -6773,7 +6776,7 @@ class Endcord:
         """Generate member list and update it in TUI"""
         if self.tui.member_list_width == 2:
             return
-        if last_index is not None and not self.tui.mlist_index-1 < last_index < self.tui.mlist_index-1 + self.screen.getmaxyx()[0]:
+        if last_index is not None and self.screen and not self.tui.mlist_index-1 < last_index < self.tui.mlist_index-1 + self.screen.getmaxyx()[0]:
             return   # dont regenerate for changes that are not visible
         member_list, member_list_format = formatter.generate_member_list(
             self.member_list,
@@ -9134,7 +9137,7 @@ class Endcord:
                                 self.member_list = []
                                 last_index = None
                             break
-                    if self.get_members and self.state["member_list"] and self.screen.getmaxyx()[1] - self.config["tree_width"] - self.member_list_width - 2 >= 32:
+                    if self.get_members and self.state["member_list"] and self.screen and self.screen.getmaxyx()[1] - self.config["tree_width"] - self.member_list_width - 2 >= 32:
                         self.update_member_list(last_index)
                     member_list_title = f"Members: {formatter.format_kilo(online_count)}/{formatter.format_kilo(member_count)}"[:self.member_list_width - self.tui.bordered]
                     self.tui.draw_member_list_title(member_list_title, color=self.colors[9])

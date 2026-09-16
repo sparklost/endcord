@@ -3499,3 +3499,47 @@ class TUI():
         new_thumb_pos = max(0, min(max_pos, rel_y - y_in_thumb))
         self.chat_index = int((max_pos - new_thumb_pos) * max_index / max_pos)
         self.draw_chat()
+
+
+class DummyTUI:
+    """Dummy TUI class for headless mode"""
+
+    def __init__(self, config):
+        self.bordered = not (config["compact"])
+        self.inline_media = False
+
+    def init_role_colors(self, all_roles, bg, alt_bg, guild_id=None):   # noqa
+        for guild in all_roles:
+            if guild_id:
+                if guild["guild_id"] != guild_id:
+                    continue
+            for role in guild["roles"]:
+                role["color_id"] = 255
+                role["alt_color_id"] = 255
+            if guild_id:
+                break
+        return all_roles
+
+    def init_colors_formatted(self, colors, alt_color):   # noqa
+        color_codes = []
+        for format_colors in colors:
+            format_codes = []
+            for color in format_colors:
+                format_codes.append([255, *color[3:]])
+            color_codes.append(format_codes)
+        for format_colors in colors:
+            format_codes = []
+            for color in format_colors:
+                format_codes.append([255, *color[3:]])
+            color_codes.append(format_codes)
+        return color_codes
+
+    def init_colors(self, colors): return [255] * len(colors)   # noqa
+    def wait_input(self, *args, **kwargs): time.sleep(60); return "", -1, 0, 999999   # noqa
+    def get_dimensions(self): return ((29, 88), (32, 28), (1, 88))   # noqa
+    def get_chat_selected(self): return (-1, 0)   # noqa
+    def get_tree_selected(self): return 0   # noqa
+    def get_assist(self, *args, **kwargs): return (None, None)   # noqa
+
+    def __getattr__(self, name):   # noqa
+        return lambda *args, **kwargs: None   # noqa

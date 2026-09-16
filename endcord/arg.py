@@ -105,6 +105,12 @@ def parser(app_name, version, default_config_path, log_path):
         Be careful, using proxy might make you more suspicious to discord",
     )
     parser.add_argument(
+        "-n",
+        "--headless",
+        action="store_true",
+        help="run in headless mode, UI will not be drawn",
+    )
+    parser.add_argument(
         "-d",
         "--debug",
         action="store_true",

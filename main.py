@@ -57,7 +57,7 @@ def sigint_handler(_signum, _frame):
 
 def main(args):
     """Main function"""
-    if not uses_gtkcurses:
+    if not uses_gtkcurses and not args.headless:
         utils.ensure_terminal()
     config_path = args.config
     theme_path = args.theme
@@ -170,7 +170,10 @@ def main(args):
     try:
         from endcord import app
         endcord = app.Endcord
-        curses.wrapper(endcord, config_data, keybindings, command_bindings, profiles, VERSION)
+        if args.headless:
+            endcord(None, config_data, keybindings, command_bindings, profiles, VERSION)
+        else:
+            curses.wrapper(endcord, config_data, keybindings, command_bindings, profiles, VERSION)
         if hasattr(app, "target_profile"):
             cmd = utils.get_executable()
             cmd = utils.remove_args(cmd, "-a", "--manager", "-p", "--profile")
