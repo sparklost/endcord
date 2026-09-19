@@ -371,7 +371,7 @@ class Gateway():
         """Send data to gateway"""
         try:
             self.ws.send(json.dumps(request))
-        except websocket._exceptions.WebSocketException:
+        except (websocket._exceptions.WebSocketException, OSError):
             self.reconnect_requested = True
 
 

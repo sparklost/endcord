@@ -1,8 +1,3 @@
-Add executable icon
-Add icon to build.py (include in workflow linux build)
-Update install script to install icon and .desktop
-Make install script more interactive
-
 VOICE CALLS:
 When double click on voice channel switch to that channel chat then ask to join
 Add option to locally mute users in voice call

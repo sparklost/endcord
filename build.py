@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import sys
 import tomllib
+from datetime import datetime
 
 CUSTOM_CFLAGS = [
     "-DNDEBUG",
@@ -148,14 +149,14 @@ PYTHON_LAST_SAFE = int(build_config.get("python_last_safe", "3.13").split(".")[1
 CURSES_TAG = build_config.get("curses_tag", "v6_6_20260627")
 WINDOWED_DEPS = load_build_config().get("windowed_deps", [])
 GVSBUILD_RELEASE = load_build_config().get("gvsbuild_release", [])
-PKGNAME = get_app_name()
-PKGVER = get_version_number()
+APP_NAME = get_app_name()
+APP_VERSION = get_version_number()
 USE_COLOR = supports_color()
 if sys.platform == "win32":
     WINDOWED_DEPS = [x for x in WINDOWED_DEPS if ("pygobject" not in x.lower() and "pycairo" not in x.lower())]
 
 
-def fprint(text, color=PURPLE, prefix=f"[{PKGNAME.capitalize()} Build Script]: ", file=sys.stdout):
+def fprint(text, color=PURPLE, prefix=f"[{APP_NAME.capitalize()} Build Script]: ", file=sys.stdout):
     """Print colored text prefixed with text, default is light purple"""
     if USE_COLOR and color:
         print(f"{color}{prefix}{text}\033[0m", file=file, flush=True)
@@ -327,6 +328,18 @@ def ensure_gtk():
                 not_installed()
                 return False
     return True
+
+
+def generate_ico(source_img):
+    """Generate icon file from png"""
+    if not shutil.which("magick"):
+        return
+    subprocess.run([
+        "magick",
+        source_img,
+        "-define", "icon:auto-resize=256,128,64,48,32,16",
+        os.path.splitext(source_img)[0] + ".ico",
+    ], capture_output=True, text=True, check=True)
 
 
 def check_patchelf():
@@ -1041,9 +1054,9 @@ def build_cython(clang, mingw):
 def build_with_pyinstaller(level, onedir, print_cmd=False):
     """Build with pyinstaller"""
     windowed = toggle_windowed(check_only=True)
-    pkgname = PKGNAME if level == "FULL" else f"{PKGNAME}-{level.lower()}"
+    app_name = APP_NAME if level == "FULL" else f"{APP_NAME}-{level.lower()}"
     if windowed:
-        pkgname = f"{pkgname}-gui"
+        app_name = f"{app_name}-gui"
     emoji_path = compress_emoji() if not print_cmd else "endcord/emoji.json"
     mode = "--onedir" if onedir else "--onefile"
     hidden_imports = ["--hidden-import=uuid"]
@@ -1086,7 +1099,7 @@ def build_with_pyinstaller(level, onedir, print_cmd=False):
         *options,
         "--noconfirm",
         "--clean",
-        f"--name={pkgname}",
+        f"--name={app_name}",
         "main.py",
     ]
     cmd = [arg for arg in cmd if arg != ""]
@@ -1103,20 +1116,20 @@ def build_with_pyinstaller(level, onedir, print_cmd=False):
     # cleanup
     fprint("Cleaning up")
     try:
-        os.remove(f"{pkgname}.spec")
+        os.remove(f"{app_name}.spec")
         shutil.rmtree("build")
     except FileNotFoundError:
         pass
-    fprint(f"Finished building {pkgname}")
+    fprint(f"Finished building {app_name}")
 
 
 def build_with_nuitka(level, onedir, clang, mingw, compile_deps, print_cmd=False):
     """Build with nuitka"""
     clang = clang or os.environ.get("CC") == "clang"
     windowed = toggle_windowed(check_only=True)
-    pkgname = PKGNAME if level == "FULL" else f"{PKGNAME}-{level.lower()}"
+    app_name = APP_NAME if level == "FULL" else f"{APP_NAME}-{level.lower()}"
     if windowed:
-        pkgname = f"{pkgname}-gui"
+        app_name = f"{app_name}-gui"
     emoji_path = compress_emoji() if not print_cmd else "endcord/emoji.json"
     if not print_cmd:
         if compile_deps and level not in ("MINI", "MICRO"):
@@ -1184,6 +1197,9 @@ def build_with_nuitka(level, onedir, clang, mingw, compile_deps, print_cmd=False
             hidden_imports += ["--include-package=ctypes.util"]
     elif sys.platform == "win32":
         options += ["--assume-yes-for-downloads"]
+        generate_ico("tools/icons/endcord.png")
+        if os.path.exists("tools/icons/endcord.ico"):
+            options += ["--windows-icon-from-ico=tools/icons/endcord.ico"]
         if windowed:
             add_data += [
                 "--include-data-dir=.gtk/lib=gtk/lib",
@@ -1201,7 +1217,7 @@ def build_with_nuitka(level, onedir, clang, mingw, compile_deps, print_cmd=False
         if not windowed:
             options += ["--macos-app-console-mode=force"]
         options += [
-            f"--macos-app-name={PKGNAME}",
+            f"--macos-app-name={APP_NAME}",
             f"--macos-app-version={get_version_number()}",
             "--macos-app-protected-resource=NSMicrophoneUsageDescription:Microphone access for recording voice message.",
         ]
@@ -1222,9 +1238,13 @@ def build_with_nuitka(level, onedir, clang, mingw, compile_deps, print_cmd=False
         "--no-deployment-flag=self-execution",   # -c and -m flags are safely handled by argparser
         "--no-prefer-source-code",
         "--onefile-tempdir-spec={TEMP}/endcord_{PID}",
+        "--company-name=SparkLost",
+        f"--product-name={APP_NAME}",
+        f"--file-version={APP_VERSION}", f"--product-version={APP_VERSION}",
+        f"--copyright=Copyright (C) 2025-{datetime.now().year} SparkLost",
         "--remove-output",
         "--output-dir=dist",
-        f"--output-filename={pkgname}",
+        f"--output-filename={app_name}",
         "main.py",
     ]
     cmd = [arg for arg in cmd if arg != ""]
@@ -1244,14 +1264,14 @@ def build_with_nuitka(level, onedir, clang, mingw, compile_deps, print_cmd=False
         shutil.rmtree("build")
     except FileNotFoundError:
         pass
-    fprint(f"Finished building {pkgname}")
+    fprint(f"Finished building {app_name}")
 
 
 def parser():
     """Setup argument parser for CLI"""
     parser = argparse.ArgumentParser(
         prog="build.py",
-        description=f"build script for {PKGNAME}",
+        description=f"build script for {APP_NAME}",
         formatter_class=argparse.RawTextHelpFormatter,
     )
     parser._positionals.title = "arguments"

@@ -105,13 +105,9 @@ Settings, logs, state and themes location:
 
 Run `endcord -h` or `endcord --help` to see available command arguments.  
 
-### Providing config
-Custom config path can be provided with `-c [PATH_TO_CONFIG]` flag.  
-If config is not found at that path, default will be written.  
-There can be missing entries in config, they will be filled with defaults.  
-
 ### Config options
 Go to [configuration](docs/configuration.md).
+Go to [keybindings](docs/keybindings.md#configuring-keybindings).
 
 ### Profile manager
 Profile manager is used for login and easier switching between multiple accounts.  
@@ -135,16 +131,6 @@ Manager can be re-opened using `--manager` flag.
 Email or QR code login may fail because captcha is requested by Discord. In that case first login and complete captcha through official client, from same IP address, then try again. If it still fails, then you'll have to use token method.  
 If you want to check what is endcord doing with credentials, look in profile_manager.py and auth.py.  
 **Do not share your token!**  
-
-### Configuring keybindings
-Go to [keybindings](docs/keybindings.md#configuring-keybindings).
-
-### Debug mode
-Debug mode can be enabled with `-d` flag.  
-It will cause extra messages to be written to log file.  
-Endcord will periodically write to drive and log file will quickly grow in size.  
-Log from previous run is renamed to `-prev` on each run and it is replaced.  
-Current log can be accessed with `show_log` command or in config directory.
 
 
 ## Usage
@@ -489,10 +475,6 @@ Endcord does its best to avoid causing any suspicious activity, so using it as-i
 You can write to Discord Support team: https://dis.gd/request.  
 If you did something particular with endcord that caused the ban, open an issue describing what that is. Maybe that can be prevented or other users can be warned.  
 
-### Debug files
-Anonymized data that might help in debugging is saved in `Debug` directory, see [Configuration](#configuration) for path. It is never automatically uploaded.  
-All channel and server names, topics, descriptions are replaced. All channel and server IDs are added to random number and hashed, so they are irreversible changed, and will be different on each run.
-
 ### Note on Python performance misconceptions
 Python is slower than languages like C or Rust, but in this use case it does not affect performance. Endcord is event-driven and network-bound, not CPU-bound, so Python’s overhead is negligible (significantly reduced when built with nuitka).  
 All CPU-critical components are implemented in Cython with minimal python calls, resulting in near-C speeds.  
@@ -562,6 +544,17 @@ If that happens, use [legacy theme](themes/legacy.ini). It is used by default on
 These are false positives. Binaries are built using nuitka, the problem is that its regularly used by other people to distribute malware. So some AVs flag all nuitka-built binaries as malware. [Ref](https://nuitka.net/user-documentation/common-issue-solutions.html#windows-virus-scanners).  
 Its the same with all other python freezing tools, like pyinstaller, cx-freeze...  
 So to run endcord, either allow it in anti-virus/windows-defender or run it from source.  
+
+### Debug mode
+Debug mode can be enabled with `-d` flag.  
+It will cause extra messages to be written to log file (in config directory).  
+Endcord will periodically write to drive and log file will quickly grow in size.  
+Log from previous run is renamed to `-prev` on each run and it is replaced.  
+Live log can be accessed with `show_log`.
+
+### Debug files
+Anonymized data that might help in debugging is saved in `Debug` directory (generated only in debug mode), see [Configuration](#configuration) for path. It is never automatically uploaded.  
+All channel and server names, topics, descriptions are replaced. All channel and server IDs are added to random number and hashed, so they are irreversible changed, and will be different on each run.
 
 ### Support
 Open an issue in [issue tracker](https://github.com/sparklost/endcord/issues).  

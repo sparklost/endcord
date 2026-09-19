@@ -155,6 +155,7 @@ jobs:
           version=${version#refs/heads/}
           extra="README.md LICENSE docs/commands.md docs/configuration.md docs/extensions.md docs/keybindings.md"
           cd dist && mkdir -p docs && cp ../README.md ../LICENSE . && cp ../docs/*.md docs/
+          cp ../tools/icons/endcord.svg .
           tar -czf "endcord-$version-linux.tar.gz" endcord $extra
           tar -czf "endcord-lite-$version-linux.tar.gz" endcord-lite $extra
           tar -czf "endcord-gui-$version-linux.tar.gz" endcord-gui $extra
@@ -180,7 +181,7 @@ jobs:
       - name: Install system dependencies
         shell: bash
         run: |
-            choco install ccache -y
+            choco install ccache imagemagick -y
             echo UV_LINK_MODE=copy >> $GITHUB_ENV
 
       - name: Install Python
