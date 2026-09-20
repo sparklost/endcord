@@ -46,7 +46,7 @@ env:
   MAC_ARM_USE_CLANG: "true"
   # macOS Intel
   MAC_INTEL_PYTHON_VERSION: "3.14"
-  MAC_INTEL_CLANG_VERSION: "21.1.8"
+  MAC_INTEL_CLANG_VERSION: "21.1.7"
   MAC_INTEL_USE_NUITKA: "false"
   MAC_INTEL_USE_CLANG: "true"
 
@@ -167,6 +167,12 @@ jobs:
           path: ./dist/*.tar.gz
           compression-level: 0
 
+      - name: Cancel workflow on failure
+        if: failure() && github.event_name == 'push'
+        run: gh run cancel ${{ github.run_id }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+
 
   build-windows:
     name: Build (Windows)
@@ -243,6 +249,12 @@ jobs:
           path: ./dist/*.zip
           compression-level: 0
 
+      - name: Cancel workflow on failure
+        if: failure() && github.event_name == 'push'
+        run: gh run cancel ${{ github.run_id }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+
 
   build-macos-arm:
     name: Build (macOS ARM)
@@ -312,6 +324,12 @@ jobs:
           path: ./dist/*.zip
           compression-level: 0
 
+      - name: Cancel workflow on failure
+        if: failure() && github.event_name == 'push'
+        run: gh run cancel ${{ github.run_id }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+
 
   build-macos-intel:
     name: Build (macOS Intel)
@@ -380,6 +398,12 @@ jobs:
           name: dist-macos-intel
           path: ./dist/*.zip
           compression-level: 0
+
+      - name: Cancel workflow on failure
+        if: failure() && github.event_name == 'push'
+        run: gh run cancel ${{ github.run_id }}
+        env:
+          GH_TOKEN: ${{ github.token }}
 
 
   draft-release:
