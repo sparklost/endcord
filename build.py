@@ -1027,7 +1027,7 @@ def build_cython(clang, mingw):
     """Build cython extensions"""
     clang = clang or os.environ.get("CC") == "clang"
     fprint(f"Compiling cython code with {"clang" if clang else "gcc"}{("mingw") if mingw else ""}")
-    setup_compiler(clang)
+    setup_compiler(clang, clear=True)
     cmd = ["uv", "run", "setup.py", "build_ext", "--inplace"]
     if mingw and sys.platform == "win32":
         cmd.append("--compiler=mingw32")   # covers mingw 32 and 64
