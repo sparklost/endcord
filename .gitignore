@@ -2,8 +2,8 @@
 THIRD_PARTY_LICENSES.txt
 .debris
 .megaignore
-.cpython
-.pyproject.toml.bak
+.cpython/
+.python/
 *_cython/*.c
 .gtk/
 SourceCodePro-Regular.ttf

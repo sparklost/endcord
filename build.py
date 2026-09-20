@@ -71,6 +71,9 @@ class Tee:
     def isatty(self):   # noqa
         return self.terminal.isatty()
 
+    def __getattr__(self, name):   # noqa
+        return getattr(self.terminal, name)
+
 
 sys.stdout = Tee("build.log")
 sys.stderr = sys.stdout
@@ -1147,6 +1150,8 @@ def build_with_nuitka(level, onedir, clang, mingw, compile_deps, print_cmd=False
                     iprint("PyNaCl is already built locally")
         patch_soundcard()
     static_python = False   # might be useful with custom python build
+    if sys.platform == "win32":
+        generate_ico("tools/icons/endcord.png")
 
     mode = "standalone" if onedir else "onefile"
     compiler = ""
@@ -1197,7 +1202,6 @@ def build_with_nuitka(level, onedir, clang, mingw, compile_deps, print_cmd=False
             hidden_imports += ["--include-package=ctypes.util"]
     elif sys.platform == "win32":
         options += ["--assume-yes-for-downloads"]
-        generate_ico("tools/icons/endcord.png")
         if os.path.exists("tools/icons/endcord.ico"):
             options += ["--windows-icon-from-ico=tools/icons/endcord.ico"]
         if windowed:
@@ -1273,7 +1277,9 @@ def parser():
         prog="build.py",
         description=f"build script for {APP_NAME}",
         formatter_class=argparse.RawTextHelpFormatter,
+        add_help=False,
     )
+    parser.suggest_on_error = True
     parser._positionals.title = "arguments"
     parser.add_argument(
         "--nuitka",
@@ -1291,13 +1297,12 @@ def parser():
         default="FULL",
         choices=["FULL", "MEDIUM", "LITE", "MINI", "MICRO"],
         help=(
-            'Change environment to build a specified level of endcord.\n'
-            'Options:\n'
-            '  "FULL"   - Has media and voice call support.\n'
-            '  "MEDIUM" - No media and voice call support, but can display images.\n'
-            '  "LITE"   - No image, media, or voice call support.\n'
-            '  "MINI"   - Like LITE minus sound unless paplay/pw-cat commands are available and no voice recording\n'
-            '  "MICRO"  - Max compatibility on legacy/weird systems. Like MICRO minus QR code and email login.'
+            'Change environment to build a specified level of endcord. Options:\n'
+            '  "FULL"   - Has media and voice call support\n'
+            '  "MEDIUM" - No media and voice call support, but can display images\n'
+            '  "LITE"   - No image, media, or voice call support\n'
+            '  "MINI"   - like LITE, no sound unless paplay/pw-cat exist, no voice recording\n'
+            '  "MICRO"  - Max compatibility on legacy/weird systems, no QR code and email login'
         ),
     )
     parser.add_argument(
@@ -1356,6 +1361,11 @@ def parser():
         help="disable extensions support in the code, overriding option in the config",
     )
     parser.add_argument(
+        "--clean-uv",
+        action="store_true",
+        help="dont store any uv cache and python to th system, keep it in project dir",
+    )
+    parser.add_argument(
         "--print-cmd",
         action="store_true",
         help="print build command for nuitka or pyinstaller and exit, without configuring any environment",
@@ -1364,6 +1374,12 @@ def parser():
         "--build-licenses",
         action="store_true",
         help="build file containing licenses from all used third party libraries",
+    )
+    parser.add_argument(
+        "-h", "--help",
+        action="help",
+        default=argparse.SUPPRESS,
+        help="show this help message and exit",
     )
     return parser.parse_args()
 
@@ -1391,6 +1407,10 @@ if __name__ == "__main__":
         os.environ["FIRST_RUN"] = get_nice_python_version()
     elif os.environ["FIRST_RUN"] != get_nice_python_version():
         fprint(f"Switched to Python {get_nice_python_version()}")
+
+    if args.clean_uv:
+        os.environ["UV_PYTHON_INSTALL_DIR"] = "./.python"
+        os.environ["UV_NO_CACHE"] = "1"
 
     if clang and not shutil.which("lld"):
         fprint("WARNING: lld is not found on system, consider installing it", color=RED)

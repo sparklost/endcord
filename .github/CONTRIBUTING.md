@@ -4,7 +4,7 @@ If you are a user, this **doesn't affect** the slightest how you are using endco
 If you are a developer, you are **NOT ALLOWED TO PUBLICLY MODIFY THE CODE**.  
 If you are a package maintainer, license specifically allows it to distribute **binaries built from verbatim unmodified source code**.  
 Slightly longer and more detailed explanation is in the [license file](LICENSE).  
-Why? Because this is one-person project, and this person is greedily taking all the fun of programming for themselves. And as bonus they ensures that this project stays 100% human made, forever.  
+Why? Because this is one-person project, and this person is greedily taking all the fun of programming for themselves. And as bonus they will ensure that this project stays 100% human made, forever.
 
 ### The only ways you can contribute
 - Open an issue containing bug report or feature request
@@ -217,6 +217,16 @@ user/flags - missing
 - Misc:
 Spacebar is still using old `user_settings` instead new protobuf settings.  
 Gateway returns error code 4000 if event "update presence" (opcode 3) is sent.
+
+
+## Recommended easy route for package maintainers
+To keep things simple, there is official install script for endcord. This script lets user choose how, where and what kind of endcord to install.  
+The easiest way to package endcord is to not package it at all, but instead package this bash install script, then maintain it.  
+The script can be found here: https://github.com/sparklost/endcord/blob/main/tools/install.sh  
+
+Alternatively, if package repository allows it, fetch binaries from releases from official endcord repository. They contain all needed files like documentation, .desktop and icon.  
+If you wish to build actual binary for specific OS/distro, and package repository is not enforcing network isolation during build process, simply run build.py.
+In case network isolation is mandatory, and you wish to do it the hard way, here are the instructions:  
 
 
 ## Build steps for package maintainers

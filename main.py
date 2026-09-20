@@ -204,6 +204,7 @@ def main(args):
 
 
 if __name__ == "__main__":
-    args = arg.parser(APP_NAME, VERSION, default_config_path, log_path)
+    level = utils.get_build_level(None, None, None).lower()
+    args = arg.parser(APP_NAME, VERSION, default_config_path, log_path, level)
     signal.signal(signal.SIGINT, sigint_handler)
     main(args)

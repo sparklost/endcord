@@ -6,7 +6,7 @@ import os
 import sys
 import tomllib
 
-extensions_white = [".py", ".ini"]
+extensions_white = [".py", ".ini", ".sh"]
 extensions_black = [".pyc"]
 
 
@@ -52,6 +52,10 @@ def main():
             for num, line in enumerate(lines):
                 if line.startswith("VERSION = ") and line.split("VERSION = ")[-1] != f'"{version}"\n':
                     lines[num] = f'VERSION = "{version}"\n'
+                    changed = True
+                    break
+                elif line.startswith("VERSION=") and line.split("VERSION=")[-1] != f'"{version}"\n':
+                    lines[num] = f'VERSION="{version}"\n'
                     changed = True
                     break
 

@@ -142,6 +142,14 @@ def detect_runtime():
 
 def get_build_level(support_image, support_media, support_call):
     """Get build level based on present dependencies"""
+    if support_image is None:
+        support_image = importlib.util.find_spec("PIL") is not None
+        support_media = support_image and importlib.util.find_spec("av") is not None
+        support_call = (
+            support_media and
+            importlib.util.find_spec("dave") is not None and
+            importlib.util.find_spec("nacl") is not None
+        )
     if support_call or support_media:
         return "FULL" + (" -media" if not support_call else "") + (" -call" if not support_call else "")
     if support_image:

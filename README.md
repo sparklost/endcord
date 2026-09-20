@@ -323,20 +323,20 @@ To prevent extension injection (malware can modify endcord config and inject ext
 
 ## Installing
 ### Linux
-- Pre-built binaries (**recommended**) are available in releases  
+- Install script (**recommended**)
+    - `bash -c "$(curl -fsSL https://raw.githubusercontent.com/sparklost/endcord/main/tools/install.sh)"`
+    - The script interactively manages multiple installations, install/build/modify/uninstall
+- Pre-built binaries are available in releases  
     Binaries are built on Ubuntu-like distro with `--custom-python --nuitka` build script options with clang, meaning they are maximally optimized.
 - Arch Linux (AUR):
+    - `yay -S endcord-installer` - same install script as explained above
     - `yay -S endcord` - full version with media support, larger executable
     - `yay -S endcord-lite` - lite version without voice calls and media support
     - `yay -S endcord-gui` - "gui" windowed version using GTK3
     - `-git` versions will build from source, with latest changes
 - [Build](#building) endcord, then copy built executable to system:  
     `sudo cp dist/endcord /usr/local/bin/`
-- Install script (installs binary from latest release or updates existing):
-    - `bash -c "$(curl -fsSL https://raw.githubusercontent.com/sparklost/endcord/main/tools/install.sh)"`
-    - Append ` -- --lite` to install lite instead
-    - Append ` -- --uninstall` to uninstall  
-Note: official means installations from these sources are coming from endcord developer and will always be up-to-date.
+Note: installations from these sources are coming directly from endcord developer and will always be up-to-date.
 
 ### Windows
 - Pre-built binaries (built with nuitka) are available in releases
@@ -354,8 +354,7 @@ Optional dependency for spellchecking: [aspell](https://github.com/adamyg/aspell
 - [Build](#building) endcord, standalone executable can be found in `./dist/`.  
 - Install script (installs binary from latest release or updates existing):
     - `bash -c "$(curl -fsSL https://raw.githubusercontent.com/sparklost/endcord/main/tools/install.sh)"`
-    - Append ` -- --lite` to install lite instead
-    - Append ` -- --uninstall` to uninstall
+    - The script interactively manages multiple installations, install/build/modify/uninstall
 Optional dependency for spellchecking: `aspell`. Can be installed with: `brew aspell`.  
 
 ### BSD
@@ -561,8 +560,9 @@ Open an issue in [issue tracker](https://github.com/sparklost/endcord/issues).
 Or, if you don't have a github account, want more interactive support, to share a theme or have a question: [Endcord Discord Server](https://discord.gg/judQSxw5K2).
 
 ### Creating and maintaining package for Linux distribution
-As endcord build script requires network access in order to install dependencies, it is impossible to use it to build endcord binaries for many distributions/repositories.  
-If thats the case, custom build script must be made, guidelines and commands for writing such are available in [contributing.md](.github/CONTRIBUTING.md#build-steps-for-package-maintainers).  
+Because endcord build script requires network access in order to install dependencies, it is impossible to use it to build endcord packages for many distributions/repositories, because they require build-time network isolation.  
+Because of that package maintainers are strongly encouraged to instead create "endcord-installer" package, that will install official bash installer script.  
+More info can be found in [contributing.md](.github/CONTRIBUTING.md#recommended-easy-route-for-package-maintainers), along with instructions for actual manual building.  
 After submitting a package to distributions package repository, open an issue here, so I can review it and add it to readme after it gets accepted.
 
 ### Source-available license
