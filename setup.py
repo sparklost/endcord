@@ -1,5 +1,6 @@
 import os
 import shutil
+import sys
 
 from Cython.Build import cythonize
 from setuptools import Extension, setup
@@ -22,7 +23,11 @@ extra_link_args = [
     "-Wl,--as-needed",
     "-Wl,--exclude-libs,ALL",
 ]
-if shutil.which("lld") and os.environ.get("CC") == "clang":
+
+if sys.platform == "darwin":
+    extra_link_args = ["-Wl,-dead_strip"]
+
+if shutil.which("lld") and os.environ.get("CC", "").endswith("clang"):
     extra_compile_args.append("-flto=thin")
     extra_link_args.append("-flto=thin")
     extra_link_args.append("-fuse-ld=lld")
