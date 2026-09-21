@@ -157,8 +157,17 @@ jobs:
           extra="README.md LICENSE com.sparklost.endcord.desktop endcord.svg docs/*.md"
           cd dist && mkdir -p docs && cp ../README.md ../LICENSE . && cp ../docs/*.md docs/
           cp ../tools/com.sparklost.endcord.desktop ../tools/icons/endcord.svg .
+          # package FULL version
+          sed -i 's/^Name=.*/Name=Endcord/' com.sparklost.endcord.desktop
+          sed -i 's/^Exec=.*/Exec=endcord/' com.sparklost.endcord.desktop
           tar -czf "endcord-$version-linux.tar.gz" endcord $extra
+          # package LITE version
+          sed -i 's/^Name=.*/Name=Endcord Lite/' com.sparklost.endcord.desktop
+          sed -i 's/^Exec=.*/Exec=endcord-lite/' com.sparklost.endcord.desktop
           tar -czf "endcord-lite-$version-linux.tar.gz" endcord-lite $extra
+          # package GUI version
+          sed -i 's/^Name=.*/Name=Endcord GUI/' com.sparklost.endcord.desktop
+          sed -i 's/^Exec=.*/Exec=endcord-gui/' com.sparklost.endcord.desktop
           tar -czf "endcord-gui-$version-linux.tar.gz" endcord-gui $extra
 
       - name: Upload build artifact

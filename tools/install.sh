@@ -342,8 +342,14 @@ MODE_LOWER="${MODE,,}"
 
 # name prompt
 if [[ "$ACTION" == "1" && -n "$INSTALLED_PATH" ]]; then
-    # inherit existing name on update
     FINAL_BIN_NAME=$(basename "$INSTALLED_PATH")
+    EXEC_CMD="$FINAL_BIN_NAME"
+    if [[ "$FINAL_BIN_NAME" == *"-"* ]]; then
+        SUFFIX="${FINAL_BIN_NAME#*-}"
+        [[ "$SUFFIX" == "gui" ]] && DISPLAY_NAME="Endcord GUI" || DISPLAY_NAME="Endcord $(tr '[:lower:]' '[:upper:]' <<< ${SUFFIX:0:1})${SUFFIX:1}"
+    else
+        DISPLAY_NAME="Endcord"
+    fi
 else
     if [[ -z "$ADD_SUFFIX" && "$MODE" != "FULL" && "$ACTION" != "3" ]]; then
         echo ""
@@ -355,6 +361,13 @@ else
         ADD_SUFFIX=${ADD_SUFFIX:-1}
     fi
     ADD_SUFFIX=${ADD_SUFFIX:-1}
+    if [[ "$ADD_SUFFIX" == "2" ]]; then
+        EXEC_CMD="endcord-${MODE_LOWER}"
+        [[ "$MODE_LOWER" == "gui" ]] && DISPLAY_NAME="Endcord GUI" || DISPLAY_NAME="Endcord $(tr '[:lower:]' '[:upper:]' <<< ${MODE_LOWER:0:1})${MODE_LOWER:1}"
+    else
+        EXEC_CMD="endcord"
+        DISPLAY_NAME="Endcord"
+    fi
 fi
 
 
@@ -548,16 +561,20 @@ $SUDO chmod +x "$INSTALL_DIR/$FINAL_BIN_NAME"
 # install .desktop and icon
 if [[ "$OS" == "Linux" && "$SKIP_DESKTOP" == false ]]; then
     DESKTOP_PATH=$(find "$SRC_DIR" -name "${APP_ID}.desktop" | head -n 1)
-    echo $DESKTOP_PATH
     ICON_PATH=$(find "$SRC_DIR" -name "endcord.svg" | head -n 1)
-    echo $ICON_PATH
     if [[ -n "$DESKTOP_PATH" && -n "$ICON_PATH" ]]; then
         echo "Installing .desktop file and icon..."
         $SUDO mkdir -p "$SHARE_DIR/applications" "$SHARE_DIR/icons/hicolor/scalable/apps"
-        $SUDO cp "$DESKTOP_PATH" "$SHARE_DIR/applications/${APP_ID}.desktop"
+        DEST_DESKTOP="$SHARE_DIR/applications/${APP_ID}.desktop"
+        $SUDO cp "$DESKTOP_PATH" "$DEST_DESKTOP"
         $SUDO cp "$ICON_PATH" "$SHARE_DIR/icons/hicolor/scalable/apps/${APP_ID}.svg"
+        $SUDO sed -i "s|^Exec=[^ ]*|Exec=$EXEC_CMD|" "$DEST_DESKTOP"
+        $SUDO sed -i "s|^Name=.*|Name=$DISPLAY_NAME|" "$DEST_DESKTOP"
         if command -v update-desktop-database &>/dev/null; then
             $SUDO update-desktop-database "$SHARE_DIR/applications" || true
+        fi
+        if command -v gtk-update-icon-cache &>/dev/null && [[ -f "$SHARE_DIR/icons/hicolor/index.theme" ]]; then
+            $SUDO gtk-update-icon-cache -f -t "$SHARE_DIR/icons/hicolor" || true
         fi
     fi
 fi
