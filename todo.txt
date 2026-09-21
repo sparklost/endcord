@@ -5,13 +5,15 @@ Use libopus instead of pyav
 Add voice call normalization option
 Fix sound stuttering when using rnnoise
 
-CORE:
+CORE EASY:
 Add keybinding configuration UI
 Add settings UI
 Add commands for other tools
 Add inbox
 Add spellcheck corrections assist
 Automatically convert @name or @role if sent as plaintext
+
+CORE HARD:
 Fix issues with wide characters in input line
 Allow client to run with invalid token but stay offline
 Provide static binaries built on muslinux
