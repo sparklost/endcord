@@ -2152,7 +2152,10 @@ class ChatGenerator:
                     format_line.append([*self.color_mention_chat_edited, self.pre_edited_len + (name_len - self.limit_username), self.pre_edited_len + (name_len - self.limit_username) + self.len_edited])
                 elif edited and not next_line:
                     format_line.append(self.color_mention_chat_edited + [len_message_line - self.len_edited, len_message_line])
-            chat_format.append(fix_line_format(format_line, message_line))
+            try:
+                chat_format.append(fix_line_format(format_line, message_line))
+            except OverflowError:   # fallback if anything goes wrong
+                chat_format.append(fix_line_format_py(format_line, message_line))
         else:
             if group:
                 format_line = self.color_message_grouped[:]
@@ -2173,7 +2176,10 @@ class ChatGenerator:
                     format_line.append([*self.color_chat_edited, self.pre_edited_len + (name_len - self.limit_username), self.pre_edited_len + (name_len - self.limit_username) + self.len_edited])
                 elif edited and not next_line:
                     format_line.append([*self.color_chat_edited, len_message_line - self.len_edited, len_message_line])
-            chat_format.append(fix_line_format(format_line, message_line))
+            try:
+                chat_format.append(fix_line_format(format_line, message_line))
+            except OverflowError:   # fallback if anything goes wrong
+                chat_format.append(fix_line_format_py(format_line, message_line))
 
         # newline
         line_num = 1
@@ -2306,7 +2312,6 @@ class ChatGenerator:
                     chat_format.append(fix_line_format(format_line, new_line))
                 except OverflowError:   # fallback if anything goes wrong
                     chat_format.append(fix_line_format_py(format_line, new_line))
-                    logger.error(f"An OverflowError occurred in cython. Please report with this information: {repr(format_line)}, {repr(new_line)}")
             line_num += 1
 
         # add images to ranges in chat_map relative to this message base line and add format for spoiler images
