@@ -60,6 +60,8 @@ class InlineMedia:
             self.inline_media_quality = "low"
         self.truecolor = config["media_truecolor"]
         self.saturation = config["media_saturation"]
+        self.box_color = config["inline_image_box_color"]
+        self.slow_media = config["media_slow_load_delay"]
         self.mention_color = colors_formatted[12][0][0]
         self.mention_color_esc = f"{ESC}[48;5;{color_mention[1]}m"
         self.run = True
@@ -290,6 +292,34 @@ class InlineMedia:
             break
 
 
+    def draw_single_image(self, data, rel_x, rel_y, w, h, mention, slow):
+        """Draw single image on designated relative position on the screen"""
+        chat_y, chat_x = self.tui.win_chat.getbegyx()
+        chat_h, chat_w = self.tui.chat_hw
+        with self.tui.lock:
+            subtitle_line = bool(self.tui.win_subtitle_line)
+            with self.image_cache_lock:
+                abs_y = chat_h - (rel_y - self.tui.chat_index - self.tui.have_title - subtitle_line + 1)
+                if abs_y - chat_y <= -h or abs_y > chat_h + 1 + subtitle_line:
+                    return
+                abs_x = chat_x + rel_x
+                cut_y = 0
+                cut_h = h
+                if abs_y > chat_h - h + 1 + subtitle_line:
+                    cut_h = min(h, chat_h - abs_y + 1) + subtitle_line
+                if abs_y <= subtitle_line:
+                    cut_h += abs_y - chat_y
+                    cut_y = -abs_y + 1 + subtitle_line
+                    abs_y = chat_y
+                # logger.info(("INIT", (h, w), abs_y, rel_y, cut_h, cut_y))
+                if slow:
+                    terminal_utils.draw_over_curses_slow("\n".join(data.split("\n")[cut_y:cut_y + cut_h]), abs_y, abs_x, delay=slow)
+                else:
+                    terminal_utils.draw_over_curses("\n".join(data.split("\n")[cut_y:cut_y + cut_h]), abs_y, abs_x)
+                self.drawn_areas.append((abs_y, abs_x, cut_h, w, mention))
+            self.draw_selection(self.tui.chat_selected)
+
+
     def downloader(self):
         """Downloader for inline media"""
         while self.run:
@@ -306,6 +336,15 @@ class InlineMedia:
             scale = min(h * (1 + self.use_blocks) * 2 / img_h, w * 2 / img_w, 1)
             img_w = int(img_w * scale)
             img_h = int(img_h * scale)
+
+            draw_box = False
+            with self.image_cache_lock:
+                if image_id in self.image_cache and not self.image_cache[image_id][0]:
+                    draw_box = True
+            if draw_box and self.box_color != -1:
+                time.sleep(0.05)
+                data = draw_image_bounding_box(-1, self.box_color, w, h)
+                self.draw_single_image(data, rel_x, rel_y, w, h, mention, slow=False)
 
             img_quality = "lossless" if "//media." in img_url else self.inline_media_quality
             if img_url.endswith("&"):
@@ -363,28 +402,7 @@ class InlineMedia:
             if not draw or self.tui.disable_drawing:
                 continue
 
-            # draw
-            chat_y, chat_x = self.tui.win_chat.getbegyx()
-            chat_h, chat_w = self.tui.chat_hw
-            with self.tui.lock:
-                subtitle_line = bool(self.tui.win_subtitle_line)
-                with self.image_cache_lock:
-                    abs_y = chat_h - (rel_y - self.tui.chat_index - self.tui.have_title - subtitle_line + 1)
-                    if abs_y - chat_y <= -h or abs_y > chat_h + 1 + subtitle_line:
-                        continue
-                    abs_x = chat_x + rel_x
-                    cut_y = 0
-                    cut_h = h
-                    if abs_y > chat_h - h + 1 + subtitle_line:
-                        cut_h = min(h, chat_h - abs_y + 1) + subtitle_line
-                    if abs_y <= subtitle_line:
-                        cut_h += abs_y - chat_y
-                        cut_y = -abs_y + 1 + subtitle_line
-                        abs_y = chat_y
-                    # logger.info(("INIT", (h, w), abs_y, rel_y, cut_h, cut_y))
-                    terminal_utils.draw_over_curses("\n".join(data.split("\n")[cut_y:cut_y + cut_h]), abs_y, abs_x)
-                    self.drawn_areas.append((abs_y, abs_x, cut_h, w, mention))
-                self.draw_selection(self.tui.chat_selected)
+            self.draw_single_image(data, rel_x, rel_y, w, h, mention, slow=self.slow_media)
 
 
     def load_image(self, path, h, w):
@@ -510,6 +528,25 @@ def img_to_term_block(data, bg_color, screen_width, screen_height, img_width, im
     # bottom padding
     while len(out_lines) < screen_height:
         out_lines.append(bg + (" " * screen_width) + RESET)
+    return "\n".join(out_lines)
+
+
+def draw_image_bounding_box(bg_color, box_color, img_width, img_height):
+    """Draw a gray bounding box in image size"""
+    box_bg = f"{ESC}[48;5;{box_color}m"
+    out_lines = []
+    for y in range(img_height):
+        line_parts = []
+        if y == 0 or y == img_height - 1:
+            line_parts.append(box_bg + (" " * img_width))
+        elif img_width > 1:
+            line_parts.append(box_bg + " " + RESET)
+            line_parts.append(f"{ESC}[48;5;{bg_color}m" + (" " * (img_width - 2)))
+            line_parts.append(box_bg + " ")
+        else:
+            line_parts.append(box_bg + " ")
+        line_parts.append(RESET)
+        out_lines.append("".join(line_parts))
     return "\n".join(out_lines)
 
 

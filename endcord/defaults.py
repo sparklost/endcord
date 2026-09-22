@@ -209,8 +209,10 @@ theme = {
     "color_format_forum": [[-1, -1], [242, -2, 0, 0, 12], [25, -2, 0, 15, 20]],
     # keyword, string, comment, number, type, classname, function, variable, preproc/builtin, specialchar, symbol, cbracket
     "syntax_token_colors": [133, 185, 102, 173, 133, 173, 111, -1, 167, 111, -1, -1],
+    "inline_image_box_color": 234,
     "media_use_blocks": True,
     "media_truecolor": True,
+    "media_slow_load_delay": 0,
     "media_ascii_palette": "  ..',;:c*loexk#O0XNW",
     "media_saturation": 1.2,
     "media_color_bg": 16,

@@ -141,6 +141,20 @@ def draw_over_curses(text, y, x):
     sys.stdout.flush()
 
 
+def draw_over_curses_slow(text, y, x, delay=0.2):
+    """SLOWLY draw lines on screen already used by curses, and restore cursor position"""
+    sys.stdout.write("\x1b[s")  # save cursor
+    sys.stdout.write("\x1b[?25l")
+    for i, line in enumerate(text.split("\n")):
+        sys.stdout.write(f"\x1b[{y + i + 1};{x + 1}H")
+        sys.stdout.write(line)
+        sys.stdout.flush()
+        time.sleep(delay)
+    sys.stdout.write("\x1b[u")  # restore cursor
+    sys.stdout.write("\x1b[?25h")
+    sys.stdout.flush()
+
+
 def read_key():
     """Blocking read key, return key code like curses.getch(), alt sequences are not handled"""
     fd = sys.stdin.fileno()

@@ -381,6 +381,9 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
     `media_ascii_palette` and media_saturation have no effect when this is ON.
 - `media_truecolor = True`  
     Use truecolor for media rendering. Works only for `media_use_blocks`.
+- `media_slow_load_delay = 0`  
+    Delay between drawing each line of inline media. Adds "retro image loading" effect. Recommended value: 0.01-0.1.  
+    Note that endcord will be graphically unresponsive until all images are rendered.
 - `media_ascii_palette = "  ..',;:c*loexk#O0XNW"`  
     Characters used to draw in terminal. From darkest to brightest. Same character can be repeated. Number of characters is not fixed.
 - `media_saturation = 1.2`  
@@ -478,10 +481,12 @@ Every next list has additional `start` and `end`- indexes on a line where color 
     Color format for message app interaction string. Corresponding to `format_interaction`.
 - `color_format_forum = [[-1, -1], [242, -2, 0, 0, 12], [25, -2, 0, 15, 20]]`  
     Color format for threads in forum. Corresponding to `format_forum`.
-- `"syntax_token_colors = [133, 185, 102, 173, 133, 173, 111, -1, 167, 111, -1, -1]`  
+- `syntax_token_colors = [133, 185, 102, 173, 133, 173, 111, -1, 167, 111, -1, -1]`  
     A list of foreground colors for code block syntax. Must have all 12 values. Values correspond to (in order):  
     keyword, string, comment, number, type, classname, function, variable, preproc/builtin, specialchar, symbol, cbracket.  
     Set to negative value to disable this token.  
+- `inline_image_box_color = 234`  
+    Color for image bounding box, drawn as placeholder until image is downloaded.
 - `media_color_bg = -1`  
     Single color value for background color when showing media.
 
