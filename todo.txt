@@ -1,5 +1,4 @@
 VOICE CALLS:
-When double click on voice channel switch to that channel chat then ask to join
 Add option to locally mute users in voice call
 Use libopus instead of pyav
 Add voice call normalization option
@@ -7,11 +6,10 @@ Fix sound stuttering when using rnnoise
 
 CORE EASY:
 Add keybinding configuration UI
-Add settings UI
-Add commands for other tools
+Add settings and theme configuration UI
+Add commands for other UI tools
 Add inbox
 Add spellcheck corrections assist
-Automatically convert @name or @role if sent as plaintext
 
 CORE HARD:
 Fix issues with wide characters in input line

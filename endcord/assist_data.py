@@ -70,7 +70,6 @@ COMMAND_ASSISTS = (
     ("voice_leave_call - leave current voice call", "voice_leave_call"),
     ("voice_reject_call - silence incoming call or cancel outgoing call", "voice_reject_call"),
     ("voice_list_call - show all call participants and their states in an updated list", "voice_list_call"),
-    ("voice_open_chat - open call chat for selected voice channel or currently active call", "voice_open_chat"),
     ("voice_set_volume_input *[0-100] - change volume for input devices in voice call", "voice_set_volume_input"),
     ("voice_set_volume_output *[0-100] - change volume for output devices in voice call", "voice_set_volume_output"),
     ("voice_set_input_device [name] - change sound input device", "voice_set_input_device"),

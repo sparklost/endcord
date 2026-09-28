@@ -47,6 +47,7 @@ match_md_url = re.compile(r"(?<!\\)\[((?:(?!\]\().)+)\]\(([^)]+)\)")
 match_url = re.compile(r"https?:\/\/[\w.-]+(\.[\w-])+[^\s)\]>]*[^\s).\]>]")
 match_discord_channel_url = re.compile(r"https:\/\/discord(?:app)?\.com\/channels\/(\d*)\/(\d*)(?:\/(\d*))?")
 match_sticker_id = re.compile(r"<;\d+;>")
+match_plain_mention = re.compile(r"@(\w+)")
 match_md_all = re.compile(
     r"""
     (?<!\\)(
@@ -582,7 +583,7 @@ def replace_discord_emoji(text, placeholder=None, *ranges_lists):
 
 def replace_mentions(text, usernames_ids, *ranges_lists, global_name=False, use_nick=False):
     """
-    Transforms mention string into nicer looking one:
+    Transform mention string into nicer looking one:
     `<@user_id>` --> `@username ` (with whitespace)
     """
     result = []
@@ -615,9 +616,47 @@ def replace_mentions(text, usernames_ids, *ranges_lists, global_name=False, use_
     return "".join(result), mention_ranges
 
 
+def reverse_replace_mentions(text, mention_ids, role_ids):
+    """Try to transform plaintext mention and role strings into original looking ones"""
+    if "@" not in text:
+        return text
+    text_lower = text.lower()
+    code_ranges = [m.span() for m in match_md_code_block.finditer(text)] + [m.span() for m in match_md_code_snippet.finditer(text)]
+
+    # replace roles
+    for role in sorted(role_ids, key=lambda r: len(r["name"]), reverse=True):   # by length descending
+        search_str = f"@{role["name"]}".lower()
+        if search_str not in text_lower:
+            continue
+        idx = text_lower.rfind(search_str)   # reverse iteration
+        while idx != -1:
+            # skip escape and code blocks
+            if not (idx > 0 and text[idx - 1] != "\\") and not any(start <= idx < end for start, end in code_ranges):
+                replacement = f"<@&{role["id"]}>"
+                text = text[:idx] + replacement + text[idx + len(search_str):]
+                text_lower = text_lower[:idx] + replacement + text_lower[idx + len(search_str):]   # stay in sync
+                diff = len(replacement) - len(search_str)
+                code_ranges = [(s if s < idx else s + diff, e if e <= idx else e + diff) for s, e in code_ranges]
+            idx = text_lower.rfind(search_str, 0, idx)
+
+    # replace usernames
+    def replacement(match):
+        start = match.start()
+        if start > 0 and text[start - 1] == "\\":
+            return match.group(0)
+        if text[:start].count("`") % 2 != 0:   # dirty but should be 'mostly' safe
+            return match.group(0)
+        name = match.group(1)
+        if name in mention_ids:
+            return f"<@{mention_ids[name]}>"
+        return match.group(0)
+
+    return re.sub(match_plain_mention, replacement, text)
+
+
 def replace_roles(text, roles_ids, *ranges_lists):
     """
-    Transforms roles string into nicer looking one:
+    Transform roles string into nicer looking one:
     `<@role_id>` --> `@role_name`
     And shifts ranges for other range lists.
     """
@@ -677,7 +716,7 @@ def replace_discord_url(text, *ranges_lists):
 
 def replace_channels(text, channels_ids, *ranges_lists):
     """
-    Transforms channels string into nicer looking one:
+    Transform channels string into nicer looking one:
     `<#channel_id>` --> `#channel_name`
     And shifts ranges for other range lists.
     """
@@ -717,7 +756,7 @@ def replace_channels(text, channels_ids, *ranges_lists):
 
 def replace_timestamps(text, timezone, *ranges_lists):
     """
-    Transforms timestamp string into nicer looking one:
+    Transform timestamp string into nicer looking one:
     `<t:timestamp:type>` --> discord specified format
     And shifts ranges for other range lists.
     """
@@ -2896,8 +2935,8 @@ def generate_extra_line_ring(caller_name, max_len, bordered, colors):
     """Generate extra line containing information about incoming call"""
     max_len = max_len - bordered * 3
     color_standout = colors[9]
-    left_text = f"{caller_name} is calling you, use commands: voice_*"
-    right_text = "[Accept] [Reject]"
+    left_text = f"{caller_name} is calling you, use voice* commands"
+    right_text = "[Accept]─[Reject]"
     max_str_length = max_len - len(right_text) - 3   # 3 for ...
 
     line_format = [
@@ -2908,10 +2947,48 @@ def generate_extra_line_ring(caller_name, max_len, bordered, colors):
 
     if len(left_text) + 1 + len(right_text) <= max_len:
         space_num = max_len - (len(left_text) + len(right_text))
-        if bordered:
-            filler = " " + "─" * (space_num - 2) + " "
-        else:
-            filler = " " * space_num
+        filler = ("─" if bordered else " ") * space_num
+        return left_text + filler + right_text, line_format
+
+    shortened_str = left_text[:max_str_length] + "..."
+    return shortened_str + right_text, line_format
+
+
+def generate_extra_line_guild_start_call(channel, voice_states, max_len, bordered, colors):
+    """Generate extra line containing information about incoming call"""
+    max_len = max_len - bordered * 3
+    color_standout = colors[9]
+    line_format = []
+
+    if not channel.get("allow_voice", True):
+        perm = "No voice perm, "
+        line_format.append((20, None, 0, len(perm) - 2))
+    elif not channel.get("allow_speak", True):
+        perm = "No speak perm, "
+        line_format.append((19, None, 0, len(perm) - 2))
+    else:
+        perm = ""
+
+    if voice_states and len(voice_states) > 1:
+        limit = f"/{channel["user_limit"]}" if channel["user_limit"] else ""
+        count = f"{voice_states[0]}{limit} member{"s" if voice_states[0] > 1 else ""}:"   # 0 is count
+        count_color = 20 if voice_states[0] >= channel["user_limit"] else color_standout
+    else:
+        count = "No members" + (f" ({channel["user_limit"]} max.)" if channel["user_limit"] else "")
+        count_color = color_standout
+
+    left_text = f"{perm}{count}, use voice* commands"
+    right_text = "[Join Call]"
+    max_str_length = max_len - len(right_text) - 3   # 3 for ...
+
+    line_format += [
+        (count_color, None, len(perm), min(len(perm) + len(count), max_str_length)),
+        (18, None, max_len - 11, max_len),
+    ]
+
+    if len(left_text) + 1 + len(right_text) <= max_len:
+        space_num = max_len - (len(left_text) + len(right_text))
+        filler = ("─" if bordered else " ") * space_num
         return left_text + filler + right_text, line_format
 
     shortened_str = left_text[:max_str_length] + "..."
@@ -2944,10 +3021,7 @@ def generate_extra_line_call(call_participants, volume_in, volume_out, max_len, 
 
     if len(left_text) + 1 + len(right_text) <= max_len:
         space_num = max_len - (len(left_text) + len(right_text))
-        if bordered:
-            filler = " " + "─" * (space_num - 2) + " "
-        else:
-            filler = " " * space_num
+        filler = ("─" if bordered else " ") * space_num
         return left_text + filler + right_text, line_format
 
     shortened_str = left_text[:max_str_length] + "..."

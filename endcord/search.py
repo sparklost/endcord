@@ -201,7 +201,7 @@ def search_channels_all(guilds, dms, query, full_input, recent=None, read_state=
     return results
 
 
-def search_usernames_roles(roles, query_results, guild_id, gateway, query, presences=[], limit=50, score_cutoff=15):
+def search_usernames_roles(roles, query_results, query, presences=[], limit=50, score_cutoff=15):
     """Search for usernames and roles"""
     results = []
     worst_score = score_cutoff
@@ -237,15 +237,8 @@ def search_usernames_roles(roles, query_results, guild_id, gateway, query, prese
             if len(results) > limit:
                 heapq.heappop(results)
                 worst_score = results[0][2]
-    else:
-        gateway.request_members(
-            guild_id,
-            None,
-            query=query,
-            limit=10,
-        )
 
-    return sorted(results, key=lambda x: x[2], reverse=True)
+    return sorted(results, key=lambda x: x[2], reverse=True), not query_results
 
 
 def search_emojis(all_emojis, favorite_emojis, local_emojis, premium, guild_id, query, safe_emoji=False, limit=50, score_cutoff=15):

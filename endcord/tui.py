@@ -303,6 +303,7 @@ class TUI():
         self.tab_spaces = int(config["tab_spaces"])
         self.vim_mode = config["vim_mode"]
         self.swap_assist = config["assist_swap_binding"]
+        self.assist_stop_space = config["assist_stop_space"]
 
         # switch thin cursor
         self.bar_cursor = config["cursor_bar"]
@@ -1870,7 +1871,7 @@ class TUI():
                 w = w - (self.tree_width + self.bordered + 1)
                 if self.bordered:
                     text = "─" + trim_with_dash(text, dash=False)
-                    line_text = self.corner_ul + text + "─" * (w - len(text) - 2) + self.corner_ur
+                    line_text = self.corner_ul + text[:w-2] + "─" * (w - len(text) - 2) + self.corner_ur
                     if extra_line_format:
                         line_format = []
                         for item in extra_line_format:
@@ -2726,6 +2727,9 @@ class TUI():
                             self.assist_start = -2
                         else:
                             self.assist_start = self.input_index
+                    elif self.assist_stop_space and key == " ":
+                        self.assist_start = -2
+
                 self.spellcheck()
                 self.cursor_pos = self.input_index - max(0, len(self.input_buffer) - w + 1 - self.input_line_index)
                 self.cursor_pos = max(self.cursor_pos, 0)

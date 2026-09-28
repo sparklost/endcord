@@ -823,7 +823,7 @@ class Endcord:
                     self.dms.remove(dm)
 
 
-    def switch_channel(self, channel_id, guild_id, parent_hint=None, preload=False, voice=True):
+    def switch_channel(self, channel_id, guild_id, parent_hint=None, preload=False):
         """All that should be done when switching channel, and also proxy to joining voice channels"""
         # dont switch to same channel
         if channel_id == self.active_channel["channel_id"]:
@@ -835,34 +835,7 @@ class Endcord:
             return
 
         # select new current channel
-        this_guild = self.select_current_channels(channel_id, guild_id, parent_hint, voice=voice)
-
-        # start voice call if its voice channel
-        if voice and this_guild == -1:
-            channel = {}
-            for guild in self.guilds:
-                if guild["guild_id"] == guild_id:
-                    for ch in guild["channels"]:
-                        if ch["id"] == channel_id:
-                            channel = ch
-                            break
-                    break
-            if not channel:
-                return
-            if not channel.get("allow_voice", True):   # check perms
-                self.update_extra_line("You don't have permission to connect to this voice channel", color=19)
-                return
-            this_voice_states = self.gateway.get_voice_states().get(channel["id"], {})
-            if this_voice_states and channel["user_limit"] and this_voice_states[0] >= channel["user_limit"]:   # check if full
-                self.update_extra_line("This voice channel is currently full")
-                return
-            self.start_call(
-                incoming=False,
-                guild_id=guild_id,
-                channel_id=channel_id,
-                enable_input=channel.get("allow_talk", True),
-            )
-            return
+        this_guild = self.select_current_channels(channel_id, guild_id, parent_hint)
 
         logger.debug(f"Switching channel, has_id: {bool(channel_id)}, has_guild: {bool(guild_id)}, has hint: {bool(parent_hint)}")
 
@@ -878,6 +851,7 @@ class Endcord:
         # clear member roles when switching guild so there are no issues with same members in both guilds
         if guild_id != self.active_channel["guild_id"]:
             self.current_member_roles = []
+            self.gateway.clear_mention_cache()
 
         # cache previous channel chat (if not forum)
         if not self.forum and self.messages:
@@ -1018,6 +992,12 @@ class Endcord:
                     self.update_extra_line(custom_text=new_extra_line, color=new_extra_line_format, permanent=True)
             elif not self.in_call:
                 self.update_extra_line(permanent=True)
+
+        # guild voice channel call ui
+        if this_guild and self.current_channel["type"] == 2:
+            self.show_guild_start_call_ui(guild_id, channel_id)
+        elif not self.in_call and self.permanent_extra_line and self.permanent_extra_line.endswith("[Join Call]"):
+            self.update_extra_line(permanent=True)
 
         # select guild member list and subscribed
         if guild_id:
@@ -1264,7 +1244,7 @@ class Endcord:
         return folder_changed
 
 
-    def select_current_channels(self, channel_id=None, guild_id=None, parent_hint=None, refresh=False, voice=True):
+    def select_current_channels(self, channel_id=None, guild_id=None, parent_hint=None, refresh=False):
         """Select current channels and current channel objects and update things related to them"""
         # update list of channels
         if not channel_id:
@@ -1286,8 +1266,6 @@ class Endcord:
         current_channel = {}
         for channel in current_channels:
             if channel["id"] == channel_id:
-                if channel["type"] == 2 and voice:   # voice channel
-                    return -1   # skip any changes
                 current_channel = channel
                 break
 
@@ -1677,7 +1655,6 @@ class Endcord:
                 break
             if self.editing and not self.command:
                 restore_text, input_index = self.load_from_store(self.active_channel["channel_id"])
-                logger.info(restore_text)
                 restore_text = self.restore_input_text[0] if not restore_text else restore_text
                 self.restore_input_text = (restore_text, "edit")
             if self.reacting["id"]:
@@ -2560,6 +2537,11 @@ class Endcord:
                             # remove popup if not in this channel
                             if self.active_channel["channel_id"] not in self.incoming_calls:
                                 self.update_extra_line(permanent=True)
+                    elif self.current_channel["type"] == 2 and self.permanent_extra_line.endswith("[Join Call]"):
+                        mouse_x = self.tui.get_x_line_clicked() + (not (self.tui.bordered))*2
+                        len_extra_line = len(self.extra_line) + 1
+                        if len_extra_line - 11 < mouse_x <= len_extra_line:   # JOIN CALL
+                            self.join_current_voice_channel()
                 elif self.fun == 4 and self.extra_line and self.extra_line.startswith("Personalized"):
                     self.download_threads.append(threading.Thread(target=self.download_file, daemon=True, args=(
                         "https://" + "archive.org/download/youtube-" + "/".join(["xvFZjo5PgG0"]*2) + ".mp4",
@@ -3037,6 +3019,7 @@ class Endcord:
                         self.restore_input_text = (input_text, "standard")
                         continue
                     nonce = discord.generate_nonce()
+                    text_to_send = formatter.reverse_replace_mentions(text_to_send, self.gateway.mention_cache, self.current_roles)
                     self.put_to_message_sender(self.discord.send_message,
                         self.active_channel["channel_id"],
                         text_to_send,
@@ -4024,14 +4007,18 @@ class Endcord:
             if not self.in_call:
                 if not self.active_channel["guild_id"]:
                     threading.Thread(target=self.start_call, daemon=True, args=(False, None, self.active_channel["channel_id"])).start()
+                elif self.current_channel["type"] == 2:
+                    self.join_current_voice_channel()
                 else:
-                    self.update_extra_line("This command can only be used in DM")
+                    self.update_extra_line("This command can only be used in DM and voice channel")
             else:
                 self.update_extra_line("Can't join multiple calls", color=self.colors[9])
 
         elif cmd_type == 49:   # VOICE_ACCEPT_CALL
             if not self.in_call:
-                if self.incoming_calls:
+                if self.current_channel["type"] == 2:
+                    self.join_current_voice_channel()
+                elif self.incoming_calls:
                     if self.most_recent_incoming_call:
                         incoming_call_ch_id = self.most_recent_incoming_call
                     else:
@@ -4120,18 +4107,6 @@ class Endcord:
                 self.update_extra_line(f"Switched to device: {device}")
             else:
                 self.update_extra_line(f"Specified device not found: {device}")
-
-        elif cmd_type == 56:   # VOICE_OPEN_CHAT
-            if self.tree_metadata[tree_sel]["type"] == 2:
-                channel_id = self.tree_metadata[tree_sel]["id"]
-                guild_id = self.find_parents_from_tree(tree_sel)[0]
-            elif self.in_call and self.in_call["guild_id"]:
-                channel_id = self.in_call["channel_id"]
-                guild_id = self.in_call["guild_id"]
-            if not reset:   # means its from command bindings
-                self.add_to_store(self.active_channel["channel_id"], self.restore_input_text[0])
-                self.restore_input_text = (None, None)
-            self.switch_channel(channel_id, guild_id, voice=False)
 
         elif cmd_type == 57:   # VIEW_EMOJI
             if cmd_args.get("name"):
@@ -4568,6 +4543,7 @@ class Endcord:
                 self.update_extra_line()
             else:
                 self.update_extra_line("Attachments are still uploading", color=self.colors[9])
+        content = formatter.reverse_replace_mentions(content, self.gateway.mention_cache, self.current_roles)
         self.discord.send_message(
             channel_id,
             content,
@@ -6022,7 +5998,8 @@ class Endcord:
     def assist(self, assist_word, assist_type, query_results=None, input_context=None):
         """Generate and show various assists when typing"""
         self.assist_type = assist_type
-        self.assist_found = []
+        if assist_type != 2:
+            self.assist_found = []
         extra_format = []
         color_low = self.colors[8]
         color_standout = self.colors[9]
@@ -6064,16 +6041,18 @@ class Endcord:
                     extra_format.append(formatter.fix_line_format_extended(line_format, text))
 
         elif assist_type == 2:   # username/role
-            self.assist_found = search.search_usernames_roles(
+            assist_found, do_query = search.search_usernames_roles(
                 self.current_roles,
                 query_results,
-                self.active_channel["guild_id"],
-                self.gateway,
                 assist_word,
                 presences=self.current_subscribed_members,
                 limit=self.assist_limit,
                 score_cutoff=self.assist_score_cutoff,
             )
+            if do_query:
+                self.gateway.request_members(self.active_channel["guild_id"], None, query=assist_word, limit=10)
+            else:
+                self.assist_found = assist_found
             for line in self.assist_found:
                 text = line[0]
                 match = re.search(match_last_parentheses, text)
@@ -6084,7 +6063,6 @@ class Endcord:
                 elif " - role" in line[0]:
                     line_format.append((color_standout, None, text.rfind(" - role") + 4, max_w))
                 extra_format.append(formatter.fix_line_format_extended(line_format, text))
-
 
         elif assist_type == 3:   # emoji
             premium_override = input_context and input_context.split(" ")[0] in self.premium_override_commands
@@ -8176,9 +8154,47 @@ class Endcord:
             self.ringer = None
 
 
+    def show_guild_start_call_ui(self, guild_id=None, channel_id=None, update=True):
+        """Show guild call ui when switching to guild voice channel"""
+        if not guild_id and not channel_id:
+            guild_id = self.active_channel["guild_id"]
+            channel_id = self.active_channel["channel_id"]
+            if self.current_channel["type"] != 2:
+                return
+        if self.in_call:
+            return
+        channel = {}
+        for guild in self.guilds:
+            if guild["guild_id"] == guild_id:
+                for ch in guild["channels"]:
+                    if ch["id"] == channel_id:
+                        channel = ch
+                        break
+                break
+        if not channel:
+            return
+        this_voice_states = self.gateway.get_voice_states().get(channel["id"], {})
+        if this_voice_states and channel["user_limit"] and this_voice_states[0] >= channel["user_limit"]:   # check if full
+            self.update_extra_line("This voice channel is currently full")
+            return
+        new_extra_line, new_extra_line_format = formatter.generate_extra_line_guild_start_call(
+            channel,
+            this_voice_states,
+            self.tui.get_dimensions()[2][1],
+            self.tui.bordered,
+            self.colors,
+        )
+        if update:
+            self.update_extra_line(custom_text=new_extra_line, color=new_extra_line_format, permanent=True)
+        else:
+            self.permanent_extra_line = new_extra_line
+            self.permanent_extra_line_format = new_extra_line_format
+
+
     def start_call(self, incoming=False, guild_id=None, channel_id=None, enable_input=True):
         """Start voice call"""
         if not (support_media and support_call):
+            self.show_guild_start_call_ui(update=False)
             self.update_extra_line("Failed to start call: No media/call support", color=20)
             return
 
@@ -8199,12 +8215,14 @@ class Endcord:
             time.sleep(0.1)
         else:
             self.update_extra_line(permanent=True)
+            self.show_guild_start_call_ui(update=False)
             self.update_extra_line("Failed to start call: gateway timeout", color=20)
             logger.warning("Failed to start call: gateway timeout")
             self.joining_call = False
             return
         if not voice_gateway_data["guild_id"] or not voice_gateway_data["channel_id"]:
             self.update_extra_line(permanent=True)
+            self.show_guild_start_call_ui(update=False)
             self.update_extra_line("Failed to start call: gateway rejected call", color=20)
             logger.warning("Failed to start call: gateway rejected call")
             self.joining_call = False
@@ -8235,6 +8253,7 @@ class Endcord:
             time.sleep(0.1)
         else:
             self.update_extra_line(permanent=True)
+            self.show_guild_start_call_ui(update=False)
             self.update_extra_line("Failed to start call: voice gateway timeout", color=20)
             logger.warning("Failed to start call: voice gateway timeout")
             del self.voice_gateway
@@ -8276,10 +8295,33 @@ class Endcord:
         self.execute_extensions_methods("on_start_call")
 
 
+    def join_current_voice_channel(self):
+        """Join voice call if curent channel is voice channel"""
+        if self.current_channel["type"] != 2:
+            return
+        if not self.current_channel.get("allow_voice", True):   # check perms
+            self.show_guild_start_call_ui(update=False)
+            self.update_extra_line("You don't have permission to connect to this voice channel", color=19)
+            return
+        this_voice_states = self.gateway.get_voice_states().get(self.current_channel["id"], {})
+        user_limit = self.current_channel["user_limit"]
+        if this_voice_states and user_limit and this_voice_states[0] >= user_limit:   # check if full
+            self.show_guild_start_call_ui(update=False)
+            self.update_extra_line("This voice channel is currently full")
+            return
+        self.start_call(
+            incoming=False,
+            guild_id=self.active_channel["guild_id"],
+            channel_id=self.active_channel["channel_id"],
+            enable_input=self.current_channel.get("allow_talk", True),
+        )
+
+
     def leave_call(self):
         """Leave voice call"""
         if self.in_call:
             call_channel_id = self.in_call["channel_id"]
+            call_guild_id = self.in_call["guild_id"]
             if call_channel_id not in self.incoming_calls:
                 self.incoming_calls.append(call_channel_id)
 
@@ -8290,9 +8332,14 @@ class Endcord:
             self.close_extra_window()
 
         self.gateway.request_voice_disconnect()
-        # keep popup (will be removed on CALL_DELETE event)
+        show_ui = False
         if self.in_call:
-            if self.in_call and call_channel_id == self.active_channel["channel_id"]:
+            if call_guild_id:
+                if self.current_channel["type"] == 2:
+                    show_ui = True
+                else:
+                    self.update_extra_line(permanent=True)
+            elif call_channel_id == self.active_channel["channel_id"]:
                 for dm in self.dms:
                     if dm["id"] == call_channel_id:
                         new_extra_line, new_extra_line_format = formatter.generate_extra_line_ring(
@@ -8303,6 +8350,8 @@ class Endcord:
                         )
                         self.update_extra_line(custom_text=new_extra_line, color=new_extra_line_format, permanent=True)
                         break
+                else:
+                    self.update_extra_line(permanent=True)
             else:
                 self.update_extra_line(permanent=True)
             self.in_call = None
@@ -8315,8 +8364,10 @@ class Endcord:
             self.voice_gateway.disconnect()
             self.voice_gateway = None
 
-        if self.in_call:
-            self.execute_extensions_methods("on_leave_call")
+        if show_ui:
+            self.show_guild_start_call_ui()
+
+        self.execute_extensions_methods("on_leave_call")
 
 
     def update_call_extra_line(self):
@@ -9078,6 +9129,8 @@ class Endcord:
                         )
                     if new_extra_line and new_extra_line != self.permanent_extra_line:
                         self.update_extra_line(custom_text=new_extra_line, color=new_extra_line_format, permanent=True)
+                elif self.current_channel["type"] == 2:
+                    self.show_guild_start_call_ui()
                 if self.tui.get_dimensions()[1] != self.tree_dim:
                     self.update_tree()
                     self.tree_dim = self.tui.get_dimensions()[1]

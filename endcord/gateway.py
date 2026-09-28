@@ -36,6 +36,7 @@ LOCAL_MEMBER_COUNT = 50   # members per guild, CPU-RAM intensive
 LOCAL_VOICE_PRESENCE_LIMIT = 50   # per guild, slightly RAM intensive
 LIMIT_SUBSCRIBED = 5   # channels per guild
 LIMIT_SUBSCRIBED_THREADS = 3   # threads per guild
+LIMIT_MENTION_CACHE = 30
 VOICE_FLAGS = 3   # CLIPS_ENABLED and ALLOW_VOICE_RECORDING
 DEFAULT_CAPABILITIES = 30717
 DEFAULT_INTENTS = 50364033
@@ -201,6 +202,7 @@ class Gateway():
         self.voice_gateway_data_ready = 0
         self.voice_states = {}
         self.should_redraw_tree = None
+        self.mention_cache = {}
 
 
     def load_extensions(self, extensions):
@@ -1258,16 +1260,19 @@ class Gateway():
                         self.querying_members = False
                         self.member_query_results = []
                         for member in data["members"]:
+                            user_id = member["user"]["id"]
+                            username = member["user"]["username"]
                             name = member.get("nick")
                             if not name:
                                 name = member["user"].get("global_name")
                             if not name:
                                 name = member["user"].get("username")
-                            self.member_query_results.append({
-                                "id": member["user"]["id"],
-                                "username": member["user"]["username"],
-                                "name": name,
-                            })
+                            self.member_query_results.append({"id": user_id, "username": username, "name": name})
+                            if username in self.mention_cache:
+                                del self.mention_cache[username]
+                            self.mention_cache[username] = user_id
+                            if len(self.mention_cache) > LIMIT_MENTION_CACHE:
+                                del self.mention_cache[next(iter(self.mention_cache))]
                     else:   # subscribed members changed presence and for updating thread member list
                         guild_id = data["guild_id"]
                         for member in data["members"]:
@@ -2383,7 +2388,7 @@ class Gateway():
 
 
     def set_subscribed_channels(self, subscribed_channels):
-        """Set currently subscribed channels and so MESSAGE_ events can be faster processed for other channels"""
+        """Set currently subscribed channels so MESSAGE_ events can be faster processed for other channels"""
         self.subscribed_channels = subscribed_channels
 
 
@@ -2406,6 +2411,11 @@ class Gateway():
         """Set offline client status"""
         # this will trigger reconnect from thread guard
         self.reconnect_requested = True
+
+
+    def clear_mention_cache(self):
+        """Clear mention cache"""
+        self.mention_cache = {}
 
 
     def get_ready(self):

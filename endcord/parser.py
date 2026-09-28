@@ -971,10 +971,6 @@ def command_string(text):
             cmd_type = 0
             cmd_args = {"value": 1}
 
-    # 56 - VOICE_OPEN_CHAT
-    elif text_lower.startswith("voice_open_chat"):
-        cmd_type = 56
-
     # 57 - VIEW_EMOJI
     elif text_lower.startswith("view_emoji"):
         cmd_type = 57

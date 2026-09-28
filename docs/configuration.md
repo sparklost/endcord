@@ -57,10 +57,6 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
     Save unsent message when switching channel, and load it when re-opening that channel.
 - `show_pending_messages = True`  
     Show pending messages in chat with `color_chat_pending` until they are sent. Disable to save some CPU usage when sending messages.
-- `assist = True`  
-    Assist when typing @username, @role, #channel, :emoji:, ;sticker;
- - `assist_swap_binding = True`  
-    Whether to swap `chat_up` and `chat_down` with `extra_up` and `extra_down` when popup window is open.
 - `cursor_bar = True`  
     Whether to use terminals own bar-shaped cursor, instead of builtin block-shaped cursor in input line.
 - `cursor_on_time = 0.7`  
@@ -152,14 +148,20 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
     Force only one open server at a time in tree. When one is opened other is closed, excluding DMs.
 - `remember_collapsed_channels = True`  
     Whether to persist collapsed state for forums and channels with threads.
+- `assist = True`  
+    Assist when typing @username, @role, #channel, :emoji:, ;sticker;
+- `assist_stop_space = True`  
+    Wether to stop assist when space character is typed.
+ - `assist_swap_binding = True`  
+    Whether to swap `chat_up` and `chat_down` with `extra_up` and `extra_down` when popup window is open.
 - `assist_skip_app_command = False`  
     Skip assist for app_name when typing app command. Instead, show all app commands and insert app_name with selected command.
-- `fallback_keybinding_parser = False`  
-    Use fallback keybinding resolver. Some keybindings may not work, but should be more stable on exotic terminals. On windows, this is forced ON.
 - `assist_limit = 50`  
     Maximum number of results when showing assist.
 - `assist_score_cutoff = 15`  
     Cutoff for assist match score. Lower value will result in more results.
+- `fallback_keybinding_parser = False`  
+    Use fallback keybinding resolver. Some keybindings may not work, but should be more stable on exotic terminals. On windows, this is forced ON.
 - `limit_command_history = 50`  
     Maximum number of commands stored in history. File is `command_history.json` in config dir.
 - `game_detection_download_delay = 7`  

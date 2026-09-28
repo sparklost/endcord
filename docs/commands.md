@@ -110,17 +110,15 @@
 - `play_in_native`  
     Play selected attachment in native media player, regardless of the `native_media_player` setting.
 - `voice_start_call`  
-    Start voice call in currently open DM.
+    Start voice call in currently open DM or join call in currntly open voice channel.
 - `voice_accept_call`  
-    Accept incoming voice call.
+    Accept incoming voice call or join call in currntly open voice channel.
 - `voice_leave_call`  
     Leave current voice call.
 - `voice_reject_call`  
     Silence incoming call or cancel outgoing call.
 - `voice_list_call`  
     Show all call participants and their states in an updated list. Must be in the call to use this.
-- `voice_open_chat`  
-    Open voice call chat for selected voice channel. If none is selected then open for currently active voice call.  
 - `voice_set_volume_input [value]`  
     Change volume for input devices in voice call. Set to 0 to mute. Value can be `0-200%`, above 100 is boost. Persisted across sessions.  
     `+` and `-` can be prefixed to value so it will increment it - useful for binding this command to a key.  

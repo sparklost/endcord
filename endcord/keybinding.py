@@ -44,6 +44,8 @@ def get_key(screen, backspace_code=127):
             ch = screen.getch()
             if ch == -1:
                 break
+            if ch > 255:
+                continue
             sequence_list.append(ch)
         screen.nodelay(False)
         screen.timeout(250)   # restore previous setting
