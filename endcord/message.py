@@ -105,7 +105,9 @@ def prepare_embeds(embeds, message_content):
         if author and content[-1].startswith("> "):
             content.append(author)
         content = "\n".join(content)
-        if content:
+        if content or proxy_url:
+            if proxy_url:
+                content = " "
             if content == message_content:
                 message_content = ""
             if message_content.startswith("https://") and " " not in message_content and "\n" not in message_content and ((main_url and main_url in message_content) or any(domain in content for domain in GIF_PROVIDERS)):
