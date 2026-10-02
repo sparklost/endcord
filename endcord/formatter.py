@@ -417,9 +417,10 @@ try:
         init_wide_ranges,
         len_wch,
         limit_width_wch,
-        replace_wide,
         split_index_wch,
     )
+    from endcord_cython.formatter import replace_wide as replace_wide_cy
+    def replace_wide(text, replacement=TREE_EMOJI_REPLACE): return replace_wide_cy(text, replacement)   # noqa
     init_wide_ranges(WIDE_RANGES)
 except ImportError:
     fix_line_format = fix_line_format_py
@@ -1421,7 +1422,7 @@ class ChatGenerator:
             self.pre_edited_len = 0
 
         # curses optimizes scrolling, so large empty space in chat will cause flickering when scrolling tree / member list
-        # this is prevented by vertically alternating space and alt_space character (U+2800 - braille pattern blank)
+        # this is prevented by vertically alternating space and alt_space character (U+2000 - en quad)
         # same thing is in member list but if member list is closed, here must be too
         fixed_content = (self.format_newline
             .replace("%timestamp", self.placeholder_timestamp)
@@ -2447,7 +2448,7 @@ class ChatGenerator:
         return chat, chat_format, chat_map
 
 
-def generate_status_line(my_user_data, my_status, unread_count, typing, active_channel, action, tasks, tabs, tabs_format, format_status_line, format_rich, colors, my_role_color, status_sign, slowmode=None, vim_mode=None, limit_typing=30, use_nick=True, fun=True):
+def generate_status_line(my_user_data, my_status, unread_count, typing, active_channel, action, tasks, tabs, tabs_format, format_status_line, format_rich, colors, my_role_color, status_sign, chain=None, slowmode=None, vim_mode=None, limit_typing=30, use_nick=True, fun=True):
     """
     Generate status line according to provided formatting.
     Possible options for format_status_line:
@@ -2657,6 +2658,7 @@ def generate_status_line(my_user_data, my_status, unread_count, typing, active_c
     sl_text, sl_format = replace_formatted(sl_text, sl_format, "%typing", typing_string, color_standout, None)
     sl_text, sl_format = replace_formatted(sl_text, sl_format, "%server", guild or "DM", color_standout, None)
     sl_text, sl_format = replace_formatted(sl_text, sl_format, "%slowmode", slowmode, color_low, 1)
+    sl_text, sl_format = replace_formatted(sl_text, sl_format, "%chain", (chain + "-") if chain else "", color_standout, 1)
 
     if have_tabs:
         pre_tab_len = len(sl_text.split(tabs)[0])
@@ -2971,8 +2973,8 @@ def generate_extra_line_guild_start_call(channel, voice_states, max_len, bordere
 
     if voice_states and len(voice_states) > 1:
         limit = f"/{channel["user_limit"]}" if channel["user_limit"] else ""
-        count = f"{voice_states[0]}{limit} member{"s" if voice_states[0] > 1 else ""}:"   # 0 is count
-        count_color = 20 if voice_states[0] >= channel["user_limit"] else color_standout
+        count = f"{voice_states[0]}{limit} member{"s" if voice_states[0] > 1 else ""}"   # 0 is count
+        count_color = 20 if (channel["user_limit"] and voice_states[0] >= channel["user_limit"]) else color_standout
     else:
         count = "No members" + (f" ({channel["user_limit"]} max.)" if channel["user_limit"] else "")
         count_color = color_standout
@@ -3028,26 +3030,37 @@ def generate_extra_line_call(call_participants, volume_in, volume_out, max_len, 
     return shortened_str + right_text, line_format
 
 
-def generate_extra_window_call(call_participants, me_muted, colors, max_len):
+def generate_extra_window_call(call_participants, user_volumes, volume_in, volume_out, colors, max_len):
     """Generate extra windows title and body as a list of voice call participants and their states"""
     title_line = "Voice call participants:"
     color_low = colors[8]
     color_standout = colors[9]
     body = []
     body_format = []
-    body.append(f"Me - {"muted  " if me_muted else "unmuted"}")
-    body_format.append([(color_low, 1 if me_muted else None, 5, 12)])
+    me_muted = not volume_in
+    me_text = f"Me - {"muted" if me_muted else "unmuted"} (I:{(str(volume_in)+"%").center(4)} O:{(str(volume_out)+"%").center(4)})"
+    body.append(me_text)
+    body_format.append([
+        (color_low, 1 if me_muted else None, 5, 12 - 2 * me_muted),
+        (color_low, None, 13 - 2 * me_muted, len(me_text)),
+    ])
     for participant in call_participants:
-        name = participant["name"]
-        text = f" - {"muted  " if participant["muted"] else "unmuted"}"
+        name = participant["name"] if participant["name"] else "Unknown"
+        muted = participant["muted"]
+        volume = user_volumes.get(participant["user_id"], 100)
+        text = f" - {"muted" if muted else "unmuted"} ({str(volume).rjust(3)}%)"
         if participant["speaking"]:
             text += " - speaking"
-        if len(participant["name"]) + len(text) > max_len:
-            name = name[:-(len(participant["name"]) + len(text) - max_len)]
+        if len(name) + len(text) > max_len:
+            name = name[:-(len(name) + len(text) - max_len)]
         body.append(name + text)
-        line_format = [([(color_low, 1 if participant["muted"] else None, len(name) + 3, len(name) + 10)])]
+        line_format = [
+            (color_low, 1 if participant["muted"] else None, len(name) + 3, len(name) + 10 - 2 * muted),
+            (color_low if volume else 20, None, len(name) + 10 - 2 * muted, len(name) + 17 - 2 * muted),
+        ]
         if participant["speaking"]:
-            line_format.append(([(color_standout, None, len(name) + 10, len(name + text))]))
+            line_format.append((color_standout, None, len(name) + 20 - 2 * muted, len(name + text)))
+        body_format.append(line_format)
     return title_line, body, body_format
 
 
@@ -3125,17 +3138,17 @@ def generate_extra_window_profile(user_data, user_roles, presence, colors, max_l
         body_format.extend([[(color_standout, 0, 0, 6), (color_status, 1, 8, len(status) + 8)], *[None] * (len(lines) - 1)])
     else:
         body.append("Status: Offline")
-        body_format.append(([(color_standout, 0, 0, 6), (color_low, 1, 8, max_len)]))
+        body_format.append([(color_standout, 0, 0, 6), (color_low, 1, 8, max_len)])
 
     # misc
     if user_data["tag"]:
         body.append(f"Tag: {user_data["tag"]}")
-        body_format.append(([(color_standout, 0, 0, 3)]))
+        body_format.append([(color_standout, 0, 0, 3)])
     body.append(f"Member since: {member_since}"[:max_len])
-    body_format.append(([(color_standout, 0, 0, 12)]))
+    body_format.append([(color_standout, 0, 0, 12)])
     if user_data["joined_at"]:
         body.append(f"Joined: {user_data["joined_at"]}")
-        body_format.append(([(color_standout, 0, 0, 6)]))
+        body_format.append([(color_standout, 0, 0, 6)])
 
     # rich presences
     if presence:
@@ -3150,10 +3163,10 @@ def generate_extra_window_profile(user_data, user_roles, presence, colors, max_l
                 state = ""
             duration = f"({format_seconds(int(time.time() - activity["start"]))})" if activity["start"] else ""
             body.append(f"{action} {activity["name"]} {duration}"[:max_len])
-            body_format.append(([
+            body_format.append([
                 (color_standout, 0, 0, len(action) + len(activity["name"]) + 1),
                 (color_low, 0, len(action) + len(activity["name"]) + 2, max_len),
-            ]))
+            ])
             body.append(f"  {state}")
             body_format.append(None)
             if activity["details"]:
@@ -3177,7 +3190,7 @@ def generate_extra_window_profile(user_data, user_roles, presence, colors, max_l
         body_format.append(None)
     if user_data["bio"]:
         body.append("Bio:")
-        body_format.append(([(color_standout, 0, 0, 3)]))
+        body_format.append([(color_standout, 0, 0, 3)])
         bio = split_long_line(user_data["bio"], max_len)
         body.extend(bio)
         body_format.extend([*[None] * len(bio)])
@@ -3192,7 +3205,7 @@ def generate_extra_window_channel(channel, voice_states, use_nick, colors, max_l
     body = []
     body_format = []
     if channel["type"] == 2:   # voice channel
-        title_line = f"Voice Channel: {channel["name"]}"[:max_len]
+        title_line = f"Voice channel: {channel["name"]}"[:max_len]
         allow_voice = channel.get("allow_voice", True)
         allow_speak = channel.get("allow_speak", True)
         if not allow_voice:
@@ -3220,7 +3233,7 @@ def generate_extra_window_channel(channel, voice_states, use_nick, colors, max_l
             for value in voice_states.values():
                 if isinstance(value, int):
                     continue
-                username, global_name, nick = value
+                username, global_name, nick, _ = value
                 if (nick and use_nick) or global_name:
                     body.append(f"  {nick if nick else global_name} ({username})"[:max_len])
                     body_format.append([(color_low, 0, len(nick if nick else global_name) + 3, max_len)])

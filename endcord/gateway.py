@@ -1093,7 +1093,7 @@ class Gateway():
                             self.voice_states[channel_id][0] = self.voice_states[channel_id].get(0, 0) + 1
                             if count > LOCAL_VOICE_PRESENCE_LIMIT:
                                 continue
-                            self.voice_states[channel_id][user_id] = (username, global_name, nick)
+                            self.voice_states[channel_id][user_id] = (username, global_name, nick, state["self_mute"] or state["mute"])
                     self.dm_activities_changed = True
                     del (guild, self.merged_users)   # this is large so lets save some memory
                     gc.collect()
@@ -1649,7 +1649,7 @@ class Gateway():
                                     username = "Unknown"
                                     global_name = None
                                     nick = None
-                                self.voice_states[channel_id][user_id] = (username, global_name, nick)
+                                self.voice_states[channel_id][user_id] = (username, global_name, nick, user["self_mute"] or user["mute"])
                             self.should_redraw_tree = data["guild_id"]
                     # removed voice states
                     for user_id in data["removed_voice_states"]:
@@ -1707,7 +1707,7 @@ class Gateway():
                             if user_id not in self.voice_states[channel_id]:
                                 self.voice_states[channel_id][0] = self.voice_states[channel_id].get(0, 0) + 1
                                 if len(self.voice_states) - 1 <= LOCAL_VOICE_PRESENCE_LIMIT:
-                                    self.voice_states[channel_id][user_id] = (username, global_name, nick)
+                                    self.voice_states[channel_id][user_id] = (username, global_name, nick, data["self_mute"] or data["mute"])
                                 self.should_redraw_tree = data["guild_id"] if data["guild_id"] else -1
                         else:
                             for channel_id, activities in self.voice_states.items():   # search for channel and activity

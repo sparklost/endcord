@@ -604,6 +604,30 @@ def search_profiles(profiles, query, limit=50, score_cutoff=15):
     return sorted(results, key=lambda x: x[2], reverse=True)
 
 
+def search_call_users(call_participants, user_volumes, query, limit=50, score_cutoff=15):
+    """Search for users in the current call"""
+    results = []
+    worst_score = score_cutoff
+
+    for participant in call_participants:
+        name = participant["name"]
+        if not name:
+            continue
+        score = fuzzy_match_score(query, name)
+        if not query:
+            score = score_cutoff
+        elif score < worst_score and query:
+            continue
+        user_id = participant["user_id"]
+        volume = user_volumes.get(user_id, 100)
+        heapq.heappush(results, (f"{name} ({volume})", "voice_set_volume_user " + f"<@{user_id}>", score))
+        if len(results) > limit:
+            heapq.heappop(results)
+            worst_score = results[0][2]
+
+    return sorted(results, key=lambda x: x[2], reverse=True)
+
+
 def search_gifs(gifs, query, limit=50, score_cutoff=15, fav=True, cmd=True):
     """Search for gifs"""
     results = []

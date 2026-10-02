@@ -672,6 +672,16 @@ class Gateway():
         self.voice_handler.stop_file_playback()
 
 
+    def set_user_volume(self, user_id, volume):
+        """Set volume per user_id"""
+        self.voice_handler.set_user_volume(user_id, volume)
+
+
+    def get_user_volumes(self):
+        """Get user_id:volume dict"""
+        return self.voice_handler.user_to_volume
+
+
 
 class VoiceHandler:
     """Voice call sound receiver, transmitter, player and recorder"""
@@ -687,6 +697,8 @@ class VoiceHandler:
         self.dave_session = gateway.dave_session
         self.ssrc_to_decryptor = {}
         self.ssrc_to_userid = {}
+        self.user_to_volume = {}
+        self.ssrc_to_gain = {}
         self.encryptor = dave.Encryptor()
 
         self.audio_queue_out = {}
@@ -790,6 +802,15 @@ class VoiceHandler:
         """Set volumes levels"""
         self.gain_input = volume_to_gain(volume_input, boost=1)
         self.gain_output = volume_to_gain(volume_output, boost=BASE_SOUND_GAIN)
+
+
+    def set_user_volume(self, user_id, volume):
+        """Set volume per user_id"""
+        self.user_to_volume[user_id] = volume
+        ssrc = next((k for k, v in self.ssrc_to_userid.items() if v == user_id), None)
+        if not ssrc:
+            return
+        self.ssrc_to_gain[ssrc] = volume_to_gain(volume)
 
 
     def live_mic_switch(self, new_mic):
@@ -1178,21 +1199,21 @@ class VoiceHandler:
                                 peer_buffer[ssrc] = False
                             else:
                                 continue  # keep buffering
-                        frames_to_mix.append(buf.popleft())
+                        gain = self.ssrc_to_gain.get(ssrc, 1)
+                        frames_to_mix.append((buf.popleft(), gain))
 
                 # mixing
                 if frames_to_mix:
                     mixed.fill(0)
-                    for frame in frames_to_mix:
-                        if frame.format.name in ("s16", "s16p"):
-                            audio = frame.to_ndarray().astype("float32") / 32768.0
-                        else:
-                            audio = frame.to_ndarray().astype("float32")
+                    for frame, gain in frames_to_mix:
+                        total_gain = gain * self.gain_output
+                        scale = (total_gain / 32768.0) if frame.format.name in ("s16", "s16p") else total_gain
+                        audio = frame.to_ndarray().astype("float32") * scale
                         if audio.shape == (2, 960):
                             audio = audio.T
                         elif audio.shape == (1, 1920):
                             audio = audio.reshape(960, 2)
-                        mixed += audio * self.gain_output
+                        mixed += audio
 
                     # normalization
                     num_speakers = len(frames_to_mix)

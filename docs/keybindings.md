@@ -81,18 +81,25 @@
 - `Z` - replay
 
 ### Default command-bindings (macros)
-- `Alt+Left/Right` -`"M-LEFT" = "switch_tab prev"` and `"M-RIGHT" = "switch_tab next"`  
-    Switch to previous/next tabbed channel.
-- `Ctrl+K` - `"C-k" = "command_palette; type 'goto '"`  
-    Open command palette and type `goto `.
-- `Shift+Up` - `"S-UP" = "tree_select server prev; collapse_all_except selected"`  
-    Select previous server in tree and collapse all other servers except it.
-- `Shift+Down` - `"S-DOWN" = "tree_select server; collapse_all_except selected"`  
-    Select next server in tree and collapse all other servers except it.
-- `Ctrl+Y Up/Down` - `"C-y UP" = "resize_popup_window +1"` and `"C-y DOWN" = "resize_popup_window -1"`  
-    Increase/Decrease vertical size of popup window by 1.
-- `Alt+Q` - `"M-q" = "voice_set_volume_input"`  
-    Toggle voice call input volume. Something like push-to-talk.
+- `Alt+Left/Right` - Switch to previous/next tabbed channel
+- `Ctrl+K` - Open command palette and type `goto `
+- `Shift+Up` - Select previous server in tree and collapse all other servers except it
+- `Shift+Down` - Select next server in tree and collapse all other servers except it
+- `Ctrl+Y Up/Down` - Increase/Decrease vertical size of popup window by 1
+- `Ctrl+Y c` - copy link to currently selected channel in tree
+- `Ctrl+Y m` - copy link to currently selected message in chat
+- `Ctrl+Y v` - Start/stop recording voice message (will be sent upon stopping)
+- `Ctrl+Y a` - Toggle afk state
+- `Ctrl+Y b` - Toggle visibility of messages from blocked users
+- `Ctrl+Y h` - Show client-side command history
+- `Alt+Q c` - Start/join a voice call (in dm or voice channel)
+- `Alt+Q a` - Accept incoming DM voice call
+- `Alt+Q q` - Leave currently ongoing voice call
+- `Alt+Q l` - Show all call participants and their states in an updated list
+- `Alt+Q i` - Toggle voice call input volume (mute/unmute), something like push-to-talk
+- `Alt+Q C-UP/DOWN` - Increase/decrease input volume by 10
+- `Alt+Q m` - Toggle mute/unmute of selected user in currently active call list
+- `Alt+Q UP/DOWN` - Increase/decrease call volume by 10 for user in currently active call list
 
 ### OS specific keybindings
 Some keybindings are used by terminals or OS itself, so they are by default rebound to something else.

@@ -1,15 +1,13 @@
 VOICE CALLS:
-Add option to locally mute users in voice call
 Use libopus instead of pyav
-Add voice call normalization option
 Fix sound stuttering when using rnnoise
 
 CORE EASY:
+Add spellcheck corrections assist
+Add inbox
 Add keybinding configuration UI
 Add settings and theme configuration UI
 Add commands for other UI tools
-Add inbox
-Add spellcheck corrections assist
 
 CORE HARD:
 Fix issues with wide characters in input line
@@ -34,6 +32,7 @@ Patch python 3.14 using python 3.16 curses module to enable 255+ colors
 Update tui.py to support 255+ colors
 Add colors to status sign in tree for selected and active dm
 Add color to embed quote line
+Add colors to rich embeds vertical line
 
 EXTENSIONS:
 endcord-kitty-media

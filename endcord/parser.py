@@ -29,7 +29,6 @@ match_time_zero = re.compile(r"\b(0[1-9]|1\d|2[0-4])(?:\s?(am|pm))?\b")   # 00, 
 match_time_clock = re.compile(r"\b([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?(?:\s?(am|pm))?\b")   # 22:59, 03:33 AM, 03:33pm, 11:11:11 am
 match_duration = re.compile(r"(\d+(?:\.\d+)?)\s*(s|sec|second|m|min|minute|h|hr|hour|d|day|w|week|mo|mon|month|y|yr|year)\b")
 
-
 match_setting = re.compile(r"(\w+) ?= ?(.+)")
 match_channel = re.compile(r"<#(\d*)>")
 match_profile = re.compile(r"<@(\d*)>")
@@ -511,6 +510,7 @@ def command_string(text):
     cmd_args = {}
     text_lower = text.lower()
     forum = True
+    close = True   # set to 2 to disable close only on command-binding
 
     # 1 - SET
     if text_lower.startswith("set "):
@@ -616,6 +616,7 @@ def command_string(text):
     # 13 - CHANNEL
     elif text_lower.startswith("channel"):
         cmd_type = 13
+        close = False
         match = re.search(match_channel, text)
         if match:
             cmd_args = {"channel_id": match.group(1)}
@@ -623,6 +624,7 @@ def command_string(text):
     # 14 - SUMMARIES
     elif text_lower.startswith("summaries"):
         cmd_type = 14
+        close = False
         match = re.search(match_channel, text)
         if match:
             cmd_args = {"channel_id": match.group(1)}
@@ -639,6 +641,8 @@ def command_string(text):
         cmd_type = 16
         forum = False
         search_text = text[7:].strip(" ")
+        if not search_text:
+            close = False
         cmd_args = {"search_text": search_text}
 
     # 17 - COPY_CHANNEL_LINK
@@ -854,6 +858,8 @@ def command_string(text):
     elif text_lower.startswith("gif"):
         cmd_type = 41
         search_text = text[4:].strip(" ")
+        if not search_text:
+            close = False
         cmd_args = {"search_text": search_text}
 
     # 42 - REDRAW
@@ -895,6 +901,11 @@ def command_string(text):
             cmd_type = 0
             cmd_args = {"value": 1}
 
+    # 46 - SHOW_COMMAND_HISTORY
+    elif text_lower.startswith("show_command_history"):
+        cmd_type = 46
+        close = False
+
     # 47 - TOGGLE_BLOCKED_MESSAGES
     elif text_lower.startswith("toggle_blocked_messages"):
         cmd_type = 47
@@ -920,9 +931,10 @@ def command_string(text):
     # 52 - VOICE_SET_VOLUME_INPUT
     elif text_lower.startswith("voice_set_volume_input"):
         cmd_type = 52
+        close = 2
         try:
             parts = text.split()
-            if len(parts):
+            if len(parts) > 1:
                 num_piece = parts[1]
                 num = abs(int(num_piece))
                 increment = 0
@@ -940,9 +952,10 @@ def command_string(text):
     # 53 - VOICE_SET_VOLUME_OUTPUT
     elif text_lower.startswith("voice_set_volume_output"):
         cmd_type = 53
+        close = 2
         try:
             parts = text.split()
-            if len(parts):
+            if len(parts) > 1:
                 num_piece = parts[1]
                 num = abs(int(num_piece))
                 increment = 0
@@ -960,6 +973,7 @@ def command_string(text):
     # 54 - VOICE_LIST_CALL
     elif text_lower.startswith("voice_list_call"):
         cmd_type = 54
+        close = False
 
     # 55 - VOICE_SET_INPUT_DEVICE
     elif text_lower.startswith("voice_set_input_device"):
@@ -968,6 +982,32 @@ def command_string(text):
         if name:
             cmd_args = {"name": name}
         else:
+            cmd_type = 0
+            cmd_args = {"value": 1}
+
+    # 56 - VOICE_SET_VOLUME_USER
+    elif text_lower.startswith("voice_set_volume_user"):
+        cmd_type = 56
+        close = 2
+        match = re.search(match_profile, text)
+        user_id = match.group(1) if match else None
+        if match:
+            text = re.sub(match_profile, "", text, count=1)
+            text = text.replace("  ", " ")
+        try:
+            parts = text.split()
+            if len(parts) > 1:
+                num_piece = parts[1]
+                num = abs(int(num_piece))
+                increment = 0
+                if "+" in num_piece:
+                    increment = 1
+                if "-" in num_piece:
+                    increment = -1
+            else:
+                num, increment = None, None
+            cmd_args = {"value": num, "increment": increment, "user_id": user_id}
+        except (IndexError, ValueError):
             cmd_type = 0
             cmd_args = {"value": 1}
 
@@ -1134,6 +1174,7 @@ def command_string(text):
     # 76 - SHOW_STATS
     elif text_lower.startswith("show_stats"):
         cmd_type = 76
+        close = False
 
     # 77 - TOGGLE_TREE
     elif text_lower.startswith("toggle_tree"):
@@ -1228,4 +1269,4 @@ def command_string(text):
     if not forum:
         cmd_type += 1000
 
-    return cmd_type, cmd_args
+    return cmd_type, cmd_args, close

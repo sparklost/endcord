@@ -77,7 +77,7 @@ LIMIT_MSG_LEN = 2000
 LIMIT_MSG_LEN_PREMIUM = 4000
 COLLAPSE_ALL_EXCEPT_OPTIONS = ("current", "selected", "above", "below")
 STANDING_TYPES = ("All Good", "Limited", "Very Limited", "At risk", "Suspended")
-ASSISTED_COMMANDS = ("set ", "string_select ", "set_notifications ", "game_detection_blacklist ", "switch_tab ", "goto ", "collapse_all_except ", "insert_timestamp ", "voice_set_input_device ", "switch_profile ", "gif ")
+ASSISTED_COMMANDS = ("set ", "string_select ", "set_notifications ", "game_detection_blacklist ", "switch_tab ", "goto ", "collapse_all_except ", "insert_timestamp ", "voice_set_input_device ", "switch_profile ", "voice_set_volume_user ", "gif ")
 STATS_COMMAND_TEXT = ("Run time", "Gateway events/h", "Gateway messages/h", "Gateway ping time", "Message buffer size", "Total API requests", "API response time", "Cache sizes", "  Cached members", "  Deleted messages", "  Summaries", "  Image cache")
 match_youtube = re.compile(r"(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)[a-zA-Z0-9_-]{11}")
 match_last_parentheses = re.compile(r"\([^()]*\)(?!.*\([^()]*\))")
@@ -1707,6 +1707,15 @@ class Endcord:
                     input_text, chat_sel, tree_sel, action = self.tui.wait_input(self.prompt, init_text=restore_text, keep_cursor=True, reset=False, clear_delta=True, forum=self.forum)
                 else:
                     input_text, chat_sel, tree_sel, action = self.tui.wait_input(self.prompt, clear_delta=True, forum=self.forum)
+
+            if self.tui.keybinding_chain is False:
+                self.update_status_line(
+                    status=("%chain" in self.format_status_line_l or "%chain" in self.format_status_line_r),
+                    title=("%chain" in self.format_title_line_l or "%chain" in self.format_title_line_r),
+                    tree=("%chain" in self.format_title_tree), subtitle=False,
+                )
+                self.tui.keybinding_chain = None
+
             logger.debug(f"Input code: {action}")
 
             # switch channel
@@ -2680,6 +2689,15 @@ class Endcord:
                 self.set_status(None, temp=True)
                 self.stop_idle_event.set()
 
+            # on first step of command chain
+            elif action == 2002:
+                self.restore_input_text = (input_text, "command" if self.command else "standard extra")
+                self.update_status_line(
+                    status=("%chain" in self.format_status_line_l or "%chain" in self.format_status_line_r),
+                    title=("%chain" in self.format_title_line_l or "%chain" in self.format_title_line_r),
+                    tree=("%chain" in self.format_title_tree), subtitle=False,
+                )
+
             # drag and drop from gtkcurses
             elif action == 3000:
                 files = self.tui.get_dropped()
@@ -2743,7 +2761,7 @@ class Endcord:
                                     continue
                             except (ValueError, IndexError):
                                 pass
-                        cmd_type, cmd_args = parser.command_string(command)
+                        cmd_type, cmd_args, close = parser.command_string(command)
                         chat_sel, _ = self.tui.get_chat_selected()
                         tree_sel = self.tui.get_tree_selected()
                         binding = None
@@ -2756,6 +2774,8 @@ class Endcord:
                                 self.wait_input(forced_binding=command[1:])
                                 time.sleep(0.01)   # so cursor doesnt appear at the end off line
                         if not binding:
+                            if not close or close == 2:
+                                self.restore_input_text = (input_text, "standard extra")
                             self.execute_command(cmd_type, cmd_args, action[1], chat_sel, tree_sel, reset=False)
                         self.check_tree_format()
                     if self.command and self.restore_input_text[1] in (None, "standard"):
@@ -2887,8 +2907,9 @@ class Endcord:
 
                 elif self.command:
                     self.tui.instant_assist = False
-                    command_type, command_args = parser.command_string(input_text)
-                    self.close_extra_window()
+                    command_type, command_args, close = parser.command_string(input_text)
+                    if close:
+                        self.close_extra_window()
                     self.execute_command(command_type, command_args, input_text, chat_sel, tree_sel)
                     self.assist_word = None
                     self.add_to_command_history(input_text)
@@ -3999,6 +4020,13 @@ class Endcord:
                     self.update_chat()
                     self.update_extra_line(f"User has been {"" if block else "un"}blocked successfully")
 
+        elif cmd_type == 46:   # SHOW_COMMAND_HISTORY
+            max_w = self.tui.get_dimensions()[2][1]
+            extra_body = [command[:max_w] for command in reversed(self.command_history)]
+            self.stop_assist(close=False)
+            self.tui.draw_extra_window("Command history:", extra_body, [], select=True)
+            self.extra_window_open = True
+
         elif cmd_type == 47:   # TOGGLE_BLOCKED_MESSAGES
             self.show_blocked_messages = not self.show_blocked_messages
             self.update_chat()
@@ -4039,7 +4067,7 @@ class Endcord:
                     self.update_extra_line(permanent=True)
 
         elif cmd_type == 52:   # VOICE_SET_VOLUME_INPUT
-            if value is None:
+            if cmd_args["value"] is None:
                 if self.state["volume_in"]:
                     self.prev_volume_in = self.state["volume_in"]
                     self.state["volume_in"] = 0
@@ -4067,9 +4095,11 @@ class Endcord:
                     time.sleep(self.extra_line_delay)
                 self.update_call_extra_line()
             utils.save_json(self.state, f"state_{self.profiles["selected"]}.json")
+            if self.voice_call_list_open:
+                self.view_voice_call_list()
 
         elif cmd_type == 53:   # VOICE_SET_VOLUME_OUTPUT
-            if value is None:
+            if cmd_args["value"] is None:
                 if self.state["volume_out"]:
                     self.prev_volume_out = self.state["volume_out"]
                     self.state["volume_out"] = 0
@@ -4087,13 +4117,14 @@ class Endcord:
                 self.voice_gateway.set_volumes(self.state["volume_in"], self.state["volume_out"])
                 self.update_call_extra_line()
             utils.save_json(self.state, f"state_{self.profiles["selected"]}.json")
+            if self.voice_call_list_open:
+                self.view_voice_call_list()
 
-        elif cmd_type == 54:   # VOICE_LIST_CALL
-            if self.in_call:
-                if self.voice_call_list_open:
-                    self.close_extra_window()
-                else:
-                    self.view_voice_call_list(reset=True)
+        elif cmd_type == 54 and self.in_call:   # VOICE_LIST_CALL
+            if self.voice_call_list_open:
+                self.close_extra_window()
+            else:
+                self.view_voice_call_list(reset=True)
 
         elif cmd_type == 55:   # VOICE_SET_INPUT_DEVICE
             device = cmd_args["name"]
@@ -4107,6 +4138,32 @@ class Endcord:
                 self.update_extra_line(f"Switched to device: {device}")
             else:
                 self.update_extra_line(f"Specified device not found: {device}")
+
+        elif cmd_type == 56 and self.voice_gateway:   # VOICE_SET_VOLUME_USER
+            user_id = cmd_args["user_id"]
+            if user_id == self.my_id:
+                return
+            voice_volumes = self.voice_gateway.get_user_volumes()
+            if not user_id:
+                if self.voice_call_list_open:
+                    selected_idx = min(self.tui.get_extra_selected() - 1, len(self.call_participants))
+                    if selected_idx < 0:
+                        return
+                    user_id = self.call_participants[selected_idx]["user_id"]
+                else:
+                    return
+            current_value = voice_volumes.get(user_id, 100)
+            if cmd_args["value"] is None:
+                value = 0 if current_value else 100
+            else:
+                value = min(max(cmd_args["value"], 0), 200)
+                if cmd_args["increment"] == 1:
+                    value = min(current_value + value, 200)
+                elif cmd_args["increment"] == -1:
+                    value = max(current_value - value, 0)
+            self.voice_gateway.set_user_volume(user_id, value)
+            if self.voice_call_list_open:
+                self.view_voice_call_list()
 
         elif cmd_type == 57:   # VIEW_EMOJI
             if cmd_args.get("name"):
@@ -5517,7 +5574,6 @@ class Endcord:
             return
         if not guild_id:
             guild_id = self.active_channel["guild_id"]
-        self.stop_assist(close=False)
         if not user_data:
             if self.viewing_user_data["id"] != user_id or self.viewing_user_data["guild_id"] != guild_id:
                 if guild_id:
@@ -5568,6 +5624,7 @@ class Endcord:
         if self.emoji_as_text:
             extra_title = utils.demojize(extra_title)
             extra_body = [utils.demojize(x) for x in extra_body]
+        self.stop_assist(close=False)
         self.tui.draw_extra_window(extra_title, extra_body, extra_format, reset_scroll=reset)
         self.extra_window_open = True
 
@@ -5726,11 +5783,13 @@ class Endcord:
         self.stop_assist(close=False)
         extra_title, extra_body, extra_format = formatter.generate_extra_window_call(
             self.call_participants,
-            not (self.state["volume_in"]),
+            self.voice_gateway.get_user_volumes(),
+            self.state["volume_in"],
+            self.state["volume_out"],
             self.colors,
             self.tui.get_dimensions()[2][1],
         )
-        self.tui.draw_extra_window(extra_title, extra_body, extra_format, reset_scroll=reset)
+        self.tui.draw_extra_window(extra_title, extra_body, extra_format, select=True, reset_scroll=reset)
         self.extra_window_open = True
         self.voice_call_list_open = True
 
@@ -6267,6 +6326,21 @@ class Endcord:
                     else:
                         extra_format.append(None)
 
+            elif assist_word.lower().startswith("voice_set_volume_user "):
+                self.assist_found = search.search_call_users(
+                    self.call_participants,
+                    self.voice_gateway.get_user_volumes(),
+                    assist_word[22:],
+                    limit=self.assist_limit,
+                    score_cutoff=self.assist_score_cutoff,
+                )
+                for line in self.assist_found:
+                    match = re.search(match_last_parentheses, line[0])
+                    if match:
+                        extra_format.append([(color_low, None, *match.span())])
+                    else:
+                        extra_format.append(None)
+
             elif assist_word.lower().startswith("gif "):
                 self.assist_found = search.search_gifs(
                     self.discord.get_settings_proto(2).get("favorite_gifs", {}).get("gifs", []),
@@ -6452,8 +6526,9 @@ class Endcord:
                     if len(self.assist_found[index]) > 3:   # instant assist for "gif" command
                         input_text = self.assist_found[index][1]
                     self.tui.instant_assist = False
-                    command_type, command_args = parser.command_string(input_text)
-                    self.close_extra_window()
+                    command_type, command_args, close = parser.command_string(input_text)
+                    if close:
+                        self.close_extra_window()
                     self.execute_command(
                         command_type,
                         command_args,
@@ -6890,6 +6965,7 @@ class Endcord:
                     self.colors,
                     self.my_current_role_color,
                     self.status_char,
+                    chain=self.tui.keybinding_chain,
                     slowmode=self.slowmode_times.get(self.active_channel["channel_id"]),
                     vim_mode=(self.tui.insert_mode if self.vim_mode else None),
                     limit_typing=self.limit_typing,
@@ -6913,6 +6989,7 @@ class Endcord:
                 self.colors,
                 self.my_current_role_color,
                 self.status_char,
+                chain=self.tui.keybinding_chain,
                 slowmode=self.slowmode_times.get(self.active_channel["channel_id"]),
                 vim_mode=(self.tui.insert_mode if self.vim_mode else None),
                 limit_typing=self.limit_typing,
@@ -6937,6 +7014,7 @@ class Endcord:
                     self.colors,
                     self.my_current_role_color,
                     self.status_char,
+                    chain=self.tui.keybinding_chain,
                     slowmode=self.slowmode_times.get(self.active_channel["channel_id"]),
                     vim_mode=(self.tui.insert_mode if self.vim_mode else None),
                     limit_typing=self.limit_typing,
@@ -6961,6 +7039,7 @@ class Endcord:
                     self.colors,
                     self.my_current_role_color,
                     self.status_char,
+                    chain=self.tui.keybinding_chain,
                     slowmode=self.slowmode_times.get(self.active_channel["channel_id"]),
                     vim_mode=(self.tui.insert_mode if self.vim_mode else None),
                     limit_typing=self.limit_typing,
@@ -6985,6 +7064,7 @@ class Endcord:
                     self.colors,
                     self.my_current_role_color,
                     self.status_char,
+                    chain=self.tui.keybinding_chain,
                     slowmode=self.slowmode_times.get(self.active_channel["channel_id"]),
                     vim_mode=(self.tui.insert_mode if self.vim_mode else None),
                     limit_typing=self.limit_typing,
@@ -7015,6 +7095,7 @@ class Endcord:
                     self.colors,
                     self.my_current_role_color,
                     self.status_char,
+                    chain=self.tui.keybinding_chain,
                     slowmode=self.slowmode_times.get(self.active_channel["channel_id"]),
                     vim_mode=(self.tui.insert_mode if self.vim_mode else None),
                     limit_typing=self.limit_typing,
@@ -8198,8 +8279,19 @@ class Endcord:
             self.update_extra_line("Failed to start call: No media/call support", color=20)
             return
 
-        self.joining_call = True
         self.call_participants = []
+        for user_id, user in self.gateway.get_voice_states().get(channel_id, {}).items():
+            if user_id == 0:
+                continue
+            self.call_participants.append({
+                "user_id": user_id,
+                "name": user[1],
+                "muted": user[3],
+                "speaking": False,
+            })
+
+        self.joining_call = True
+
         self.update_extra_line(custom_text="Connecting to voice server", permanent=True)
         self.gateway.request_voice_gateway(
             guild_id,
@@ -9086,6 +9178,9 @@ class Endcord:
                 self.update_status_line()
             changed_guild = self.gateway.get_should_redraw_tree()
             if changed_guild and changed_guild not in self.state["collapsed"]:
+                if changed_guild == self.active_channel["guild_id"]:
+                    if not self.in_call and self.permanent_extra_line and self.permanent_extra_line.endswith("[Join Call]"):
+                        self.show_guild_start_call_ui()
                 self.update_tree()
                 self.update_status_line()
 

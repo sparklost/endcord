@@ -66,10 +66,10 @@ def set_list_item(input_list, item, index):
 
 
 def trim_with_dash(text, dash=True):
-    """Trim spaces from a line and add '─' if there were spaces prefixed"""
+    """Trim strictly spaces from a line and add '─' if there were spaces prefixed"""
     if dash and text and text[0] == " ":
-        return "─" + text.strip()
-    return text.strip()
+        return "─" + text.strip(" ")
+    return text.strip(" ")
 
 
 def replace_spaces_dash(text):
@@ -1773,7 +1773,7 @@ class TUI():
                 y += 1
                 while y < h:
                     # curses optimizes scrolling, so large empty space will cause flickering when scrolling member list
-                    # this is prevented by vertically alternating space and alt_space character (U+2800 - braille pattern blank)
+                    # this is prevented by vertically alternating space and alt_space character (U+2000 - en quad)
                     self.win_tree.insstr(y, 0, f"{" " if y % 2 else ALT_SPACE}\n", curses.color_pair(1))
                     y += 1
                 while num < len(self.tree_format):   # continue loop to detect mentions below visible area
@@ -2097,7 +2097,7 @@ class TUI():
                 y += 1
                 while y < h:
                     # curses optimizes scrolling, so large empty space will cause flickering when scrolling tree
-                    # this is prevented by vertically alternating space and alt_space character (U+2800 - braille pattern blank)
+                    # this is prevented by vertically alternating space and alt_space character (U+2000 - en quad)
                     self.win_member_list.insstr(y, 0, f"{" " if y % 2 else ALT_SPACE}\n", curses.color_pair(1))
                     y += 1
                 self.win_member_list.noutrefresh()
@@ -2685,7 +2685,6 @@ class TUI():
             self.delta_cache = ""
             self.undo_index = None
         selected_completion = 0
-        self.keybinding_chain = None
         key = -1
         self.screen.timeout(250)
         while self.run:
@@ -2704,6 +2703,14 @@ class TUI():
                     return self.return_input_code(code)
                 continue
             w = self.input_hw[1]
+
+            # full keybinding chain
+            if self.keybinding_chain:
+                if key == "ESC":
+                    self.keybinding_chain = None
+                    return self.return_input_code(2002)
+                key = f"{self.keybinding_chain} {"SPACE" if key == " " else key}"
+                self.keybinding_chain = False
 
             # regular characters
             if len(key) == 1 and self.insert_mode:
@@ -2750,13 +2757,10 @@ class TUI():
                 self.pressed_num_key = int(key[-1:])
                 return self.return_input_code(42)
 
-            # deal with chains
-            if key in self.chainable and not self.keybinding_chain:
+            # keybinding chain prefix
+            if not self.keybinding_chain and key in self.chainable:
                 self.keybinding_chain = key
-                continue
-            if self.keybinding_chain:
-                key = f"{self.keybinding_chain} {"SPACE" if key == " " else key}"
-                self.keybinding_chain = None
+                return self.return_input_code(2002)
 
             # gtkcurses events
             if key.startswith("PASTE"):
@@ -2777,6 +2781,7 @@ class TUI():
 
             # special keys
             if key == keybinding.KEY_ESCAPE:
+                self.keybinding_chain = None
                 if self.assist_start:
                     self.assist_start = -1
                 if self.vim_mode and self.insert_mode:
@@ -3182,6 +3187,11 @@ class TUI():
             self.cursor_pos = max(self.cursor_pos, 0)
             self.cursor_pos = min(w - 1, self.cursor_pos)
             self.draw_input_line()
+
+            # unmatched keybinding chain
+            if self.keybinding_chain is False:
+                self.keybinding_chain = None
+                return self.return_input_code(2002)
 
             if press:
                 break

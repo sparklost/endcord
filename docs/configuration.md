@@ -288,14 +288,14 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
     Formatting for single reaction string. Reactions string is assembled by joining these strings with `reactions_separator` in between. See [format_one_reaction](#format_one_reaction) for more info.
 - `format_timestamp = "%H:%M"`  
     Format for timestamps in messages. Same as [datetime format codes](https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes)
-- `format_status_line_l = " ⠀%status_dot %nick %warn_state %unreads %action %typing"`  
+- `format_status_line_l = "  %status_dot %nick %warn_state %unreads %action %typing"`  
     Formatting for left side of status line. See [format_status](#format_status) for more info. Set to `None` to disable.  
-    This and other line formats will replace trailing, heading and 3 or more space characters with "middle line" if used in standard mode (not compact). This can be avoided by using Braille Pattern Blank character: `⠀`.  
+    This and other line formats will replace trailing, heading and 3 or more space characters with "middle line" if used in standard mode (not compact). This can be avoided by using en quad character: ` `.  
 - `format_status_line_r = "%vim_mode %slowmode"`  
     Formatting for right side of status line. See [format_status](#format_status) for more info.
 - `format_title_line_l = " %server: %channel_no_tab"`  
     Formatting for left side of title line. See [format_status](#format_status) for more info. Set to `None` to disable.
-- `format_title_line_r = None`  
+- `format_title_line_r = "%chain"`  
     Formatting for right side of title line. See [format_status](#format_status) for more info.
 - `format_subtitle_line = "─%tabs"`  
     Formatting for subtitle line - drawn below title line, only if there is content. See [format_status](#format_status) for more info.
@@ -548,6 +548,7 @@ Note: everything after `%content` may be pushed to newline.
 - `%task` - currently running slow task (reconnecting, downloading chat...)
 - `%tabs` - all tabs formatted with `format_tabs` then joined with `tabs_separator`
 - `%slowmode` - `Slowmode: hh:mm:ss` if slowmode is enabled, otherwise its hidden
+- `%chain` - Prefix of currently pressed keybinding chain, eg `C-y-`
 - `%app_name` - default is `endcord`, can be changed with `ENDCORD_APP_NAME` environment variable
 - `%vim_mode` - `[--INSERT--]` or `[--NORMAL--]` when `vim_mode` is ON
 
