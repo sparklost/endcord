@@ -691,13 +691,21 @@ def replace_roles(text, roles_ids, *ranges_lists):
 
 
 def replace_discord_url(text, *ranges_lists):
-    """Replace discord url for channel and message and shift ranges for other range lists."""
+    """Replace discord url for channel and message and shift ranges for other range lists"""
     result = []
     last_pos = 0
     offset = 0
     for match in re.finditer(match_discord_channel_url, text):
         start, end = match.span()
-        result.append(text[last_pos:start])
+        left_side = text[last_pos:start]
+
+        # skip if inside []() or [](<>)
+        if "[" in left_side and (left_side.endswith("](") or left_side.endswith("](<")):
+            right_side = text[end:]
+            if right_side.startswith(")") or right_side.startswith(">)"):
+                continue
+
+        result.append(left_side)
         if match.group(3):
             new_text = f"<#{match.group(2)}/{match.group(3)}>>MSG"
         else:
@@ -883,6 +891,7 @@ def replace_markdown_urls(text, except_ranges, *ranges_lists):
         if skip:
             continue
         new_text = match.group(1)
+        new_text, _, _ = format_md_all(new_text, 0)
         url = match.group(2).strip("<>")
         if not match_url.match(url):   # verify url
             continue
@@ -1572,7 +1581,7 @@ class ChatGenerator:
 
 
     def insert_data_into(self, data_list, data, index):
-        """Insert data into data list at specific index, like data_list.extend(data) at custom index. Data order will be inverted."""
+        """Insert data into data list at specific index, like data_list.extend(data) at custom index. Data order will be inverted"""
         for value in data:
             data_list.insert(index, value)
 
@@ -3497,7 +3506,7 @@ def generate_extra_window_assist(found, assist_type, max_len, placeholder_emoji=
             if item[0].startswith("** "):
                 body.append(f"**    - {item[0][3:]}"[:max_len])
             else:
-                body.append(f"    - {item[0]}"[:max_len])
+                body.append(f"    -{item[0]}"[:max_len])
         else:
             body.append(f"{prefix}{item[0]}"[:max_len])
     if not body:

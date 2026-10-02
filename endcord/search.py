@@ -264,18 +264,21 @@ def search_emojis(all_emojis, favorite_emojis, local_emojis, premium, guild_id, 
             for guild in emojis:
                 guild_name = guild["guild_name"]
                 for guild_emoji in guild["emojis"]:
-                    if guild_emoji["id"] == emoji_name:
+                    if guild_emoji[0] == emoji_name:
                         break
                 else:
                     continue
-                formatted = f"** {guild_emoji["name"]} ({guild_name})"
+                anim = len(guild_emoji) == 3
+                formatted = f"** {guild_emoji[1]} ({guild_name})"
                 if query.startswith("**"):
                     score = 1000 + fuzzy_match_score(query[2:].strip(), formatted)
                 else:
                     score = fuzzy_match_score(query, formatted)
                 if score < worst_score:
                     continue
-                heapq.heappush(results, (formatted, f"<:{guild_emoji["name"]}:{guild_emoji["id"]}>", score + 1000))
+                if anim:
+                    formatted += " - Animated"
+                heapq.heappush(results, (formatted, f"<{"a" if anim else ""}:{guild_emoji[1]}:{guild_emoji[0]}>", score + 1000))
         except ValueError:
             emoji_string = f":{emoji_name}:"
             for emoji, data in utils.EMOJI_DATA.items():
@@ -308,11 +311,14 @@ def search_emojis(all_emojis, favorite_emojis, local_emojis, premium, guild_id, 
     for guild in emojis:
         guild_name = guild["guild_name"]
         for guild_emoji in guild["emojis"]:
-            formatted = f" {guild_emoji["name"]} ({guild_name})"
+            anim = len(guild_emoji) == 3
+            formatted = f" {guild_emoji[1]} ({guild_name})"
             score = fuzzy_match_score(query, formatted)
             if score < worst_score:
                 continue
-            heapq.heappush(results, (formatted, f"<:{guild_emoji["name"]}:{guild_emoji["id"]}>", score))
+            if anim:
+                formatted += " - Animated"
+            heapq.heappush(results, (formatted, f"<{"a" if anim else ""}:{guild_emoji[1]}:{guild_emoji[0]}>", score))
             if len(results) > limit:
                 heapq.heappop(results)
                 worst_score = results[0][2]

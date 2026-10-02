@@ -83,9 +83,8 @@
 ### Default command-bindings (macros)
 - `Alt+Left/Right` - Switch to previous/next tabbed channel
 - `Ctrl+K` - Open command palette and type `goto `
-- `Shift+Up` - Select previous server in tree and collapse all other servers except it
-- `Shift+Down` - Select next server in tree and collapse all other servers except it
-- `Ctrl+Y Up/Down` - Increase/Decrease vertical size of popup window by 1
+- `Shift+UP/DOWN` - Select previous/next server in tree and collapse all other servers except it
+- `Ctrl+Y UP/DOWN` - Increase/Decrease vertical size of popup window by 1
 - `Ctrl+Y c` - copy link to currently selected channel in tree
 - `Ctrl+Y m` - copy link to currently selected message in chat
 - `Ctrl+Y v` - Start/stop recording voice message (will be sent upon stopping)
@@ -182,7 +181,7 @@ Special commands available only for command-bindings are documented in [Commands
 ## Vim mode keybindings
 - `i` - Enter insert mode
 
-### tree
+### Tree
 - `K/J` - Navigating channel tree
 - `Space` - Expand selected categories and servers or enter selected channel
 - `W` - Un/collapse channel with threads in tree
@@ -190,7 +189,7 @@ Special commands available only for command-bindings are documented in [Commands
 - `I` - View channel info (selected in tree)
 - `C`- Copy selected channel (in tree) URL to clipboard
 
-### input line
+### Input line
 - `h/l` - character left/right
 - `b/w` - word left/right
 - `Ctrl+h/l` - select left/right
@@ -204,7 +203,7 @@ Special commands available only for command-bindings are documented in [Commands
 - `X` - Delete word
 - `p` - Smart paste - paste text or file as attachment
 
-### chat
+### Chat
 - `Enter` - Send message
 - `k/j` - Navigating messages
 - `r` - Reply to selected message
@@ -227,16 +226,16 @@ Special commands available only for command-bindings are documented in [Commands
 - `n` - Show pinned messages in current channel
 - `Ctrl+Shift+V` - This is common terminal binding to paste text, better use: `paste` command
 
-### popup line
+### Popup line
 - `<` - Previous uploaded/uploading attachment
 - `>` - Next uploaded/uploading attachment
 
-### popup window
+### Popup window
 - `,/.` - navigate in popup window / member list
 - `q` - select in popup window / member list
 - `V` - Preview selected file in upload assist or when searching gif or attachments ready to send
 
-### other
+### Other
 - `:` - Open command palette
 - `X` - Cancel all downloads and uploads
 - `s` - Cycle user status (online/away/DnD/invisible)

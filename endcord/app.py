@@ -4456,7 +4456,7 @@ class Endcord:
                         if not self.premium and guild["guild_id"] != self.active_channel["guild_id"]:
                             continue
                         for guild_emoji in guild["emojis"]:
-                            if guild_emoji["id"] == emoji_id:
+                            if guild_emoji[0] == emoji_id:
                                 valid = True
                                 emoji_string = emoji_id
                                 break
@@ -5930,7 +5930,7 @@ class Endcord:
                                 if not self.premium and guild["guild_id"] != self.active_channel["guild_id"]:
                                     continue
                                 for guild_emoji in guild["emojis"]:
-                                    if guild_emoji["id"] == emoji_id:
+                                    if guild_emoji[0] == emoji_id:
                                         valid = True
                                         break
                                 if valid or not self.premium:
@@ -6141,9 +6141,9 @@ class Endcord:
                 if match:
                     start, end = match.span()
                     if self.placeholder_emoji and line[1].startswith("<:"):
-                        extra_format.append([(color_low, None, start + 5, end + 6)])
+                        extra_format.append([(color_low, None, start + 5, len(line[0]) + 5)])
                     else:
-                        extra_format.append([(color_low, None, start - 1, end + 4)])
+                        extra_format.append([(color_low, None, start - 1, len(line[0]))])
                 else:
                     extra_format.append(None)
 

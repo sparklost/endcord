@@ -586,12 +586,13 @@ class Gateway():
 
         # emojis
         guild_emojis = []
-        for emojis in guild["emojis"]:
-            if emojis["available"]:
-                guild_emojis.append({
-                    "id": emojis["id"],
-                    "name": emojis["name"],
-                })
+        for emoji in guild["emojis"]:
+            if not emoji["available"]:
+                continue
+            if emoji["animated"]:
+                guild_emojis.append((emoji["id"], emoji["name"], True))
+            else:
+                guild_emojis.append((emoji["id"], emoji["name"]))
         self.emojis.append({
             "guild_id": guild["id"],
             "guild_name": properties["name"],

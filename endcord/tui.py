@@ -540,13 +540,13 @@ class TUI():
 
 
     def screen_update_barcursor(self):
-        """Thread that updates drawn content on physical screen"""
+        """Thread that updates drawn content on physical screen, when using bar-shaped cursor"""
         while self.run:
             self.need_update.wait()
             # here must be delay, otherwise output gets messed up
             with self.lock:
                 time.sleep(self.screen_update_delay)
-                # must draw inlut line on each update so cursor belongs to it
+                # must draw input line on each update so cursor belongs to it
                 self.win_input_line.noutrefresh()
                 curses.doupdate()
                 self.need_update.clear()

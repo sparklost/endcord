@@ -106,7 +106,7 @@ Settings, logs, state and themes location:
 Run `endcord -h` or `endcord --help` to see available command arguments.  
 
 ### Config options
-Go to [configuration](docs/configuration.md).
+Go to [configuration](docs/configuration.md).  
 Go to [keybindings](docs/keybindings.md#configuring-keybindings).
 
 ### Profile manager
