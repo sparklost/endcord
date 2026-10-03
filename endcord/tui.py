@@ -3520,6 +3520,7 @@ class DummyTUI:
     def __init__(self, config):
         self.bordered = not (config["compact"])
         self.inline_media = False
+        self.keybinding_chain = None
 
     def init_role_colors(self, all_roles, bg, alt_bg, guild_id=None):   # noqa
         for guild in all_roles:
