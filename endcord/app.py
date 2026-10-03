@@ -2687,11 +2687,11 @@ class Endcord:
 
             # terminal focus out/in
             elif action == 2001:
-                self.restore_input_text = (input_text, "command" if self.command else "standard extra")   # prevents closing extra window
+                self.full_restore_input_text(input_text)
                 if self.idle_timeout and self.my_status["status"] == "online":
                     threading.Thread(target=self.idle_status_timer, daemon=True).start()
             elif action == 2000:
-                self.restore_input_text = (input_text, "command" if self.command else "standard extra")
+                self.full_restore_input_text(input_text)
                 if not self.idle_timeout:
                     continue
                 if self.my_status["afk"] == 2:
@@ -2701,12 +2701,13 @@ class Endcord:
 
             # on first step of command chain
             elif action == 2002 and self.tui.keybinding_chain:
-                self.restore_input_text = (input_text, "command" if self.command else "standard extra")
+                self.full_restore_input_text(input_text)
                 self.update_status_line(
                     status=("%chain" in self.format_status_line_l or "%chain" in self.format_status_line_r),
                     title=("%chain" in self.format_title_line_l or "%chain" in self.format_title_line_r),
                     tree=("%chain" in self.format_title_tree), subtitle=False,
                 )
+                skip = True
                 if self.assist_which_key:
                     max_w = self.tui.get_dimensions()[2][1]
                     extra_title, extra_body, extra_format = formatter.generate_extra_window_whkey(
@@ -2715,11 +2716,11 @@ class Endcord:
                         self.tui.keybinding_chain,
                         self.colors, max_w,
                     )
-                    skip = True
-                    if self.extra_window_open:
-                        self.extra_bkp = (self.tui.extra_window_title, self.tui.extra_window_body, self.tui.extra_window_format, True)
-                    self.tui.draw_extra_window(extra_title, extra_body, extra_format)
-                    self.extra_window_open = True
+                    if len(extra_body) > 1:
+                        if self.extra_window_open:
+                            self.extra_bkp = (self.tui.extra_window_title, self.tui.extra_window_body, self.tui.extra_window_format, True)
+                        self.tui.draw_extra_window(extra_title, extra_body, extra_format)
+                        self.extra_window_open = True
                 continue
 
             # drag and drop from gtkcurses
@@ -3089,7 +3090,7 @@ class Endcord:
                 self.reset_states()
 
             # enter with no text
-            elif input_text == "":
+            elif input_text == "" and not skip:
                 if self.forum:
                     if input_text and input_text != "\n":
                         self.add_to_store(self.active_channel["channel_id"], input_text)
@@ -4636,6 +4637,22 @@ class Endcord:
             nonce=None,
         )
         self.update_extra_line("Message sent")
+
+
+    def full_restore_input_text(self, input_text):
+        """Set restore_input_text with respect to currently active prompt"""
+        if self.command:
+            self.restore_input_text = (input_text, "command")
+        elif self.search:
+            self.restore_input_text = (input_text, "search")
+        elif self.reacting["id"]:
+            self.restore_input_text = (input_text, "react")
+        elif self.editing:
+            self.restore_input_text = (input_text, "edit")
+        elif self.deleting:
+            self.restore_input_text = ("DELETE?", "prompt")
+        else:
+            self.restore_input_text = (input_text, "standard extra")
 
 
     def refresh_attachment_url(self, url):
@@ -6990,7 +7007,7 @@ class Endcord:
                     self.colors,
                     self.my_current_role_color,
                     self.status_char,
-                    chain=self.tui.keybinding_chain,
+                    keyb_chain=self.tui.keybinding_chain,
                     slowmode=self.slowmode_times.get(self.active_channel["channel_id"]),
                     vim_mode=(self.tui.insert_mode if self.vim_mode else None),
                     limit_typing=self.limit_typing,
@@ -7014,7 +7031,7 @@ class Endcord:
                 self.colors,
                 self.my_current_role_color,
                 self.status_char,
-                chain=self.tui.keybinding_chain,
+                keyb_chain=self.tui.keybinding_chain,
                 slowmode=self.slowmode_times.get(self.active_channel["channel_id"]),
                 vim_mode=(self.tui.insert_mode if self.vim_mode else None),
                 limit_typing=self.limit_typing,
@@ -7039,7 +7056,7 @@ class Endcord:
                     self.colors,
                     self.my_current_role_color,
                     self.status_char,
-                    chain=self.tui.keybinding_chain,
+                    keyb_chain=self.tui.keybinding_chain,
                     slowmode=self.slowmode_times.get(self.active_channel["channel_id"]),
                     vim_mode=(self.tui.insert_mode if self.vim_mode else None),
                     limit_typing=self.limit_typing,
@@ -7064,7 +7081,7 @@ class Endcord:
                     self.colors,
                     self.my_current_role_color,
                     self.status_char,
-                    chain=self.tui.keybinding_chain,
+                    keyb_chain=self.tui.keybinding_chain,
                     slowmode=self.slowmode_times.get(self.active_channel["channel_id"]),
                     vim_mode=(self.tui.insert_mode if self.vim_mode else None),
                     limit_typing=self.limit_typing,
@@ -7089,7 +7106,7 @@ class Endcord:
                     self.colors,
                     self.my_current_role_color,
                     self.status_char,
-                    chain=self.tui.keybinding_chain,
+                    keyb_chain=self.tui.keybinding_chain,
                     slowmode=self.slowmode_times.get(self.active_channel["channel_id"]),
                     vim_mode=(self.tui.insert_mode if self.vim_mode else None),
                     limit_typing=self.limit_typing,
@@ -7120,7 +7137,7 @@ class Endcord:
                     self.colors,
                     self.my_current_role_color,
                     self.status_char,
-                    chain=self.tui.keybinding_chain,
+                    keyb_chain=self.tui.keybinding_chain,
                     slowmode=self.slowmode_times.get(self.active_channel["channel_id"]),
                     vim_mode=(self.tui.insert_mode if self.vim_mode else None),
                     limit_typing=self.limit_typing,

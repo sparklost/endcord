@@ -2457,7 +2457,7 @@ class ChatGenerator:
         return chat, chat_format, chat_map
 
 
-def generate_status_line(my_user_data, my_status, unread_count, typing, active_channel, action, tasks, tabs, tabs_format, format_status_line, format_rich, colors, my_role_color, status_sign, chain=None, slowmode=None, vim_mode=None, limit_typing=30, use_nick=True, fun=True):
+def generate_status_line(my_user_data, my_status, unread_count, typing, active_channel, action, tasks, tabs, tabs_format, format_status_line, format_rich, colors, my_role_color, status_sign, keyb_chain=None, slowmode=None, vim_mode=None, limit_typing=30, use_nick=True, fun=True):
     """
     Generate status line according to provided formatting.
     Possible options for format_status_line:
@@ -2667,7 +2667,7 @@ def generate_status_line(my_user_data, my_status, unread_count, typing, active_c
     sl_text, sl_format = replace_formatted(sl_text, sl_format, "%typing", typing_string, color_standout, None)
     sl_text, sl_format = replace_formatted(sl_text, sl_format, "%server", guild or "DM", color_standout, None)
     sl_text, sl_format = replace_formatted(sl_text, sl_format, "%slowmode", slowmode, color_low, 1)
-    sl_text, sl_format = replace_formatted(sl_text, sl_format, "%chain", (chain + "-") if chain else "", color_standout, 1)
+    sl_text, sl_format = replace_formatted(sl_text, sl_format, "%chain", (keyb_chain + "-") if keyb_chain else "", color_standout, 1)
 
     if have_tabs:
         pre_tab_len = len(sl_text.split(tabs)[0])
