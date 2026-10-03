@@ -592,7 +592,7 @@ class Gateway():
             if emoji["animated"]:
                 guild_emojis.append((emoji["id"], emoji["name"], True))
             else:
-                guild_emojis.append((emoji["id"], emoji["name"]))
+                guild_emojis.append((emoji["id"], emoji["name"], True))
         self.emojis.append({
             "guild_id": guild["id"],
             "guild_name": properties["name"],

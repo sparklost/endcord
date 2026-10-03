@@ -3527,6 +3527,27 @@ def generate_extra_window_reactions(reaction, details, colors, max_len):
     return title_line[:max_len], body, body_format
 
 
+def generate_extra_window_whkey(keybindings, command_bindings, prefix, colors, max_len):
+    """Generate extra window title and body for which-key"""
+    title_line = f"Available bindings with {prefix} prefix"
+    color_standout = colors[9]
+    body = []
+    body_format = []
+    for name, data in keybindings.items():
+        if not data[0]:
+            continue
+        keybinding = data[0].replace(" ", "-")
+        if keybinding.startswith(prefix):
+            body.append(f"{keybinding} - {name.replace("_", " ")}"[:max_len])
+            body_format.append([(color_standout, None, 0, len(keybinding))])
+    for binding, name in command_bindings.items():
+        keybinding = binding.replace(" ", "-")
+        if keybinding.startswith(prefix):
+            body.append(f"{keybinding} - {name.replace("_", " ")}"[:max_len])
+            body_format.append([(color_standout, None, 0, len(keybinding))])
+    return title_line[:max_len], body, body_format
+
+
 def generate_extra_window_stats(data, texts, colors, max_len):
     """Generate extra window for stats command"""
     title_line = "Client stats:"

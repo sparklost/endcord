@@ -156,6 +156,8 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
     Whether to swap `chat_up` and `chat_down` with `extra_up` and `extra_down` when popup window is open.
 - `assist_skip_app_command = False`  
     Skip assist for app_name when typing app command. Instead, show all app commands and insert app_name with selected command.
+- `assist_which_key = True`  
+    Whether to show keybindings hint when chained binding prefix is pressed.
 - `assist_limit = 50`  
     Maximum number of results when showing assist.
 - `assist_score_cutoff = 15`  

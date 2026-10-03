@@ -94,7 +94,7 @@ class Endcord:
         self.profiles = profiles
 
         # select profile
-        for profile in chain(profiles["keyring"] + profiles["plaintext"]):
+        for profile in chain(profiles["keyring"], profiles["plaintext"]):
             if profile["name"] == profiles["selected"]:
                 self.token = profile["token"]
                 self.last_run = profile["time"]
@@ -146,6 +146,7 @@ class Endcord:
         self.extra_line_delay = config["extra_line_delay"]
         self.assist_limit = config["assist_limit"]
         self.assist_score_cutoff = config["assist_score_cutoff"]
+        self.assist_which_key = config["assist_which_key"]
         self.external_editor = config["external_editor"]
         self.limit_command_history = config["limit_command_history"]
         self.remove_prev_notif = ["remove_previous_notification"]
@@ -1708,12 +1709,21 @@ class Endcord:
                 else:
                     input_text, chat_sel, tree_sel, action = self.tui.wait_input(self.prompt, clear_delta=True, forum=self.forum)
 
+            skip = False
             if self.tui.keybinding_chain is False:
                 self.update_status_line(
                     status=("%chain" in self.format_status_line_l or "%chain" in self.format_status_line_r),
                     title=("%chain" in self.format_title_line_l or "%chain" in self.format_title_line_r),
                     tree=("%chain" in self.format_title_tree), subtitle=False,
                 )
+                skip = True
+                if self.assist_which_key and self.tui.extra_window_title.startswith("Available bindings"):
+                    if self.extra_bkp and self.extra_bkp[0] and len(self.extra_bkp) == 4:
+                        self.tui.draw_extra_window(self.extra_bkp[0], self.extra_bkp[1], self.extra_bkp[2], select=True)
+                        self.extra_bkp = None
+                    else:
+                        self.stop_extra_window()
+                self.restore_input_text = (input_text, "command" if self.command else "standard extra")
                 self.tui.keybinding_chain = None
 
             logger.debug(f"Input code: {action}")
@@ -2690,13 +2700,27 @@ class Endcord:
                 self.stop_idle_event.set()
 
             # on first step of command chain
-            elif action == 2002:
+            elif action == 2002 and self.tui.keybinding_chain:
                 self.restore_input_text = (input_text, "command" if self.command else "standard extra")
                 self.update_status_line(
                     status=("%chain" in self.format_status_line_l or "%chain" in self.format_status_line_r),
                     title=("%chain" in self.format_title_line_l or "%chain" in self.format_title_line_r),
                     tree=("%chain" in self.format_title_tree), subtitle=False,
                 )
+                if self.assist_which_key:
+                    max_w = self.tui.get_dimensions()[2][1]
+                    extra_title, extra_body, extra_format = formatter.generate_extra_window_whkey(
+                        self.keybindings,
+                        self.tui.command_bindings,
+                        self.tui.keybinding_chain,
+                        self.colors, max_w,
+                    )
+                    skip = True
+                    if self.extra_window_open:
+                        self.extra_bkp = (self.tui.extra_window_title, self.tui.extra_window_body, self.tui.extra_window_format, True)
+                    self.tui.draw_extra_window(extra_title, extra_body, extra_format)
+                    self.extra_window_open = True
+                continue
 
             # drag and drop from gtkcurses
             elif action == 3000:
@@ -2792,7 +2816,7 @@ class Endcord:
                 pass
 
             # enter
-            elif (action == 0 and input_text and input_text != "\n" and self.active_channel["channel_id"]) or self.command or self.search_gif:
+            elif (action == 0 and input_text and input_text != "\n" and self.active_channel["channel_id"]) or ((self.command or self.search_gif) and not skip):
                 if (self.assist_word is not None or self.search_gif) and self.assist_found:
                     self.restore_input_text = (input_text, "standard")
                     new_input_text, new_input_index = self.insert_assist(
@@ -6469,6 +6493,7 @@ class Endcord:
             if (self.search or self.command) and self.extra_bkp:
                 self.extra_window_open = True
                 self.tui.draw_extra_window(self.extra_bkp[0], self.extra_bkp[1], self.extra_bkp[2], select=True)
+                self.extra_bkp = None
         else:
             self.tui.instant_assist = False
 

@@ -2707,7 +2707,7 @@ class TUI():
             # full keybinding chain
             if self.keybinding_chain:
                 if key == "ESC":
-                    self.keybinding_chain = None
+                    self.keybinding_chain = False
                     return self.return_input_code(2002)
                 key = f"{self.keybinding_chain} {"SPACE" if key == " " else key}"
                 self.keybinding_chain = False
@@ -3190,7 +3190,6 @@ class TUI():
 
             # unmatched keybinding chain
             if self.keybinding_chain is False:
-                self.keybinding_chain = None
                 return self.return_input_code(2002)
 
             if press:
