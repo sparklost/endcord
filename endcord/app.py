@@ -200,7 +200,7 @@ class Endcord:
         self.current_roles = []
         self.current_guild_properties = {}
         self.current_channels = []
-        self.current_channel = {}
+        self.current_channel = {"type": None}
         self.slowmodes = {}
         self.slowmode_times = {}
         self.slowmode_thread = None
@@ -1131,7 +1131,7 @@ class Endcord:
         self.messages = []
         self.current_guild_properties = {}
         self.current_channels = []
-        self.current_channel = {}
+        self.current_channel = {"type": None}
         self.disable_sending = False
         self.typing = []
         self.chat_end = False
