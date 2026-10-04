@@ -580,10 +580,7 @@ def command_string(text):
         if "attachment" in value_part or "3" in value_part:
             cmd_args = {"type": 3}
 
-    # 8 - COPY_MESSAGE
-    elif text_lower.startswith("copy_message"):
-        cmd_type = 8
-        forum = False
+    # 8 moved bellow 18
 
     # 9 - UPLOAD
     elif text_lower.startswith("upload"):
@@ -655,6 +652,11 @@ def command_string(text):
     # 18 - COPY_MESSAGE_LINK
     elif text_lower.startswith("copy_message_link"):
         cmd_type = 18
+        forum = False
+
+    # 8 - COPY_MESSAGE
+    elif text_lower.startswith("copy_message"):
+        cmd_type = 8
         forum = False
 
     # 19 - GOTO_MENTION

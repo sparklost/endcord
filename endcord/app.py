@@ -6510,7 +6510,6 @@ class Endcord:
             if (self.search or self.command) and self.extra_bkp:
                 self.extra_window_open = True
                 self.tui.draw_extra_window(self.extra_bkp[0], self.extra_bkp[1], self.extra_bkp[2], select=True)
-                self.extra_bkp = None
         else:
             self.tui.instant_assist = False
 

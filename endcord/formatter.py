@@ -1887,6 +1887,8 @@ class ChatGenerator:
             content = message["content"]
             if self.emoji_as_text:
                 content = utils.demojize(content)
+            if edited and content.endswith("```"):
+                content += "\n"
             content = replace_bracketed_urls(content)
             content, emoji_ranges = replace_discord_emoji(content, self.placeholder_emoji)
             content, mention_ranges = replace_mentions(content, message["mentions"], emoji_ranges, global_name=self.use_global_name, use_nick=self.use_nick)
@@ -2372,6 +2374,7 @@ class ChatGenerator:
             # search for marker on this line and above
             marker = f"<{MARKER}:{num_i}>"
             shift = 0
+            start_y = min(start_y, len(chat) - 1)
             while chat[start_y-shift][self.newline_len:] != marker:
                 shift += 1
                 if start_y - shift < 0:
