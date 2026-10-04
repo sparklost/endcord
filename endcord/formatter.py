@@ -34,7 +34,7 @@ MIN_TAB_LEN = 8
 ACTIVITY_VERBS = ("Playing", "Streaming", "Listening to", "Watching", "Competing in")
 LOG_LELVELS = ("INFO", "DEBUG", "WARNING", "ERROR", "FATAL")
 
-match_d_emoji = re.compile(r"<(a?):(.+):(\d+)>")
+match_d_emoji = re.compile(r"<(a?):([^:]+):(\d+)>")
 match_mention = re.compile(r"<@(\d+)>")
 match_role = re.compile(r"<@&(\d+)>")
 match_channel = re.compile(r"<#([\d\/]+)>")
