@@ -1901,7 +1901,7 @@ class ChatGenerator:
             content, code_blocks = replace_code_blocks(content, emoji_ranges, mention_ranges, channel_ranges, timestamp_ranges, code_snippets)
             content, urls = replace_markdown_urls(content, (code_snippets, code_blocks), emoji_ranges, mention_ranges, channel_ranges, timestamp_ranges, code_snippets)
             code_blocks_tokens = []
-            if self.syntax_highlight:
+            if self.syntax_highlight and self.tokenize_code:
                 for block in code_blocks:
                     if not block[2]:
                         continue
