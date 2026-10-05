@@ -17,8 +17,8 @@ Endcord is a third-party feature rich Discord client, running entirely in termin
 It is built with Python (this [doesn't mean its slow](#note-on-python-performance-misconceptions)) and ncurses library, to deliver lightweight yet feature rich experience.  
 [More screenshots](https://github.com/sparklost/endcord/blob/main/.github/screenshots.md).  
 Official endcord will always stay **purely human project**.  
-Endcord is source-available licensed, and thus not open source, more details [here](#source-available-license). You are not allowed to create create public fork that modifies the code.  
-Any third party endcord forks may add features that can lead to account ban, contain outdated or even malicious code, cause instability, especially if they include LLM generated/modified code, so it is strongly recommended to avoid them.
+Endcord is source-available licensed, and thus not open source, more details [here](#source-available-license). You are not allowed to create public fork that modifies the code.  
+Any third party endcord forks may add features that can lead to account ban, cause instability, contain outdated or even malicious code, so it is strongly recommended to avoid them.
 
 
 ## Features
@@ -373,6 +373,7 @@ Optional dependency for spellchecking: `aspell`. Can be installed with: `brew as
 - `imagemagick` - To make notification images round; only needed for endcord-lite.
 - `source-highlight` or `python-pygments` - Code block syntax highlighting (Alternatively use [this extension](https://github.com/sparklost/endcord-pygments-syntax)).
 - `rnnoise` - Noise suppression in voice calls (or use `--bundle-rnnoise` build.py arg)
+- `libopus` - Needed for voice calls only if endcord is built without bundled libopus
 - `GTK3` - Only required for `endcord-gui` (windowed mode), not needed for prebuilt binaries only on windows
 
 
@@ -478,7 +479,8 @@ If you did something particular with endcord that caused the ban, open an issue 
 Python is slower than languages like C or Rust, but in this use case it does not affect performance. Endcord is event-driven and network-bound, not CPU-bound, so Python’s overhead is negligible (significantly reduced when built with nuitka).  
 All CPU-critical components are implemented in Cython with minimal python calls, resulting in near-C speeds.  
 Python was chosen because it enables rapid development.  
-Additionally if built with nuitka, custom Python is compiled from source (preferably with clang) with custom compiler flags for performance.
+Additionally if built with nuitka, custom Python is compiled from source (preferably with clang) with custom compiler flags for performance.  
+Full list of optimizations made for endcord can be found [here](.github/CONTRIBUTING.md#list-of-optimizations).
 
 ### Running multiple endcord instances
 To run multiple endcord instances at the same time, while keeping them completely separated, run endcord with `ENDCORD_APP_NAME` environment variable set to something else. This will change "endcord" everywhere: in config and cache paths, notifications, keyring...

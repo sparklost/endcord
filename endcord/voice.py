@@ -16,13 +16,12 @@ import time
 import urllib.parse
 from collections import deque
 
-import av
 import dave
 import nacl.bindings
 import numpy as np
 import websocket
 
-from endcord import socks
+from endcord import opus, socks
 
 # safely import soundcard, in case there is no sound system
 try:
@@ -31,13 +30,15 @@ except (AssertionError, RuntimeError):
     soundcard = False
 
 DISCORD_HOST = "discord.com"
-BASE_SOUND_GAIN = 2.0
+BASE_INPUT_GAIN = 1
+BASE_OUTPUT_GAIN = 2.0
 VOICE_FLAGS = 2   # ALLOW_VOICE_RECORDING
 UDP_TIMEOUT = 10
 OPUS_SILENCE = bytes([0xF8, 0xFF, 0xFE])
 SILENCE_BUFFER = 5
 MAX_SILENCE = 10
 MAX_LATENCY_FRAMES = 5
+TRANSMITTER_QUEUE_TIMEOUT = 0.06
 MIXER_BUFFER = 3
 RTCP_SEND_DELAY = 5   # set to 0 to disable RTCP SR
 CODECS = [
@@ -708,22 +709,16 @@ class VoiceHandler:
 
         if opus_mode not in ("voip", "audio", "lowdelay"):
             opus_mode = "voip"
-        self.opus_decoder = av.codec.CodecContext.create("opus", "r")
-        self.opus_encoder = av.codec.CodecContext.create("opus", "w")
-        self.opus_encoder.sample_rate = 48000
-        self.opus_encoder.layout = "stereo"
-        self.opus_encoder.format = "flt"
-        self.opus_encoder.options = {
-            "application": opus_mode,
-            "vbr": "off" if opus_mode == "audio" else "on",
-        }
-        if opus_mode != "audio":
-            self.opus_encoder.bit_rate = 96000
-        self.opus_encoder.open()
+        self.opus_encoder = opus.OpusEncoder(
+            application=opus_mode,
+            bitrate=None if opus_mode == "audio" else 96000,
+            vbr=opus_mode != "audio",
+        )
+        self.ssrc_to_opus_decoder = {}
 
         self.microphone = init_microphone(custom_mic)
-        self.gain_input = volume_to_gain(volume_input, boost=1)
-        self.gain_output = volume_to_gain(volume_output, boost=BASE_SOUND_GAIN)
+        self.gain_input = volume_to_gain(volume_input, boost=BASE_INPUT_GAIN)
+        self.gain_output = volume_to_gain(volume_output, boost=BASE_OUTPUT_GAIN)
         self.silence_threshold = 10 ** (silence / 20)
         self.fast_mixer = fast_mixer
         if denoise:
@@ -800,8 +795,8 @@ class VoiceHandler:
 
     def set_volumes(self, volume_input, volume_output):
         """Set volumes levels"""
-        self.gain_input = volume_to_gain(volume_input, boost=1)
-        self.gain_output = volume_to_gain(volume_output, boost=BASE_SOUND_GAIN)
+        self.gain_input = volume_to_gain(volume_input, boost=BASE_INPUT_GAIN)
+        self.gain_output = volume_to_gain(volume_output, boost=BASE_OUTPUT_GAIN)
 
 
     def set_user_volume(self, user_id, volume):
@@ -933,14 +928,17 @@ class VoiceHandler:
 
             # opus
             try:
-                av_packet = av.packet.Packet(payload)
-                frames = self.opus_decoder.decode(av_packet)
+                opus_decoder = self.ssrc_to_opus_decoder.get(ssrc)
+                if opus_decoder is None:
+                    opus_decoder = opus.OpusDecoder()
+                    self.ssrc_to_opus_decoder[ssrc] = opus_decoder
+                pcm = opus_decoder.decode(bytes(payload))
                 with self.audio_queue_out_lock:
                     buf = self.audio_queue_out.setdefault(ssrc, deque(maxlen=20))
-                    for frame in frames:
-                        buf.append(frame)
+                    for i in range(0, len(pcm) - 959, 960):
+                        buf.append(pcm[i:i + 960])
             except Exception as e:
-                logger.error(f"PyAV opus decoding failed. Error: {e}")
+                logger.error(f"Opus decoding failed. Error: {e}")
 
         self.gateway.disconnect()
 
@@ -965,7 +963,7 @@ class VoiceHandler:
                 skipped_samples += dropped * 960
             payload = None
             try:
-                audio_data = self.audio_queue_in.get(timeout=0.02)
+                audio_data = self.audio_queue_in.get(timeout=TRANSMITTER_QUEUE_TIMEOUT)
                 if audio_data is None:
                     break
             except queue.Empty:
@@ -1000,13 +998,7 @@ class VoiceHandler:
                     audio_float = audio_data.astype("float32")
                 audio_float *= self.gain_input
                 np.clip(audio_float, -1.0, 1.0, out=audio_float)
-                frame = av.AudioFrame.from_ndarray(
-                    np.expand_dims(audio_float.reshape(-1), axis=0),
-                    format="flt",
-                    layout="stereo",
-                )
-                frame.sample_rate = 48000
-                payload = self.opus_encoder.encode(frame)[0]   # Always returns 1 packet
+                payload = self.opus_encoder.encode(audio_float.reshape(-1), 960)
 
             opus_payload_size = len(bytes(payload))
 
@@ -1206,14 +1198,7 @@ class VoiceHandler:
                 if frames_to_mix:
                     mixed.fill(0)
                     for frame, gain in frames_to_mix:
-                        total_gain = gain * self.gain_output
-                        scale = (total_gain / 32768.0) if frame.format.name in ("s16", "s16p") else total_gain
-                        audio = frame.to_ndarray().astype("float32") * scale
-                        if audio.shape == (2, 960):
-                            audio = audio.T
-                        elif audio.shape == (1, 1920):
-                            audio = audio.reshape(960, 2)
-                        mixed += audio
+                        mixed += frame * (gain * self.gain_output)
 
                     # normalization
                     num_speakers = len(frames_to_mix)
@@ -1322,7 +1307,47 @@ class VoiceHandler:
 
 
     def audio_file_player(self, path, mix=False):
-        """Play audio file from path. Multi-thread safe with automatic mic handling."""
+        """Play audio file from path. Multi-thread safe with automatic mic handling"""
+
+        def av_frames(path):
+            import av
+            container = av.open(path)
+            try:
+                if not container.streams.audio:
+                    raise ValueError("No audio stream")
+                resampler = av.audio.resampler.AudioResampler(format="fltp", layout="stereo", rate=48000)
+                fifo = av.audio.fifo.AudioFifo()
+                for frame in container.decode(container.streams.audio[0]):
+                    for new_frame in resampler.resample(frame):
+                        new_frame.pts = None
+                        fifo.write(new_frame)
+                        while fifo.samples >= 960:
+                            arr = fifo.read(960).to_ndarray()
+                            yield arr.astype(np.float32).T
+            finally:
+                container.close()
+
+        def ffmpeg_frames(path):
+            import subprocess
+            proc = subprocess.Popen(
+                ["ffmpeg", "-v", "quiet", "-i", path, "-f", "f32le", "-ac", "2", "-ar", "48000", "-"],
+                stdout=subprocess.PIPE,
+                stdin=subprocess.DEVNULL,
+            )
+            try:
+                chunk_size = 960 * 2 * 4
+                first = True
+                while True:
+                    data = proc.stdout.read(chunk_size)
+                    if len(data) < chunk_size:
+                        if first:
+                            raise ValueError("ffmpeg produced no audio")
+                        break
+                    first = False
+                    yield np.frombuffer(data, dtype=np.float32).reshape(960, 2)
+            finally:
+                proc.kill()
+
         # init
         if not hasattr(self, "file_players_lock"):
             self.file_players_lock = threading.Lock()
@@ -1338,28 +1363,25 @@ class VoiceHandler:
 
         # player
         try:
-            container = av.open(path)
-            if not container.streams.audio:
-                return
-            in_stream = container.streams.audio[0]
-            resampler = av.audio.resampler.AudioResampler(format="fltp", layout="stereo", rate=48000)
-            fifo = av.audio.fifo.AudioFifo()
             self.playing = True
-            for frame in container.decode(in_stream):
-                if not self.playing:
+            for source in (av_frames, ffmpeg_frames):
+                started = False
+                frames = source(path)
+                try:
+                    for arr in frames:
+                        started = True
+                        if not self.playing:
+                            break
+                        player_queue.put(arr)
                     break
-                for new_frame in resampler.resample(frame):
-                    if not self.playing:
+                except Exception as e:
+                    if started:
+                        logger.error(f"Error while playing audio file {path}: {e}")
                         break
-                    new_frame.pts = None
-                    fifo.write(new_frame)
-                    while fifo.samples >= 960 and self.playing:
-                        arr = fifo.read(960).to_ndarray()
-                        if arr.dtype == np.int16:
-                            arr = arr.astype(np.float32) / 32768.0
-                        else:
-                            arr = arr.astype(np.float32)
-                        player_queue.put(arr.T)
+                finally:
+                    frames.close()
+            else:
+                logger.error(f"No available decoder for audio file {path}")
         except Exception as e:
             logger.error(f"Error while playing audio file {path}: {e}")
 

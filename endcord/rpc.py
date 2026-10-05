@@ -416,7 +416,7 @@ class RPC:
 
 
     def get_activities(self):
-        """Get activities for all connected apps, and if they changed."""
+        """Get activities for all connected apps, and if they changed"""
         cache = self.changed
         if self.changed:
             self.changed = False

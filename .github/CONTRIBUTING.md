@@ -81,44 +81,6 @@ https://github.com/discord-userdoccers/discord-userdoccers
 ### App command permissions chart
 https://discord.com/developers/docs/change-log#upcoming-application-command-permission-changes
 
-### Layout
-Standard:
-```
-┌────────────────────────────────────────────────┐
-│┌─TITLE─┐┌─────────────── TITLE ─────┐┌────────┐│
-││       ││                           ││        ││
-││       ││                           ││ MEMBER ││
-││       ││            CHAT           ││  LIST  ││
-││       ││                           ││        ││
-││       ││                           I│        ││
-││ TREE  │└───────────────────────────┘└────────┘│
-││       │┌────────────── EXTRA2 ───────────────┐│
-││       ││             EXTRA BODY              ││
-││       │┌────────────── EXTRA1 ───────────────┐│
-││       │├────────────── STATUS ───────────────┤│
-││       ││[PROMPT]>                            ││
-│└───────┘└─────────────────────────────────────┘│
-└────────────────────────────────────────────────┘
-```
-Compact:
-```
-┌────────────────────────────────────────────────┐
-│W TITLE W│WWWWWWWWWWWWWWW TITLE WWWWWWWWWWWWWWWW│
-│         │                             │        │
-│         │                             │        │
-|         │                             │ MEMBER │
-│         │            CHAT             │  LIST  │
-│         │                             │        │
-│         │                             │        │
-│  TREE   │                             │        │
-│         │MMMMMMMMMMMMMMM EXTRA2 MMMMMMMMMMMMMMM│
-│         │              EXTRA BODY              │
-│         │UUUUUUUUUUUUUUU EXTRA1 UUUUUUUUUUUUUUU│
-│         │WWWWWWWWWWWWWWW STATUS WWWWWWWWWWWWWWW│
-│         │[PROMPT]>                             │
-└────────────────────────────────────────────────┘
-```
-
 ### Tree layout and formatting
 ```
 > FOLDER
@@ -217,6 +179,33 @@ user/flags - missing
 - Misc:
 Spacebar is still using old `user_settings` instead new protobuf settings.  
 Gateway returns error code 4000 if event "update presence" (opcode 3) is sent.
+
+
+## List of optimizations
+- All received message events are weighted if they are relevant before any "deep" processing
+- All received events are "cleaned", I keep only what I need
+- Chat drawing function is made in optimized cython code
+- TUI media player is heavily optimized in cython, removed 99% of python overhead, resulting in even less lag than `mpv --vo=tct`
+- critical "formatter" parts are also made in cython (formatter is the thing that converts raw message data into text seen on screen and ranges of format/colors), this includes all wide character operations, so its faster than wcwidth library
+- Game detection is more efficient than discords own service - I did not use psutil lib (did on windows), instead I reduced it to minimal number of filesystem reads per process, then its all persistently cached so only new processes are fully checked, also downloaded game data (~10MB json) is minified (10x smaller) and never fully loaded in RAM (its converted to ndjson)
+- All "fuzzy" search operations use my own implementation which is several times faster than rapidfuzz, and give better results, because I tuned it perfectly for my use case, actually its not exactly "fuzzy" its more like autocomplete in IDE
+- Using very low-level http.client instead of "requests" library, just to save 1.5MB of RAM, even tho official python docs recommend not to do that
+- There is no constant mouse position tracking (except for dragging stuff) because that thing eats CPU
+- I'm also using highly low-level curses TUI library, it is insanely optimized CPU and RAM-wise (since it is initially made for actual terminals like VT100)
+- There are no markdown parser - I wrote regexes (don't do that)
+- I made endcord with threading library so in freethreaded python it can use all cores, even tho it doesnt need to, but media player will be able to play audio and video with less lag
+- Using my custom file downloader to avoid using large urllib3 library
+- I made my own custom "emojizer" and "demojizer" using less storage and RAM (than official "emoji" library)
+- I made my own protobuf encoder/decoder - less RAM and smaller binary (not using googles huge library)
+- I made my own magic library, I call it "minimagic", so I dont have to use large magic.so, I only need it to detect image audio and video files
+- I made my own QR code generator (mainly for fun, but its 10x smaller than qrcode library in LOC)
+- I made my own pysocks replacement, its just a little socket wrapper that adds socks5 udp layer
+- even wrote my own murmurhash3 function in python, just to avoid another dependency
+- endcord has multiple "levels", you pick what you need, lower levels lack features but have smaller binaries and can run on weird systems, higher levels have features that some users dont need and may use more RAM
+- python is stripped of unused modules then compiled with preferably clang and custom compiler args selected for maximum performance and smallest binary size (with PGO enabled)
+- some C libraries are also built with same compiler and configuration (numpy, pycryptodome, pynacl, rnnoise, libopus)
+- binary is built with nuitka which converts python to C (a lot of C) then compiles it, preferably with clang, and its getting better
+
 
 
 ## Recommended easy route for package maintainers

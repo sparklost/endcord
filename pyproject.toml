@@ -11,7 +11,7 @@ dependencies = [
     "soundcard>=0.4.6",
     "soundfile>=0.14.0",
     "numpy>=2.5.3",
-    "pycryptodome>=3.23.0",
+    "pycryptodome>=3.24.0",
     "pywin32>=312; sys_platform == 'win32'",
     "pywin32-ctypes>=0.2.3; sys_platform == 'win32'",
     "windows-curses>=2.4.2; sys_platform == 'win32'",
@@ -28,7 +28,7 @@ build = [
     "setuptools>=82.0.0",
 ]
 media = [
-    "av>=19.0.0",
+    "av==18.1.0",   # 19.x.x changed libxau so it doesnt work with pillow
     "dave-py>=1.0.0",
     "pillow>=12.3.0",
     "pynacl>=1.6.2",
@@ -40,8 +40,9 @@ python_freethreaded = "3.14.7"
 python_last_safe = "3.13.14"
 curses_tag = "v6_6_20260808"   # later versions mess-up the ui
 rnnoise_tag = "main"
+libopus_ver = "1.5.2"
 gvsbuild_release = "2026.8.0"
 mini_exclude_deps = ["numpy", "soundfile", "soundcard"]
 micro_exclude_deps = ["numpy", "soundfile", "soundcard", "orjson", "pycryptodome"]
-medium_deps = ["pillow"]
+medium_deps = ["pillow", "dave-py", "pynacl"]
 windowed_deps = ["pygobject", "pycairo", "pystray"]

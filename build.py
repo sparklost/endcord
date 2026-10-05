@@ -130,7 +130,7 @@ def get_version_number():
 
 
 def supports_color():
-    """Return True if the running terminal supports ANSI colors."""
+    """Return True if the running terminal supports ANSI colors"""
     if sys.platform == "win32":
         return (os.getenv("ANSICON") is not None or
             os.getenv("WT_SESSION") is not None or
@@ -555,7 +555,7 @@ def find_file_in_venv(lib_name, file_name, silent=False, recurse=False, startswi
 
 
 def check_venv_file_size(lib_name, file_name, min_file_size):
-    """Crude way to check if this is already custom compiled library or downloaded binary. Return True if it should be built."""
+    """Crude way to check if this is already custom compiled library or downloaded binary; return True if it should be built"""
     path = find_file_in_venv(lib_name, file_name, silent=True, recurse=True, startswith=True)
     if not path:
         return True
@@ -812,7 +812,7 @@ def setup_compiler(clang, clear=False, overwrite=False, cflags=[], ldflags=[], c
     if clang:
         os.environ["CC"] = "clang"
         os.environ["CXX"] = "clang++"
-        if shutil.which("lld") and lld:
+        if shutil.which("lld") and clang and lld:
             os.environ["LD"] = "lld"
     if clear:
         os.environ["CFLAGS"] = CFLAGS_OLD
@@ -1009,11 +1009,7 @@ def build_rnnoise(clang):
     setup_compiler(clang)
     from tools.build_rnnoise import build_rnnoise
     try:
-        lib_path = build_rnnoise(
-            "build",
-            build_config.get("rnnoise_tag", "v0.2"),
-            avx2=check_avx2(),
-        )
+        lib_path = build_rnnoise("build", build_config.get("rnnoise_tag", "v0.2"), avx2=check_avx2())
     except Exception as e:
         iprint(f"Error building RNNoise: {e}")
         return
@@ -1021,6 +1017,31 @@ def build_rnnoise(clang):
         shutil.copy2(lib_path, os.path.join("endcord", os.path.basename(lib_path)))
     else:
         iprint("Failed building RNNoise")
+
+
+def build_libopus(clang):
+    """Build opus library and move it to ./endcord"""
+    fprint("Building libopus with custom compiler args")
+    if any(
+        os.path.exists(os.path.join("endcord", filename))
+        for filename in ("libopus.so", "libopus.dll", "libopus.dylib")
+    ):
+        iprint("Libopus is already built")
+        return
+    if not shutil.which("make"):
+        iprint("make is missing", color=RED)
+    os.makedirs("build", exist_ok=True)
+    setup_compiler(clang, lld=False)
+    from tools.build_libopus import build_libopus
+    try:
+        lib_path = build_libopus("build", build_config.get("libopus_ver", "1.5.2"))
+    except Exception as e:
+        iprint(f"Error building libopus: {e}")
+        return
+    if lib_path and os.path.exists(lib_path):
+        shutil.copy2(lib_path, os.path.join("endcord", os.path.basename(lib_path)))
+    else:
+        iprint("Failed building libopus")
 
 
 def build_cython(clang, mingw):
@@ -1061,6 +1082,9 @@ def build_with_pyinstaller(level, onedir, print_cmd=False):
     if windowed:
         app_name = f"{app_name}-gui"
     emoji_path = compress_emoji() if not print_cmd else "endcord/emoji.json"
+    if not print_cmd and level in ("FULL", "MEDIUM"):
+        libopus = build_libopus(clang)
+
     mode = "--onedir" if onedir else "--onefile"
     hidden_imports = ["--hidden-import=uuid"]
     exclude_imports = [
@@ -1071,9 +1095,12 @@ def build_with_pyinstaller(level, onedir, print_cmd=False):
     add_data = []
     if level not in ("MINI", "MICRO"):
         package_data += ["--collect-data=soundcard"]
+
     rnnoise = get_rnnoise()
     if rnnoise:
         add_data += [f"--add-binary={rnnoise}{";" if sys.platform == "win32" else ":"}endcord"]
+    if libopus:
+        add_data += [f"--add-binary={libopus}{";" if sys.platform == "win32" else ":"}endcord"]
     options = []
 
     # platform-specific
@@ -1148,6 +1175,8 @@ def build_with_nuitka(level, onedir, clang, mingw, compile_deps, print_cmd=False
                 else:
                     fprint("Building pycryptodome with custom compiler args")
                     iprint("PyNaCl is already built locally")
+        if level in ("FULL", "MEDIUM"):
+            libopus = build_libopus(clang)
         patch_soundcard()
     static_python = False   # might be useful with custom python build
     if sys.platform == "win32":
@@ -1182,6 +1211,9 @@ def build_with_nuitka(level, onedir, clang, mingw, compile_deps, print_cmd=False
     rnnoise = get_rnnoise()
     if rnnoise:
         add_data += [f"--include-data-files={rnnoise}={rnnoise}"]
+    if libopus:
+        add_data += [f"--include-data-files={libopus}={libopus}"]
+
 
     setup_compiler(clang)
 
@@ -1298,9 +1330,9 @@ def parser():
         choices=["FULL", "MEDIUM", "LITE", "MINI", "MICRO"],
         help=(
             'Change environment to build a specified level of endcord. Options:\n'
-            '  "FULL"   - Has media and voice call support\n'
-            '  "MEDIUM" - No media and voice call support, but can display images\n'
-            '  "LITE"   - No image, media, or voice call support\n'
+            '  "FULL"   - Has media support\n'
+            '  "MEDIUM" - Has call support, no media support, but can display images\n'
+            '  "LITE"   - No image, media, nor call support\n'
             '  "MINI"   - like LITE, no sound unless paplay/pw-cat exist, no voice recording\n'
             '  "MICRO"  - Max compatibility on legacy/weird systems, no QR code and email login'
         ),

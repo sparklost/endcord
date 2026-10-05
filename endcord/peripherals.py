@@ -270,7 +270,7 @@ def notify_remove(notification_id):
 
 
 def copy_to_clipboard(text):
-    """Copy text to clipboard. Cross-platform."""
+    """Copy text to clipboard, cross-platform"""
     text = str(text)
 
     if sys.platform == "linux":

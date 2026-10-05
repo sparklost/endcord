@@ -8259,7 +8259,7 @@ class Endcord:
 
     def start_ringing(self, path, loop_delay=1, loop_max=60):
         """Start ringing with specified audio file"""
-        if support_media and support_call:
+        if support_call:
             if not self.terminal_media:
                 from endcord import media
             self.ringer = media.TerminalMedia(self.config, self.keybindings, ui=False)
@@ -8316,7 +8316,7 @@ class Endcord:
 
     def start_call(self, incoming=False, guild_id=None, channel_id=None, enable_input=True):
         """Start voice call"""
-        if not (support_media and support_call):
+        if not support_call:
             self.show_guild_start_call_ui(update=False)
             self.update_extra_line("Failed to start call: No media/call support", color=20)
             return
@@ -8374,7 +8374,7 @@ class Endcord:
             silence=self.config["call_silence_threshold"],
             opus_mode=self.config["call_opus_mode"],
             fast_mixer=self.config["call_fast_mixer"],
-            denoise=self.config["call_mic_noise_suppression"],
+            denoise=self.config["call_noise_suppression"],
         )
         self.in_call = {"guild_id": guild_id, "channel_id": channel_id}
         for _ in range(100):   # wait for 10s
@@ -8456,7 +8456,7 @@ class Endcord:
         if self.in_call:
             call_channel_id = self.in_call["channel_id"]
             call_guild_id = self.in_call["guild_id"]
-            if call_channel_id not in self.incoming_calls:
+            if not call_guild_id and call_channel_id not in self.incoming_calls:
                 self.incoming_calls.append(call_channel_id)
 
         if self.voice_gateway:

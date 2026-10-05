@@ -592,7 +592,7 @@ def is_emoji(character):
 
 
 def split_emoji(text, variation=True):
-    """Split text on each character, optionally keeping or removing emoji variation sequences."""
+    """Split text on each character, optionally keeping or removing emoji variation sequences"""
     result = []
     for char in text:
         if "\ufe00" <= char <= "\ufe0f":

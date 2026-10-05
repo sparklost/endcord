@@ -885,7 +885,7 @@ class TUI():
 
 
     def get_last_free_color_id(self):
-        """Return last free color id. Should be run at the end of all color initialization in endcord.tui."""
+        """Return last free color id; should be run at the end of all color initialization in endcord.tui"""
         return self.last_free_id
 
 

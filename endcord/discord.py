@@ -2097,7 +2097,7 @@ class Discord():
 
 
     def bot_update_command(self, command, command_id, guild_id=None, resource=None):
-        """Update command for this bot. This endpoint works ONLY FOR BOTS."""
+        """Update command for this bot. This endpoint works ONLY FOR BOTS!"""
         message_data = json.dumps(command)
         if guild_id:
             url = f"/api/v9/applications/{self.my_id}/guilds/{guild_id}/commands/{command_id}"
@@ -2115,7 +2115,7 @@ class Discord():
 
 
     def bot_delete_command(self, command_id, guild_id=None):
-        """Delete command for this bot. This endpoint works ONLY FOR BOTS."""
+        """Delete command for this bot. This endpoint works ONLY FOR BOTS!"""
         message_data = None
         if guild_id:
             url = f"/api/v9/applications/{self.my_id}/guilds/{guild_id}/commands/{command_id}"
@@ -2131,7 +2131,7 @@ class Discord():
 
 
     def bot_respond_interaction(self, response_type, interaction, interaction_id, interaction_token):
-        """Respond to interaction. This endpoint works ONLY FOR BOTS."""
+        """Respond to interaction. This endpoint works ONLY FOR BOTS!"""
         payload = {"type": response_type}
         if interaction:
             payload["data"] = interaction
