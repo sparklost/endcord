@@ -184,7 +184,7 @@ Note: always put string in `""`. To use `"` inside the string escape it like thi
 - `call_fast_mixer = False`  
     This option only has effect on mixing received audio from multiple users speaking at the same time.  
     If True, call will use faster mixer that uses less CPU but might result in lower audio quality.  
-- `call_noise_suppression = False`  
+- `call_noise_suppression = True`  
     Run noise suppression on audio recorded from microphone. Audio will be downmixed to mono. To use this, either install rnnoise on the system, or build endcord with `--bundle-rnnoise` build.py script argument.
 - `downloads_path = None`  
     Path to custom downloads directory. Set to `None` to use system default.

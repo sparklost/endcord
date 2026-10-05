@@ -21,7 +21,6 @@ Add stage and stream calls
 Add localization
 
 GTKCURSES:
-Optimize gtkcurses with cython
 Add ascii/block image/media viewer
 Add ascii/block inline image/media
 Add full image/media viewer

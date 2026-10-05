@@ -549,6 +549,14 @@ class GtkTerminalWindow(Gtk.Window):
             self.font_desc = Pango.FontDescription.from_string(f"{FONT_NAME} {FONT_SIZE}")
         self.last_mouse_cell = (None, None)
         self.scroll_buffer = 0.0   # for touchpad
+        self.font_normal = self.font_desc
+        self.font_bold = self.font_desc.copy()
+        self.font_bold.set_weight(Pango.Weight.BOLD)
+        self.font_italic = self.font_desc.copy()
+        self.font_italic.set_style(Pango.Style.ITALIC)
+        self.font_bold_italic = self.font_desc.copy()
+        self.font_bold_italic.set_weight(Pango.Weight.BOLD)
+        self.font_bold_italic.set_style(Pango.Style.ITALIC)
 
         # calculate font height and width and set it in curses class
         layout = self.drawing_area.create_pango_layout("▒")
@@ -628,6 +636,9 @@ class GtkTerminalWindow(Gtk.Window):
                     fg_color, bg_color = color_map[fg_idx]
                     if flags & A_STANDOUT:
                         fg_color, bg_color = bg_color, fg_color
+                    is_whitespace = text.strip(" ") == ""   # skip whitespace if its same color as global bg
+                    if is_whitespace and bg_color == bg and not (flags & A_UNDERLINE):
+                        continue
                     bg_px_width = (draw_x - span_start_x) * self.char_width
                     px_x = span_start_x * self.char_width
                     px_y = y * self.char_height
@@ -640,14 +651,19 @@ class GtkTerminalWindow(Gtk.Window):
                             cr.set_source_rgb(*rgb_to_cairo(bg_color))
                         cr.rectangle(px_x, px_y, bg_px_width, self.char_height)
                         cr.fill()
+                    if is_whitespace and not (flags & A_UNDERLINE):
+                        continue
 
                     # draw text
-                    current_desc = self.font_desc.copy()
-                    if flags & A_BOLD:
-                        current_desc.set_weight(Pango.Weight.BOLD)
-                    if flags & A_ITALIC:
-                        current_desc.set_style(Pango.Style.ITALIC)
-                    layout.set_font_description(current_desc)
+                    if (flags & A_BOLD) and (flags & A_ITALIC):
+                        desc = self.font_bold_italic
+                    elif flags & A_BOLD:
+                        desc = self.font_bold
+                    elif flags & A_ITALIC:
+                        desc = self.font_italic
+                    else:
+                        desc = self.font_normal
+                    layout.set_font_description(desc)
                     layout.set_text(text, -1)
                     cr.set_source_rgb(*rgb_to_cairo(fg_color))
                     if self.on_windows and flags & A_EMOJI:
@@ -709,12 +725,15 @@ class GtkTerminalWindow(Gtk.Window):
                         cr.rectangle(cursor_px_x, cursor_px_y, cursor_width, self.char_height)
                         cr.fill()
                         if ch:
-                            current_desc = self.font_desc.copy()
-                            if flags & A_BOLD:
-                                current_desc.set_weight(Pango.Weight.BOLD)
-                            if flags & A_ITALIC:
-                                current_desc.set_style(Pango.Style.ITALIC)
-                            layout.set_font_description(current_desc)
+                            if (flags & A_BOLD) and (flags & A_ITALIC):
+                                desc = self.font_bold_italic
+                            elif flags & A_BOLD:
+                                desc = self.font_bold
+                            elif flags & A_ITALIC:
+                                desc = self.font_italic
+                            else:
+                                desc = self.font_normal
+                            layout.set_font_description(desc)
                             layout.set_text(ch, -1)
                             cr.set_source_rgb(*rgb_to_cairo(cursor_fg))
                             cr.move_to(cursor_px_x, cursor_px_y)
