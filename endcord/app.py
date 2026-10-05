@@ -5423,7 +5423,8 @@ class Endcord:
                 self.tui.allow_chat_selected_hide(self.get_chat_last_message_id() == self.last_message_id)
                 if scroll:
                     scroll_diff = old_chat_len - 1 - selected_line
-                    self.tui.set_chat_index(self.tui.chat_index + 2 - scroll_diff)
+                    logger.info((old_chat_len, selected_line, self.tui.chat_index, scroll_diff))
+                    self.tui.set_chat_index(max(0, self.tui.chat_index + 2 - scroll_diff))
                     if selected_id and selected_id > self.messages[0]["id"]:
                         self.tui.set_selected(3, scroll=False)
                     elif len(self.messages) != all_msg:
