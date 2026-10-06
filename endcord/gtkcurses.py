@@ -76,6 +76,7 @@ except Exception:
 APP_ID = f"com.{peripherals.REPO_OWNER}.{TRUE_APP_NAME}"
 
 CTRL_SHIFT_V_PASTE = False   # enable Ctrl+Shift+V pasting
+ENABLE_SHIFT_BACKSPACE = False
 ENABLE_TRAY = True
 TRAY_ICON_NORMAL = None
 TRAY_ICON_UNREAD = None
@@ -120,6 +121,7 @@ if config_path:
             GTK_DARK_THEME = config.get("gtk_dark_theme", GTK_DARK_THEME)
             APP_NAME = config.get("app_name", APP_NAME)
             CTRL_SHIFT_V_PASTE = config.get("ctrl_shift_v_paste", CTRL_SHIFT_V_PASTE)
+            ENABLE_SHIFT_BACKSPACE = config.get("enable_shif_backspace", ENABLE_SHIFT_BACKSPACE)
             ENABLE_TRAY = config.get("enable_tray", ENABLE_TRAY)
             TRAY_ICON_NORMAL = config.get("tray_icon_normal", TRAY_ICON_NORMAL)
             TRAY_ICON_UNREAD = config.get("tray_icon_unread", TRAY_ICON_UNREAD)
@@ -776,6 +778,8 @@ class GtkTerminalWindow(Gtk.Window):
             event_queue.put(mod_prefix + "ENTER")
             return True
         if keyval == Gdk.KEY_BackSpace:
+            if not ENABLE_SHIFT_BACKSPACE and mod_prefix == "S-":
+                event_queue.put("BACKSPACE")
             event_queue.put(mod_prefix + "BACKSPACE")
             return True
         if keyval in (Gdk.KEY_Tab, Gdk.KEY_ISO_Left_Tab):
