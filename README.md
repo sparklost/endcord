@@ -486,10 +486,11 @@ Full list of optimizations made for endcord can be found [here](.github/CONTRIBU
 To run multiple endcord instances at the same time, while keeping them completely separated, run endcord with `ENDCORD_APP_NAME` environment variable set to something else. This will change "endcord" everywhere: in config and cache paths, notifications, keyring...
 
 ### No emoji
-If emoji are drawn as empty box or similar, it means emoji are not supported by this terminal. In that case, enable `emoji_as_text` in `config.ini`.
+If emoji are drawn as empty box or similar, it means emoji font is not installed, its misconfigured in terminal config, or emoji are not supported by this terminal.  
+If case emoji cant be configured, enable `emoji_as_text` in eendcord `config.ini`.
 
 ### Sticker cannot be opened
-If the message says it "cannot be opened", then this is lottie sticker. These stickers have special vector way of drawing animations and will not be supported.
+This is very likely "lottie sticker". These stickers have special vector way of drawing (not svg) and will not be supported.
 
 ### Restore locally hidden channels
 Locally hidden channels can be restored by removing them in `hidden_channels.json`, see [Configuration](#configuration) for path.  
@@ -508,8 +509,7 @@ Custom notification sound can be set in config: `custom_notification_sound = /pa
 
 ### Some keybindings don't work with non-Latin keyboard layouts (non-ascii)
 This happens with `Alt+Key` keybindings, but may happen with other modifiers too. That happens because terminal emulators translate pressed keys with non-Latin keyboard layouts to Unicode. So when `ALT+B` is pressed, but Greek layout is used, endcord will receive `ALT+β`.  
-But this also means that it can be added to keybinding config, instead byte, provide character itself eg.: `β` or `ALT+β`.  
-See [keybinding](#keybinding) for instructions on how to add multiple keybindings for same action.
+But this also means that it can be added to keybinding config. See [keybinding](#keybinding) for instructions on how to add multiple keybindings for same action.
 
 ### If some keybindings still don't work
 Its probably terminal emulator sending different key codes than those in default settings. Check this by running endcord with `-k` or `--keybinding` to start keybinding resolver.  
@@ -518,7 +518,8 @@ This mostly happens with `Ctrl+Arrow` and `Alt+Arrow` combinations, on some non-
 As a last resort try setting `fallback_keybinding_parser = True` in config.  
 
 ### Running in tty
-If there are no colors in Linux tty (but there should be), endcord can run inside [fbterm](https://salsa.debian.org/debian/fbterm).  
+Linux tty doesnt support 256-colors endcord will try to run anyways (and may still crash) but UI lines will be drawn wrongly and colors will be mixed up.
+But endcord can run inside [fbterm](https://salsa.debian.org/debian/fbterm), [kmscon](https://github.com/kmscon/kmscon) or [yaft](https://github.com/uobikiemukot/yaft).  
 Follow [fbterm setup instructions](https://wiki.archlinux.org/title/Fbterm#Installation), then set environment variable: `export TERM=fbterm` and run endcord.  
 Some characters may fail to render so set `emoji_as_text = True` in config and `compact = True` in theme. Some theme characters should also be tweaked.  
 Note: keybinding `Ctrl+Up/Down/Left/Right` does not work in tty, either rebind them or add custom keymap, or in `/etc/vconsole.conf`.  

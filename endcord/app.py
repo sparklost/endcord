@@ -2586,6 +2586,7 @@ class Endcord:
                 # insert_mode already toggled in tui
                 self.restore_input_text = (input_text, "standard")
                 self.update_status_line()
+                self.full_restore_input_text(input_text)
 
             # # single click on title line
             # elif action == 16:
