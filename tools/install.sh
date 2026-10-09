@@ -620,7 +620,7 @@ Installation will complete, but launching the binary requires dynamic linking su
 To enable 'nix-ld', add this to your /etc/nixos/configuration.nix:
    programs.nix-ld.enable = true;
 Then rebuild your system:
-   $ sudo nixos-rebuild switch
+   sudo nixos-rebuild switch
 After this ${APP_NAME} will run without re-installing.
 EOF
 echo -e "${CYAN}==>${NC} ${GREEN}$APP_NAME-${MODE_LOWER} installed successfully${NC}"
