@@ -1,5 +1,15 @@
-## Default config values with explanations:
-Note: always put string in `""`. To use `"` inside the string escape it like this: `\"`. To use `\` escape it like this: `\\`. These are counted as single character.
+## Configuration
+Settings, logs, state, themes, extensions etc. location:
+- On Linux: `~/.config/endcord/` or `$XDG_DATA_HOME/endcord/`  
+- On Windows: `%USERPROFILE%/AppData/Local/endcord/`  
+- On macOS: `~/Library/Application Support/endcord/`  
+- Or run `open_config_dir` command inside endcord.
+
+Run `endcord -h` or `endcord --help` to see available command arguments.  
+
+Note: always put string in `""`. To use `"` inside the string escape it like this: `\"`. To use `\` escape it like this: `\\`. These are counted as single character.  
+
+Also see [keybindings configuration](docs/keybindings.md#configuring-keybindings).
 
 ### Main
 - `theme = None`  

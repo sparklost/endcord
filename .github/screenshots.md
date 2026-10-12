@@ -1,12 +1,14 @@
 <div align="center">
+<h2>Endcord Screenshots</h2>
 <a href="https://github.com/sparklost/endcord?tab=readme-ov-file#features">Features</a> |
-<a href="https://github.com/sparklost/endcord?tab=readme-ov-file#configuration">Config</a> |
-<a href="https://github.com/sparklost/endcord?tab=readme-ov-file#usage">Usage</a> |
+<a href="https://github.com/sparklost/endcord/blob/main/.github/screenshots.md">Screenshots</a> |
+<a href="https://github.com/sparklost/endcord/blob/main/docs/configuration.md">Config</a> |
+<a href="https://github.com/sparklost/endcord/blob/main/docs/wiki.md">Wiki</a> |
 <a href="https://github.com/sparklost/endcord?tab=readme-ov-file#installing">Installing</a> |
 <a href="https://github.com/sparklost/endcord?tab=readme-ov-file#building">Building</a> |
 <a href="https://github.com/sparklost/endcord/blob/main/docs/extensions.md">Extensions</a> |
 <a href="https://github.com/sparklost/endcord/blob/main/.github/CONTRIBUTING.md">Contributing</a> |
-<a href="https://github.com/sparklost/endcord?tab=readme-ov-file#faq">FAQ</a> |
+<a href="https://github.com/sparklost/endcord/blob/main/docs/FAQ.md">FAQ</a> |
 <a href="https://discord.gg/judQSxw5K2">Discord</a>
 <br><br>
 <b>Standard theme:</b><br>
