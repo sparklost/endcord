@@ -2,8 +2,8 @@
 <h1>Endcord</h1>
 <a href="https://github.com/sparklost/endcord?tab=readme-ov-file#features">Features</a> |
 <a href="https://github.com/sparklost/endcord/blob/main/.github/screenshots.md">Screenshots</a> |
-<a href="https://github.com/sparklost/endcord/blob/main/docs/configuration.md">Config</a> |
 <a href="https://github.com/sparklost/endcord/blob/main/docs/wiki.md">Wiki</a> |
+<a href="https://github.com/sparklost/endcord/blob/main/docs/configuration.md">Config</a> |
 <a href="https://github.com/sparklost/endcord?tab=readme-ov-file#installing">Installing</a> |
 <a href="https://github.com/sparklost/endcord?tab=readme-ov-file#building">Building</a> |
 <a href="https://github.com/sparklost/endcord/blob/main/docs/extensions.md">Extensions</a> |

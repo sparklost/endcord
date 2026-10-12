@@ -2,14 +2,15 @@
 <h2>Endcord Wiki</h2>
 <a href="https://github.com/sparklost/endcord?tab=readme-ov-file#features">Features</a> |
 <a href="https://github.com/sparklost/endcord/blob/main/.github/screenshots.md">Screenshots</a> |
-<a href="https://github.com/sparklost/endcord/blob/main/docs/configuration.md">Config</a> |
 <a href="https://github.com/sparklost/endcord/blob/main/docs/wiki.md">Wiki</a> |
+<a href="https://github.com/sparklost/endcord/blob/main/docs/configuration.md">Config</a> |
 <a href="https://github.com/sparklost/endcord?tab=readme-ov-file#installing">Installing</a> |
 <a href="https://github.com/sparklost/endcord?tab=readme-ov-file#building">Building</a> |
 <a href="https://github.com/sparklost/endcord/blob/main/docs/extensions.md">Extensions</a> |
 <a href="https://github.com/sparklost/endcord/blob/main/.github/CONTRIBUTING.md">Contributing</a> |
 <a href="https://github.com/sparklost/endcord/blob/main/docs/FAQ.md">FAQ</a> |
 <a href="https://discord.gg/judQSxw5K2">Discord</a>
+<hr><br><br>
 </div>
 
 - [Basic usage](documentation/usage.md) - All you need to know to get started, highly recommended for new users
