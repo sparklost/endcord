@@ -10,7 +10,7 @@
 <a href="https://github.com/sparklost/endcord/blob/main/.github/CONTRIBUTING.md">Contributing</a> |
 <a href="https://github.com/sparklost/endcord/blob/main/docs/FAQ.md">FAQ</a> |
 <a href="https://discord.gg/judQSxw5K2">Discord</a>
-<hr><br><br>
+<hr><br>
 </div>
 
 - [Basic usage](documentation/usage.md) - All you need to know to get started, highly recommended for new users

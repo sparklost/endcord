@@ -1395,7 +1395,7 @@ def parser():
     parser.add_argument(
         "--clean-uv",
         action="store_true",
-        help="dont store any uv cache and python to th system, keep it in project dir",
+        help="dont store any uv cache and python to the system, keep it in project dir",
     )
     parser.add_argument(
         "--print-cmd",

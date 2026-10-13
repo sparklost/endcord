@@ -10,7 +10,7 @@
 <a href="https://github.com/sparklost/endcord/blob/main/.github/CONTRIBUTING.md">Contributing</a> |
 <a href="https://github.com/sparklost/endcord/blob/main/docs/FAQ.md">FAQ</a> |
 <a href="https://discord.gg/judQSxw5K2">Discord</a>
-<hr><br><br>
+<hr><br>
 <b>Standard theme:</b><br>
 <img src="./screenshots/01.png" alt="Standard theme" width="864">
 <br>(Note: kitty protocol inline images can be setup with <a href="github.com/sparklost/endcord-image-inline">this</a> extension, and <a href="github.com/sparklost/endcord-image-emoji">this</a> for emoji)

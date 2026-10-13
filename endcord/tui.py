@@ -11,7 +11,7 @@ import sys
 import threading
 import time
 
-from endcord import acs, keybinding, peripherals, utils
+from endcord import acs, formatter, keybinding, peripherals, utils
 
 logger = logging.getLogger(__name__)
 uses_gtkcurses = hasattr(curses, "GTKCURSES")
@@ -328,6 +328,7 @@ class TUI():
         # initial values
         self.disable_drawing = False
         self.prompt = "> "
+        self.prompt_len = 2
         self.input_buffer = ""
         self.status_txt_l = ""
         self.status_txt_r = ""
@@ -566,8 +567,8 @@ class TUI():
                 self.have_title + bool(self.win_subtitle_line),
                 self.tree_width + 1,
             )
-            prompt_hwyx = (1, len(self.prompt), h - 1, self.tree_width + 1)
-            input_line_hwyx = (1, w - (self.tree_width + 1) - len(self.prompt), h - 1, self.tree_width + len(self.prompt) + 1)
+            prompt_hwyx = (1, self.prompt_len, h - 1, self.tree_width + 1)
+            input_line_hwyx = (1, w - (self.tree_width + 1) - self.prompt_len, h - 1, self.tree_width + self.prompt_len + 1)
             status_line_hwyx = (1, w - (self.tree_width + 1), h - 2, self.tree_width + 1)
             tree_hwyx = (h - self.have_title_tree, self.tree_width, self.have_title, 0)
             self.win_chat = self.screen.derwin(*chat_hwyx)
@@ -634,12 +635,12 @@ class TUI():
 
         # re-init areas
         if not redraw_only:
-            prompt_hwyx = (1, len(self.prompt), h - 2, self.tree_width + 2)
+            prompt_hwyx = (1, self.prompt_len, h - 2, self.tree_width + 2)
             input_line_hwyx = (
                 1,
-                w - (self.tree_width + 1) - len(self.prompt) - 2,
+                w - (self.tree_width + 1) - self.prompt_len - 2,
                 h - 2,
-                self.tree_width + len(self.prompt) + 2,
+                self.tree_width + self.prompt_len + 2,
             )
             status_line_hwyx = (1, w - (self.tree_width + 2), h - 3, self.tree_width + 2)
             self.win_chat = self.screen.derwin(*chat_hwyx)
@@ -1823,12 +1824,12 @@ class TUI():
             del (self.win_prompt, self.win_input_line)
             input_line_hwyx = (
                 1,
-                w - (self.tree_width + self.bordered + 1) - len(self.prompt) - 2*self.bordered,
+                w - (self.tree_width + self.bordered + 1) - self.prompt_len - 2*self.bordered,
                 h - 1 - self.bordered,
-                self.tree_width + len(self.prompt) + 2*self.bordered + 1)
+                self.tree_width + self.prompt_len + 2*self.bordered + 1)
             self.win_input_line = self.screen.derwin(*input_line_hwyx)
             self.input_hw = self.win_input_line.getmaxyx()
-            prompt_hwyx = (1, len(self.prompt), h - 1 - self.bordered, self.tree_width + 2*self.bordered + 1)
+            prompt_hwyx = (1, self.prompt_len, h - 1 - self.bordered, self.tree_width + 2*self.bordered + 1)
             self.win_prompt = self.screen.derwin(*prompt_hwyx)
             self.win_prompt.insstr(0, 0, self.prompt, curses.color_pair(13) | self.attrib_map[13])
             self.win_prompt.noutrefresh()
@@ -2271,6 +2272,7 @@ class TUI():
     def update_prompt(self, prompt):
         """Update and draw prompt line, resize input line but dont redraw it"""
         self.prompt = prompt
+        self.prompt_len = formatter.len_wch(prompt)
         if not self.disable_drawing:
             self.draw_prompt()
 
@@ -2670,7 +2672,7 @@ class TUI():
         if init_text:
             self.input_buffer = init_text
             if not keep_cursor:
-                w += len(self.prompt) - len(prompt)
+                w += self.prompt_len - formatter.len_wch(prompt)
                 self.input_index = len(self.input_buffer)
                 self.cursor_pos = self.input_index - max(0, len(self.input_buffer) - w + 1 - self.input_line_index)
                 self.cursor_pos = max(self.cursor_pos, 0)
