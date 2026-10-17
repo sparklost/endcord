@@ -32,8 +32,8 @@ from endcord.message import is_relevant_message, prepare_message
 
 DISCORD_HOST = "discord.com"
 DISCORD_HOST_GATEWY = "wss://gateway.discord.gg"
-LOCAL_MEMBER_COUNT = 50   # members per guild, CPU-RAM intensive
-LOCAL_VOICE_PRESENCE_LIMIT = 50   # per guild, slightly RAM intensive
+LOCAL_MEMBER_COUNT = 50   # members per guild, CPU and RAM intensive
+LOCAL_VOICE_PRESENCE_LIMIT = 20   # per channel, slightly RAM intensive
 LIMIT_SUBSCRIBED = 5   # channels per guild
 LIMIT_SUBSCRIBED_THREADS = 3   # threads per guild
 LIMIT_MENTION_CACHE = 30
@@ -351,7 +351,6 @@ class Gateway():
                 data = response.read()
                 connection.close()
                 self.gateway_url = json.loads(data)["url"]
-                logger.info(self.gateway_url)
             else:
                 connection.close()
                 sys.exit(f"Failed to get gateway url. Response code: {response.status}. Exiting...")
@@ -1067,7 +1066,7 @@ class Gateway():
                             "custom_status": custom_status,
                             "activities": activities,
                         })
-                    # get initial voice presences
+                    # get initial voice states
                     for num, guild in enumerate(data["guilds"]):
                         count = 0
                         for state in guild["voice_states"]:
@@ -1094,7 +1093,7 @@ class Gateway():
                             self.voice_states[channel_id][0] = self.voice_states[channel_id].get(0, 0) + 1
                             if count > LOCAL_VOICE_PRESENCE_LIMIT:
                                 continue
-                            self.voice_states[channel_id][user_id] = (username, global_name, nick, state["self_mute"] or state["mute"])
+                            self.voice_states[channel_id][user_id] = (username, global_name, nick, state["self_mute"] or state["mute"], state["self_video"])
                     self.dm_activities_changed = True
                     del (guild, self.merged_users)   # this is large so lets save some memory
                     gc.collect()
@@ -1650,7 +1649,7 @@ class Gateway():
                                     username = "Unknown"
                                     global_name = None
                                     nick = None
-                                self.voice_states[channel_id][user_id] = (username, global_name, nick, user["self_mute"] or user["mute"])
+                                self.voice_states[channel_id][user_id] = (username, global_name, nick, user["self_mute"] or user["mute"], user["self_video"])
                             self.should_redraw_tree = data["guild_id"]
                     # removed voice states
                     for user_id in data["removed_voice_states"]:
@@ -1707,9 +1706,9 @@ class Gateway():
                                 self.voice_states[channel_id] = {}
                             if user_id not in self.voice_states[channel_id]:
                                 self.voice_states[channel_id][0] = self.voice_states[channel_id].get(0, 0) + 1
-                                if len(self.voice_states) - 1 <= LOCAL_VOICE_PRESENCE_LIMIT:
-                                    self.voice_states[channel_id][user_id] = (username, global_name, nick, data["self_mute"] or data["mute"])
-                                self.should_redraw_tree = data["guild_id"] if data["guild_id"] else -1
+                            if len(self.voice_states[channel_id]) - 1 <= LOCAL_VOICE_PRESENCE_LIMIT:
+                                self.voice_states[channel_id][user_id] = (username, global_name, nick, data["self_mute"] or data["mute"], data["self_video"])
+                            self.should_redraw_tree = data["guild_id"] if data["guild_id"] else -1
                         else:
                             for channel_id, activities in self.voice_states.items():   # search for channel and activity
                                 if user_id not in activities:

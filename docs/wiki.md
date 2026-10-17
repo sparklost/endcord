@@ -13,10 +13,10 @@
 <hr><br>
 </div>
 
-- [Basic usage](documentation/usage.md) - All you need to know to get started, highly recommended for new users
-- [Keybindings](documentation/keybindings.md) - List of all keybindings, controls, vim mode and macros
-- [Configuration](documentation/configuration.md) - List of all options and their descriptions
-- [FAQ](documentation/FAQ.md) - Frequently asked questions
-- [Extensions](documentation/usage.md) - How to install and create endcord extensions
+- [Basic usage](usage.md) - All you need to know to get started, highly recommended for new users
+- [Keybindings](keybindings.md) - List of all keybindings, controls, vim mode and macros
+- [Configuration](configuration.md) - List of all options and their descriptions
+- [FAQ](FAQ.md) - Frequently asked questions
+- [Extensions](usage.md) - How to install and create endcord extensions
 - [Search extensions](https://github.com/topics/endcord-extension) - Search endcord extensions on GitHub
 - [Official Discord server](https://discord.gg/judQSxw5K2)

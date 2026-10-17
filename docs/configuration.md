@@ -9,7 +9,7 @@ Run `endcord -h` or `endcord --help` to see available command arguments.
 
 Note: always put string in `""`. To use `"` inside the string escape it like this: `\"`. To use `\` escape it like this: `\\`. These are counted as single character.  
 
-Also see [keybindings configuration](docs/keybindings.md#configuring-keybindings).
+Also see [keybindings configuration](keybindings.md#configuring-keybindings).
 
 ### Main
 - `theme = None`  
@@ -214,6 +214,10 @@ Also see [keybindings configuration](docs/keybindings.md#configuring-keybindings
     Sound played when there is outgoing call. Linux only. Set to `None` to disable. Sound names can be found in `/usr/share/sounds/freedesktop/stereo`, without extension.
 - `custom_ringtone_outgoing = None`  
     Path to audio file played when there is outgoing call. Set to `None` to disable. The file will be played in loop.
+- `custom_sound_join_call = None`  
+    Path to audio file played when user joins current voice call.
+- `custom_sound_leave_call = None`  
+    Path to audio file played when user leaves current voice call.
 - `custom_media_player = None`  
     Custom script, command, or path to executable that will be used to play media. Dont forget to make it executable. Can also run `bash path/to/file.sh`.  
     Prebuilt script already exists [here](https://github.com/sparklost/endcord/blob/main/tools/endcord-custom-media.sh), configuration instructions are in the script.  

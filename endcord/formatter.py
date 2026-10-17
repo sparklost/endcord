@@ -2984,15 +2984,18 @@ def generate_extra_line_guild_start_call(channel, voice_states, max_len, bordere
         perm = ""
 
     if voice_states and len(voice_states) > 1:
+        videos = sum(1 for t in voice_states.values() if (not isinstance(t, int) and t[4]))
+        video_text = f"(VID:{videos}) " if videos else ""
         limit = f"/{channel["user_limit"]}" if channel["user_limit"] else ""
         count = f"{voice_states[0]}{limit} member{"s" if voice_states[0] > 1 else ""}"   # 0 is count
         count_color = 20 if (channel["user_limit"] and voice_states[0] >= channel["user_limit"]) else color_standout
     else:
+        video_text = ""
         count = "No members" + (f" ({channel["user_limit"]} max.)" if channel["user_limit"] else "")
         count_color = color_standout
 
     left_text = f"{perm}{count}, use voice* commands"
-    right_text = "[Join Call]"
+    right_text = f"{video_text}[Join Call]"
     max_str_length = max_len - len(right_text) - 3   # 3 for ...
 
     line_format += [
@@ -3009,14 +3012,15 @@ def generate_extra_line_guild_start_call(channel, voice_states, max_len, bordere
     return shortened_str + right_text, line_format
 
 
-def generate_extra_line_call(call_participants, volume_in, volume_out, max_len, bordered, rtt, colors):   # noqa
+def generate_extra_line_call(call_participants, volume_in, volume_out, videos, rtt, max_len, bordered, colors):   # noqa
     """Generate extra line containing information about ongoing call"""
     max_len = max_len - bordered * 3
     color_low = colors[8]
     color_standout = colors[9]
     left_text = "In the call: You"
     rtt_text = f"({min(rtt, 999.9):.1f}ms) " if rtt is not None else ""
-    right_text = f"{rtt_text}[I:{(str(volume_in)+"%").center(4)} O:{(str(volume_out)+"%").center(4)}] [Leave]"
+    video_text = f"(VID:{len(videos)}) " if videos else ""
+    right_text = f"{video_text}{rtt_text}[I:{(str(volume_in)+"%").center(4)} O:{(str(volume_out)+"%").center(4)}] [Leave]"
     max_str_length = max_len - len(right_text) - 3   # 3 for ...
 
     for participant in call_participants:
@@ -3042,7 +3046,7 @@ def generate_extra_line_call(call_participants, volume_in, volume_out, max_len, 
     return shortened_str + right_text, line_format
 
 
-def generate_extra_window_call(call_participants, user_volumes, volume_in, volume_out, colors, max_len):
+def generate_extra_window_call(call_participants, user_volumes, videos, volume_in, volume_out, colors, max_len):
     """Generate extra windows title and body as a list of voice call participants and their states"""
     title_line = "Voice call participants:"
     color_low = colors[8]
@@ -3057,10 +3061,13 @@ def generate_extra_window_call(call_participants, user_volumes, volume_in, volum
         (color_low, None, 13 - 2 * me_muted, len(me_text)),
     ])
     for participant in call_participants:
+        user_id = participant["user_id"]
         name = participant["name"] if participant["name"] else "Unknown"
         muted = participant["muted"]
-        volume = user_volumes.get(participant["user_id"], 100)
-        text = f" - {"muted" if muted else "unmuted"} ({str(volume).rjust(3)}%)"
+        volume = user_volumes.get(user_id, 100)
+
+        stream_txt = " [STREAM]" if user_id in videos else ""
+        text = f" - {"muted" if muted else "unmuted"} ({str(volume).rjust(3)}%){stream_txt}"
         if participant["speaking"]:
             text += " - speaking"
         if len(name) + len(text) > max_len:
@@ -3245,9 +3252,10 @@ def generate_extra_window_channel(channel, voice_states, use_nick, colors, max_l
             for value in voice_states.values():
                 if isinstance(value, int):
                     continue
-                username, global_name, nick, _ = value
+                username, global_name, nick, _, streaming = value
                 if (nick and use_nick) or global_name:
-                    body.append(f"  {nick if nick else global_name} ({username})"[:max_len])
+                    stream_txt = " [STREAM]" if streaming else ""
+                    body.append(f"  {nick if nick else global_name} ({username}){stream_txt}"[:max_len])
                     body_format.append([(color_low, 0, len(nick if nick else global_name) + 3, max_len)])
                 else:
                     body.append(f"  {username}"[:max_len])

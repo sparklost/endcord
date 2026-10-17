@@ -97,7 +97,7 @@ Stop recording, close popup window, stop replying, everything else.
 ### Client commands
 Press `Ctrl+/` to switch to command mode. Command mode has its own assist but can also trigger regular assist.
 Last 10 commands can be cycled with `Arrow Up/Down` bindings while in command mode.
-[Commands list](docs/commands.md).
+[Commands list](commands.md).
 
 ### App commands
 App commands assist is initiated by typing `/` at the start of input line.
@@ -160,11 +160,11 @@ Custom theme path can be provided with `-c [PATH_TO_THEME]` flag or in `config.i
 Theme can also be changed in `config.ini` under section `[theme]`.
 Loading order: argument theme -> `config.ini` theme -> builtin default theme. There can be missing settings.
 If theme is not found at provided path, default theme will be written to it.
-If only file name is provided, without `.ini` extension, theme will be searched in `Themes` directory, see [Configuration](docs/configuration.md) for path.
+If only file name is provided, without `.ini` extension, theme will be searched in `Themes` directory, see [Configuration](configuration.md) for path.
 Default themes are assumed to be drawn on dark terminal background (preferably black).
 
 ### Vim mode
-Vim-like mode can be enabled in the config by setting `vim_mode = True`. Keybindings list can be found [here](docs/keybindings.md#vim-mode-keybindings).
+Vim-like mode can be enabled in the config by setting `vim_mode = True`. Keybindings list can be found [here](keybindings.md#vim-mode-keybindings).
 In vim mode there are currently 2 modes: "normal" and "insert".
 Normal mode is the default mode and allows using many "single-key" keybindings, fully disabling the input line.
 As usual, press `i` to switch to insert mode and `Esc` to leave it. Insert mode will allow typing in input line.
@@ -173,7 +173,7 @@ Note that original keybindings are not disabled and can be used from any mode. A
 
 ### Media support
 Very large number of image and video formats are supported thanks to pillow and PyAV.
-All the visual media is converted to ASCII art that can be additionally configured in [theme](docs/configuration.md#theme).
+All the visual media is converted to ASCII art that can be additionally configured in [theme](configuration.md#theme).
 But there is also setting in config to open media in external app (cross-system, will use default system app for that file format).
 "endcord-lite" (without voice calls and ASCII media support), can be built by specifying `--lite` flag to build script. Lite version is significantly smaller, cant make voice calls, but still can open media in external app.
 

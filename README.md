@@ -23,7 +23,7 @@ Any third party endcord forks may add features that can lead to account ban, cau
 
 ## Features
 - Extremely low CPU and RAM usage (see [RAM usage](docs/FAQ.md#ram-usage))
-- Voice calls (DM, groups and servers)
+- Voice and video calls (DM, groups and servers) with video streaming
 - Vim-mode
 - Integrated RPC (only Rich Presence) and game detection
 - Mouse controls
@@ -149,7 +149,7 @@ Optional dependency for spellchecking: `aspell`. Can be installed with: `brew as
 - `aspell` - Spellchecking (and `aspell-en` dictionary)
 - `git` - Install and update extensions from other sources than github
 - `yt-dlp` - youtube support
-- `mpv` - Play youtube videos in native player (non-ascii)
+- `mpv` - View video streams in calls, and play youtube videos in native player (non-ascii)
 - `libsecret` - Store token in system keyring (secret service provider is also required (eg. `gnome-keyring`, `KWallet`, `KeePassXC`), with `dbus` as dependency)
 - `libappindicator-gtk3` - Tray support under wayland, for [windowed mode](docs/FAQ.md#gui-windowed-mode) only.
 - `imagemagick` - To make notification images round; only needed for endcord-lite.

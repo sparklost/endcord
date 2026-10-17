@@ -7,9 +7,11 @@ import logging
 import os
 import queue
 import random
+import re
 import socket
 import ssl
 import struct
+import subprocess
 import sys
 import threading
 import time
@@ -21,7 +23,7 @@ import nacl.bindings
 import numpy as np
 import websocket
 
-from endcord import opus, socks
+from endcord import opus, peripherals, socks
 
 # safely import soundcard, in case there is no sound system
 try:
@@ -40,16 +42,23 @@ MAX_SILENCE = 10
 MAX_LATENCY_FRAMES = 5
 TRANSMITTER_QUEUE_TIMEOUT = 0.06
 MIXER_BUFFER = 3
-RTCP_SEND_DELAY = 5   # set to 0 to disable RTCP SR
+RTCP_SR_SEND_DELAY = 5
+RTCP_RR_SEND_DELAY = 1
+RTCP_PLI_SEND_DELAY = 2
 CODECS = [
     {"name": "opus", "type": "audio", "priority": 1000, "payload_type": 120},
-    # video disabled for now
     # {"name": "AV1", "type": "video", "priority": 1000, "payload_type": 101, "rtx_payload_type": 102, "encode": False, "decode": True},
-    # {"name": "H264", "type": "video", "priority": 2000, "payload_type": 103, "rtx_payload_type": 104, "encode": True, "decode": True},
+    {"name": "H264", "type": "video", "priority": 2000, "payload_type": 103, "rtx_payload_type": 104, "encode": True, "decode": True},
     # # h265 only in discord beta
     # {"name": "VP8", "type": "video", "priority": 3000, "payload_type": 105, "rtx_payload_type": 106, "encode": True, "decode": True},
     # {"name": "VP9", "type": "video", "priority": 4000, "payload_type": 107, "rtx_payload_type": 108, "encode": False, "decode": True},
 ]
+VIDEO_HEIGHT = 720   # screen share is scaled to this height
+VIDEO_FPS = 30
+VIDEO_BITRATE = 2500   # kbps
+VIDEO_QUEUE_SIZE = 30
+ANNEXB_START = b"\x00\x00\x00\x01"
+ANNEXB_START_RE = re.compile(b"\x00\x00\x01")
 logger = logging.getLogger(__name__)
 rtp_unpacker = struct.Struct(">xxHII")
 
@@ -103,10 +112,19 @@ def detect_silence(data, threshold=0.03):
     return rms < threshold
 
 
+def split_annex_b(data, final=False):
+    """Split H264 annex B stream into NAL units without start codes"""
+    starts = [m.end() for m in ANNEXB_START_RE.finditer(data)]
+    nals = [bytes(data[starts[i]:starts[i + 1] - 3]).rstrip(b"\x00") for i in range(len(starts) - 1)]
+    if final and starts:
+        nals.append(bytes(data[starts[-1]:]).rstrip(b"\x00"))
+    return [nal for nal in nals if nal], (starts[-1] - 3 if starts else 0)
+
+
 class Gateway():
     """Methods for fetching and sending data to Discord voice gateway through websocket"""
 
-    def __init__(self, voice_gateway_data, my_id, volume_input, volume_output, user_agent, proxy=None, custom_mic=None, silence=-30, opus_mode="voip", fast_mixer=False, denoise=True):
+    def __init__(self, voice_gateway_data, my_id, volume_input, volume_output, user_agent, proxy=None, custom_mic=None, silence=-30, opus_mode="voip", fast_mixer=False, denoise=True, mpv="mpv"):
         self.voice_gateway_data = voice_gateway_data
         self.guild_id = voice_gateway_data["guild_id"]
         self.channel_id = voice_gateway_data["channel_id"]
@@ -122,8 +140,8 @@ class Gateway():
         self.heartbeat_received = True
         self.sequence = 1
         self.resumable = False
-        self.voice_handler = None
-        self.voice_handler_thread = None
+        self.call_handler = None
+        self.call_handler_thread = None
         self.call_buffer = []
         self.media_session_id = None
         self.udp = None
@@ -139,6 +157,7 @@ class Gateway():
         self.known_user_ids = set()
         self.known_user_ids.add(str(my_id))
         self.ssrc_cache = set()
+        self.video_sources = {}
 
         self.enable_input = volume_input >= 0
         self.volume_input = volume_input if self.enable_input else 0
@@ -148,6 +167,7 @@ class Gateway():
         self.opus_mode = opus_mode
         self.fast_mixer = fast_mixer
         self.denoise = denoise
+        self.mpv = mpv
 
         self.connect()
 
@@ -199,10 +219,10 @@ class Gateway():
             self.disconnect()
 
 
-    def start_voice_handler(self):
+    def start_call_handler(self):
         """Initialize and start voice handler"""
-        if not self.voice_handler:
-            self.voice_handler = VoiceHandler(
+        if not self.call_handler:
+            self.call_handler = CallHandler(
                 self,
                 self.my_id,
                 self.ssrc,
@@ -216,23 +236,27 @@ class Gateway():
                 opus_mode=self.opus_mode,
                 fast_mixer=self.fast_mixer,
                 denoise=self.denoise,
+                mpv=self.mpv,
             )
-            self.voice_handler.start()
+            self.call_handler.start()
 
         while self.ssrc_cache:   # load cached ssrc-id pairs received before voice handler was initialized
             ssrc, user_id = self.ssrc_cache.pop()
-            self.voice_handler.add_ssrc_mapping(ssrc, user_id)
+            self.call_handler.add_ssrc_mapping(ssrc, user_id)
+
+        for user_id, ssrcs in self.video_sources.items():
+            self.call_handler.update_video_source(user_id, ssrcs)
 
 
-    def stop_voice_handler(self):
+    def stop_call_handler(self):
         """Stop voice handler without stopping gateway"""
         try:
             self.udp.close()
         except Exception:
             pass
-        if self.voice_handler:
-            self.voice_handler.stop()
-            self.voice_handler = None
+        if self.call_handler:
+            self.call_handler.stop()
+            self.call_handler = None
 
 
     def connect_ws(self):
@@ -371,7 +395,7 @@ class Gateway():
                 self.dave_protocol_version = data.get("dave_protocol_version", 0)
                 self.state = 2
                 self.send_speaking()
-                self.start_voice_handler()
+                self.start_call_handler()
 
             elif opcode == 14:   # SESSION UPDATE
                 data = response["d"]
@@ -389,6 +413,20 @@ class Gateway():
                     })
                     self.known_user_ids.add(str(user_id))
 
+            elif opcode == 12:   # VIDEO SOURCES
+                data = response["d"]
+                user_id = int(data["user_id"])
+                streams = data.get("streams") or []
+                ssrcs = {int(s["ssrc"]) for s in streams if s.get("ssrc") and s.get("active", True)}
+                if not streams and data.get("video_ssrc"):
+                    ssrcs = {int(data["video_ssrc"])}
+                if ssrcs:
+                    self.video_sources[user_id] = ssrcs
+                else:
+                    self.video_sources.pop(user_id, None)
+                if self.call_handler:
+                    self.call_handler.update_video_source(user_id, ssrcs)
+
             elif opcode == 13:   # CLIENT DISCONNECT
                 data = response["d"]
                 self.call_buffer.append({
@@ -396,6 +434,9 @@ class Gateway():
                     "user_id": data["user_id"],
                 })
                 self.known_user_ids.discard(str(data["user_id"]))
+                self.video_sources.pop(int(data["user_id"]), None)
+                if self.call_handler:
+                    self.call_handler.update_video_source(int(data["user_id"]), set())
 
             elif opcode == 5:   # SPEAKING
                 data = response["d"]
@@ -405,9 +446,9 @@ class Gateway():
                     "speaking": bool(data["user_id"]),
                 })
                 if "ssrc" in data:
-                    if self.voice_handler:
-                        self.voice_handler.add_ssrc_mapping(int(data["ssrc"]), int(data["user_id"]))
-                    else:   # add to cache until voice_handler object is created
+                    if self.call_handler:
+                        self.call_handler.add_ssrc_mapping(int(data["ssrc"]), int(data["user_id"]))
+                    else:   # add to cache until call_handler object is created
                         self.ssrc_cache.add((int(data["ssrc"]), int(data["user_id"])))
 
             # DAVE OPCODES
@@ -418,8 +459,8 @@ class Gateway():
                 self.send_dave_ready_for_transition(transition_id)
 
             elif opcode == 22:  # DAVE_PROTOCOL_EXECUTE_TRANSITION
-                if self.voice_handler:
-                    self.voice_handler.update_ratchets(self.dave_session)
+                if self.call_handler:
+                    self.call_handler.update_ratchets(self.dave_session)
 
             elif opcode == 24:   # DAVE_PROTOCOL_PREPARE_EPOCH
                 data = response["d"]
@@ -451,8 +492,8 @@ class Gateway():
                     self.send_dave_mls_invalid_commit_welcome(transition_id)
                     self.send_dave_mls_key_package()
                 else:
-                    if self.voice_handler:
-                        self.voice_handler.update_ratchets(self.dave_session)
+                    if self.call_handler:
+                        self.call_handler.update_ratchets(self.dave_session)
                     if transition_id != 0:
                         self.send_dave_ready_for_transition(transition_id)
 
@@ -464,8 +505,8 @@ class Gateway():
                     self.send_dave_mls_invalid_commit_welcome(transition_id)
                     self.send_dave_mls_key_package()
                 else:
-                    if self.voice_handler:
-                        self.voice_handler.update_ratchets(self.dave_session)
+                    if self.call_handler:
+                        self.call_handler.update_ratchets(self.dave_session)
                     self.send_dave_ready_for_transition(transition_id)
 
         logger.debug("Receiver stopped")
@@ -597,6 +638,29 @@ class Gateway():
         self.send(payload)
 
 
+    def send_video_sources(self, active, video_ssrc, rtx_ssrc):
+        """Send VIDEO event to start/stop outgoing video stream"""
+        self.send({
+            "op": 12,
+            "d": {
+                "audio_ssrc": self.ssrc,
+                "video_ssrc": video_ssrc if active else 0,
+                "rtx_ssrc": rtx_ssrc if active else 0,
+                "streams": [{
+                    "type": "video",
+                    "rid": "100",
+                    "ssrc": video_ssrc,
+                    "active": active,
+                    "quality": 100,
+                    "rtx_ssrc": rtx_ssrc,
+                    "max_bitrate": VIDEO_BITRATE * 1000,
+                    "max_framerate": VIDEO_FPS,
+                    "max_resolution": {"type": "fixed", "width": VIDEO_HEIGHT * 16 // 9, "height": VIDEO_HEIGHT},
+                }],
+            },
+        })
+
+
     def get_state(self):
         """
         Return current state of gateway:
@@ -616,8 +680,8 @@ class Gateway():
                 self.udp.close()
             except Exception:
                 pass
-            if self.voice_handler:
-                self.voice_handler.stop()
+            if self.call_handler:
+                self.call_handler.stop()
             self.ws.close(timeout=0)   # this will stop receiver
             time.sleep(0.6)   # time for heartbeater to stop
             logger.debug("Gateway disconnected")
@@ -640,8 +704,8 @@ class Gateway():
 
     def get_rtt(self):
         """Get rtt value in ms"""
-        if self.voice_handler:
-            return self.voice_handler.get_rtt()
+        if self.call_handler:
+            return self.call_handler.get_rtt()
         return 0.0
 
 
@@ -649,13 +713,13 @@ class Gateway():
         """Set volumes levels"""
         self.volume_input = volume_input if self.enable_input else 0
         self.volume_output = volume_output
-        if self.voice_handler:
-            self.voice_handler.set_volumes(self.volume_input, self.volume_output)
+        if self.call_handler:
+            self.call_handler.set_volumes(self.volume_input, self.volume_output)
 
 
     def live_mic_switch(self, new_mic):
         """Change microphone while in the stream"""
-        self.voice_handler.live_mic_switch(new_mic)
+        self.call_handler.live_mic_switch(new_mic)
 
 
     def play_audio_file(self, path, block=False, mix=False):
@@ -663,31 +727,46 @@ class Gateway():
         if not self.enable_input:
             return
         if block:
-            self.voice_handler.audio_file_player(path, mix)
+            self.call_handler.audio_file_player(path, mix)
         else:
-            threading.Thread(target=self.voice_handler.audio_file_player, args=(path, mix), daemon=True).start()
+            threading.Thread(target=self.call_handler.audio_file_player, args=(path, mix), daemon=True).start()
 
 
     def stop_file_playback(self):
         """Stop playback of all audio files"""
-        self.voice_handler.stop_file_playback()
+        self.call_handler.stop_file_playback()
 
 
     def set_user_volume(self, user_id, volume):
         """Set volume per user_id"""
-        self.voice_handler.set_user_volume(user_id, volume)
+        self.call_handler.set_user_volume(user_id, volume)
 
 
     def get_user_volumes(self):
         """Get user_id:volume dict"""
-        return self.voice_handler.user_to_volume
+        return self.call_handler.user_to_volume
+
+
+    def get_video_users(self):
+        """Get list of user_ids that are currently sending video"""
+        return [str(k) for k in self.video_sources]
+
+
+    def start_video_player(self, user_id=None):
+        """Start mpv and show video of user_id, or of first user, return False if there are none"""
+        return self.call_handler.start_video_player(user_id)
+
+
+    def stop_video_player(self):
+        """Close mpv and stop receiving video"""
+        self.call_handler.stop_video_player()
 
 
 
-class VoiceHandler:
+class CallHandler:
     """Voice call sound receiver, transmitter, player and recorder"""
 
-    def __init__(self, gateway, my_id, my_ssrc, udp, secret_key, encryption_mode, volume_input, volume_output, custom_mic=None, silence=-30, opus_mode="voip", fast_mixer=False, denoise=True):
+    def __init__(self, gateway, my_id, my_ssrc, udp, secret_key, encryption_mode, volume_input, volume_output, custom_mic=None, silence=-30, opus_mode="voip", fast_mixer=False, denoise=True, mpv="mpv"):
         self.gateway = gateway
         self.my_id = my_id
         self.my_ssrc = my_ssrc
@@ -743,6 +822,21 @@ class VoiceHandler:
         self.transport_counter = 0
         self.packets_sent = 0
         self.bytes_sent = 0
+        self.counter_lock = threading.Lock()
+
+        # video stuff
+        self.video_ssrc_to_userid = {}
+        self.watch_user = None
+        self.watch_ssrc = None
+        self.mpv_path = mpv
+        self.mpv_proc = None
+        self.mpv_ipc = None
+        self.twcc_epoch = time.monotonic()
+        self.video_rotation = 0
+        self.mpv_rotation = 0
+        self.video_queue = None
+        self.last_pli = 0
+        self.reset_video_receiver()
 
 
     def start(self):
@@ -774,9 +868,8 @@ class VoiceHandler:
                 self.audio_thread_rec.start()
 
             # start rtcp sender
-            if RTCP_SEND_DELAY:
-                self.rtcp_sender_thread = threading.Thread(target=self.rtcp_sender_report_loop, daemon=True)
-                self.rtcp_sender_thread.start()
+            if RTCP_SR_SEND_DELAY:
+                threading.Thread(target=self.rtcp_sender_report_loop, daemon=True).start()
 
         else:
             logger.warning("Could not find any speakers or sound system is not running")
@@ -787,6 +880,7 @@ class VoiceHandler:
         if not self.run:
             return
         self.run = False
+        self.stop_video_player(notify=False)
         try:
             self.udp.close()
         except Exception:
@@ -823,10 +917,17 @@ class VoiceHandler:
             self.audio_thread_rec.start()
 
 
+    def next_counter(self):
+        """Get next transport counter as bytes"""
+        with self.counter_lock:
+            self.transport_counter = (self.transport_counter + 1) & 0xFFFFFFFF
+            return struct.pack(">I", self.transport_counter)
+
+
     def update_ratchets(self, session):
         """Update DAVE ratchets"""
         # update for other users
-        for ssrc, user_id in self.ssrc_to_userid.items():
+        for ssrc, user_id in list(self.ssrc_to_userid.items()) + list(self.video_ssrc_to_userid.items()):
             ratchet = session.get_key_ratchet(str(user_id))
             if ratchet is not None:
                 if ssrc not in self.ssrc_to_decryptor:
@@ -849,8 +950,25 @@ class VoiceHandler:
             self.ssrc_to_decryptor[ssrc].transition_to_key_ratchet(ratchet, transition_expiry=10.0)
 
 
+    def transport_encrypt(self, header, payload):
+        """Transport encrypt payload, return header + ciphertext + counter"""
+        counter = self.next_counter()
+        if self.mode == "aead_aes256_gcm_rtpsize":
+            nonce = bytearray(12)
+            nonce[:4] = counter
+            ciphertext = nacl.bindings.crypto_aead_aes256gcm_encrypt(bytes(payload), bytes(header), bytes(nonce), self.secret_key)
+        elif self.mode == "aead_xchacha20_poly1305_rtpsize":
+            nonce = bytearray(24)
+            nonce[:4] = counter
+            ciphertext = nacl.bindings.crypto_aead_xchacha20poly1305_ietf_encrypt(bytes(payload), bytes(header), bytes(nonce), self.secret_key)
+        else:
+            logger.error(f"Unknown mode: {self.mode}")
+            return None
+        return bytes(header) + ciphertext + counter
+
+
     def receiver_loop(self):
-        """Receive data, unpack, transport decrypt, DAVE decrypt, opus decode, and put it to queue"""
+        """Receive data, unpack, transport decrypt, DAVE decrypt, opus decode, and put it to queue; send video to handle_video_packet"""
         while self.run:
             # receive
             try:
@@ -863,6 +981,7 @@ class VoiceHandler:
                 break
             if not data:
                 continue
+            arrival = time.monotonic()
 
             # RTP
             # logger.info(("RECEIVED", data))
@@ -878,10 +997,14 @@ class VoiceHandler:
             counter = data[-4:]
             ciphertext = data[cutoff:-4]
 
-            # skip non-opus payloads and parse RTCP
-            if data[1] & 0x7F != 0x78:
+            # skip non-opus and non-video payloads and parse RTCP
+            payload_type = data[1] & 0x7F
+            is_video = payload_type == 0x67
+            if payload_type != 0x78 and not is_video:
                 self.handle_rtcp(data)
                 continue
+            if is_video and self.watch_user is None:
+                continue   # not watching video
 
             # transport
             try:
@@ -909,7 +1032,16 @@ class VoiceHandler:
             # strip RTP extension body
             if has_extension:
                 ext_body_len = int.from_bytes(data[cutoff - 2:cutoff], "big") * 4
+                self.parse_rtp_extensions(bytes(data[cutoff - 4:cutoff - 2]), payload[:ext_body_len], is_video, arrival)
                 payload = payload[ext_body_len:]
+
+            # video
+            if is_video:
+                if self.video_ssrc_to_userid.get(ssrc) != self.watch_user or self.watch_ssrc not in (None, ssrc):
+                    continue   # not watching this video
+                self.watch_ssrc = ssrc
+                self.handle_video_packet(sequence, timestamp, bool(data[1] & 0x80), ssrc, payload)
+                continue
 
             # DAVE
             if self.gateway.dave_protocol_version > 0:
@@ -944,7 +1076,7 @@ class VoiceHandler:
 
 
     def transmitter_loop(self):
-        """Take data from queue, opus encode, DAVE encrypt, transport encrypt, pack and send it"""
+        """Take data from queue, opus encode, DAVE encrypt, transport encrypt, pack and send it; video is sent with send_video_frame"""
         skipped_samples = 0
         silence_counter = 0
         max_silence_packets = MAX_SILENCE + SILENCE_BUFFER
@@ -1024,26 +1156,15 @@ class VoiceHandler:
             struct.pack_into(">I", header, 8, self.my_ssrc)
 
             # transport encryption
-            self.transport_counter = (self.transport_counter + 1) & 0xFFFFFFFF
-            counter = struct.pack(">I", self.transport_counter)
             try:
-                if self.mode == "aead_aes256_gcm_rtpsize":
-                    nonce = bytearray(12)
-                    nonce[:4] = counter
-                    payload = nacl.bindings.crypto_aead_aes256gcm_encrypt(bytes(payload), bytes(header), bytes(nonce), self.secret_key)
-                elif self.mode == "aead_xchacha20_poly1305_rtpsize":
-                    nonce = bytearray(24)
-                    nonce[:4] = counter
-                    payload = nacl.bindings.crypto_aead_xchacha20poly1305_ietf_encrypt(bytes(payload), bytes(header), bytes(nonce), self.secret_key)
-                else:
-                    logger.error(f"Unknown mode: {self.mode}")
+                payload = self.transport_encrypt(header, payload)
+                if not payload:
                     skipped_samples += 960
                     continue
             except Exception as e:
                 logger.error(f"Encryption failed; mode: {self.mode}; error: {e}")
                 skipped_samples += 960
                 continue
-            payload = bytes(header) + payload + counter
 
             # send
             try:
@@ -1078,29 +1199,15 @@ class VoiceHandler:
             struct.pack_into(">I", payload, 20, self.packets_sent)
             struct.pack_into(">I", payload, 24, self.bytes_sent)
 
-            header = payload[:8]
-            body = payload[8:]
-            self.transport_counter = (self.transport_counter + 1) & 0xFFFFFFFF
-            counter = struct.pack(">I", self.transport_counter)
-            if self.mode == "aead_aes256_gcm_rtpsize":
-                nonce = bytearray(12)
-                nonce[:4] = counter
-                ciphertext = nacl.bindings.crypto_aead_aes256gcm_encrypt(bytes(body), bytes(header), bytes(nonce), self.secret_key)
-            elif self.mode == "aead_xchacha20_poly1305_rtpsize":
-                nonce = bytearray(24)
-                nonce[:4] = counter
-                ciphertext = nacl.bindings.crypto_aead_xchacha20poly1305_ietf_encrypt(bytes(body), bytes(header), bytes(nonce), self.secret_key)
-            else:
-                logger.error(f"Unknown mode: {self.mode}")
-                time.sleep(RTCP_SEND_DELAY)
+            payload = self.transport_encrypt(payload[:8], payload[8:])
+            if not payload:
+                time.sleep(RTCP_SR_SEND_DELAY)
                 continue
-            payload = bytes(header) + ciphertext + counter
-
             try:
                 self.udp.send(payload)
             except Exception:
                 break
-            time.sleep(RTCP_SEND_DELAY)
+            time.sleep(RTCP_SR_SEND_DELAY)
 
 
     def handle_rtcp(self, data):
@@ -1170,6 +1277,9 @@ class VoiceHandler:
                         f"  rtt={self.rtt_ms:.1f}ms\n",
                     )
                 block_offset += 24
+
+
+    ### ------- AUDIO ------- ###
 
 
     def audio_player(self, samplerate, channels):
@@ -1433,3 +1543,373 @@ class VoiceHandler:
             out[start:end, 1] = cleaned_float
 
         return out
+
+
+    ### ------- VIDEO ------- ###
+
+
+    def reset_video_receiver(self):
+        """Reset video receiver state"""
+        self.video_ts = None
+        self.video_seq = None
+        self.video_frame = bytearray()
+        self.video_broken = False
+        self.video_synced = False
+        self.video_ext_seq = None   # extended highest sequence number
+        self.video_prev_seq = 0
+        self.video_received = 0
+        self.video_cum_lost = 0
+        self.twcc_packets = {}   # twcc arival times
+        self.twcc_max = None
+        self.twcc_next = None
+        self.twcc_count = 0
+        self.twcc_sent = 0
+
+
+    def update_video_source(self, user_id, ssrcs):
+        """Update video ssrcs of user and update ratchets, close mpv if video stopped"""
+        for ssrc in [s for s, u in self.video_ssrc_to_userid.items() if u == user_id]:
+            del self.video_ssrc_to_userid[ssrc]
+
+        for ssrc in ssrcs:
+            self.video_ssrc_to_userid[ssrc] = user_id
+            ratchet = self.gateway.dave_session.get_key_ratchet(str(user_id))
+            if ratchet is not None:
+                if ssrc not in self.ssrc_to_decryptor:
+                    self.ssrc_to_decryptor[ssrc] = dave.Decryptor()
+                self.ssrc_to_decryptor[ssrc].transition_to_key_ratchet(ratchet, transition_expiry=10.0)
+
+        if user_id == self.watch_user:
+            if not ssrcs:
+                self.stop_video_player()
+            elif self.watch_ssrc not in ssrcs:   # stream restarted with different ssrc
+                self.watch_ssrc = None
+                self.reset_video_receiver()
+
+
+    def send_rtcp_pli(self, media_ssrc):
+        """Send RTCP picture loss indicator and ask sender for a keyframe"""
+        payload = bytearray(12)
+        payload[0] = 0x81   # v2, no padding, FMT=1
+        payload[1] = 206   # PT=PSFB
+        struct.pack_into(">H", payload, 2, 2)   # length in 32bit words
+        struct.pack_into(">I", payload, 4, self.my_ssrc)
+        struct.pack_into(">I", payload, 8, media_ssrc)
+        payload = self.transport_encrypt(payload[:8], payload[8:])
+        if not payload:
+            logger.error(f"Unknown mode: {self.mode}")
+            return
+        try:
+            self.udp.send(payload)
+        except Exception:
+            pass
+
+
+    def parse_rtp_extensions(self, profile, body, is_video, arrival):
+        """Get video orientation and transport-wide sequence number from RTP header extensions"""
+        if profile != b"\xbe\xde":
+            return
+        offset = 0
+        while offset < len(body):
+            if body[offset] == 0:   # padding
+                offset += 1
+                continue
+            ext_id = body[offset] >> 4
+            length = (body[offset] & 0x0F) + 1
+            if ext_id == 15:
+                break
+            ext_data = body[offset + 1:offset + 1 + length]
+
+            if is_video and ext_id == 4 and length == 1:   # video orientation packet
+                self.video_rotation = (ext_data[0] & 0x03) * 90
+
+            elif ext_id == 5 and length == 2 and self.watch_user is not None:   # twcc packet
+                sequence = int.from_bytes(ext_data, "big")
+                if self.twcc_max is None:
+                    unwrapped = sequence
+                    self.twcc_max = sequence
+                else:
+                    diff = (sequence - self.twcc_max) & 0xFFFF
+                    unwrapped = self.twcc_max + diff if diff < 0x8000 else self.twcc_max - (0x10000 - diff)
+                    self.twcc_max = max(self.twcc_max, unwrapped)
+                if self.twcc_next is None:
+                    self.twcc_next = unwrapped
+                if unwrapped >= self.twcc_next:
+                    self.twcc_packets[unwrapped] = arrival
+                if arrival - self.twcc_sent >= 0.1:   # send feedback every 100ms
+                    self.twcc_sent = arrival
+                    self.send_twcc()
+
+            offset += 1 + length
+
+
+    def rtcp_receiver_report_loop(self):
+        """Send RTCP receiver report for watched video"""
+        while self.run:
+            ssrc = self.watch_ssrc
+            if not ssrc or self.video_ext_seq is None:
+                return
+            expected = self.video_ext_seq - self.video_prev_seq
+            lost = max(expected - self.video_received, 0)
+            fraction = min(lost * 256 // expected, 255) if expected > 0 else 0
+            self.video_cum_lost += lost
+            self.video_prev_seq = self.video_ext_seq
+            self.video_received = 0
+
+            report = bytearray(32)
+            report[0] = 0x81   # v2, no padding, RC=1
+            report[1] = 201   # PT=RR
+            struct.pack_into(">H", report, 2, 7)   # length in 32bit words
+            struct.pack_into(">I", report, 4, self.my_ssrc)
+            struct.pack_into(">I", report, 8, ssrc)
+            report[12] = fraction
+            report[13:16] = (self.video_cum_lost & 0xFFFFFF).to_bytes(3, "big")
+            struct.pack_into(">I", report, 16, self.video_ext_seq & 0xFFFFFFFF)   # jitter, lsr and dlsr = 0
+
+            payload = self.transport_encrypt(report[:8], report[8:])
+            if not payload:
+                time.sleep(RTCP_RR_SEND_DELAY)
+                continue
+            try:
+                self.udp.send(payload)
+            except Exception:
+                pass
+            time.sleep(RTCP_RR_SEND_DELAY)
+
+
+    def send_twcc(self):
+        """Send RTCP transport-wide congestion control feedback, server needs this to calculate bandwidth and pick video quality"""
+        if not self.twcc_packets:
+            return
+        last = max(self.twcc_packets)
+        base = max(self.twcc_next, last - 499)   # limit packet size
+        reference = int((self.twcc_packets[min(s for s in self.twcc_packets if s >= base)] - self.twcc_epoch) / 0.064)   # 64ms units
+        previous = reference * 0.064
+        symbols = []   # 0 = not received, 1 = received with 1 byte delta, 2 = received with 2 byte delta
+        deltas = bytearray()
+        for sequence in range(base, last + 1):
+            arrival = self.twcc_packets.get(sequence)
+            if arrival is None:
+                symbols.append(0)
+                continue
+            units = round((arrival - self.twcc_epoch - previous) / 0.00025)   # 250us units
+            if 0 <= units <= 255:
+                symbols.append(1)
+                deltas.append(units)
+            else:
+                units = max(-32768, min(32767, units))
+                symbols.append(2)
+                deltas += units.to_bytes(2, "big", signed=True)
+            previous += units * 0.00025
+
+        chunks = bytearray()
+        for i in range(0, len(symbols), 7):
+            value = 0xC000
+            for j, symbol in enumerate(symbols[i:i + 7]):
+                value |= symbol << (12 - 2 * j)
+            chunks += value.to_bytes(2, "big")
+
+        packet = bytearray(12) + struct.pack(">HHI", base & 0xFFFF, len(symbols), ((reference & 0xFFFFFF) << 8) | self.twcc_count) + chunks + deltas
+        packet += bytes(-len(packet) % 4)
+        packet[0] = 0x8F   # v2, no padding, FMT=15
+        packet[1] = 205   # PT=RTPFB
+        struct.pack_into(">H", packet, 2, len(packet) // 4 - 1)   # length in 32bit words
+        struct.pack_into(">I", packet, 4, self.my_ssrc)
+        struct.pack_into(">I", packet, 8, self.watch_ssrc or 0)
+        self.twcc_next = last + 1
+        self.twcc_packets.clear()
+        self.twcc_count = (self.twcc_count + 1) & 0xFF
+        packet = self.transport_encrypt(packet[:8], packet[8:])
+        if not packet:
+            return
+        try:
+            self.udp.send(packet)
+        except Exception:
+            pass
+
+
+    def set_mpv_rotation(self, degrees):
+        """Rotate mpv video through ipc"""
+        command = (json.dumps({"command": ["set_property", "video-rotate", degrees]}) + "\n").encode()
+        try:
+            if sys.platform == "win32":
+                with open(self.mpv_ipc, "wb", buffering=0) as pipe:
+                    pipe.write(command)
+            else:
+                with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
+                    sock.settimeout(1)
+                    sock.connect(self.mpv_ipc)
+                    sock.sendall(command)
+        except OSError:
+            return False
+        return True
+
+
+    def request_keyframe(self):
+        """Request keyframe from the watched user, max 1 per second"""
+        while self.run:
+            now = time.monotonic()
+            if now - self.last_pli < 1:
+                return
+            self.last_pli = now
+            if self.watch_ssrc:
+                self.send_rtcp_pli(self.watch_ssrc)
+            else:
+                for ssrc, user_id in self.video_ssrc_to_userid.items():
+                    if user_id == self.watch_user:
+                        self.send_rtcp_pli(ssrc)
+            time.sleep(RTCP_PLI_SEND_DELAY)
+
+
+    def handle_video_packet(self, sequence, timestamp, marker, ssrc, payload):
+        """Unpack H264 RTP payload, DAVE decrypt, and add to queue for mpv"""
+        if not payload:
+            return
+        gap = self.video_seq is not None and sequence != (self.video_seq + 1) & 0xFFFF
+        self.video_seq = sequence
+        if self.video_ext_seq is None:
+            self.video_ext_seq = sequence
+            self.video_prev_seq = sequence - 1
+        else:
+            diff = (sequence - self.video_ext_seq) & 0xFFFF
+            if diff < 0x8000:   # wraparound
+                self.video_ext_seq += diff
+        self.video_received += 1
+        if timestamp != self.video_ts:   # new frame
+            self.video_ts = timestamp
+            self.video_frame = bytearray()
+            self.video_broken = gap
+        elif gap:
+            self.video_broken = True
+
+        # unpack NALs
+        nal_type = payload[0] & 0x1F
+        if 1 <= nal_type <= 23:   # single NAL
+            self.video_frame += ANNEXB_START + payload
+        elif nal_type == 24:   # STAP-A
+            offset = 1
+            while offset + 2 <= len(payload):
+                size = int.from_bytes(payload[offset:offset + 2], "big")
+                offset += 2
+                self.video_frame += ANNEXB_START + payload[offset:offset + size]
+                offset += size
+        elif nal_type == 28 and len(payload) > 2:   # FU-A
+            if payload[1] & 0x80:   # start of fragmented NAL
+                self.video_frame += ANNEXB_START + bytes([(payload[0] & 0xE0) | (payload[1] & 0x1F)])
+            elif not self.video_frame:   # joined in the middle of the frame
+                self.video_broken = True
+            self.video_frame += payload[2:]
+
+        if not marker:
+            return
+        frame = bytes(self.video_frame)
+        self.video_frame = bytearray()
+        if self.video_broken:   # lost packet, wait for keyframe
+            self.video_synced = False
+            self.request_keyframe()
+            return
+
+        # DAVE
+        if self.gateway.dave_protocol_version > 0:
+            if not self.gateway.dave_session.has_established_group():
+                return
+            decryptor = self.ssrc_to_decryptor.get(ssrc)
+            if decryptor is None:
+                return
+            frame = decryptor.decrypt(dave.MediaType.video, frame)
+            if frame is None:
+                return
+            frame = bytes(frame)
+
+        # start only from keyframe
+        if not self.video_synced:
+            if not any(nal[0] & 0x1F == 5 for nal in split_annex_b(frame, final=True)[0]):
+                self.request_keyframe()
+                return
+            self.video_synced = True
+        video_queue = self.video_queue
+        if video_queue is None:
+            return
+        try:
+            video_queue.put_nowait(frame)
+        except queue.Full:   # wait for next keyframe
+            self.video_synced = False
+
+
+    def start_video_player(self, user_id=None):
+        """Start video player for user_id or first user that sends video, currently only piped to mpv"""
+        self.stop_video_player()
+        if user_id is None:
+            user_id = next(iter(self.video_ssrc_to_userid.values()), None)
+        if user_id is None or int(user_id) not in self.video_ssrc_to_userid.values():
+            return False
+        if sys.platform == "win32":
+            self.mpv_ipc = f"\\\\.\\pipe\\endcord-mpv-{os.getpid()}"
+        else:
+            self.mpv_ipc = os.path.join(peripherals.runtime_path, f"endcord-mpv-{os.getpid()}.sock")
+        self.video_rotation = 0
+        self.mpv_rotation = 0
+        try:
+            command = [
+                self.mpv_path, "--no-terminal", "--no-audio", "--force-window=immediate",
+                "--profile=low-latency", "--untimed", "--title=endcord video call",
+                "--demuxer=lavf", "--demuxer-lavf-format=h264", f"--input-ipc-server={self.mpv_ipc}", "-",
+            ]
+            mpv_proc = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except OSError as e:
+            logger.error(f"Failed to start mpv: {e}")
+            return False
+
+        self.reset_video_receiver()
+        self.watch_ssrc = None
+        self.video_queue = queue.Queue(maxsize=VIDEO_QUEUE_SIZE)
+        self.mpv_proc = mpv_proc
+        self.watch_user = int(user_id)
+
+        threading.Thread(target=self.mpv_pipe, args=(mpv_proc, self.video_queue), daemon=True).start()
+        threading.Thread(target=self.rtcp_receiver_report_loop, daemon=True).start()
+        threading.Thread(target=self.request_keyframe, daemon=True).start()
+
+        self.gateway.send({"op": 15, "d": {"any": 100}})   # tell server to send video
+        self.request_keyframe()
+        return True
+
+
+    def stop_video_player(self, notify=True):
+        """Close mpv, stop receiving video and notify server"""
+        self.watch_user = None
+        self.watch_ssrc = None
+
+        mpv_proc = self.mpv_proc
+        self.mpv_proc = None
+        if not mpv_proc:
+            return
+        try:
+            mpv_proc.stdin.close()
+        except Exception:
+            pass
+        if mpv_proc.poll() is None:
+            mpv_proc.terminate()
+
+        if notify:
+            self.gateway.send({"op": 15, "d": {"any": 0}})   # tell server to stop sending video
+
+
+    def mpv_pipe(self, mpv_proc, frames):
+        """Thread that writes frames from queue to mpv stdin"""
+        while self.run and self.mpv_proc is mpv_proc and mpv_proc.poll() is None:
+            try:
+                frame = frames.get(timeout=0.5)
+            except queue.Empty:
+                frame = None
+            if frame is not None:
+                try:
+                    mpv_proc.stdin.write(frame)
+                    mpv_proc.stdin.flush()
+                except (OSError, ValueError):
+                    break
+            if self.mpv_rotation != self.video_rotation and self.set_mpv_rotation(self.video_rotation):
+                self.mpv_rotation = self.video_rotation
+
+        if self.mpv_proc is mpv_proc:   # mpv closed by user
+            self.stop_video_player(notify=self.run)

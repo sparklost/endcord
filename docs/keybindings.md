@@ -6,7 +6,7 @@
 - `Alt+H` - Un/collapse channel with threads in tree
 - `Alt+J` - Join/leave selected thread in tree
 - `Alt+I` - View channel info (selected in tree)
-- `Alt+Shift+U`- Copy selected channel (in tree) URL to clipboard
+- `Alt+Shift+U` - Copy selected channel (in tree) URL to clipboard
 - `Shift+Up/Down` - Select prev/next server and collapse all other servers
 
 ### Input line
@@ -65,7 +65,7 @@
 - `Alt+D` - Cycle user status (online/away/DnD/invisible)
 - `Alt+M` - Toggle member list
 - `Ctrl+T` - Toggle tabbed state for selected channel in tree
-- `Alt+NUM`- Switch to tab, `NUM` is 1-9 in number row, not numeric keypad!
+- `Alt+NUM` - Switch to tab, `NUM` is 1-9 in number row, not numeric keypad!
 - `Alt+E` - Open external editor to type message in it
 - `Ctrl+K` - Open command palette and type `goto ` and show recent channels
 - `Alt+Left/Right` - Switch tabs incrementally (next/previous)
@@ -85,20 +85,21 @@
 - `Ctrl+K` - Open command palette and type `goto `
 - `Shift+UP/DOWN` - Select previous/next server in tree and collapse all other servers except it
 - `Ctrl+Y UP/DOWN` - Increase/Decrease vertical size of popup window by 1
-- `Ctrl+Y c` - copy link to currently selected channel in tree
-- `Ctrl+Y m` - copy link to currently selected message in chat
-- `Ctrl+Y v` - Start/stop recording voice message (will be sent upon stopping)
-- `Ctrl+Y a` - Toggle afk state
-- `Ctrl+Y b` - Toggle visibility of messages from blocked users
-- `Ctrl+Y h` - Show client-side command history
-- `Alt+Q c` - Start/join a voice call (in dm or voice channel)
-- `Alt+Q a` - Accept incoming DM voice call
-- `Alt+Q q` - Leave currently ongoing voice call
-- `Alt+Q l` - Show all call participants and their states in an updated list
-- `Alt+Q i` - Toggle voice call input volume (mute/unmute), something like push-to-talk
+- `Ctrl+Y C` - copy link to currently selected channel in tree
+- `Ctrl+Y M` - copy link to currently selected message in chat
+- `Ctrl+Y V` - Start/stop recording voice message (will be sent upon stopping)
+- `Ctrl+Y A` - Toggle afk state
+- `Ctrl+Y B` - Toggle visibility of messages from blocked users
+- `Ctrl+Y H` - Show client-side command history
+- `Alt+Q C` - Start/join a voice call (in dm or voice channel)
+- `Alt+Q A` - Accept incoming DM voice call
+- `Alt+Q Q` - Leave currently ongoing voice call
+- `Alt+Q V` - Play video from first user that is streaming video (or selected user in open call list)
+- `Alt+Q L` - Show all call participants and their states in an updated list
+- `Alt+Q I` - Toggle voice call input volume (mute/unmute), something like push-to-talk
 - `Alt+Q C-UP/DOWN` - Increase/decrease input volume by 10
-- `Alt+Q m` - Toggle mute/unmute of selected user in currently active call list
-- `Alt+Q UP/DOWN` - Increase/decrease call volume by 10 for user in currently active call list
+- `Alt+Q M` - Toggle mute/unmute of selected user in open call list
+- `Alt+Q UP/DOWN` - Increase/decrease call volume by 10 for selected user in open call list
 
 ### OS specific keybindings
 Some keybindings are used by terminals or OS itself, so they are by default rebound to something else.
@@ -187,7 +188,7 @@ Special commands available only for command-bindings are documented in [Commands
 - `W` - Un/collapse channel with threads in tree
 - `O` - Join/leave selected thread in tree
 - `I` - View channel info (selected in tree)
-- `C`- Copy selected channel (in tree) URL to clipboard
+- `C` - Copy selected channel (in tree) URL to clipboard
 
 ### Input line
 - `h/l` - character left/right
@@ -241,7 +242,7 @@ Special commands available only for command-bindings are documented in [Commands
 - `s` - Cycle user status (online/away/DnD/invisible)
 - `m` - Toggle member list
 - `t` - Toggle tabbed state for selected channel in tree
-- `NUM`- Switch to tab, `NUM` is 1-9.
+- `NUM` - Switch to tab, `NUM` is 1-9.
 - `E` - Open external editor to type message in it
 - `Ctrl+K` - Open command palette and type `goto ` and show recent channels
 - `Alt+Left/Right` - Switch tabs incrementally (next/previous)

@@ -131,6 +131,10 @@
     If command is executed as command-binding, then selected user from `voice_list_call` window will be used, unless specified.
 - `voice_set_input_device [name]`  
     Set input device from provided list of devices. Selection is persisted across sessions. If device is unavailable, default one will be selected automatically.
+- `voice_play_video *[user_id]`  
+    Play video from specified streaming user, or first if none is provided.
+- `voice_quit_video`  
+    Stop playing video stream.
 - `send_as_file`  
     Upload currently typed text as txt file attachment.
 - `generate_invite *[duration] *[limit]`  

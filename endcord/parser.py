@@ -1268,6 +1268,17 @@ def command_string(text):
         if match:
             cmd_args = {"channel_id": match.group(1)}
 
+    # 88 - VOICE_PLAY_VIDEO
+    elif text_lower.startswith("voice_play_video"):
+        cmd_type = 88
+        match = re.search(match_profile, text)
+        if match:
+            cmd_args = {"user_id": match.group(1)}
+
+    # 89 - VOICE_QUIT_VIDEO
+    elif text_lower.startswith("voice_quit_video"):
+        cmd_type = 89
+
     if not forum:
         cmd_type += 1000
 

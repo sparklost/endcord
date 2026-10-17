@@ -1,12 +1,14 @@
-Add mpv pipe video calls
-Add screen recording to video calls
+Add real folder names and renaming
+Add camera and screen recording to video calls
+Add website
 
 CORE EASY:
 Add spellcheck corrections assist
 Add inbox
 Add keybinding configuration UI
 Add settings and theme configuration UI
-Add commands for other UI tools
+Add documentation viewer
+Add commands for UI tools
 
 CORE HARD:
 Fix issues with wide characters in input line

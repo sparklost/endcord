@@ -93,7 +93,7 @@ Also, endcord built-in media player will not work because its standalone TUI tha
 Building with pyinstaller is not recommended because it generates huge binary.
 You can toggle windowed mode by running: `python build.py --toggle-windowed`.
 Then run endcord from source: `uv run main.py`.
-After first run in windowed mode, extra config will be generated in endcord config path, a file called `gtkcurses.json`. More info in [configuration](docs/configuration.md).
+After first run in windowed mode, extra config will be generated in endcord config path, a file called `gtkcurses.json`. More info in [configuration](configuration.md).
 All keybindings will work in windowed mode, even those not available in terminal (eg. `Shift+Enter`, `Ctrl+Z`).
 Note: To have tray icon on Linux, [ayatana appindicator](https://github.com/AyatanaIndicators/libayatana-appindicator) must be installed.
 

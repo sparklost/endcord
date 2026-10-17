@@ -610,12 +610,15 @@ def search_profiles(profiles, query, limit=50, score_cutoff=15):
     return sorted(results, key=lambda x: x[2], reverse=True)
 
 
-def search_call_users(call_participants, user_volumes, query, limit=50, score_cutoff=15):
+def search_call_users(call_participants, user_volumes, videos, query, streams_only=False, limit=50, score_cutoff=15):
     """Search for users in the current call"""
     results = []
     worst_score = score_cutoff
 
     for participant in call_participants:
+        streaming = participant["user_id"] in videos
+        if streams_only and not streaming:
+            continue
         name = participant["name"]
         if not name:
             continue
@@ -626,7 +629,8 @@ def search_call_users(call_participants, user_volumes, query, limit=50, score_cu
             continue
         user_id = participant["user_id"]
         volume = user_volumes.get(user_id, 100)
-        heapq.heappush(results, (f"{name} ({volume})", "voice_set_volume_user " + f"<@{user_id}>", score))
+        command = "voice_play_video " if streams_only else "voice_set_volume_user "
+        heapq.heappush(results, (f"{name} (Vol: {volume}){" - streaming" if streaming else ""}", command + f"<@{user_id}>", score))
         if len(results) > limit:
             heapq.heappop(results)
             worst_score = results[0][2]

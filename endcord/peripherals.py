@@ -14,6 +14,7 @@ import ssl
 import struct
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import urllib.parse
@@ -34,6 +35,7 @@ except (AttributeError, NameError):
     APP_NAME = "endcord"
 VERSION = "1.5.4"
 NO_NOTIFY_SOUND_DE = ("kde", "plasma")   # linux desktops without notification sound
+RUNTIME_TEMP = False   # forces all temp files to be written to runtime dir
 
 # windows specific init
 have_termux_notify = False
@@ -90,52 +92,52 @@ elif sys.platform == "linux":
 
 # get platform specific paths
 if sys.platform == "linux":
-    path = os.environ.get("XDG_CONFIG_HOME", "")
-    if path.strip():
+    path = os.environ.get("XDG_CONFIG_HOME", "").strip()
+    if path:
         config_path = os.path.join(path, APP_NAME)
-        log_path = os.path.join(path, APP_NAME)
     else:
         config_path = f"~/.config/{APP_NAME}"
-        log_path = f"~/.config/{APP_NAME}"
-    path = os.environ.get("XDG_RUNTIME_DIR", "")
-    if path.strip():
-        temp_path = os.path.join(path, APP_NAME)
+    log_path = config_path
+    path = os.environ.get("XDG_RUNTIME_DIR", "").strip()
+    if path:
+        runtime_path = os.path.join(path, APP_NAME)
     else:
         # per-user temp dir
-        temp_path = f"/run/user/{os.getuid()}/{APP_NAME}"
+        runtime_path = f"/run/user/{os.getuid()}/{APP_NAME}"
         # fallback to .cache
         if not os.access(f"/run/user/{os.getuid()}", os.W_OK):
-            temp_path = f"~/.cache/{APP_NAME}/temp"
-    os.makedirs(os.path.expanduser(temp_path), exist_ok=True)
-    path = os.environ.get("XDG_CACHE_HOME", "")
-    if path.strip():
+            runtime_path = f"~/.cache/{APP_NAME}/runtime"
+    os.makedirs(os.path.expanduser(runtime_path), mode=0o700, exist_ok=True)
+    temp_path = os.path.join(tempfile.gettempdir(), APP_NAME)
+    os.makedirs(os.path.expanduser(temp_path), mode=0o700, exist_ok=True)
+    path = os.environ.get("XDG_CACHE_HOME", "").strip()
+    if path:
         cache_path = os.path.join(path, APP_NAME)
     else:
         cache_path = f"~/.cache/{APP_NAME}"
-    path = os.environ.get("XDG_DOWNLOAD_DIR", "")
-    if path.strip():
-        downloads_path = os.path.join(path, APP_NAME)
-    else:
-        downloads_path = "~/Downloads"
+    downloads_path = "~/Downloads"
 elif sys.platform == "win32":
     config_path = os.path.join(os.environ["LOCALAPPDATA"], APP_NAME)
-    log_path = os.path.join(os.environ["LOCALAPPDATA"], APP_NAME)
-    temp_path = os.path.join(os.environ["LOCALAPPDATA"], "Temp", APP_NAME)
+    log_path = config_path
+    runtime_path = os.path.join(os.environ["LOCALAPPDATA"], "Temp", APP_NAME)
+    temp_path = os.path.join(tempfile.gettempdir(), APP_NAME)
     cache_path = os.path.join(os.environ["LOCALAPPDATA"], APP_NAME, "Cache")
     downloads_path = os.path.join(os.environ["USERPROFILE"], "Downloads")
 elif sys.platform == "darwin":
     config_path = f"~/Library/Application Support/{APP_NAME}"
-    log_path = f"~/Library/Application Support/{APP_NAME}"
-    temp_path = f"~/Library/Caches/TemporaryItems/{APP_NAME}"
+    log_path = config_path
+    runtime_path = f"~/Library/Caches/TemporaryItems/{APP_NAME}"
+    temp_path = os.path.join(tempfile.gettempdir(), APP_NAME)
     cache_path = f"~/Library/Caches/{APP_NAME}"
     downloads_path = "~/Downloads"
 else:
     print(f"Unsupported platform: {sys.platform}", file=sys.stderr)
     sys.exit(1)
-
+if RUNTIME_TEMP:
+    temp_path = runtime_path
 
 # ensure paths exists
-for app_path in (config_path, log_path, temp_path, cache_path, downloads_path):
+for app_path in (config_path, log_path, runtime_path, temp_path, cache_path, downloads_path):
     if not os.path.exists(os.path.expanduser(app_path)):
         os.makedirs(os.path.expanduser(app_path), exist_ok=True)
 
@@ -579,7 +581,9 @@ def native_select_files(file_filter=None, multiple=True, auto=False):
 
 
 def play_audio(path):
-    """Play audio file with simpleaudio or with pw-cat on pipewire"""
+    """Play audio file with various methods on different systems"""
+    if not path:
+        return
     path = os.path.expanduser(path)
     if not os.path.exists(path):
         logger.warn(f"Audio file not found at path: {path}")

@@ -77,7 +77,7 @@ LIMIT_MSG_LEN = 2000
 LIMIT_MSG_LEN_PREMIUM = 4000
 COLLAPSE_ALL_EXCEPT_OPTIONS = ("current", "selected", "above", "below")
 STANDING_TYPES = ("All Good", "Limited", "Very Limited", "At risk", "Suspended")
-ASSISTED_COMMANDS = ("set ", "string_select ", "set_notifications ", "game_detection_blacklist ", "switch_tab ", "goto ", "collapse_all_except ", "insert_timestamp ", "voice_set_input_device ", "switch_profile ", "voice_set_volume_user ", "gif ")
+ASSISTED_COMMANDS = ("set ", "string_select ", "set_notifications ", "game_detection_blacklist ", "switch_tab ", "goto ", "collapse_all_except ", "insert_timestamp ", "voice_set_input_device ", "switch_profile ", "voice_set_volume_user ", "voice_play_video ", "gif ")
 STATS_COMMAND_TEXT = ("Run time", "Gateway events/h", "Gateway messages/h", "Gateway ping time", "Message buffer size", "Total API requests", "API response time", "Cache sizes", "  Cached members", "  Deleted messages", "  Summaries", "  Image cache")
 match_youtube = re.compile(r"(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)[a-zA-Z0-9_-]{11}")
 match_last_parentheses = re.compile(r"\([^()]*\)(?!.*\([^()]*\))")
@@ -4547,6 +4547,21 @@ class Endcord:
                     value = flags | (1 << 11)
                 self.discord.set_channel_flags(value, channel_id, guild_id)
 
+        elif cmd_type == 88 and self.voice_gateway:   # VOICE_PLAY_VIDEO
+            if not shutil.which(self.config["mpv_path"]):
+                self.update_extra_line("Can't view video stream: mpv is not installed", color=19)
+                return
+            user_id = cmd_args.get("user_id")
+            if not user_id and self.voice_call_list_open:
+                selected_idx = min(self.tui.get_extra_selected() - 1, len(self.call_participants))
+                if selected_idx >= 0:
+                    user_id = self.call_participants[selected_idx]["user_id"]
+            if not self.voice_gateway.start_video_player(user_id):
+                self.update_extra_line("Can't view video stream: User is not streaming", color=19)
+
+        elif cmd_type == 89 and self.voice_gateway:   # VOICE_QUIT_VIDEO
+            self.voice_gateway.stop_video_player()
+
         if success is None:
             self.gateway.set_offline()
             self.update_extra_line("Network error", color=20)
@@ -5827,6 +5842,7 @@ class Endcord:
         extra_title, extra_body, extra_format = formatter.generate_extra_window_call(
             self.call_participants,
             self.voice_gateway.get_user_volumes(),
+            self.voice_gateway.get_video_users(),
             self.state["volume_in"],
             self.state["volume_out"],
             self.colors,
@@ -6213,7 +6229,8 @@ class Endcord:
                     extra_format.append(None)
 
         elif assist_type == 5:   # client command
-            if assist_word.lower().startswith("set "):
+            command_lower = assist_word.lower()
+            if command_lower.startswith("set "):
                 if assist_word[4:]:
                     self.assist_found = search.search_settings(
                         self.config,
@@ -6227,7 +6244,7 @@ class Endcord:
                 for line in self.assist_found:
                     extra_format.append([(color_standout, None, 0, line[0].find(" = "))])
 
-            elif assist_word.lower().startswith("string_select "):
+            elif command_lower.startswith("string_select "):
                 chat_sel, _ = self.tui.get_chat_selected()
                 msg_index = self.lines_to_msg(chat_sel)
                 if msg_index is not None:
@@ -6242,7 +6259,7 @@ class Endcord:
                         for line in self.assist_found:
                             extra_format.append([(color_standout, None, line[0].find(" - ") + 3, max_w)])
 
-            elif assist_word.lower().startswith("set_notifications "):
+            elif command_lower.startswith("set_notifications "):
                 query_words = assist_word.split(" ")
                 channel_id = None
                 if len(query_words) > 1:
@@ -6278,7 +6295,7 @@ class Endcord:
                         else:
                             extra_format.append(None)
 
-            elif assist_word.lower().startswith("game_detection_blacklist ") and self.enable_game_detection and self.game_detection.run:
+            elif command_lower.startswith("game_detection_blacklist ") and self.enable_game_detection and self.game_detection.run:
                 self.assist_found = search.search_games(
                     self.game_detection.get_detected(),
                     self.state["games_blacklist"],
@@ -6292,7 +6309,7 @@ class Endcord:
                     else:
                         extra_format.append(None)
 
-            elif assist_word.lower().startswith("switch_tab "):
+            elif command_lower.startswith("switch_tab "):
                 self.assist_found = search.search_tabs(
                     self.channel_cache,
                     assist_word[11:],
@@ -6306,7 +6323,7 @@ class Endcord:
                     else:
                         extra_format.append(None)
 
-            elif assist_word.lower().startswith("goto "):
+            elif command_lower.startswith("goto "):
                 self.assist_found = search.search_channels_all(
                     self.guilds,
                     self.dms,
@@ -6328,7 +6345,7 @@ class Endcord:
                         line_format.append((color_standout, None, start, start + len(text[start:].split(" ")[0])))
                     extra_format.append(formatter.fix_line_format_extended(line_format, text))
 
-            elif assist_word.lower().startswith("collapse_all_except "):
+            elif command_lower.startswith("collapse_all_except "):
                 self.assist_found = search.search_options(
                     COLLAPSE_ALL_EXCEPT_OPTIONS,
                     assist_word[20:],
@@ -6337,11 +6354,11 @@ class Endcord:
                     score_cutoff=self.assist_score_cutoff,
                 )
 
-            elif assist_word.lower().startswith("insert_timestamp "):
+            elif command_lower.startswith("insert_timestamp "):
                 value = parser.parse_time(assist_word[17:])
                 self.assist_found = formatter.generate_timestamp_assist(value, assist_word[:17])
 
-            elif assist_word.lower().startswith("voice_set_input_device "):
+            elif command_lower.startswith("voice_set_input_device "):
                 self.assist_found = search.search_mics(
                     peripherals.get_audio_input_devices(),
                     self.state["audio_input_device"],
@@ -6355,7 +6372,7 @@ class Endcord:
                     else:
                         extra_format.append(None)
 
-            elif assist_word.lower().startswith("switch_profile "):
+            elif command_lower.startswith("switch_profile "):
                 self.assist_found = search.search_profiles(
                     self.profiles,
                     assist_word[15:],
@@ -6369,11 +6386,13 @@ class Endcord:
                     else:
                         extra_format.append(None)
 
-            elif assist_word.lower().startswith("voice_set_volume_user "):
+            elif command_lower.startswith("voice_set_volume_user ") or command_lower.startswith("voice_play_video "):
                 self.assist_found = search.search_call_users(
                     self.call_participants,
                     self.voice_gateway.get_user_volumes(),
+                    self.voice_gateway.get_video_users(),
                     assist_word[22:],
+                    streams_only=command_lower.startswith("voice_play_video "),
                     limit=self.assist_limit,
                     score_cutoff=self.assist_score_cutoff,
                 )
@@ -6384,7 +6403,7 @@ class Endcord:
                     else:
                         extra_format.append(None)
 
-            elif assist_word.lower().startswith("gif "):
+            elif command_lower.startswith("gif "):
                 self.assist_found = search.search_gifs(
                     self.discord.get_settings_proto(2).get("favorite_gifs", {}).get("gifs", []),
                     assist_word[4:],
@@ -6433,7 +6452,7 @@ class Endcord:
             if autocomplete:
                 query = assist_word.lower()
                 if self.allow_app_command_autocomplete and self.app_command_autocomplete != query and time.monotonic() - self.app_command_sent_time > INTERACTION_THROTTLING:
-                    self.app_command_autocomplete = assist_word.lower()
+                    self.app_command_autocomplete = query
                     self.execute_app_command(query, autocomplete=True)
                     self.app_command_sent_time = time.monotonic()
                 elif self.app_command_autocomplete_resp:
@@ -8176,6 +8195,7 @@ class Endcord:
                     else:
                         # if user is added by USER_JOIN, show popup
                         self.update_extra_line(f"{event["name"]} joined the call", color=[(self.colors[9], None, 0, len(str(event["name"])))])
+                        threading.Thread(target=peripherals.play_audio, daemon=True, args=(self.config["custom_sound_join_call"], )).start()
                         if event["name"]:
                             self.call_participants[num]["name"] = event["name"]
                             self.update_call_extra_line()
@@ -8208,6 +8228,7 @@ class Endcord:
                     if participant["user_id"] == event["user_id"] and participant["name"]:
                         # if user is already added by STATE_UPDATE, just show popup
                         self.update_extra_line(f"{participant["name"]} joined the call", color=[(self.colors[9], None, 0, len(str(participant["name"])))])
+                        threading.Thread(target=peripherals.play_audio, daemon=True, args=(self.config["custom_sound_join_call"], )).start()
                         break
                 else:
                     # this adds only user_id, STATE_UPDATE has to fill user data
@@ -8227,6 +8248,7 @@ class Endcord:
                             if recipient["id"] == event["user_id"]:
                                 name = recipient["global_name"] or recipient["username"]
                                 self.update_extra_line(f"{name} joined the call", color=[(self.colors[9], None, 0, len(str(name)))])
+                                threading.Thread(target=peripherals.play_audio, daemon=True, args=(self.config["custom_sound_join_call"], )).start()
                                 # add call participant
                                 for num, participant in enumerate(self.call_participants):
                                     if participant["user_id"] == event["user_id"]:
@@ -8251,6 +8273,7 @@ class Endcord:
             for num, participant in enumerate(self.call_participants):
                 if participant["user_id"] == event["user_id"]:
                     self.update_extra_line(f"{participant["name"]} left the call")
+                    threading.Thread(target=peripherals.play_audio, daemon=True, args=(self.config["custom_sound_leave_call"], )).start()
                     self.call_participants.pop(num)
                     self.update_call_extra_line()
                     if self.voice_call_list_open:
@@ -8260,7 +8283,7 @@ class Endcord:
 
     def start_ringing(self, path, loop_delay=1, loop_max=60):
         """Start ringing with specified audio file"""
-        if support_call:
+        if support_media:
             if not self.terminal_media:
                 from endcord import media
             self.ringer = media.TerminalMedia(self.config, self.keybindings, ui=False)
@@ -8376,6 +8399,7 @@ class Endcord:
             opus_mode=self.config["call_opus_mode"],
             fast_mixer=self.config["call_fast_mixer"],
             denoise=self.config["call_noise_suppression"],
+            mpv=self.config["mpv_path"],
         )
         self.in_call = {"guild_id": guild_id, "channel_id": channel_id}
         for _ in range(100):   # wait for 10s
@@ -8461,7 +8485,7 @@ class Endcord:
                 self.incoming_calls.append(call_channel_id)
 
         if self.voice_gateway:
-            self.voice_gateway.stop_voice_handler()
+            self.voice_gateway.stop_call_handler()
 
         if self.voice_call_list_open:
             self.close_extra_window()
@@ -8513,9 +8537,10 @@ class Endcord:
             self.call_participants,
             self.state["volume_in"],
             self.state["volume_out"],
+            self.voice_gateway.get_video_users(),
+            self.voice_gateway.get_rtt() if self.voice_gateway else 999.9,
             self.tui.get_dimensions()[2][1] - self.tui.bordered,
             self.tui.bordered,
-            self.voice_gateway.get_rtt() if self.voice_gateway else 999.9,
             self.colors,
         )
         self.update_extra_line(custom_text=self.permanent_extra_line, color=self.permanent_extra_line_format, permanent=True)
@@ -8854,8 +8879,8 @@ class Endcord:
             self.hide_channel(hidden["channel_id"], hidden["guild_id"])
 
         # some checks
-        if "~/.cache" in peripherals.temp_path:
-            logger.warning(f"Temp files will be stored in {peripherals.temp_path}")
+        if "~/.cache" in peripherals.runtime_path:
+            logger.warning(f"Runtime temp files will be stored in {peripherals.runtime_path}")
         if self.config["proxy"]:
             logger.info(f"Using proxy: {self.config["proxy"]}")
 
@@ -9220,7 +9245,7 @@ class Endcord:
                 self.update_tree()
                 self.update_status_line()
             changed_guild = self.gateway.get_should_redraw_tree()
-            if changed_guild and changed_guild not in self.state["collapsed"]:
+            if (changed_guild and changed_guild not in self.state["collapsed"]) or (self.active_channel["guild_id"] == changed_guild):
                 if changed_guild == self.active_channel["guild_id"]:
                     if not self.in_call and self.permanent_extra_line and self.permanent_extra_line.endswith("[Join Call]"):
                         self.show_guild_start_call_ui()
@@ -9260,9 +9285,10 @@ class Endcord:
                             self.call_participants,
                             self.state["volume_in"],
                             self.state["volume_out"],
+                            self.voice_gateway.get_video_users(),
+                            self.voice_gateway.get_rtt() if self.voice_gateway else 999.9,
                             self.tui.get_dimensions()[2][1],
                             self.tui.bordered,
-                            self.voice_gateway.get_rtt() if self.voice_gateway else 999.9,
                             self.colors,
                         )
                     if new_extra_line and new_extra_line != self.permanent_extra_line:

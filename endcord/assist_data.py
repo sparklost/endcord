@@ -74,6 +74,8 @@ COMMAND_ASSISTS = (
     ("voice_set_volume_output *[0-100] - change volume for output devices in voice call", "voice_set_volume_output"),
     ("voice_set_volume_user *[value] <@[user_id]> - change volume for user in current voice call", "voice_set_volume_user"),
     ("voice_set_input_device [name] - change sound input device", "voice_set_input_device"),
+    ("voice_play_video *[user_id] - play video from specified streaming user", "voice_play_video"),
+    ("voice_quit_video - stop playing video stream", "voice_quit_video"),
     ("send_as_file - upload currently typed text as txt file attachment", "send_as_file"),
     ("generate_invite *[duration] *[limit] - generate invite to current server, default is 7 days", "generate_invite"),
     ("rename_folder [name] - locally rename selected folder in tree", "rename_folder"),
