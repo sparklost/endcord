@@ -1187,8 +1187,11 @@ def manage(profiles_path, external_selected, config, force_open=False):
         else:
             profiles_enc, profiles_plain, selected, proceed = data
     except curses.error as e:
+        if str(e) == "addwstr() returned ERR":
+            sys.exit("There was no enough space to render the TUI, please increase the terminal size")
         if str(e) != "endwin() returned ERR":
-            logger.error(e)
+            import traceback
+            logger.error("".join(traceback.format_exception(e)))
             sys.exit("Curses error, see log for more info")
         proceed = False
 

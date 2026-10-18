@@ -1037,7 +1037,7 @@ def error_handler(message, unblock_event, report=False):
         message = "Exited with return code 1.\nThere might be more info in the log."
         report = True
     if report:
-        report = "\n\nYou can report this here:\nhttps://github.com/sparklost/endcord/issues"
+        report = "\n\nPlease report this here:\nhttps://github.com/sparklost/endcord/issues"
     def build_and_show():   # noqa
         win = Gtk.Window()
         win.set_title(f"{APP_NAME.capitalize()} Error Report")

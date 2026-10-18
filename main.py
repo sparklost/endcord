@@ -189,7 +189,7 @@ def main(args):
                 exit_message = utils.THREAD_EXCEPTION
             else:
                 exit_message = str(e.code)
-            if e.code:
+            if e.code and "--manage" not in exit_message:
                 logger.critical(f"Exit with message: {exit_message}")
                 print(f"{exit_message}\nPlease report this error here:\nhttps://github.com/sparklost/endcord/issues\n", file=sys.stderr)
             else:

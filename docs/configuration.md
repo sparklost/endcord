@@ -131,7 +131,7 @@ Also see [keybindings configuration](keybindings.md#configuring-keybindings).
 - `media_font_aspect_ratio = None`  
     Font height/width ratio is automatically queried from terminal. But it may fail, in that case default `2.25` value is used.  
     If pictures appear wider or narrower change this to value = `char_w / char_h`, eg. `18 / 8 = 2.25`.
-- `inline_media = False`  
+- `inline_media = True`  
     Draw inline images in chat. Requires media support (not endcord-lite). Currently does nothing.
 - `inline_media_height = 14`  
     Height of DISPLAYED image in chat. In number of characters.
