@@ -1,6 +1,5 @@
-Add real folder names and renaming
-Add camera and screen recording to video calls
 Add website
+Add camera and screen recording to video calls
 
 CORE EASY:
 Add spellcheck corrections assist

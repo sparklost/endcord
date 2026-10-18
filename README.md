@@ -47,7 +47,7 @@ Any third party endcord forks may add features that can lead to account ban, cau
     - Collapse categories and servers
     - DMs in separate drop-down, show DM status
     - Forums, imageborads and thread channels
-    - Folders with custom naming
+    - Folders (can be renamed)
 - Show reactions, replied message, forwarded message
 - Show embeds, attachment types and links, code blocks (with syntax highlighting)
 - Spellchecking

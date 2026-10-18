@@ -4416,21 +4416,16 @@ class Endcord:
 
         elif cmd_type == 81:   # RENAME_FOLDER
             folder_id = self.tree_metadata[tree_sel].get("id")
-            guild_folders_ids = [x["id"] for x in self.guild_folders]
-            if folder_id and folder_id in guild_folders_ids:
-                for folder in self.state["folder_names"]:
+            if folder_id and "guild_folders" in self.discord_settings:
+                for folder in self.discord_settings["guild_folders"].get("folders", []):
+                    if folder.get("id") == folder_id:
+                        folder["name"] = cmd_args["name"]
+                        break
+                for folder in self.guild_folders:
                     if folder["id"] == folder_id:
                         folder["name"] = cmd_args["name"]
                         break
-                else:
-                    self.state["folder_names"].append({
-                        "id": folder_id,
-                        "name": cmd_args["name"],
-                    })
-                for num, folder in enumerate(self.state["folder_names"]):
-                    if folder["id"] not in guild_folders_ids:
-                        self.state["folder_names"].pop(num)
-                utils.save_json(self.state, f"state_{self.profiles["selected"]}.json")
+                self.discord.patch_settings_proto(1, {"guild_folders": self.discord_settings["guild_folders"]})
                 self.update_tree()
 
         elif cmd_type == 82:   # SEND_AS_FILE
@@ -7275,7 +7270,6 @@ class Endcord:
             self.gateway.voice_states,   # faster than get_voice_states()
             self.active_channel["channel_id"],
             self.config,
-            folder_names=self.state["folder_names"],
             safe_emoji=self.emoji_as_text,
             max_width=self.tui.get_dimensions()[1][1],
         )
@@ -7382,55 +7376,62 @@ class Endcord:
         Force will set even if its not marked as unseen, used for active channel.
         """
         # check channels
+        channels = []
         channel = self.read_state.get(target_id)
         if channel and channel["last_message_id"] and int(channel["last_acked_message_id"]) < int(channel["last_message_id"]):
             self.set_channel_seen(target_id)
             if target_id in self.read_state and "last_acked_unreads_line" in self.read_state[target_id]:
                 self.read_state[target_id]["last_acked_unreads_line"] = None
-        else:
-            channels = []
+            return
 
-            # check guilds
-            for guild in self.guilds:
-                if guild["guild_id"] == target_id:
-                    for channel in guild["channels"]:
-                        channel_r = self.read_state.get(channel["id"])
-                        if channel_r and channel_r["last_message_id"] and int(channel_r["last_acked_message_id"]) < int(channel_r["last_message_id"]):
-                            channels.append({
-                                "channel_id": channel["id"],
-                                "message_id": channel_r["last_message_id"],
-                            })
-                    break
+        # check folders
+        target_guilds = []
+        for folder in self.guild_folders:
+            if folder["id"] == target_id:
+                target_guilds = folder["guilds"]
+                break
 
-            # check categories
-            _, _, guild_id, _, parent_id = self.find_parents_from_id(target_id)
-            guild = None
-            if guild_id and not parent_id:   # category has no parent_id
-                for guild in self.guilds:
-                    if guild["guild_id"] == guild_id:
-                        break
-            if guild:
+        # check guilds
+        for guild in self.guilds:
+            if guild["guild_id"] == target_id or guild["guild_id"] in target_guilds:
                 for channel in guild["channels"]:
-                    if channel["parent_id"] == target_id:   # category
-                        channel_r = self.read_state.get(channel["id"])
-                        if channel_r and channel_r["last_message_id"] and int(channel_r["last_acked_message_id"]) < int(channel_r["last_message_id"]):
-                            channels.append({
-                                "channel_id": channel["id"],
-                                "message_id": channel_r["last_message_id"],
-                            })
+                    channel_r = self.read_state.get(channel["id"])
+                    if channel_r and channel_r["last_message_id"] and int(channel_r["last_acked_message_id"]) < int(channel_r["last_message_id"]):
+                        channels.append({
+                            "channel_id": channel["id"],
+                            "message_id": channel_r["last_message_id"],
+                        })
+                break
 
-            if channels:
-                success = self.discord.ack_bulk(channels)
-                if success is None:
-                    self.gateway.set_offline()
-                    self.update_extra_line("Network error", color=20)
-                    return
-                for channel in channels:
-                    channel_id = channel["channel_id"]
-                    self.set_channel_seen(channel_id, ack=False, update_tree=False)
-                    if channel_id in self.read_state and "last_acked_unreads_line" in self.read_state[channel_id]:
-                        self.read_state[channel_id]["last_acked_unreads_line"] = None
-                self.update_tree()
+        # check categories
+        _, _, guild_id, _, parent_id = self.find_parents_from_id(target_id)
+        guild = None
+        if guild_id and not parent_id:   # category has no parent_id
+            for guild in self.guilds:
+                if guild["guild_id"] == guild_id:
+                    break
+        if guild:
+            for channel in guild["channels"]:
+                if channel["parent_id"] == target_id:   # category
+                    channel_r = self.read_state.get(channel["id"])
+                    if channel_r and channel_r["last_message_id"] and int(channel_r["last_acked_message_id"]) < int(channel_r["last_message_id"]):
+                        channels.append({
+                            "channel_id": channel["id"],
+                            "message_id": channel_r["last_message_id"],
+                        })
+
+        if channels:
+            success = self.discord.ack_bulk(channels)
+            if success is None:
+                self.gateway.set_offline()
+                self.update_extra_line("Network error", color=20)
+                return
+            for channel in channels:
+                channel_id = channel["channel_id"]
+                self.set_channel_seen(channel_id, ack=False, update_tree=False)
+                if channel_id in self.read_state and "last_acked_unreads_line" in self.read_state[channel_id]:
+                    self.read_state[channel_id]["last_acked_unreads_line"] = None
+            self.update_tree()
 
 
     def set_channel_seen(self, channel_id, message_id=None, ack=True, force=False, update_tree=True, force_remove_notify=True):
@@ -8828,13 +8829,14 @@ class Endcord:
         if "status" not in self.discord_settings:
             self.discord_settings = self.discord.get_settings_proto(1)
 
-        # guild position
+        # guild position and folders
         self.guild_folders = []
         found = []
         if "guild_folders" in self.discord_settings:
             for folder in self.discord_settings["guild_folders"].get("folders", []):
                 self.guild_folders.append({
                     "id": folder.get("id"),
+                    "name": folder.get("name"),
                     "guilds": folder["guild_ids"],
                 })
                 found += folder["guild_ids"]

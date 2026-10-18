@@ -26,7 +26,8 @@ def make_varint(value):
     result = bytearray()
     while True:
         b = value & 0x7F
-        if value >> 7:
+        value >>= 7
+        if value:
             result.append(b | 0x80)
         else:
             result.append(b)

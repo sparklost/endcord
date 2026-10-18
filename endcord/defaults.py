@@ -419,7 +419,6 @@ state = {
     "member_list": True,
     "tree": True,
     "collapsed": [],
-    "folder_names": [],
     "tabbed_channels": [],
     "recent_channels": [],
     "favorite_emojis": [],

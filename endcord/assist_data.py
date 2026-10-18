@@ -78,7 +78,7 @@ COMMAND_ASSISTS = (
     ("voice_quit_video - stop playing video stream", "voice_quit_video"),
     ("send_as_file - upload currently typed text as txt file attachment", "send_as_file"),
     ("generate_invite *[duration] *[limit] - generate invite to current server, default is 7 days", "generate_invite"),
-    ("rename_folder [name] - locally rename selected folder in tree", "rename_folder"),
+    ("rename_folder [name] - rename selected folder in tree", "rename_folder"),
     ("toggle_pinned *<#[channel_id]> - toggle pinned state for selected channel in tree", "toggle_pinned"),
     ("resize_popup_window [num/-1/+1] - resize extra window", "resize_popup_window"),
     ("collapse_all_except *[option] - collapse all servers in tree except specific [option]", "collapse_all_except"),

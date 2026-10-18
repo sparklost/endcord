@@ -3770,7 +3770,7 @@ def generate_message_notification(data, channels, roles, guild_name, my_data, co
     return title, body
 
 
-def generate_tree(dms, guilds, threads, read_state, guild_folders, activities, collapsed, voice_states, active_channel_id, config, folder_names=[], safe_emoji=False, max_width=0):
+def generate_tree(dms, guilds, threads, read_state, guild_folders, activities, collapsed, voice_states, active_channel_id, config, safe_emoji=False, max_width=0):
     """
     Generate channel tree according to provided formatting.
     tree_format keys:
@@ -3897,12 +3897,7 @@ def generate_tree(dms, guilds, threads, read_state, guild_folders, activities, c
     guilds_used_index = []
     for num_f, folder in enumerate(guild_folders):
         if show_folders and folder["id"] and folder["id"] != "MISSING":
-            for folder_name in folder_names:
-                if folder_name["id"] == folder["id"]:
-                    name = folder_name["name"]
-                    break
-            else:
-                name = f"Folder-{num_f}"
+            name = folder["name"] if folder["name"] else f"Folder-{num_f}"
             guilds_sorted.append({
                 "folder": True,
                 "id": folder["id"],
