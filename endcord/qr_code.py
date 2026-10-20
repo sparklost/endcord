@@ -488,8 +488,8 @@ def draw_qr_curses(screen, text, text_above="", text_below="", color_id=0, margi
     import curses
     screen_height, screen_width = screen.getmaxyx()
     screen.bkgd(" ", color_id)
-    text_above = [x.center(screen_width) for x in text_above.split("\n")]
-    text_below = [x.center(screen_width) for x in text_below.split("\n")]
+    text_above = [x.center(screen_width - margin*2) for x in text_above.split("\n")]
+    text_below = [x.center(screen_width - margin*2) for x in text_below.split("\n")]
     matrix = generate_qr(text)
     height = len(matrix)
     width = len(matrix[0])
@@ -498,7 +498,7 @@ def draw_qr_curses(screen, text, text_above="", text_below="", color_id=0, margi
     height_real = (height + 1) // 2
     if screen_width < (width + margin*2) or available_height < (height_real + margin*2):
         screen.clear()
-        text = ["Terminal too small:", f"Need: {width}x{height_real}", f"Have: {screen_width}x{available_height}"]
+        text = ["Terminal too small:", f"Need: {width + margin*2}x{height_real + margin*2}", f"Have: {screen_width}x{available_height}"]
         start_y = max(0, (screen_height - len(text)) // 2)
         for idx, line in enumerate(text):
             if start_y + idx < screen_height:
@@ -506,14 +506,14 @@ def draw_qr_curses(screen, text, text_above="", text_below="", color_id=0, margi
         screen.refresh()
         return
 
-    current_y = 0
+    current_y = margin
     for line in text_above:
         if current_y < screen_height:
-            screen.insstr(current_y, 0, line[:screen_width], color_id)
+            screen.insstr(current_y, margin, line[:screen_width - margin*2], color_id)
             current_y += 1
 
-    padding_h = (available_height - height_real) // 2
-    padding_w = (screen_width - width) // 2
+    padding_h = (available_height - height_real - margin*2) // 2 + margin
+    padding_w = (screen_width - width - margin*2) // 2 + margin
 
     for y in range(0, height, 2):
         top_line = matrix[y]
@@ -545,10 +545,8 @@ def draw_qr_curses(screen, text, text_above="", text_below="", color_id=0, margi
         except curses.error:
             pass
 
-    start_below_y = screen_height - len(text_below)
+    start_below_y = screen_height - len(text_below) - margin
     for idx, line in enumerate(text_below):
         draw_y = start_below_y + idx
         if 0 <= draw_y < screen_height:
-            screen.insstr(draw_y, 0, line[:screen_width], color_id)
-
-    screen.refresh()
+            screen.insstr(draw_y, margin, line[:screen_width - margin*2], color_id)

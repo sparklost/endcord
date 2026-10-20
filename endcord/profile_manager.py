@@ -10,7 +10,6 @@ import re
 import shutil
 import subprocess
 import sys
-import threading
 import time
 from datetime import datetime
 
@@ -361,14 +360,6 @@ def init_auth(config):
         user_agent,
         proxy=config["proxy"],
     )
-
-
-def esc_detector_thread(screen):
-    """A thread that waits until ESCAPE is pressed"""
-    while True:
-        key = screen.getch()
-        if key in (27, "ESC"):
-            return
 
 
 def main_tui(screen, profiles_enc, profiles_plain, selected, have_keyring, config):
@@ -740,11 +731,13 @@ def manage_profile(screen, have_keyring, config, editing_profile=None):
                 continue
             run = True
             drawing = False
-            esc_detector = None
             content_changed = True
             prev_timeout = True
+            prev_state = None
+            screen.nodelay(True)
             while run:
-                if drawing and not esc_detector.is_alive():
+                key = screen.getch()
+                if key == 27:  # ESC
                     set_step(2, mem=False)
                     break
                 state = gateway_auth.get_state()
@@ -753,9 +746,11 @@ def manage_profile(screen, have_keyring, config, editing_profile=None):
                     prev_timeout = timeout
                     content_changed = True
                 timeout_text = f"Session will timeout in: {f"{(timeout) // 60}m {timeout % 60}s"}"
+                if prev_state != state:
+                    screen.clear()
+                    screen.bkgd(" ", curses.color_pair(1))
+                    prev_state = state
                 if state != 1 and drawing:
-                    if esc_detector and esc_detector.is_alive():
-                        curses.ungetch(27)
                     drawing = False
                 if state == 0:   # wait
                     pass
@@ -763,33 +758,37 @@ def manage_profile(screen, have_keyring, config, editing_profile=None):
                     fingerprint = gateway_auth.get_fingerprint()
                     url = f"https://{discord_auth.host}/ra/{fingerprint}"
                     if not drawing:
-                        if not esc_detector or not esc_detector.is_alive():
-                            esc_detector = threading.Thread(target=esc_detector_thread, daemon=True, args=(screen, ))
-                            esc_detector.start()
                         drawing = True
-                elif state == 2:   # pending ticket
+                elif state == 2 and content_changed:   # pending ticket
                     user_id, username = gateway_auth.get_user()
                     text = f"Waiting for verification. \nUsername:{username}\nUser ID: {user_id}\n " + timeout_text
                     draw_text(screen, text, center=True)
+                    if bordered:
+                        draw_border(screen, 1)
+                    screen.refresh()
                 elif state == 3:   # success
                     ticket = gateway_auth.get_ticket()
                     status, encrypted_token = discord_auth.exchange_ticket(ticket)
                     if status == 1:
+                        screen.nodelay(False)
                         key_prompt(screen, ("Failed to exchange ticket." + CHECK_LOG, "", ANY_KEY_TEXT))
                         set_step(2, mem=False)
                         break
                     elif status == 2:
+                        screen.nodelay(False)
                         key_prompt(screen, CAPTCHA_REQUIRED_TEXT)
                         set_step(2, mem=False)
                         break
                     elif status == 3:
+                        screen.nodelay(False)
                         key_prompt(screen, NETWORK_ERROR_TEXT)
                         set_step(2, mem=False)
                         break
                     token = gateway_auth.decrypt_token(encrypted_token)
                     profile["token"] = token
                     gateway_auth.disconnect_ws()
-                    return profile, True
+                    set_step(900, mem=False)
+                    break
                 elif state in (4, 5, 6):   # network error, timeout, cancel
                     if state == 4:
                         text = NETWORK_ERROR_TEXT
@@ -799,6 +798,7 @@ def manage_profile(screen, have_keyring, config, editing_profile=None):
                         text = ("Authentication session has been canceled. Try again.", "", ANY_KEY_TEXT)
                     else:
                         text = "unknown"
+                    screen.nodelay(False)
                     key_prompt(screen, text)
                     gateway_auth.disconnect_ws()
                     set_step(2, mem=False)
@@ -808,11 +808,11 @@ def manage_profile(screen, have_keyring, config, editing_profile=None):
                     text_above = "Scan this QR code with your phone to login:"
                     text_below = url + "\n\n" + timeout_text + "\nEsc to go back."
                     qr_code.draw_qr_curses(screen, url, text_above, text_below, color_id=0, margin=bordered)
-                    draw_border(screen, 1)
+                    if bordered:
+                        draw_border(screen, 1)
                     screen.refresh()
                 time.sleep(0.1)
-            if esc_detector and esc_detector.is_alive():
-                curses.ungetch(27)
+            screen.nodelay(False)
 
         elif step == 900:   # save method
             if not have_keyring or editing_profile:   # skip asking for source
@@ -841,7 +841,7 @@ def delete_profile(screen, profiles_enc, profiles_plain, selected_profile):
         h, w = screen.getmaxyx()
         text = f"Are you sure you want to delete {profile["name"]} profile? Enter/Y / Esc/N"
         text = text.center(w)
-        screen.addstr(int(h/2), 0, text, curses.color_pair(1) | curses.A_STANDOUT | curses.A_BOLD)
+        screen.addstr(int(h/2), 0, text, curses.color_pair(1) | curses.A_BOLD)
         if bordered:
             draw_border(screen, 1)
 
@@ -1048,11 +1048,11 @@ def key_prompt(screen, description_text, enter=False):
     """Prompt to press enter/esc or any key"""
     screen.clear()
     screen.bkgd(" ", curses.color_pair(1))
-    if bordered:
-        draw_border(screen, 1)
     _, w = screen.getmaxyx()
     for num, line in enumerate(description_text):
         screen.addstr(num+1, 0, line.center(w), curses.color_pair(1))
+    if bordered:
+        draw_border(screen, 1)
     run = True
     proceed = False
     while run:
@@ -1075,12 +1075,10 @@ def draw_text(screen, text, center=False):
     _, w = screen.getmaxyx()
     for num, line in enumerate(text.split("\n")):
         if center:
-            screen.addstr(num+1, 0, line.center(w), curses.color_pair(1))
+            screen.insstr(num+1, 0, line.center(w), curses.color_pair(1))
         else:
             text = "\n".join((" " * 2) + line.lstrip(" ") for line in text.split("\n"))
-            screen.addstr(num+1, 0, line, curses.color_pair(1))
-
-    screen.refresh()
+            screen.insstr(num+1, 0, line, curses.color_pair(1))
 
 
 def draw_buttons(screen, selected, y, w):

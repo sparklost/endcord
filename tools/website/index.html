@@ -1,0 +1,81 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
+
+<title>Endcord</title>
+<meta name="description" content="The most feature rich Discord TUI client">
+<meta name="author" content="SparkLost">
+<link rel="icon" type="image/x-icon" href="./endcord.png">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Endcord">
+<meta property="og:description" content="The most feature rich Discord TUI client">
+<meta property="og:image" content="https://repository-images.githubusercontent.com/912455660/639d71ca-75f3-409d-8f63-b1b39f3dc0c3">
+<meta property="og:url" content="https://sparklost.github.io/endcord">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Endcord">
+<meta name="twitter:description" content="The most feature rich Discord TUI client">
+<meta name="twitter:image" content="https://repository-images.githubusercontent.com/912455660/639d71ca-75f3-409d-8f63-b1b39f3dc0c3">
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400;700&display=swap">
+<link rel="stylesheet" href="https://pyscript.net/releases/2026.7.3/core.css">
+<script type="module" src="https://pyscript.net/releases/2026.7.3/core.js"></script>
+
+<style>
+  :root { --lh: 20px; --hy: 10px; --hx: 4px; }
+
+  /* layout */
+  html, body { height: 100%; margin: 0; overflow: hidden; background: #000; color: #ddd; font: 16px/var(--lh) 'Source Code Pro', monospace; }
+  #frame { position: relative; display: flex; flex-direction: column; width: 100%; height: 100%; }
+  .edge, .hr, .row { flex: none; } .edge, .hr { height: var(--lh); }
+  .hr { margin: 0 var(--hx); background: linear-gradient(#666, #666) 0 var(--hy) / 100% 1px no-repeat; }
+  .row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0 2ch; padding: 0 2ch; }
+  #body { flex: 1; display: flex; min-height: 0; padding: 0 2ch; }
+  #side { flex: none; overflow: hidden; }
+  #side a { display: block; overflow: hidden; white-space: pre; text-overflow: ellipsis; }
+  #vline { flex: none; width: 1ch; margin: calc(-1 * var(--hy)) 1ch; background: linear-gradient(#666, #666) var(--hx) 0 / 1px 100% no-repeat; }
+  #main { flex: 1; min-width: 0; margin: 0 -1ch 0 0; padding: 0 1ch 0 0; overflow: auto; outline: none; white-space: pre; font: inherit; scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: #666 #000; }
+  #measure { position: absolute; visibility: hidden; white-space: pre; }
+
+  /* frame decoration */
+  #box { position: absolute; top: var(--hy); right: var(--hx); bottom: calc(var(--hy) - 1px); left: var(--hx); border: 1px solid #666; border-radius: 10px; pointer-events: none; }
+
+  /* text formatting */
+  .b, .h1, .h2, .h3 { font-weight: 700; }
+  .h1 { color: #fc6; } .h2 { color: #6cf; } .h3 { color: #9c6; }
+  .c { color: #e6b673; } .q { color: #9a9; } .dim { color: #666; }
+  .cb { display: inline-block; background: #1b1b1b; color: #e6b673; }
+  .l { color: #8be; text-decoration: underline; }
+  .cur { color: #6cf; }
+
+  /* links and interaction */
+  a { color: inherit; text-decoration: none; cursor: pointer; }
+  a:hover, a:focus { background: #ddd; color: #000; outline: none; }
+
+  /* android */
+  .android #side, .android #vline, .android .hint { display: none; }
+</style>
+
+<script>
+  if (/Android/i.test(navigator.userAgent)) document.documentElement.classList.add("android");
+</script>
+
+</head>
+<body>
+<span id="measure"></span>
+<div id="frame">
+  <div id="box"></div>
+  <div class="edge"></div>
+  <div class="row" id="head"><span id="title">Endcord {%VERSION}<span class="hint"> - the most feature rich Discord TUI client</span></span><span id="page"></span></div>
+  <div class="hr"></div>
+  <div id="body"><nav id="side"></nav><div id="vline"></div><pre id="main" tabindex="0"><span style="white-space: normal">Loading UI... waiting for PyScript to start up (this can take a few seconds).</span></pre></div>
+  <div class="hr"></div>
+  <div class="row" id="bar"><a href="#" data-go="home">[Home]</a><span class="hint">Tab - links | Up/Down - scroll | Esc - home</span></div>
+  <div class="edge"></div>
+</div>
+
+<script type="mpy" src="website.py"></script>
+
+</body>
+</html>

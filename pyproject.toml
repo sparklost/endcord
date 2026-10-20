@@ -1,17 +1,17 @@
 [project]
 name = "endcord"
-version = "1.5.4"
+version = "1.6.0"
 description = "The most feature rich Discord TUI client."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "websocket-client>=1.9.2",
     "python-socks>=3.1.1",
-    "orjson>=3.12.0",
+    "orjson>=3.13.0",
     "soundcard>=0.4.6",
     "soundfile>=0.14.0",
-    "numpy>=2.5.3",
-    "pycryptodome>=3.24.0",
+    "numpy>=2.5.4",
+    "pycryptodome>=4.1.0",
     "pywin32>=312; sys_platform == 'win32'",
     "pywin32-ctypes>=0.2.3; sys_platform == 'win32'",
     "windows-curses>=2.4.2; sys_platform == 'win32'",
@@ -23,20 +23,20 @@ dependencies = [
 [dependency-groups]
 build = [
     "cython>=3.3.0",
-    "nuitka[onefile]>=4.2.2",
+    "nuitka[onefile]>=4.3.1",
     "pyinstaller>=6.22.3",
     "setuptools>=82.0.0",
 ]
 media = [
-    "av==18.1.0",   # 19.x.x changed libxau so it doesnt work with pillow
+    "av==19.0.1",
     "dave-py>=1.0.0",
-    "pillow>=12.3.0",
+    "pillow>=13.0.0",
     "pynacl>=1.6.2",
 ]
 
 [build]
-python_max = "3.14.7"
-python_freethreaded = "3.14.7"
+python_max = "3.14.8"
+python_freethreaded = "3.14.8"
 python_last_safe = "3.13.14"
 curses_tag = "v6_6_20260808"   # later versions mess-up the ui
 rnnoise_tag = "main"

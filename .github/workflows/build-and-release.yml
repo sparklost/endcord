@@ -116,7 +116,7 @@ jobs:
           ./tools/build_python.sh "${args[@]}" curses "$CURSES_VERSION"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v10.0.1
+        uses: astral-sh/setup-uv@v10.3.0
         with:
           enable-cache: false
 
@@ -206,7 +206,7 @@ jobs:
           python-version: ${{ env.WIN_PYTHON_VERSION }}
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v10.0.1
+        uses: astral-sh/setup-uv@v10.3.0
         with:
           enable-cache: false
 
@@ -297,7 +297,7 @@ jobs:
           python-version: ${{ env.MAC_ARM_PYTHON_VERSION }}
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v10.0.1
+        uses: astral-sh/setup-uv@v10.3.0
         with:
           enable-cache: false
 
@@ -375,7 +375,7 @@ jobs:
           python-version: ${{ env.MAC_INTEL_PYTHON_VERSION }}
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v10.0.1
+        uses: astral-sh/setup-uv@v10.3.0
         with:
           enable-cache: false
 

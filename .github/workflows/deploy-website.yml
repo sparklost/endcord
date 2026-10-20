@@ -1,0 +1,45 @@
+name: Deploy Website
+run-name: ${{ github.workflow }} for ${{ github.ref_name }}
+
+on:
+  push:
+    tags:
+      - '[0-9]*.[0-9]*.[0-9]*'
+
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version shown on the website, eg. 1.2.3"
+        required: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build website
+        env:
+          VERSION: ${{ github.event.inputs.version || github.ref_name }}
+        run: python3 tools/website/build_website.py "$VERSION" --out build/website --bundle
+
+      - uses: actions/configure-pages@v6
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: build/website
+
+      - id: deployment
+        uses: actions/deploy-pages@v5

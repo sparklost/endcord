@@ -20,7 +20,7 @@ else:
 
 from endcord import arg, config, defaults, peripherals, utils
 
-VERSION = "1.5.4"
+VERSION = "1.6.0"
 default_config_path = peripherals.config_path
 log_path = peripherals.log_path
 threading.stack_size(512 * 1024)
@@ -84,13 +84,14 @@ def main(args):
         merge=True,
         lower=False,
     )
-    if config_data["vim_mode"]:
+    if config_data["vim_mode"] or gen_config:
         vim_keybindings = config.load_keybindings(
             config_path,
             defaults.vim_mode_bindings,
             section="vim_mode_bindings",
             gen_config=gen_config,
         )
+    if config_data["vim_mode"]:
         keybindings = config.merge_keybindings(keybindings, vim_keybindings, command_bindings)
 
     keybindings = config.normalize_keybindings(keybindings)

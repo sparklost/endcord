@@ -11,7 +11,7 @@ set -e
 
 REPO_OWNER="sparklost"
 APP_NAME="endcord"
-VERSION="1.5.4"
+VERSION="1.6.0"
 VALID_NAMES=("endcord" "endcord-micro" "endcord-mini" "endcord-lite" "endcord-medium" "endcord-full" "endcord-gui")
 APP_ID="com.${REPO_OWNER}.${APP_NAME}"
 

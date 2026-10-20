@@ -8,21 +8,21 @@
 <a href="https://github.com/sparklost/endcord?tab=readme-ov-file#building">Building</a> |
 <a href="https://github.com/sparklost/endcord/blob/main/docs/extensions.md">Extensions</a> |
 <a href="https://github.com/sparklost/endcord/blob/main/.github/CONTRIBUTING.md">Contributing</a> |
-<a href="https://github.com/sparklost/endcord/blob/main/docs/FAQ.md">FAQ</a> |
+<a href="https://github.com/sparklost/endcord/blob/main/docs/faq.md">FAQ</a> |
 <a href="https://discord.gg/judQSxw5K2">Discord</a>
 <img src="./.github/screenshots/01.png" alt="Screenshot 1" width="864">
 </div>
 
 Endcord is a third-party feature rich Discord client, running entirely in terminal (or in its own GTK3 window).  
-It is built with Python (this [doesn't mean its slow](docs/FAQ.md#note-on-python-performance-misconceptions)) and ncurses library, to deliver lightweight yet feature rich experience.  
+It is built with Python (this [doesn't mean its slow](docs/faq.md#note-on-python-performance-misconceptions)) and ncurses library, to deliver lightweight yet feature rich experience.  
 [More screenshots](https://github.com/sparklost/endcord/blob/main/.github/screenshots.md).  
 Official endcord will always stay **purely human project**.  
-Endcord is source-available licensed, and thus not open source, more details [here](docs/FAQ.md#source-available-license). You are not allowed to create public fork that modifies the code.  
+Endcord is source-available licensed, and thus not open source, more details [here](docs/faq.md#source-available-license). You are not allowed to create public fork that modifies the code.  
 Any third party endcord forks may add features that can lead to account ban, cause instability, contain outdated or even malicious code, so it is strongly recommended to avoid them.
 
 
 ## Features
-- Extremely low CPU and RAM usage (see [RAM usage](docs/FAQ.md#ram-usage))
+- Extremely low CPU and RAM usage (see [RAM usage](docs/faq.md#ram-usage))
 - Voice and video calls (DM, groups and servers) with video streaming
 - Vim-mode
 - Integrated RPC (only Rich Presence) and game detection
@@ -100,7 +100,7 @@ Any third party endcord forks may add features that can lead to account ban, cau
 > [!WARNING]
 > Using third-party client is against Discord's Terms of Service and may cause your account to be banned!  
 > **Use endcord at your own risk!**  
-> For more info see [FAQ](docs/FAQ.md).
+> For more info see [FAQ](docs/faq.md).
 
 
 ## Installing
@@ -123,7 +123,7 @@ Note: installations from these sources are coming directly from endcord develope
 ### Windows
 - Pre-built binaries (built with nuitka) are available in releases
 - [Build](#building) endcord, standalone executable can be found in `./dist/endcord.exe`
-- It is recommended to use [endcord-gui](docs/FAQ.md#gui-windowed-mode) on Windows.
+- It is recommended to use [endcord-gui](docs/faq.md#gui-windowed-mode) on Windows.
 
 Install [WezTerm](https://wezterm.org/) (recommended), [windows terminal](https://github.com/microsoft/terminal), [cmder](https://github.com/cmderdev/cmder), or any other modern terminal. And run exe from there. If built with windowed mode, terminal is not required to use endcord.  
 WezTerm proved to introduce the least drawing issues.  
@@ -151,7 +151,7 @@ Optional dependency for spellchecking: `aspell`. Can be installed with: `brew as
 - `yt-dlp` - youtube support
 - `mpv` - View video streams in calls, and play youtube videos in native player (non-ascii)
 - `libsecret` - Store token in system keyring (secret service provider is also required (eg. `gnome-keyring`, `KWallet`, `KeePassXC`), with `dbus` as dependency)
-- `libappindicator-gtk3` - Tray support under wayland, for [windowed mode](docs/FAQ.md#gui-windowed-mode) only.
+- `libappindicator-gtk3` - Tray support under wayland, for [windowed mode](docs/faq.md#gui-windowed-mode) only.
 - `imagemagick` - To make notification images round; only needed for endcord-lite.
 - `source-highlight` or `python-pygments` - Code block syntax highlighting (Alternatively use [this extension](https://github.com/sparklost/endcord-pygments-syntax)).
 - `rnnoise` - Noise suppression in voice calls (or use `--bundle-rnnoise` build.py arg)
@@ -165,7 +165,7 @@ To build endcord-lite, add `--level=LITE` flag. No voice calls and terminal medi
 To build into directory, not as a single executable, add `--onedir` flag. Will speed up startup.  
 To build with Nuitka, add `--nuitka` flag. More optimized, smaller executable, long compile time. See [Nuitka](#nuitka) for more info.  
 If compiler is not available, or built binary is failing, try building with `--nocython`, which will produce slightly less optimized binaries.  
-To toggle [windowed mode](docs/FAQ.md#gui-windowed-mode) run: `python build.py --toggle-windowed`.  
+To toggle [windowed mode](docs/faq.md#gui-windowed-mode) run: `python build.py --toggle-windowed`.  
 
 ### Build steps
 1. Install [Python](https://www.python.org/) 3.12 or later

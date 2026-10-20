@@ -1,6 +1,3 @@
-Add website
-Add camera and screen recording to video calls
-
 CORE EASY:
 Add spellcheck corrections assist
 Add inbox
