@@ -1957,7 +1957,7 @@ class ChatGenerator:
                 embed_type = clean_type(embed_type)
                 if embed_type.lower() not in ("image", "video"):
                     embed_type = "file"
-                    embed_url = embed.get("name", "")
+                    embed_url = embed.get("name", "Unnamed")
                     if embed.get("duration"):
                         embed_url += f" ({format_seconds(embed["duration"], nice=True, pad=False)})"
                     pre_embed_len = pre_content_len + len(content)
@@ -1974,7 +1974,11 @@ class ChatGenerator:
                 embed_marker_ranges.append([len(content), len(content) + 13])
                 content += f"[rich embed]:\n{embed_url}"
             else:
-                if embed_type.startswith("gif") and embed_url.startswith(">"):
+                if embed["name"]:
+                    embed_url = trim_string(embed["name"], self.trim_embed_url_size)
+                elif embed.get("proxy_url") and embed_url == " " and not self.placeholder_images:
+                    embed_url = trim_string(embed["proxy_url"], self.trim_embed_url_size)
+                elif embed_type.startswith("gif") and embed_url.startswith(">"):
                     embed_url = embed_url[2:]
                 embed_url, url_ranges = replace_markdown_urls(embed_url, ())
                 if url_ranges:

@@ -106,7 +106,7 @@ def prepare_embeds(embeds, message_content):
             content.append(author)
         content = "\n".join(content)
         if content or proxy_url:
-            if proxy_url:
+            if proxy_url and not content:
                 content = " "
             if content == message_content:
                 message_content = ""
