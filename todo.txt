@@ -1,3 +1,17 @@
+Fix crash when viewing media
+Fix build.py error with nuitka and custom python
+Fix numpy build without openblas
+
+Fix embed name not shown when no inline media
+Fix download command on inline media
+# fix endcord package install conflicts on aur
+# increase all extensions endcord versions
+
+Add camera and screen recording to video calls
+    add voice_start_stream command with source selection (assist, default ?)
+    add voice_end_stream command
+    without ffmpeg? if no, add it as dependency in readme
+
 CORE EASY:
 Add spellcheck corrections assist
 Add inbox

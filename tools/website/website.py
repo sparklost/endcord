@@ -45,7 +45,9 @@ Hi, I dont know how to make websites, I only know how to make TUIs, so you get t
 - [Report a bug on GitHub]({BUG_URL})
 - [endcord-rpc, the miniature rpc-only client]({RPC_URL})
 
+
 Made with my own 2 hands - by SparkLost
+
 And you may not edit this website on GitHub
 """
 
@@ -394,6 +396,7 @@ async def go(key, anchor=""):
             break
     else:
         page.textContent = key.split("/")[-1].replace(".md", "")
+    document.title = "Endcord" if key == "home" else "Endcord - " + page.textContent
 
     side_html = []
     for title, page_key in PAGES:

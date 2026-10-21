@@ -202,7 +202,6 @@ def format_seconds(seconds, nice=False, pad=True):
     return ":".join(parts)
 
 
-
 def generate_discord_timestamp(timestamp, discord_format, timezone=True):
     """Generate discord formatted timestamp"""
     if discord_format == "R":
@@ -249,7 +248,7 @@ def format_kilo(n, dec=1):
     return f"{s}K"
 
 
-def move_by_indexes(indexes, *ranges_lists):
+def move_by_indexes(indexes, *ranges_lists, is_sorted=True):
     """Move format by indexes"""
     for ranges in ranges_lists:
         for format_part in ranges:
@@ -258,8 +257,8 @@ def move_by_indexes(indexes, *ranges_lists):
                     format_part[0] -= 1
                 if index < format_part[1]:
                     format_part[1] -= 1
-                else:
-                    break
+                elif is_sorted:
+                    break   # dangerous if indexes is unsorted
 
 
 def emoji_name(emoji_char):
@@ -978,11 +977,14 @@ def format_md_all(line, content_start, except_ranges=()):
     """
     line_format = []
     indexes = []
+    search_from = 0
     for _ in range(20):   # safety limit
         line_content = line[content_start:]
-        string_match = re.search(match_md_all, line_content)
+        string_match = re.search(match_md_all, line_content[search_from:])
         if not string_match:
             break
+        match_start = string_match.start() + search_from
+        match_end = string_match.end() + search_from
 
         if string_match.group(2):   # underline
             attribute = curses.A_UNDERLINE
@@ -994,26 +996,26 @@ def format_md_all(line, content_start, except_ranges=()):
             attribute = curses.A_ITALIC
             format_len = 1
 
-        start = string_match.start() + content_start
-        end = string_match.end() + content_start
+        start = match_start + content_start
+        end = match_end + content_start
         skip = False
         for except_range in chain(*except_ranges):
             start_r = except_range[0]
             end_r = except_range[1]
             # if this match is inside excepted range
-            if (start >= start_r and start <= end_r) or (end > start_r and end < end_r):
+            if start >= start_r and end <= end_r:
                 skip = True
                 break
         if skip:
+            search_from = match_end
             continue
         text = string_match.group(0)[format_len:-format_len]
         line = line[:start] + text + line[end:]
         true_end = end - 2 * format_len
 
         # keep indexes of changes
-        indexes.extend((start, true_end))
-        if format_len == 2:
-            indexes.extend((start+1, end - 3))
+        indexes.extend([start] * format_len)
+        indexes.extend([end - 2 * format_len] * format_len)
 
         # rearrange formats at indexes after this format index
         done = False
@@ -1035,6 +1037,8 @@ def format_md_all(line, content_start, except_ranges=()):
                 attribute |= format_part[2]
         if not done:
             line_format.append([start, end - 2 * format_len, attribute])
+
+        search_from = 0
 
     # sort by format start so tui can draw nested format on top of previous one
     line_format = sorted(line_format, key=lambda x: x[0], reverse=True)

@@ -762,6 +762,16 @@ class Gateway():
         self.call_handler.stop_video_player()
 
 
+    def start_screen_sharing(self, source=None):
+        """Capture screen with ffmpeg and send it as video"""
+        return self.call_handler.start_screen_sharing(source)
+
+
+    def stop_screen_sharing(self):
+        """Stop screen sharing"""
+        self.call_handler.stop_screen_sharing()
+
+
 
 class CallHandler:
     """Voice call sound receiver, transmitter, player and recorder"""
@@ -837,6 +847,11 @@ class CallHandler:
         self.video_queue = None
         self.last_pli = 0
         self.reset_video_receiver()
+        self.ffmpeg_proc = None
+        self.screen_ssrc = 0
+        self.screen_rtx_ssrc = 0
+        self.video_sequence = random.randint(0, 0xFFFF)
+        self.video_timestamp_base = random.randint(0, 0xFFFFFFFF)
 
 
     def start(self):
@@ -881,6 +896,7 @@ class CallHandler:
             return
         self.run = False
         self.stop_video_player(notify=False)
+        self.stop_screen_sharing(notify=False)
         try:
             self.udp.close()
         except Exception:
@@ -1836,6 +1852,59 @@ class CallHandler:
             self.video_synced = False
 
 
+    def send_video_frame(self, ssrc, nals, timestamp):
+        """DAVE encrypt frame, transport encrypt pack and send"""
+        if self.gateway.dave_protocol_version > 0:
+            if not self.gateway.dave_session.has_established_group():
+                return True
+            encrypted = self.encryptor.encrypt(
+                dave.MediaType.video,
+                ssrc,
+                b"".join(ANNEXB_START + nal for nal in nals),
+            )
+            if encrypted is None:
+                return True
+            nals = split_annex_b(bytes(encrypted), final=True)[0]
+
+        # pack NALs
+        chunk_size = 1100 - 2
+        packets = []
+        for nal in nals:
+            if len(nal) <= 1100:   # single NAL
+                packets.append(nal)
+                continue
+            indicator = (nal[0] & 0xE0) | 28   # FU-A
+            body = nal[1:]
+            for i in range(0, len(body), chunk_size):
+                fu_header = nal[0] & 0x1F
+                if i == 0:
+                    fu_header |= 0x80
+                if i + chunk_size >= len(body):
+                    fu_header |= 0x40
+                packets.append(bytes([indicator, fu_header]) + body[i:i + chunk_size])
+
+        # send packets
+        for i, packet in enumerate(packets):
+            self.video_sequence = (self.video_sequence + 1) & 0xFFFF
+            header = bytearray(12)
+            header[0] = 0x80   # v2, no padding, no extension, cc=0
+            header[1] = 0x67 | (0x80 if i == len(packets) - 1 else 0)   # marker on last packet of frame
+            struct.pack_into(">H", header, 2, self.video_sequence)
+            struct.pack_into(">I", header, 4, timestamp)
+            struct.pack_into(">I", header, 8, ssrc)
+            payload = self.transport_encrypt(header, packet)
+            if not payload:
+                logger.error(f"Unknown mode: {self.mode}")
+                continue
+            try:
+                self.udp.send(payload)
+            except BlockingIOError:
+                pass
+            except Exception:
+                return False
+        return True
+
+
     def start_video_player(self, user_id=None):
         """Start video player for user_id or first user that sends video, currently only piped to mpv"""
         self.stop_video_player()
@@ -1913,3 +1982,83 @@ class CallHandler:
 
         if self.mpv_proc is mpv_proc:   # mpv closed by user
             self.stop_video_player(notify=self.run)
+
+
+    def start_screen_sharing(self, source=None):
+        """Capture screen with ffmpeg, encode to H264 and send it"""
+        if self.ffmpeg_proc:
+            return True
+        stream = next((s for s in self.gateway.streams if s.get("rid") == "100"), None)
+        if not stream:
+            logger.error("Server did not provide video stream info")
+            return False
+
+        if source is None:
+            if sys.platform == "win32":
+                source = ["-f", "gdigrab", "-framerate", str(VIDEO_FPS), "-i", "desktop"]
+            elif sys.platform == "darwin":
+                source = ["-f", "avfoundation", "-capture_cursor", "1", "-framerate", str(VIDEO_FPS), "-i", "Capture screen 0:none"]
+            else:
+                source = ["-f", "x11grab", "-framerate", str(VIDEO_FPS), "-i", os.environ.get("DISPLAY", ":0")]
+
+        command = [
+            "ffmpeg", "-v", "error", *source,
+            "-vf", f"scale=-2:{VIDEO_HEIGHT},format=yuv420p",
+            "-c:v", "libx264", "-preset", "ultrafast", "-tune", "zerolatency", "-profile:v", "baseline",
+            "-g", str(VIDEO_FPS * 2),   # keyframe every 2s
+            "-b:v", f"{VIDEO_BITRATE}k", "-maxrate", f"{VIDEO_BITRATE}k", "-bufsize", f"{VIDEO_BITRATE // 2}k",
+            "-x264-params", "aud=1:repeat-headers=1",   # use access unit delimiters as frame boundaries
+            "-f", "h264", "-",
+        ]
+        try:
+            ffmpeg_proc = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        except OSError as e:
+            logger.error(f"Failed to start ffmpeg: {e}")
+            return False
+
+        self.screen_ssrc = int(stream["ssrc"])
+        self.screen_rtx_ssrc = int(stream.get("rtx_ssrc", 0))
+        if self.gateway.dave_protocol_version > 0:
+            self.encryptor.assign_ssrc_to_codec(self.screen_ssrc, dave.Codec.h264)
+        self.ffmpeg_proc = ffmpeg_proc
+
+        self.gateway.send_video_sources(True, self.screen_ssrc, self.screen_rtx_ssrc)
+        threading.Thread(target=self.screen_share_loop, args=(ffmpeg_proc, self.screen_ssrc), daemon=True).start()
+        return True
+
+
+    def stop_screen_sharing(self, notify=True):
+        """Stop screen capturing and notify server"""
+        if not self.ffmpeg_proc:
+            return
+        self.ffmpeg_proc.kill()
+        self.ffmpeg_proc = None
+        if notify:
+            self.gateway.send_video_sources(False, self.screen_ssrc, self.screen_rtx_ssrc)
+
+
+    def screen_share_loop(self, ffmpeg_proc, ssrc):
+        """Thread that reads H264 stream from ffmpeg, split it into frames and send them"""
+        buffer = bytearray()
+        access_unit = []
+        start_time = time.monotonic()
+        ok = True
+
+        while ok and self.run and self.ffmpeg_proc is ffmpeg_proc:
+            data = ffmpeg_proc.stdout.read1(65536)
+            if not data:
+                break
+            buffer += data
+            nals, cut = split_annex_b(buffer)
+            del buffer[:cut]
+            for nal in nals:
+                if nal[0] & 0x1F == 9 and access_unit:   # frame is complete
+                    timestamp = (self.video_timestamp_base + int((time.monotonic() - start_time) * 90000)) & 0xFFFFFFFF   # 90khz
+                    ok = self.send_video_frame(ssrc, access_unit, timestamp)
+                    access_unit = []
+                    if not ok:
+                        break
+                access_unit.append(nal)
+
+        if self.ffmpeg_proc is ffmpeg_proc:   # ffmpeg died or sending failed
+            self.stop_screen_sharing(notify=self.run)
