@@ -47,6 +47,7 @@ settings = {
     "extra_line_delay": 5,
     "gif_download_type": 1,
     "trim_embed_url_size": 40,
+    "show_embed_names": False,
     "aspell_mode": "normal",
     "aspell_lang": "en_US",
     "media_mute": False,

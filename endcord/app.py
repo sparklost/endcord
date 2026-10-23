@@ -6326,6 +6326,7 @@ class Endcord:
                     self.tui.input_buffer,
                     recent=self.state["recent_channels"][:-1],   # exclude current channel
                     read_state=self.read_state,
+                    goto=True,
                     limit=self.assist_limit,
                     score_cutoff=self.assist_score_cutoff,
                 )
@@ -9247,7 +9248,7 @@ class Endcord:
                 self.update_tree()
                 self.update_status_line()
             changed_guild = self.gateway.get_should_redraw_tree()
-            if (changed_guild and changed_guild not in self.state["collapsed"]) or (self.active_channel["guild_id"] == changed_guild):
+            if changed_guild and (changed_guild not in self.state["collapsed"] or (self.active_channel["guild_id"] == changed_guild)):
                 if changed_guild == self.active_channel["guild_id"]:
                     if not self.in_call and self.permanent_extra_line and self.permanent_extra_line.endswith("[Join Call]"):
                         self.show_guild_start_call_ui()

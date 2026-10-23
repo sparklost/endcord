@@ -108,7 +108,7 @@ def search_channels_guild(channels, query, limit=50, score_cutoff=15):
     return sorted(results, key=lambda x: x[2], reverse=True)
 
 
-def search_channels_all(guilds, dms, query, full_input, recent=None, read_state=None, limit=50, score_cutoff=15):
+def search_channels_all(guilds, dms, query, full_input, recent=None, read_state=None, goto=False, limit=50, score_cutoff=15):
     """Search for guilds/categories/channels/DMs"""
     results = []
     worst_score = score_cutoff
@@ -133,7 +133,7 @@ def search_channels_all(guilds, dms, query, full_input, recent=None, read_state=
         score = fuzzy_match_score(query, formatted) * 4 + bonus_score   # dms get more score so they are on top
         if score < worst_score * 4:
             continue
-        if recent:
+        if goto:
             completion = f"goto <#{dm["id"]}>"
         else:
             completion = dm["id"]
@@ -184,7 +184,7 @@ def search_channels_all(guilds, dms, query, full_input, recent=None, read_state=
                 score = fuzzy_match_score(query, formatted) + bonus_score
                 if score < worst_score:
                     continue
-                if recent:
+                if goto:
                     completion = f"goto <#{channel["id"]}>"
                 else:
                     completion = channel["id"]

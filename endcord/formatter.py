@@ -1307,6 +1307,7 @@ class ChatGenerator:
         self.syntax_highlight = config["syntax_highlight"]
         self.smart_chat_lines = config["smart_chat_lines"] and self.message_grouping
         self.unreads_edge = "" if self.emoji_as_text else config["tree_drop_down_thread"]
+        self.show_embed_names = config["show_embed_names"]
         if self.smart_chat_lines:
             self.tree_drop_down_intersect = config["tree_drop_down_intersect"]
             self.tree_drop_down_vline = config["tree_drop_down_vline"]
@@ -1950,7 +1951,9 @@ class ChatGenerator:
             if spoiler:
                 spoiler = 1000 + num_e not in message.get("spoiled", [])
             if "main_url" not in embed:   # its attachment
-                if self.placeholder_images:
+                if embed["name"] and self.show_embed_names:
+                    embed_url = trim_string(embed["name"], self.trim_embed_url_size)
+                elif self.placeholder_images:
                     embed_url = ""
                 elif self.trim_embed_url_size:
                     embed_url = trim_string(embed_url, self.trim_embed_url_size)
@@ -1974,8 +1977,9 @@ class ChatGenerator:
                 embed_marker_ranges.append([len(content), len(content) + 13])
                 content += f"[rich embed]:\n{embed_url}"
             else:
-                if embed["name"]:
-                    embed_url = trim_string(embed["name"], self.trim_embed_url_size)
+                if self.show_embed_names:
+                    name = embed.get("name")
+                    embed_url = trim_string(name if name else "Unnamed", self.trim_embed_url_size)
                 elif embed.get("proxy_url") and embed_url == " " and not self.placeholder_images:
                     embed_url = trim_string(embed["proxy_url"], self.trim_embed_url_size)
                 elif embed_type.startswith("gif") and embed_url.startswith(">"):

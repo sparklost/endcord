@@ -359,7 +359,7 @@ class TUI():
         self.cursor_pos = 0   # on-screen position of cursor
         self.cursor_on = True
         self.enable_autocomplete = False
-        self.spelling_range = [0, 0]
+        self.spelling_range = (0, 0, 0)
         self.misspelled = []
         self.delta_store = []
         self.last_action = None
@@ -2204,6 +2204,21 @@ class TUI():
             self.hibernate_cursor = 0
 
 
+    def ensure_cursor_visible(self):
+        """Adjust input_line_index so cursor is on-screen"""
+        _, w = self.input_hw
+        buf_len = len(self.input_buffer)
+        x = self.input_index - max(0, buf_len - w + 1 - self.input_line_index)
+        margin = min(INPUT_LINE_JUMP, w - 3)
+        if x < 0:   # off the left edge
+            new_start = max(0, self.input_index - margin)
+            self.input_line_index = buf_len - w + 1 - new_start
+        elif x > w - 1:   # off the right edge
+            new_start = self.input_index - (w - 1) + margin
+            self.input_line_index = buf_len - w + 1 - new_start
+        self.input_line_index = min(max(0, self.input_line_index), max(0, buf_len - w + 1))
+
+
     def update_status_line(self, text_l, text_r=None, text_l_format=[], text_r_format=[]):
         """Update status line text and format"""
         redraw = False
@@ -2432,7 +2447,7 @@ class TUI():
             # first space before last word
             range_word_end = len(self.input_buffer) - len(resplit(self.input_buffer)[-1]) - split_char_in(self.input_buffer)
         # indexes of words visible on screen
-        spelling_range = [range_word_start, range_word_end]
+        spelling_range = (range_word_start, range_word_end, line_start)
         if spelling_range != self.spelling_range:
             words_on_screen = resplit(self.input_buffer[range_word_start:range_word_end])
             misspelled_words_on_screen = self.spellchecker.check_list(words_on_screen)
@@ -2870,6 +2885,7 @@ class TUI():
             elif key == 504:   # input_left
                 if self.input_select_start is not None:
                     self.input_index = min(self.input_select_start, self.input_select_end)
+                    self.ensure_cursor_visible()
                     self.show_cursor()
                 elif self.input_index > 0:
                     # if index hits left screen edge, but there is more text to left, move line right
@@ -2884,6 +2900,7 @@ class TUI():
             elif key == 505:   # input_right
                 if self.input_select_start is not None:
                     self.input_index = max(self.input_select_start, self.input_select_end)
+                    self.ensure_cursor_visible()
                     self.show_cursor()
                 elif self.input_index < len(self.input_buffer):
                     # if index hits right screen edge, but there is more text to right, move line right
@@ -2903,12 +2920,8 @@ class TUI():
                     else:
                         left_len += len(word)
                         break
-                self.input_index -= left_len
-                self.input_index = max(self.input_index, 0)
-                input_line_index_diff = self.input_index - max(0, len(self.input_buffer) - w + 1 - self.input_line_index)
-                if input_line_index_diff <= 0:
-                    self.input_line_index -= input_line_index_diff - 4   # diff is negative
-                    self.input_line_index = min(max(0, self.input_line_index), max(0, len(self.input_buffer) - w))
+                self.input_index = max(self.input_index - left_len, 0)
+                self.ensure_cursor_visible()
                 self.input_select_start = None
                 self.spellcheck()
 
@@ -2920,23 +2933,20 @@ class TUI():
                     else:
                         left_len += len(word)
                         break
-                self.input_index += left_len
-                self.input_index = min(self.input_index, len(self.input_buffer))
-                input_line_index_diff = self.input_index - max(0, len(self.input_buffer) - w - self.input_line_index) - w
-                if input_line_index_diff >= 0:
-                    self.input_line_index -= input_line_index_diff + 4   # diff is negative
-                    self.input_line_index = min(max(0, self.input_line_index), max(0, len(self.input_buffer) - w))
+                self.input_index = min(self.input_index + left_len, len(self.input_buffer))
+                self.ensure_cursor_visible()
                 self.input_select_start = None
                 self.spellcheck()
 
             elif key == 526:   # end_left
                 self.input_index = 0
-                self.input_line_index = 0
+                self.input_line_index = max(0, len(self.input_buffer) - w + 1)
                 self.input_select_start = None
                 self.spellcheck()
 
             elif key == 527:   # end_right
                 self.input_index = len(self.input_buffer)
+                self.input_line_index = 0
                 self.input_select_start = None
                 self.spellcheck()
 

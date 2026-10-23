@@ -246,6 +246,17 @@ def find_detectable_apps_file(directory):
     return path, etag, save_time
 
 
+def delete_detectable_apps_files(directory, exception_file_path):
+    """Delete all files with given prefix and suffix"""
+    abs_exception_path = os.path.abspath(exception_file_path)
+    for file_path in glob.glob(os.path.join(directory, "detectable_apps_*.ndjson")):
+        if os.path.isfile(file_path) and os.path.abspath(file_path) != abs_exception_path:
+            try:
+                os.remove(file_path)
+            except Exception:
+                pass
+
+
 def find_app(proc_path, list_path, my_platform):
     """Search the detectable applications list and find the app"""
     proc_path = proc_path.lower()
@@ -330,7 +341,7 @@ class GameDetection:
             if old_etag != etag:
                 logger.info(f'Downloaded new detectable applications list with ETag: W/"{etag}"')
                 if old_path:
-                    os.remove(old_path)
+                    delete_detectable_apps_files(peripherals.config_path)
             del (old_path, old_etag)
         else:
             path = old_path

@@ -115,6 +115,8 @@ Also see [keybindings configuration](keybindings.md#configuring-keybindings).
     2 - mp4 Video  
 - `trim_embed_url_size = 40`  
     Length to which to trim embed url, appended with `...`. Set to `None` to disable. Minimum is 20.
+- `show_embed_names = False`  
+    Show embed/attachment file name. Forced ON when inline media is disabled/unavailable.
 - `aspell_mode = "normal"`  
     [Aspell](http://aspell.net/) filter mode.  
     Available options: `ultra` / `fast` / `normal` / `slow` / `bad-spellers`  
