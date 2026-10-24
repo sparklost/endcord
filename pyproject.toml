@@ -11,12 +11,12 @@ dependencies = [
     "soundcard>=0.4.6",
     "soundfile>=0.14.0",
     "numpy>=2.5.4",
-    "pycryptodome>=4.1.0",
+    "pycryptodome>=4.2.0",
     "pywin32>=312; sys_platform == 'win32'",
     "pywin32-ctypes>=0.2.3; sys_platform == 'win32'",
     "windows-curses>=2.4.2; sys_platform == 'win32'",
     "windows-toasts>=1.3.1; sys_platform == 'win32'",
-    "certifi>=2026.7.22; sys_platform == 'darwin'",
+    "certifi>=2026.10.23; sys_platform == 'darwin'",
     "psutil>=7.2.2; sys_platform != 'linux'",
 ]
 

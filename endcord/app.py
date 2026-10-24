@@ -8541,7 +8541,7 @@ class Endcord:
             self.state["volume_out"],
             self.voice_gateway.get_video_users(),
             self.voice_gateway.get_rtt() if self.voice_gateway else 999.9,
-            self.tui.get_dimensions()[2][1] - self.tui.bordered,
+            self.tui.get_dimensions()[2][1],
             self.tui.bordered,
             self.colors,
         )

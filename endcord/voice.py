@@ -49,9 +49,8 @@ CODECS = [
     {"name": "opus", "type": "audio", "priority": 1000, "payload_type": 120},
     # {"name": "AV1", "type": "video", "priority": 1000, "payload_type": 101, "rtx_payload_type": 102, "encode": False, "decode": True},
     {"name": "H264", "type": "video", "priority": 2000, "payload_type": 103, "rtx_payload_type": 104, "encode": True, "decode": True},
-    # # h265 only in discord beta
-    # {"name": "VP8", "type": "video", "priority": 3000, "payload_type": 105, "rtx_payload_type": 106, "encode": True, "decode": True},
-    # {"name": "VP9", "type": "video", "priority": 4000, "payload_type": 107, "rtx_payload_type": 108, "encode": False, "decode": True},
+    # {"name": "H265", "type": "video", "priority": 3000, "payload_type": 105, "rtx_payload_type": 106, "encode": True, "decode": True},
+    # {"name": "VP8", "type": "video", "priority": 4000, "payload_type": 107, "rtx_payload_type": 108, "encode": True, "decode": True},
 ]
 VIDEO_HEIGHT = 720   # screen share is scaled to this height
 VIDEO_FPS = 30
@@ -273,7 +272,7 @@ class Gateway():
             proxy = urllib.parse.urlsplit(self.proxy)
             scheme = proxy.scheme
             self.ws.connect(
-                gateway_url + "/?v=8",
+                gateway_url + "/?v=9",
                 header=self.header,
                 proxy_type="socks5h" if scheme == "socks5" else "http" if scheme == "https" else scheme,
                 http_proxy_host=proxy.hostname,
@@ -561,16 +560,12 @@ class Gateway():
                 "user_id": self.my_id,
                 "session_id": self.voice_gateway_data["session_id"],
                 "token": self.voice_gateway_data["token"],
-                "video": True,
                 "max_dave_protocol_version": dave.get_max_supported_protocol_version(),
+                "video": True,
                 "streams": [{
                     "type": "video",
                     "rid": "100",
                     "quality": 100,
-                }, {
-                    "type": "video",
-                    "rid": "50",
-                    "quality": 50,
                 }],
             },
         }
