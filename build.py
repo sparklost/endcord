@@ -1166,7 +1166,7 @@ def build_with_nuitka(level, onedir, clang, mingw, compile_deps, print_cmd=False
     if not print_cmd:
         if compile_deps and level not in ("MINI", "MICRO"):
             build_numpy_lite(clang)
-            if check_venv_file_size("Crypto", "_chacha", 10000):
+            if check_venv_file_size("Crypto", "_chacha", 20000):
                 build_generic_package("pycryptodome", clang, safe=True)
             else:
                 fprint("Building pycryptodome with custom compiler args")

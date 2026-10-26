@@ -1762,7 +1762,6 @@ class TUI():
                     self.win_tree.insstr(y, 0, line[:text_start], color_line)
                     self.win_tree.insstr(y, text_start, line[text_start:], color)
                     # if this is dm, set color for status sign
-                    # drawing it only for "normal" DMs, just to save some color pairs until python curses fixes the bug
                     if 300 <= code < 399 and second_digit == 0 and not selected:
                         if first_digit == 2:   # online
                             # this character is always at position 4 (set in formatter)

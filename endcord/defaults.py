@@ -140,6 +140,7 @@ theme = {
     "format_search_message": "%channel: [%date] <%global_name> | %content",
     "edited_string": "(edited)",
     "app_string": "- (%app) ",
+    "vim_mode_strings": ["[--NORMAL--]", "[--INSERT--]"],
     "quote_character": "║",
     "scrollbar_character": "┃",
     "reactions_separator": " ",

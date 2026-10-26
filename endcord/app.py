@@ -155,6 +155,7 @@ class Endcord:
         self.enable_calls = config["calls"]
         self.game_detection_download_delay = config["game_detection_download_delay"]
         self.vim_mode = config["vim_mode"]
+        self.vim_mode_strings = config["vim_mode_strings"]
         self.notifications_pfp = config["notifications_pfp"]
         self.font_ratio = config["media_font_aspect_ratio"]
         self.inline_media = config["inline_media"] and importlib.util.find_spec("PIL") is not None and sys.platform != "win32" and not uses_gtkcurses and self.screen
@@ -1824,22 +1825,15 @@ class Endcord:
                 msg_index = self.lines_to_msg(chat_sel)
                 if msg_index is None:
                     continue
-                urls = None
-                embeds = self.get_stuff_from_selected_line(chat_sel, 5)
-                if not embeds:
-                    embeds = self.get_msg_embeds(msg_index)
-                    urls = self.get_msg_urls_chat(msg_index)
-                selected_urls = []
-                for num in self.get_stuff_from_selected_line(chat_sel, 0):
-                    if urls[num] in embeds:
-                        selected_urls.append(urls[num])
+                line_urls, inline_images, message_urls = self.get_urls_from_chat(chat_sel, msg_index)
+                selected_urls = inline_images or [url for url, is_embed in line_urls if is_embed]
                 if len(selected_urls) == 1:
                     self.download_threads.append(threading.Thread(target=self.download_file, daemon=True, args=(selected_urls[0], )))
                     self.download_threads[-1].start()
                 else:
                     self.ignore_typing = True
                     self.downloading_file = {
-                        "urls": selected_urls or urls,
+                        "urls": selected_urls or [url for url, _ in message_urls],
                         "web": False,
                         "open": False,
                     }
@@ -1853,22 +1847,15 @@ class Endcord:
                 msg_index = self.lines_to_msg(chat_sel)
                 if msg_index is None:
                     continue
-                urls = None
-                embeds = self.get_stuff_from_selected_line(chat_sel, 5)
-                selected_urls = []
-                if not embeds:
-                    urls = self.get_msg_urls_chat(msg_index)
-                    for num in self.get_stuff_from_selected_line(chat_sel, 0):
-                        selected_urls.append(urls[num])
-                else:
-                    selected_urls = embeds
+                line_urls, inline_images, message_urls = self.get_urls_from_chat(chat_sel, msg_index)
+                selected_urls = inline_images or [url for url, _ in line_urls]
                 if len(selected_urls) == 1:
                     selected_url = self.refresh_attachment_url(selected_urls[0])
                     webbrowser.open(selected_url, new=0, autoraise=True)
                 elif selected_urls:
                     self.ignore_typing = True
                     self.downloading_file = {
-                        "urls": selected_urls or urls,
+                        "urls": selected_urls,
                         "web": True,
                         "open": False,
                     }
@@ -1884,25 +1871,17 @@ class Endcord:
                 msg_index = self.lines_to_msg(chat_sel)
                 if msg_index is None:
                     continue
-                urls = None
-                embeds = self.get_stuff_from_selected_line(chat_sel, 5)
-                if not embeds:
-                    embeds = self.get_msg_embeds(msg_index)
-                    urls = self.get_msg_urls_chat(msg_index)
-                selected_urls = []
-                if urls:
-                    for num in self.get_stuff_from_selected_line(chat_sel, 0):
-                        if urls[num] in embeds:
-                            selected_urls.append(urls[num])
-                else:
-                    selected_urls = embeds
+                line_urls, inline_images, message_urls = self.get_urls_from_chat(chat_sel, msg_index)
+                selected_urls = inline_images or [url for url, is_embed in line_urls if is_embed and self.get_embed_type(msg_index, url) == "media"]
+                if not selected_urls:
+                    selected_urls = [url for url, is_embed in message_urls if is_embed and self.get_embed_type(msg_index, url) == "media"]
                 if len(selected_urls) == 1:
                     self.download_threads.append(threading.Thread(target=self.download_file, daemon=True, args=(selected_urls[0], False, True)))
                     self.download_threads[-1].start()
                 elif selected_urls:
                     self.ignore_typing = True
                     self.downloading_file = {
-                        "urls": selected_urls or urls,
+                        "urls": selected_urls,
                         "web": False,
                         "open": True,
                     }
@@ -2405,6 +2384,7 @@ class Endcord:
                                     if item[0] <= mouse_x < item[1]:
                                         clicked_type = 5
                                         clicked_id = item[2]
+                                        clicked_embed = item[3] if len(item) > 3 else False
                             if ranges[2]:   # custom emoji
                                 for num, item in enumerate(ranges[2]):
                                     if item[0] <= mouse_x < item[1]:
@@ -2450,20 +2430,12 @@ class Endcord:
                             self.go_replied(msg_index)
                         elif clicked_type == 4 and clicked_id is not None:   # add/remove reaction
                             self.build_reaction(clicked_id, msg_index=msg_index)
-                        elif clicked_type == 5:   # url
-                            if isinstance(clicked_id, str):
-                                webbrowser.open(clicked_id, new=0, autoraise=True)
+                        elif clicked_type == 5:   # url, embed or embed name
+                            url = clicked_id
+                            if not self.messages:   # blank chat: about / log viewer
+                                webbrowser.open(url, new=0, autoraise=True)
                                 continue
-                            urls = self.get_msg_urls_chat(msg_index)
-                            content_urls = []
-                            for match in re.finditer(formatter.match_url, self.messages[msg_index]["content"]):
-                                content_urls.append(match.group())
-                            url = urls[clicked_id]
-                            embed_url = False
-                            for embed in self.get_msg_embeds(msg_index, media_only=True, stickers=False):
-                                if embed == url and url not in content_urls:
-                                    embed_url = True
-                                    break
+                            embed_type = self.get_embed_type(msg_index, url) if clicked_embed else None
                             match = re.search(match_youtube, url)
                             if match:
                                 if support_media and shutil.which(self.config["yt_dlp_path"]) and shutil.which(self.config["mpv_path"]):
@@ -2471,8 +2443,11 @@ class Endcord:
                                     self.download_threads[-1].start()
                                 else:
                                     webbrowser.open(url, new=0, autoraise=True)
-                            elif embed_url:
-                                self.download_threads.append(threading.Thread(target=self.download_file, daemon=True, args=(url, False, False, True)))
+                            elif embed_type == "media":   # play
+                                self.download_threads.append(threading.Thread(target=self.download_file, daemon=True, args=(url, False, True)))
+                                self.download_threads[-1].start()
+                            elif embed_type == "file":   # download
+                                self.download_threads.append(threading.Thread(target=self.download_file, daemon=True, args=(url, )))
                                 self.download_threads[-1].start()
                             else:
                                 url = self.refresh_attachment_url(url)
@@ -3249,18 +3224,10 @@ class Endcord:
             if msg_index is None:
                 return
             select_num = cmd_args.get("num", 0)
-            embeds = []
-            for embed in self.messages[msg_index]["embeds"]:
-                if embed["url"]:
-                    embeds.append(embed["url"])
-            urls = self.get_msg_urls_chat(msg_index)
-            if urls:
-                selected_urls = []
-                for num in self.get_stuff_from_selected_line(chat_sel, 0):   # get url on this line
-                    if urls[num] in embeds:
-                        selected_urls.append(urls[num])
-                if not selected_urls:
-                    selected_urls = self.get_stuff_from_selected_line(chat_sel, 5)
+            line_urls, inline_images, message_urls = self.get_urls_from_chat(chat_sel, msg_index)
+            urls = [url for url, _ in message_urls]
+            selected_urls = [url for url, is_embed in line_urls if is_embed] or inline_images
+            if urls or selected_urls:
                 if selected_urls and (len(selected_urls) == 1 or select_num):
                     select_num = max(min(select_num-1, len(selected_urls)-1), 0)
                     self.download_threads.append(threading.Thread(target=self.download_file, daemon=True, args=(
@@ -3293,13 +3260,10 @@ class Endcord:
             if msg_index is None:
                 return
             select_num = cmd_args.get("num", 0)
-            urls = self.get_msg_urls_chat(msg_index)
-            if urls:
-                selected_urls = []
-                for num in self.get_stuff_from_selected_line(chat_sel, 0):   # get url
-                    selected_urls.append(urls[num])
-                if not selected_urls:
-                    selected_urls = self.get_stuff_from_selected_line(chat_sel, 5)
+            line_urls, inline_images, message_urls = self.get_urls_from_chat(chat_sel, msg_index)
+            urls = [url for url, _ in message_urls]
+            selected_urls = [url for url, _ in line_urls] or inline_images
+            if urls or selected_urls:
                 if selected_urls and (len(selected_urls) == 1 or select_num):
                     select_num = max(min(select_num-1, len(selected_urls)-1), 0)
                     selected_url = self.refresh_attachment_url(selected_urls[select_num])
@@ -3325,27 +3289,19 @@ class Endcord:
             if msg_index is None:
                 return
             select_num = cmd_args.get("num", 0)
-            embeds = self.get_msg_embeds(msg_index)
-            selected_urls = []
-            urls = self.get_msg_urls_chat(msg_index)
-            inline_image = self.get_stuff_from_selected_line(chat_sel, 5)
-            if inline_image:
-                selected_urls = inline_image
-            elif urls:
-                for num in self.get_stuff_from_selected_line(chat_sel, 0):   # get url
-                    if urls[num] in embeds:
-                        selected_urls.append(urls[num])
-            else:
-                selected_urls = embeds
+            line_urls, inline_images, message_urls = self.get_urls_from_chat(chat_sel, msg_index)
+            selected_urls = inline_images or [url for url, is_embed in line_urls if is_embed and self.get_embed_type(msg_index, url) == "media"]
+            if not selected_urls:
+                selected_urls = [url for url, is_embed in message_urls if is_embed and self.get_embed_type(msg_index, url) == "media"]
             if selected_urls and (len(selected_urls) == 1 or select_num):
                 select_num = max(min(select_num-1, len(selected_urls)-1), 0)
                 open_type = 2 if cmd_type == 85 else True
                 self.download_threads.append(threading.Thread(target=self.download_file, daemon=True, args=(selected_urls[select_num], False, open_type)))
                 self.download_threads[-1].start()
-            else:
+            elif selected_urls:
                 self.ignore_typing = True
                 self.downloading_file = {
-                    "urls": selected_urls or urls,
+                    "urls": selected_urls,
                     "web": False,
                     "open": 2 if cmd_type == 85 else True,
                 }
@@ -4915,42 +4871,42 @@ class Endcord:
         return line_stuff
 
 
-    def get_msg_urls_chat(self, msg_index):
-        """Get all urls from message, as visible in chat"""
-        urls = self.get_msg_urls(msg_index, embeds=False)
-        message = self.messages[msg_index]
-        content = ""
+    def get_urls_from_chat(self, chat_sel, msg_index):
+        """Get urls from chat_map, return (line_urls, inline_images, message_urls)"""
+        line_map = self.chat_map[chat_sel]
+        line_urls = []
+        inline_images = []
 
-        # exclude urls that are replaced with #channel
-        for match in re.finditer(formatter.match_discord_channel_url, message["content"]):
-            if match.group() in urls:
-                urls.remove(match.group())
+        if line_map and line_map[5]:
+            if line_map[5][0]:
+                line_urls = [(url[2], url[3] if len(url) > 3 else False) for url in line_map[5][0]]
+            if line_map[5][5]:
+                embed = self.messages[msg_index]["embeds"][line_map[5][5][2]]
+                if embed["type"] in ("article", "rich"):
+                    inline_images = [embed["proxy_url"] or embed["main_url"]]
+                inline_images = [embed["main_url"] if not embed["url"].startswith("https://") else embed["url"]]
 
-        if "poll" in message:
-            content = formatter.format_poll(message["poll"])
+        message_urls = []
+        for map_line in self.chat_map:
+            if map_line and map_line[0] == msg_index and map_line[5] and map_line[5][0]:
+                for url in map_line[5][0]:
+                    url_1 = url[2], url[3] if len(url) > 3 else False
+                    if url not in message_urls:
+                        message_urls.append(url_1)
 
-        for embed in message["embeds"]:
-            if embed["url"] and not embed.get("hidden") and embed["url"] not in content:
-                if content:
-                    content += "\n"
-                content += f"[{formatter.clean_type(embed["type"])} embed]:\n{embed["url"]}"
+        return line_urls, inline_images, message_urls
 
-        for sticker in message["stickers"]:
-            sticker_type = sticker["format_type"]
-            if content:
-                content += "\n"
-            if sticker_type == 1:
-                content += f"[png sticker] (can be opened): {sticker["name"]}"
-            elif sticker_type == 2:
-                content += f"[apng sticker] (can be opened): {sticker["name"]}"
-            elif sticker_type == 3:
-                content += f"[lottie sticker] (cannot be opened): {sticker["name"]}"
-            else:
-                content += f"[gif sticker] (can be opened): {sticker["name"]}"
 
-        for match in re.finditer(formatter.match_url, content):
-            urls.append(match.group())
-        return urls
+    def get_embed_type(self, msg_index, url):
+        """Get kind of embed by its url: "media" - playable, "file" - downloadable, None - not embed"""
+        for embed in self.messages[msg_index]["embeds"]:
+            if url in (embed["url"], embed.get("main_url")) or (embed["type"] == "rich" and url in embed["url"]):
+                if embed["type"].split("/")[0] in MEDIA_EMBEDS:
+                    return "media"
+                if "main_url" not in embed:
+                    return "file"
+                return None
+        return None
 
 
     def copy_msg_url(self, msg_index):
@@ -4960,28 +4916,6 @@ class Endcord:
         msg_id = self.messages[msg_index]["id"]
         url = f"https://{self.discord.host}/channels/{guild_id}/{channel_id}/{msg_id}"
         peripherals.copy_to_clipboard(url)
-
-
-    def get_msg_embeds(self, msg_index, media_only=True, stickers=True):
-        """Get all playable media embeds and stickers from message in chat"""
-        urls = []
-        for embed in self.messages[msg_index]["embeds"]:
-            media_type = embed["type"].split("/")[0]
-            if embed["url"] and (not media_only or media_type in MEDIA_EMBEDS):
-                if media_type == "rich":
-                    for num, match in enumerate(re.finditer(formatter.match_url, embed["url"])):
-                        if "media" in embed and len(embed["media"]) >= num and embed["media"][num]:
-                            urls.append(match.group())
-                elif embed.get("main_url"):
-                    urls.append(embed["main_url"])
-                else:
-                    urls.append(embed["url"])
-        if stickers:
-            for sticker in self.messages[msg_index]["stickers"]:
-                sticker_url = self.discord.get_sticker_url(sticker)
-                if sticker_url:
-                    urls.append(sticker_url)
-        return urls
 
 
     def spoil(self, msg_index, spoiler_index=None):
@@ -5434,7 +5368,6 @@ class Endcord:
                 self.tui.allow_chat_selected_hide(self.get_chat_last_message_id() == self.last_message_id)
                 if scroll:
                     scroll_diff = old_chat_len - 1 - selected_line
-                    logger.info((old_chat_len, selected_line, self.tui.chat_index, scroll_diff))
                     self.tui.set_chat_index(max(0, self.tui.chat_index + 2 - scroll_diff))
                     if selected_id and selected_id > self.messages[0]["id"]:
                         self.tui.set_selected(3, scroll=False)
@@ -7005,6 +6938,8 @@ class Endcord:
         self.unread_count *= found
         unread_count = self.unread_count + (self.unread_shift * (-1 if self.unread_count < 0 else 1))
         unread_count = min(max(unread_count, -999), 999)
+        slowmode = self.slowmode_times.get(self.active_channel["channel_id"])
+        vim_mode = self.vim_mode_strings[int(self.tui.insert_mode)] if self.vim_mode else None
 
         if status:
             if self.format_status_line_r:
@@ -7024,8 +6959,8 @@ class Endcord:
                     self.my_current_role_color,
                     self.status_char,
                     keyb_chain=self.tui.keybinding_chain,
-                    slowmode=self.slowmode_times.get(self.active_channel["channel_id"]),
-                    vim_mode=(self.tui.insert_mode if self.vim_mode else None),
+                    slowmode=slowmode,
+                    vim_mode=vim_mode,
                     limit_typing=self.limit_typing,
                     fun=self.fun,
                 )
@@ -7048,8 +6983,8 @@ class Endcord:
                 self.my_current_role_color,
                 self.status_char,
                 keyb_chain=self.tui.keybinding_chain,
-                slowmode=self.slowmode_times.get(self.active_channel["channel_id"]),
-                vim_mode=(self.tui.insert_mode if self.vim_mode else None),
+                slowmode=slowmode,
+                vim_mode=vim_mode,
                 limit_typing=self.limit_typing,
                 fun=self.fun,
             )
@@ -7073,8 +7008,8 @@ class Endcord:
                     self.my_current_role_color,
                     self.status_char,
                     keyb_chain=self.tui.keybinding_chain,
-                    slowmode=self.slowmode_times.get(self.active_channel["channel_id"]),
-                    vim_mode=(self.tui.insert_mode if self.vim_mode else None),
+                    slowmode=slowmode,
+                    vim_mode=vim_mode,
                     limit_typing=self.limit_typing,
                     fun=self.fun,
                 )
@@ -7098,8 +7033,8 @@ class Endcord:
                     self.my_current_role_color,
                     self.status_char,
                     keyb_chain=self.tui.keybinding_chain,
-                    slowmode=self.slowmode_times.get(self.active_channel["channel_id"]),
-                    vim_mode=(self.tui.insert_mode if self.vim_mode else None),
+                    slowmode=slowmode,
+                    vim_mode=vim_mode,
                     limit_typing=self.limit_typing,
                     fun=self.fun,
                 )
@@ -7123,8 +7058,8 @@ class Endcord:
                     self.my_current_role_color,
                     self.status_char,
                     keyb_chain=self.tui.keybinding_chain,
-                    slowmode=self.slowmode_times.get(self.active_channel["channel_id"]),
-                    vim_mode=(self.tui.insert_mode if self.vim_mode else None),
+                    slowmode=slowmode,
+                    vim_mode=vim_mode,
                     limit_typing=self.limit_typing,
                     fun=self.fun,
                 )
@@ -7154,8 +7089,8 @@ class Endcord:
                     self.my_current_role_color,
                     self.status_char,
                     keyb_chain=self.tui.keybinding_chain,
-                    slowmode=self.slowmode_times.get(self.active_channel["channel_id"]),
-                    vim_mode=(self.tui.insert_mode if self.vim_mode else None),
+                    slowmode=slowmode,
+                    vim_mode=vim_mode,
                     limit_typing=self.limit_typing,
                     fun=self.fun,
                 )

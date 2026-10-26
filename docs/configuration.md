@@ -335,6 +335,8 @@ Also see [keybindings configuration](keybindings.md#configuring-keybindings).
     A string that replaces `%edited` in the message format when the message is edited.
  - `app_string = "- (%app)"`  
     A string that replaces `%app` in the message format when the message is sent from app or webhook.
+- `vim_mode_strings = ["[--NORMAL--]", "[--INSERT--]"]`  
+    A list of two strings used in `%vim_mode`. First is normal mode, second is insert mode.
 - `quote_character = "║"`  
     A character that is prefixed to each line of single or multiline quote.
 - `scrollbar_character = "┃"`  
@@ -568,7 +570,7 @@ Note: everything after `%content` may be pushed to newline.
 - `%slowmode` - `Slowmode: hh:mm:ss` if slowmode is enabled, otherwise its hidden
 - `%chain` - Prefix of currently pressed keybinding chain, eg `C-y-`
 - `%app_name` - default is `endcord`, can be changed with `ENDCORD_APP_NAME` environment variable
-- `%vim_mode` - `[--INSERT--]` or `[--NORMAL--]` when `vim_mode` is ON
+- `%vim_mode` - Uses strings from `vim_mode_strings` option when `vim_mode` is ON
 
 ### format_rich
 - `%type` - type of rich presence: "Playing" or "Listening to"

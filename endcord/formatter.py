@@ -1122,6 +1122,24 @@ def ranges_multiline_one_line(ranges, line_len, newline_len, quote=False):
     return line_ranges
 
 
+def urls_multiline_one_line(ranges, line_len, newline_len, quote=False):
+    """Generate ranges for one line"""
+    line_ranges = []
+    for num, format_range in enumerate(ranges):
+        if format_range[0] >= line_len or format_range[1] < newline_len:
+            continue
+        if format_range[0] >= newline_len:
+            if format_range[1] < line_len:
+                line_ranges.append([format_range[0], format_range[1], *format_range[2:]])
+            else:
+                line_ranges.append([format_range[0], line_len, *format_range[2:]])
+        elif format_range[1] < line_len:
+            line_ranges.append([newline_len + quote*2, format_range[1], *format_range[2:]])
+        else:
+            line_ranges.append([newline_len + quote*2, line_len, *format_range[2:]])
+    return line_ranges
+
+
 def split_long_line(line, max_len, align=0, normalize=False):
     """
     Split long line into list, on nearest space to left or on newline.
@@ -1307,7 +1325,6 @@ class ChatGenerator:
         self.syntax_highlight = config["syntax_highlight"]
         self.smart_chat_lines = config["smart_chat_lines"] and self.message_grouping
         self.unreads_edge = "" if self.emoji_as_text else config["tree_drop_down_thread"]
-        self.show_embed_names = config["show_embed_names"]
         if self.smart_chat_lines:
             self.tree_drop_down_intersect = config["tree_drop_down_intersect"]
             self.tree_drop_down_vline = config["tree_drop_down_vline"]
@@ -1316,6 +1333,7 @@ class ChatGenerator:
         self.dpw = dpw   # "dots" per character width
         self.placeholder_emoji = "  " if placeholder_emoji else None
         self.placeholder_images = (config["inline_media_height"]) if placeholder_images else None
+        self.show_embed_names = config["show_embed_names"] or not self.placeholder_images
 
         # load colors
         self.color_default = [colors[0]]
@@ -1940,6 +1958,7 @@ class ChatGenerator:
         embeds = []
         image_locations = []
         embed_marker_ranges = []
+        embed_spans = []   # [start, end, real_url] of embed text, to mark urls found inside as embed urls
         for num_e, embed in enumerate(message["embeds"]):
             embed_url = embed["url"]
             embed_type = embed["type"]
@@ -1947,24 +1966,25 @@ class ChatGenerator:
                 continue
             if content:
                 content += "\n"
+            real_url = embed["main_url"] if "main_url" in embed and not embed_url.startswith("https://") else embed_url
+            embed_start = pre_content_len + len(content)
+            attachment = "main_url" not in embed
+            url_ranges = []
             spoiler = embed["name"] and embed["name"].startswith("SPOILER_")
+            duration = f"({format_seconds(embed["duration"], nice=True, pad=False)})" if embed.get("duration") else ""
             if spoiler:
                 spoiler = 1000 + num_e not in message.get("spoiled", [])
             if "main_url" not in embed:   # its attachment
-                if embed["name"] and self.show_embed_names:
-                    embed_url = trim_string(embed["name"], self.trim_embed_url_size)
+                embed_type = clean_type(embed_type)
+                if (embed["name"] and self.show_embed_names) or embed_type not in ("image", "video"):
+                    embed_url = trim_string(embed.get("name", "Unnamed"), self.trim_embed_url_size)
                 elif self.placeholder_images:
                     embed_url = ""
                 elif self.trim_embed_url_size:
                     embed_url = trim_string(embed_url, self.trim_embed_url_size)
-                embed_type = clean_type(embed_type)
-                if embed_type.lower() not in ("image", "video"):
-                    embed_type = "file"
-                    embed_url = embed.get("name", "Unnamed")
-                    if embed.get("duration"):
-                        embed_url += f" ({format_seconds(embed["duration"], nice=True, pad=False)})"
-                    pre_embed_len = pre_content_len + len(content)
-                    embeds.append([pre_embed_len, pre_embed_len + len(embed_type) + 15 + len(embed_url), 0])
+                if duration and embed_url:
+                    duration = " " + duration
+                embed_url += duration
                 embed_marker_ranges.append([len(content), len(content) + len(embed_type) + 14])
                 content += f"[{embed_type} attachment]: {embed_url}"
             elif embed_type == "rich":
@@ -1973,7 +1993,7 @@ class ChatGenerator:
                 if url_ranges:
                     pre_embed_len = pre_content_len + len(content) + len(embed_type) + 10
                     for url_range in url_ranges:
-                        urls.append([pre_embed_len + url_range[0], pre_embed_len + url_range[1], 0])
+                        urls.append([pre_embed_len + url_range[0], pre_embed_len + url_range[1], url_range[2], True])
                 embed_marker_ranges.append([len(content), len(content) + 13])
                 content += f"[rich embed]:\n{embed_url}"
             else:
@@ -1988,13 +2008,17 @@ class ChatGenerator:
                 if url_ranges:
                     pre_embed_len = pre_content_len + len(content) + len(embed_type) + 10
                     for url_range in url_ranges:
-                        urls.append([pre_embed_len + url_range[0], pre_embed_len + url_range[1], 0])
+                        urls.append([pre_embed_len + url_range[0], pre_embed_len + url_range[1], url_range[2], True])
                 if embed_type.startswith("gif") and embed_url.startswith("["):
                     pass
                 elif embed["main_url"] == embed_url and self.trim_embed_url_size:
                     embed_url = trim_string(embed_url, self.trim_embed_url_size)
                 embed_marker_ranges.append([len(content), len(content) + len(embed_type) + 9])
-                content += f"[{embed_type} embed]: {embed_url}"
+                content += f"[{embed_type} embed]: {embed_url.strip()}"
+            if embed_type != "rich" and not url_ranges and embed_url:   # make embed text clickable
+                text_start = embed_start + len(embed_type) + (15 if attachment else 10)
+                urls.append([text_start, pre_content_len + len(content) - len(duration), real_url, True])
+            embed_spans.append([embed_start, pre_content_len + len(content), None if embed_type == "rich" else real_url])
             if self.placeholder_images and embed.get("proxy_url") and embed["hw"]:
                 if not embed["hw"][0] or not embed["hw"][1]:
                     continue
@@ -2059,13 +2083,15 @@ class ChatGenerator:
                         skip = True
                         break
                 if not skip:
-                    urls.append([start, end, match.group()])
+                    is_embed = False
+                    for span in embed_spans:
+                        if span[0] <= start < span[1]:
+                            is_embed = True
+                            skip = bool(span[2])   # not rich embed, already has its own range
+                            break
+                    if not skip:
+                        urls.append([start, end, match.group(), is_embed])
         urls = sorted(urls, key=lambda x: x[0])
-        for idx, url in enumerate(urls):
-            url[2] = idx
-        idx = len(urls)
-        for i, embed in enumerate(embeds):
-            embed[2] = idx + i
 
         # find spoilers - must be after all other replacements
         spoilers = []
@@ -2081,7 +2107,6 @@ class ChatGenerator:
             move_by_indexes(
                 md_indexes,
                 urls,
-                embeds,
                 spoilers,
                 code_snippets,
                 code_blocks,
@@ -2100,7 +2125,6 @@ class ChatGenerator:
                 escaped_indexes,
                 md_format,
                 urls,
-                embeds,
                 spoilers,
                 code_snippets,
                 code_blocks,
@@ -2182,7 +2206,7 @@ class ChatGenerator:
         code_block_format += format_multiline_one_line_format(code_blocks_tokens, newline_index+1, 0, quote)
 
         chat.append(message_line)
-        urls_this_line = fix_map_ranges(ranges_multiline_one_line(urls + embeds, newline_index+1, 0, quote), message_line)
+        urls_this_line = fix_map_ranges(urls_multiline_one_line(urls + embeds, newline_index+1, 0, quote), message_line)
         spoilers_this_line = fix_map_ranges(ranges_multiline_one_line(spoilers, newline_index+1, 0, quote), message_line)
         emoji_this_line = fix_map_ranges(ranges_multiline_one_line(emoji_ranges, newline_index+1, 0, quote), message_line)
         mentions_this_line = fix_map_ranges(ranges_multiline_one_line(mention_ranges, newline_index+1, 0, quote), message_line)
@@ -2336,7 +2360,7 @@ class ChatGenerator:
 
             len_new_line = len(new_line)
             chat.append(new_line)
-            urls_this_line = fix_map_ranges(ranges_multiline_one_line(urls + embeds, len_new_line, self.newline_len, quote), new_line)
+            urls_this_line = fix_map_ranges(urls_multiline_one_line(urls + embeds, len_new_line, self.newline_len, quote), new_line)
             spoilers_this_line = fix_map_ranges(ranges_multiline_one_line(spoilers, len_new_line, self.newline_len, quote), new_line)
             emoji_this_line = fix_map_ranges(ranges_multiline_one_line(emoji_ranges, len_new_line, self.newline_len, quote), new_line)
             mentions_this_line = fix_map_ranges(ranges_multiline_one_line(mention_ranges, len_new_line, self.newline_len, quote), new_line)
@@ -2649,11 +2673,7 @@ def generate_status_line(my_user_data, my_status, unread_count, typing, active_c
     else:
         slowmode = f"Slowmode: {format_seconds(slowmode)}"
 
-    if vim_mode is False:
-        vim_mode = "[--NORMAL--]"
-    elif vim_mode is True:
-        vim_mode = "[--INSERT--]"
-    else:
+    if vim_mode is None:
         vim_mode = ""
 
     sl_format = []
