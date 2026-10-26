@@ -120,7 +120,7 @@ Some keybindings are used by terminals or OS itself, so they are by default rebo
 - Scrollbar to move it there, or drag it
 - Tree border to toggle its minimized state
 - Member list border to toggle its minimized state
-- Buttons in call UI, click on input/output volume values to toggle mute each
+- Buttons in call UI, click on input/output volume values to toggle mute each, click on `VID` to open list of streaming users
 
 ### Double click on:
 - Tree - un/collapse category/server or enter channel

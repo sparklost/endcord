@@ -3052,7 +3052,7 @@ def generate_extra_line_call(call_participants, volume_in, volume_out, videos, r
     left_text = "In the call: You"
     rtt_text = f"({min(rtt, 999.9):.1f}ms) " if rtt is not None else ""
     video_text = f"(VID:{len(videos)}) " if videos else ""
-    right_text = f"{video_text}{rtt_text}[I:{(str(volume_in)+"%").center(4)} O:{(str(volume_out)+"%").center(4)}] [Leave]"
+    right_text = f"{rtt_text}{video_text}[I:{(str(volume_in)+"%").center(4)} O:{(str(volume_out)+"%").center(4)}] [Leave]"
     max_str_length = max_len - len(right_text) - 3   # 3 for ...
 
     for participant in call_participants:
@@ -3063,11 +3063,13 @@ def generate_extra_line_call(call_participants, volume_in, volume_out, videos, r
     line_format = [
         (color_standout, None, 13, len(left_text[:max_str_length])),
         (color_standout, None, max_len - 23, max_len - 8),
-        (20 if int(rtt) > 500 else 19 if rtt > 200 else color_low, None, max_len - 23 - len(rtt_text), max_len - 23),
+        (20 if int(rtt) > 500 else 19 if rtt > 200 else color_low, None, max_len - 23 - len(rtt_text) - len(video_text), max_len - 23 - len(video_text)),
         (20 if volume_out == 0 else None, None, max_len - 15, max_len - 9),
         (20 if volume_in == 0 else None, None, max_len - 22, max_len - 16),
         (20, None, max_len - 7, max_len),
     ]
+    if videos:
+        line_format.append((18, None, max_len - 23 - len(video_text), max_len - 23))
 
     if len(left_text) + 1 + len(right_text) <= max_len:
         space_num = max_len - (len(left_text) + len(right_text))

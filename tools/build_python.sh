@@ -103,8 +103,7 @@ CFLAGS="${CFLAGS} \
     -fno-strict-overflow \
     -DNDEBUG \
     -g0 \
-    -O3 \
-    -D_Py_TIER2=3 \
+    -O2 \
     $( [[ "${OLD_CFLAGS}" =~ -mtune= ]] || echo "-mtune=generic" ) \
     -fvisibility=hidden \
     -I/usr/include"

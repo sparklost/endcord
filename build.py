@@ -17,7 +17,7 @@ from datetime import datetime
 CUSTOM_CFLAGS = [
     "-DNDEBUG",
     "-g0",
-    "-O3",
+    "-O2",
     "-mtune=generic",
     "-fno-semantic-interposition",
     "-fno-strict-overflow",

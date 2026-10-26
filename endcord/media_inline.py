@@ -64,6 +64,7 @@ class InlineMedia:
         self.slow_media = config["media_slow_load_delay"]
         self.mention_color = colors_formatted[12][0][0]
         self.mention_color_esc = f"{ESC}[48;5;{color_mention[1]}m"
+        self.draw_box = self.box_color != -1
         self.run = True
         self.prev_chat_index = None
         self.prev_win_hw = self.tui.screen_hw
@@ -93,6 +94,15 @@ class InlineMedia:
         """Stop all threads"""
         self.run = False
         self.download_queue.put([None] * 9)
+
+
+    def clear_queue(self):
+        """Clear download queue (when switching channel)"""
+        while self.run:
+            try:
+                self.download_queue.get_nowait()
+            except queue.Empty:
+                break
 
 
     def force_redraw(self):
@@ -176,11 +186,7 @@ class InlineMedia:
             with self.image_cache_lock:
                 subtitle_line = bool(self.tui.win_subtitle_line)
                 for data, rel_y, rel_x, h, w, draw, mention in self.image_cache.values():
-                    if not data:
-                        frame = draw_image_bounding_box(-1, self.box_color, w, h)
-                        self.draw_single_image(frame, rel_x, rel_y, w, h, mention, slow=False, lock=False)
-                        continue
-                    elif not draw:
+                    if not draw and (not self.draw_box or data):
                         continue
                     abs_y = chat_h - (rel_y - self.tui.chat_index - self.tui.have_title - subtitle_line + 1)
                     if abs_y - chat_y <= -h or abs_y > chat_h + 1 + subtitle_line:
@@ -195,6 +201,11 @@ class InlineMedia:
                         cut_y = -abs_y + 1 + subtitle_line
                         abs_y = chat_y
                     # logger.info(("DRAW", (h, w), abs_y, rel_y, cut_h, cut_y))
+                    if not data and self.draw_box:
+                        frame = draw_image_bounding_box(-1, self.box_color, w, h)
+                        self.draw_single_image(frame, rel_x, rel_y, w, h, mention, slow=False, lock=False)
+                        drawn_areas.append((abs_y, abs_x, cut_h, w, mention))
+                        continue
                     terminal_utils.draw_over_curses("\n".join(data.split("\n")[cut_y:cut_y + cut_h]), abs_y, abs_x)
                     drawn_areas.append((abs_y, abs_x, cut_h, w, mention))
             self.draw_selection(self.tui.chat_selected)
@@ -217,8 +228,8 @@ class InlineMedia:
         chat_y, chat_x = self.tui.win_chat.getbegyx()
         chat_h = self.tui.chat_hw[0]
         subtitle_line = bool(self.tui.win_subtitle_line)
-        for _, rel_y, _, h, w, draw, mention in self.image_cache.values():
-            if not draw:
+        for data, rel_y, _, h, w, draw, mention in self.image_cache.values():
+            if not draw and (not self.draw_box or data):
                 continue
             abs_y = chat_h - (rel_y - self.tui.chat_index - self.tui.have_title - subtitle_line + 1)
             cut_h = h
@@ -252,7 +263,7 @@ class InlineMedia:
                 new_y = max(new_y, occupied_end)
             if new_y < old_end:   # end segment
                 to_clear.append((new_y, old_end, x, w, mention_old))
-        # logger.info(f"DATA:\n  {self.drawn_areas}\n  {occupied}\n  {to_clear}")
+        logger.info(f"DATA:\n  {self.drawn_areas}\n  {occupied}\n  {to_clear}")
 
         # clear segments, if any
         if not to_clear:
@@ -349,7 +360,7 @@ class InlineMedia:
             with self.image_cache_lock:
                 if image_id in self.image_cache and not self.image_cache[image_id][0]:
                     draw_box = True
-            if draw_box and self.box_color != -1:
+            if draw_box and self.draw_box:
                 time.sleep(0.05)
                 data = draw_image_bounding_box(-1, self.box_color, w, h)
                 with self.tui.lock:

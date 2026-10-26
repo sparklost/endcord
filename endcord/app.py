@@ -1081,6 +1081,8 @@ class Endcord:
             else:
                 self.tui.set_member_list_width(2)
         if not self.forum:
+            if self.inline_media:
+                self.inline_media_drawer.clear_queue()   # discard all pending inline image downloads
             self.chat_dim = self.tui.get_dimensions()[0]
             self.update_chat(keep_selected=False, select_message_index=select_message_index, select_unread=True)
         else:
@@ -2491,6 +2493,7 @@ class Endcord:
                     if self.in_call:
                         mouse_x = self.tui.get_x_line_clicked() + (not (self.tui.bordered)) * 2
                         len_extra_line = len(self.extra_line) + 1
+                        videos = self.voice_gateway.get_video_users()
                         if len_extra_line - 15 < mouse_x <= len_extra_line - 9:   # CLICK ON OUTPUT VOL
                             if self.state["volume_out"]:
                                 self.prev_volume_out = self.state["volume_out"]
@@ -2513,6 +2516,25 @@ class Endcord:
                             self.update_call_extra_line()
                         elif len_extra_line - 7 < mouse_x <= len_extra_line:   # LEAVE
                             self.leave_call()
+                        elif videos and len_extra_line - 30 - (1 if len(videos) > 9 else 0) < mouse_x <= len_extra_line - 24:   # CLICK ON (VID:N)
+                            if not shutil.which(self.config["mpv_path"]):
+                                self.update_extra_line("Can't view video stream: mpv is not installed", color=19)
+                            elif len(videos) == 1:
+                                self.voice_gateway.start_video_player(videos[0])
+                            else:
+                                self.update_extra_line(force=True)
+                                self.reset_states(editing=False)
+                                self.command = True
+                                self.command_history_index = max(len(self.command_history), 0)
+                                self.ignore_typing = True
+                                self.tui.instant_assist = True
+                                self.extra_window_open = True
+                                if self.vim_mode:
+                                    self.tui.set_vim_insert(True)
+                                    self.update_status_line()
+                                self.add_to_store(self.active_channel["channel_id"], input_text)
+                                self.restore_input_text = ("voice_play_video ", "command")
+                                self.assist("voice_play_video ", 5)
                     elif self.most_recent_incoming_call or self.active_channel["channel_id"] in self.incoming_calls:
                         mouse_x = self.tui.get_x_line_clicked() + (not (self.tui.bordered))*2
                         len_extra_line = len(self.extra_line) + 1
@@ -2773,7 +2795,7 @@ class Endcord:
                             elif command.startswith("*") and command[1:]:
                                 binding = True
                                 self.wait_input(forced_binding=command[1:])
-                                time.sleep(0.01)   # so cursor doesnt appear at the end off line
+                                time.sleep(0.01)   # so cursor doesnt appear at the end of line
                         if not binding:
                             if not close or close == 2:
                                 self.restore_input_text = (input_text, "standard extra")
