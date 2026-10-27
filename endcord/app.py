@@ -7227,6 +7227,7 @@ class Endcord:
             collapsed,
             self.gateway.voice_states,   # faster than get_voice_states()
             self.active_channel["channel_id"],
+            self.activity_icons,
             self.config,
             safe_emoji=self.emoji_as_text,
             max_width=self.tui.get_dimensions()[1][1],

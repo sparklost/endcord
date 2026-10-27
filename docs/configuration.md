@@ -160,6 +160,8 @@ Also see [keybindings configuration](keybindings.md#configuring-keybindings).
     Force only one open server at a time in tree. When one is opened other is closed, excluding DMs.
 - `remember_collapsed_channels = True`  
     Whether to persist collapsed state for forums and channels with threads.
+- `dm_activity_in_tree = True`  
+    Wether to show DM rich presence activity icon instead of status dot (`tree_dm_status` in theme) in tree. Uses characters from `activity_icons` in thme.
 - `assist = True`  
     Assist when typing @username, @role, #channel, :emoji:, ;sticker;
 - `assist_stop_space = True`  

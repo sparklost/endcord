@@ -31,7 +31,7 @@ if sys.platform == "win32":
 import cairo
 import gi
 
-from endcord import peripherals, utils
+from endcord import color, peripherals, utils
 from endcord.wide_ranges import WIDE_RANGES
 
 gi.require_version("Gtk", "3.0")
@@ -1297,6 +1297,14 @@ def init_pair(pair_id, fg, bg):
         missing = pair_id + 1 - len(color_map)
         color_map.extend([DEFAULT_PAIR] * missing)
     color_map[pair_id] = (fg_rgb, bg_rgb)
+
+
+def pair_content(pair_id):
+    """curses.pair_content clone"""
+    try:
+        return color.closest_color(color_map[pair_id][0])[0], color.closest_color(color_map[pair_id][1])[0]
+    except Exception:
+        return 0, 0
 
 
 def initscr():   # noqa

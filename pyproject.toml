@@ -29,7 +29,7 @@ build = [
 ]
 media = [
     "av==19.0.2",
-    "dave-py>=1.0.0",
+    "dave-py>=1.1.0",
     "pillow>=13.0.0",
     "pynacl>=1.6.2",
 ]
@@ -38,10 +38,10 @@ media = [
 python_max = "3.14.8"
 python_freethreaded = "3.14.8"
 python_last_safe = "3.13.14"
-curses_tag = "v6_6_20260808"   # later versions mess-up the ui
+curses_tag = "v6_6_20261024"
 rnnoise_tag = "main"
 libopus_ver = "1.5.2"
-gvsbuild_release = "2026.8.0"
+gvsbuild_release = "2026.10.0"
 mini_exclude_deps = ["numpy", "soundfile", "soundcard"]
 micro_exclude_deps = ["numpy", "soundfile", "soundcard", "orjson", "pycryptodome"]
 medium_deps = ["pillow", "dave-py", "pynacl"]

@@ -3692,6 +3692,8 @@ def generate_member_list(member_list_raw, guild_roles, width, use_nick, status_s
     filler = " " * width
     first = True
     for member in member_list_raw:
+        if "group" in member and not member["count"]:
+            continue
         this_format = []
         if "id" in member:
 
@@ -3804,7 +3806,7 @@ def generate_message_notification(data, channels, roles, guild_name, my_data, co
     return title, body
 
 
-def generate_tree(dms, guilds, threads, read_state, guild_folders, activities, collapsed, voice_states, active_channel_id, config, safe_emoji=False, max_width=0):
+def generate_tree(dms, guilds, threads, read_state, guild_folders, activities, collapsed, voice_states, active_channel_id, activity_icons, config, safe_emoji=False, max_width=0):
     """
     Generate channel tree according to provided formatting.
     tree_format keys:
@@ -3843,6 +3845,7 @@ def generate_tree(dms, guilds, threads, read_state, guild_folders, activities, c
     dm_status_char = config["tree_dm_status"]
     show_folders = config["tree_show_folders"]
     uncollapse_threads = config["remember_collapsed_channels"]
+    dm_activity_in_tree = config["dm_activity_in_tree"]
     intersection = f"{dd_intersect}{dd_hline*2}"   # default: "|--"
     pass_by = f"{dd_vline}  "   # default: "|  "
     intersection_end = f"{dd_corner}{dd_hline*2}"   # default: "\\--"
@@ -3877,9 +3880,9 @@ def generate_tree(dms, guilds, threads, read_state, guild_folders, activities, c
         code = 300
         # get dm status
         if len(dm["recipients"]) == 1:
-            for activity in activities:
-                if activity["id"] == dm["recipients"][0]["id"]:
-                    status = activity["status"]
+            for presence in activities:
+                if presence["id"] == dm["recipients"][0]["id"]:
+                    status = presence["status"]
                     if status == "online":
                         code += 2
                     elif status == "idle":
@@ -3888,7 +3891,8 @@ def generate_tree(dms, guilds, threads, read_state, guild_folders, activities, c
                         code += 4
                     else:
                         break
-                    name = dm_status_char + " " + name
+                    status_char = activity_icons[presence["activities"][0]["type"]] if presence["activities"] and dm_activity_in_tree else dm_status_char
+                    name = status_char + " " + name
                     break
         mention_count = generate_count(len(ch_read_state["mentions"])) if unseen_dm else ""
         if dm["type"] == 3:

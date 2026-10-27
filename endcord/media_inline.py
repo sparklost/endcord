@@ -263,7 +263,7 @@ class InlineMedia:
                 new_y = max(new_y, occupied_end)
             if new_y < old_end:   # end segment
                 to_clear.append((new_y, old_end, x, w, mention_old))
-        logger.info(f"DATA:\n  {self.drawn_areas}\n  {occupied}\n  {to_clear}")
+        # logger.info(f"DATA:\n  {self.drawn_areas}\n  {occupied}\n  {to_clear}")
 
         # clear segments, if any
         if not to_clear:

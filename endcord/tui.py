@@ -1481,14 +1481,15 @@ class TUI():
         with self.lock:
             w = self.input_hw[1]
             # show only part of line when longer than screen
-            start = max(0, len(self.input_buffer) - w + 1 - self.input_line_index)
+            offset = w - 1 + self.input_line_index
+            start = max(0, len(self.input_buffer) - offset)
             end = start + w - 1
             line_text = self.input_buffer[start:end].replace("\n", "␤")
 
             # prepare selected range
             if self.input_select_start is not None:
-                selected_start_screen = self.input_select_start - max(0, len(self.input_buffer) - w + 1 - self.input_line_index)
-                selected_end_screen = self.input_select_end - max(0, len(self.input_buffer) - w + 1 - self.input_line_index)
+                selected_start_screen = self.input_select_start - max(0, len(self.input_buffer) - offset)
+                selected_end_screen = self.input_select_end - max(0, len(self.input_buffer) - offset)
                 if selected_start_screen > selected_end_screen:
                     # swap so start is always left side
                     selected_start_screen, selected_end_screen = selected_end_screen, selected_start_screen
@@ -1508,7 +1509,7 @@ class TUI():
                 # selected part of string
                 elif self.input_select_start is not None and selected_start_screen <= pos < selected_end_screen:
                     safe_insch(self.win_input_line, 0, pos, character, curses.color_pair(15) | self.attrib_map[15])
-                elif pos in self.red_list:
+                elif pos + start in self.red_list:
                     safe_insch(self.win_input_line, 0, pos, character, curses.color_pair(20))
                 else:
                     for bad_range in self.misspelled:
@@ -1762,14 +1763,9 @@ class TUI():
                     self.win_tree.insstr(y, 0, line[:text_start], color_line)
                     self.win_tree.insstr(y, text_start, line[text_start:], color)
                     # if this is dm, set color for status sign
-                    if 300 <= code < 399 and second_digit == 0 and not selected:
-                        if first_digit == 2:   # online
-                            # this character is always at position 4 (set in formatter)
-                            self.win_tree.addch(y, 4, self.tree_dm_status, curses.color_pair(18))
-                        elif first_digit == 3:   # idle
-                            self.win_tree.addch(y, 4, self.tree_dm_status, curses.color_pair(19))
-                        elif first_digit == 4:   # dnd
-                            self.win_tree.addch(y, 4, self.tree_dm_status, curses.color_pair(20))
+                    if 300 <= code < 399 and second_digit == 0 and not selected and 2 <= first_digit <= 4:
+                        # status character is always at position 4 (set in formatter)
+                        self.win_tree.chgat(y, 4, 1, curses.color_pair(first_digit + 16))
                 y += 1
                 while y < h:
                     # curses optimizes scrolling, so large empty space will cause flickering when scrolling member list

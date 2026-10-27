@@ -66,6 +66,7 @@ settings = {
     "default_stickers": True,
     "only_one_open_server": False,
     "remember_collapsed_channels": True,
+    "dm_activity_in_tree": True,
     "assist": True,
     "assist_stop_space": True,
     "assist_swap_binding": True,
