@@ -341,7 +341,7 @@ class GameDetection:
             if old_etag != etag:
                 logger.info(f'Downloaded new detectable applications list with ETag: W/"{etag}"')
                 if old_path:
-                    delete_detectable_apps_files(peripherals.config_path)
+                    delete_detectable_apps_files(peripherals.config_path, path)
             del (old_path, old_etag)
         else:
             path = old_path

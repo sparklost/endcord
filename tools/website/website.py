@@ -31,20 +31,34 @@ INSTALL_CMD = 'bash -c "$(curl -fsSL https://raw.githubusercontent.com/sparklost
 DISCORD_URL = "https://discord.gg/judQSxw5K2"
 BUG_URL = "https://github.com/sparklost/endcord/issues"
 RPC_URL = "https://github.com/sparklost/endcord-rpc"
-HOME_MD = f"""# Endcord
+DONATE_URL = "https://ko-fi.com/sparklost"
+HOME_MD = f"""Hi! I don't know how to make websites. I only know how to make TUIs, so you get this instead.
 
-Hi, I dont know how to make websites, I only know how to make TUIs, so you get this instead.
+---
+
+### Getting Started
 
 - [Read the README]({PAGES[1][1]})
-- [Browse the wiki]({PAGES[2][1]})
-- [Browse endcord extensions]({PAGES[3][1]})
-- [Pick the binary you want on GitHub releases]({RELEASES_URL})
-- [Copy the linux/macos endcord-installer.sh command](copy:install)
-- [Join the official discord server]({DISCORD_URL})
-- [View the repo on GitHub]({REPO_URL})
-- [Report a bug on GitHub]({BUG_URL})
-- [endcord-rpc, the miniature rpc-only client]({RPC_URL})
+- [Browse the Wiki]({PAGES[2][1]})
+- [Explore Endcord Extensions]({PAGES[3][1]})
+- [Download a Binary]({RELEASES_URL}) — GitHub Releases
 
+### Installation
+
+Copy and run the installer for Linux / MacOS: [endcord-installer.sh](copy:install)
+
+### Community & Development
+
+- [Source Code]({REPO_URL})
+- [Report a Bug]({BUG_URL})
+- [Join the Official Discord]({DISCORD_URL})
+- [Endcord-RPC]({RPC_URL}) — the miniature RPC-only client
+
+### Support the Project
+
+If you enjoy Endcord and want to support its purely human development, you can [Donate Here]({DONATE_URL}).
+
+---
 
 Made with my own 2 hands - by SparkLost
 
