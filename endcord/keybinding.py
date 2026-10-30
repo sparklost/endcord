@@ -476,7 +476,7 @@ def find_chainable(keybindings, command_bindings):
             if len(split_binding) == 1:
                 continue
             elif len(split_binding) > 2:
-                logger.warn(f"Invalid keybinding: {binding_group}")
+                logger.warning(f"Invalid keybinding: {binding_group}")
             chainable.append(split_binding[0])
         else:
             for binding in binding_group[0]:
@@ -484,7 +484,7 @@ def find_chainable(keybindings, command_bindings):
                 if len(split_binding) == 1:
                     continue
                 elif len(split_binding) > 2:
-                    logger.warn(f"Invalid keybinding: {binding}")
+                    logger.warning(f"Invalid keybinding: {binding}")
                 if split_binding[0] not in chainable:
                     chainable.append(split_binding[0])
     for binding in command_bindings:   # here read key instead value
@@ -493,7 +493,7 @@ def find_chainable(keybindings, command_bindings):
             if len(split_binding) == 1:
                 continue
             elif len(split_binding) > 2:
-                logger.warn(f"Invalid keybinding: {binding}")
+                logger.warning(f"Invalid keybinding: {binding}")
             if split_binding[0] not in chainable:
                 chainable.append(split_binding[0])
     return chainable

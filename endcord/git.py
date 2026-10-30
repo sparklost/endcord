@@ -93,7 +93,7 @@ def setup_extension(ext_path):
     if not os.path.exists(os.path.join(ext_path, "setup.py")):
         return
     if not shutil.which("virtualenv"):
-        logger.warn("Could not setup extension: virtualenv is not found on system")
+        logger.warning("Could not setup extension: virtualenv is not found on system")
         return
     subprocess.run(["python", "setup.py"], cwd=ext_path, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 

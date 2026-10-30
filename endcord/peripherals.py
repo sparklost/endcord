@@ -52,7 +52,7 @@ if sys.platform == "win32":
         toaster = WindowsToaster(APP_NAME)
     except OSError:
         toaster = None
-        logger.warn("Failed initializing notification system")
+        logger.warning("Failed initializing notification system")
     # for pasting
     user32 = ctypes.windll.user32
     user32.OpenClipboard.argtypes = [wintypes.HWND]
@@ -586,7 +586,7 @@ def play_audio(path):
         return
     path = os.path.expanduser(path)
     if not os.path.exists(path):
-        logger.warn(f"Audio file not found at path: {path}")
+        logger.warning(f"Audio file not found at path: {path}")
         return
 
     if sys.platform == "linux":
@@ -682,10 +682,10 @@ def get_connection(host, port=443, timeout=2, proxy=None):
             connection = http.client.HTTPSConnection(host, port, timeout=timeout + 5)   # extra time for tor
             connection.sock = proxy_sock
         else:
-            logger.warn(f"Invalid proxy: {proxy}")
+            logger.warning(f"Invalid proxy: {proxy}")
             connection = http.client.HTTPSConnection(host, port, timeout=timeout, context=ssl_context)
     except Exception as e:
-        logger.warn(f"Error connecting to proxy {proxy}: {e}")
+        logger.warning(f"Error connecting to proxy {proxy}: {e}")
         connection = http.client.HTTPSConnection(host, port, timeout=timeout, context=ssl_context)
     return connection
 
@@ -1185,3 +1185,66 @@ def tokenize_code_pygments(code_text, lang, initial_idx=0):
         current_idx = end_idx
 
     return tokens
+
+
+video_sources_cache = []
+video_sources_query_time = 0
+
+
+def get_video_sources(fps=30, height=720, delay=5):
+    """Get list of available video sources, screens and cameras, needs ffmpeg"""
+    global video_sources_cache, video_sources_query_time
+    if time.monotonic() < video_sources_query_time + delay:
+        return video_sources_cache
+    sources = []
+    try:
+        if sys.platform == "win32":
+            output = subprocess.run(
+                ["ffmpeg", "-hide_banner", "-list_devices", "true", "-f", "dshow", "-i", "dummy"],
+                stdin=subprocess.DEVNULL, capture_output=True, text=True, check=True,
+            )
+            for name in re.findall(r'"([^"]+)" \(video\)', output.stderr):
+                sources.append((name, ["-f", "dshow", "-i", f"video={name}"]))
+            sources.append(("Capture Screen", ["-f", "gdigrab", "-framerate", str(fps), "-i", "desktop"]))
+
+        elif sys.platform == "darwin":
+            output = subprocess.run(
+                ["ffmpeg", "-hide_banner", "-f", "avfoundation", "-list_devices", "true", "-i", ""],
+                stdin=subprocess.DEVNULL, capture_output=True, text=True, check=True,
+            )
+            for line in output.stderr.splitlines():
+                if "AVFoundation audio devices" in line:
+                    break
+                match = re.search(r"\[(\d+)\] (.+)$", line)
+                if match:
+                    source = ["-f", "avfoundation", "-framerate", str(fps)]
+                    device = match.group(2)
+                    if device.lower().startswith("capture screen"):
+                        device = "Capture Screen"
+                        source += ["-capture_cursor", "1"]
+                    else:
+                        source += ["-pixel_format", "uyvy422"]
+                    sources.append((device, source + ["-i", f"{match.group(1)}:none"]))
+
+        else:
+            sys_path = "/sys/class/video4linux"
+            for device in sorted(os.listdir(sys_path), key=lambda x: int(x[5:]) if x[5:].isdigit() else 0):
+                try:
+                    with open(os.path.join(sys_path, device, "index"), "r", encoding="utf-8") as f:
+                        if f.read().strip() != "0":   # skip metadata nodes
+                            continue
+                    with open(os.path.join(sys_path, device, "name"), "r", encoding="utf-8") as f:
+                        name = f.read().strip()
+                except OSError:
+                    continue
+                sources.append((f"{name} ({device})", [
+                    "-f", "v4l2", "-input_format", "mjpeg", "-framerate", str(fps),
+                    "-video_size", f"{height * 16 // 9}x{height}", "-i", f"/dev/{device}",
+                ]))
+            sources.append(("Capture Screen", ["-f", "gdigrab", "-framerate", str(fps), "-i", "desktop"]))
+
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    video_sources_cache = sources
+    video_sources_query_time = time.monotonic()
+    return sources

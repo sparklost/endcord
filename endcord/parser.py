@@ -1279,6 +1279,17 @@ def command_string(text):
     elif text_lower.startswith("voice_quit_video"):
         cmd_type = 89
 
+    # 90 - VOICE_ENABLE_CAMERA
+    elif text_lower.startswith("voice_enable_camera"):
+        cmd_type = 90
+        name = text[20:].strip(" ")
+        if name:
+            cmd_args = {"name": name}
+
+    # 91 - VOICE_DISABLE_CAMERA
+    elif text_lower.startswith("voice_disable_camera"):
+        cmd_type = 91
+
     if not forum:
         cmd_type += 1000
 

@@ -3044,7 +3044,7 @@ def generate_extra_line_guild_start_call(channel, voice_states, max_len, bordere
     return shortened_str + right_text, line_format
 
 
-def generate_extra_line_call(call_participants, volume_in, volume_out, videos, rtt, max_len, bordered, colors):   # noqa
+def generate_extra_line_call(call_participants, volume_in, volume_out, videos, rec, rtt, max_len, bordered, colors):   # noqa
     """Generate extra line containing information about ongoing call"""
     max_len = max_len - bordered * 3
     color_low = colors[8]
@@ -3052,8 +3052,9 @@ def generate_extra_line_call(call_participants, volume_in, volume_out, videos, r
     left_text = "In the call: You"
     rtt_text = f"({min(rtt, 999.9):.1f}ms) " if rtt is not None else ""
     video_text = f"(VID:{len(videos)}) " if videos else ""
-    right_text = f"{rtt_text}{video_text}[I:{(str(volume_in)+"%").center(4)} O:{(str(volume_out)+"%").center(4)}] [Leave]"
+    right_text = f"{rtt_text}{"●REC " if rec else ""}{video_text}[I:{(str(volume_in)+"%").center(4)} O:{(str(volume_out)+"%").center(4)}] [Leave]"
     max_str_length = max_len - len(right_text) - 3   # 3 for ...
+    rec_txt_len = 5 if rec else 0
 
     for participant in call_participants:
         left_text += f", {participant["name"]}"
@@ -3063,13 +3064,15 @@ def generate_extra_line_call(call_participants, volume_in, volume_out, videos, r
     line_format = [
         (color_standout, None, 13, len(left_text[:max_str_length])),
         (color_standout, None, max_len - 23, max_len - 8),
-        (20 if int(rtt) > 500 else 19 if rtt > 200 else color_low, None, max_len - 23 - len(rtt_text) - len(video_text), max_len - 23 - len(video_text)),
+        (20 if int(rtt) > 500 else 19 if rtt > 200 else color_low, None, max_len - 23 - len(rtt_text) - len(video_text) - rec_txt_len, max_len - 23 - len(video_text) - rec_txt_len),
         (20 if volume_out == 0 else None, None, max_len - 15, max_len - 9),
         (20 if volume_in == 0 else None, None, max_len - 22, max_len - 16),
         (20, None, max_len - 7, max_len),
     ]
     if videos:
         line_format.append((18, None, max_len - 23 - len(video_text), max_len - 23))
+    if rec:
+        line_format.append((20, 1, max_len - 28 - len(video_text), max_len - 23 - len(video_text)))
 
     if len(left_text) + 1 + len(right_text) <= max_len:
         space_num = max_len - (len(left_text) + len(right_text))

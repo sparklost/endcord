@@ -77,7 +77,7 @@ LIMIT_MSG_LEN = 2000
 LIMIT_MSG_LEN_PREMIUM = 4000
 COLLAPSE_ALL_EXCEPT_OPTIONS = ("current", "selected", "above", "below")
 STANDING_TYPES = ("All Good", "Limited", "Very Limited", "At risk", "Suspended")
-ASSISTED_COMMANDS = ("set ", "string_select ", "set_notifications ", "game_detection_blacklist ", "switch_tab ", "goto ", "collapse_all_except ", "insert_timestamp ", "voice_set_input_device ", "switch_profile ", "voice_set_volume_user ", "voice_play_video ", "gif ")
+ASSISTED_COMMANDS = ("set ", "string_select ", "set_notifications ", "game_detection_blacklist ", "switch_tab ", "goto ", "collapse_all_except ", "insert_timestamp ", "voice_set_input_device ", "switch_profile ", "voice_set_volume_user ", "voice_play_video ", "voice_enable_camera ", "gif ")
 STATS_COMMAND_TEXT = ("Run time", "Gateway events/h", "Gateway messages/h", "Gateway ping time", "Message buffer size", "Total API requests", "API response time", "Cache sizes", "  Cached members", "  Deleted messages", "  Summaries", "  Image cache")
 match_youtube = re.compile(r"(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)[a-zA-Z0-9_-]{11}")
 match_last_parentheses = re.compile(r"\([^()]*\)(?!.*\([^()]*\))")
@@ -2494,6 +2494,8 @@ class Endcord:
                         mouse_x = self.tui.get_x_line_clicked() + (not (self.tui.bordered)) * 2
                         len_extra_line = len(self.extra_line) + 1
                         videos = self.voice_gateway.get_video_users()
+                        videos_len = (8 + (1 if len(videos) > 9 else 0)) if videos else 0
+                        streaming = self.in_call["video"] or self.in_call["stream"]
                         if len_extra_line - 15 < mouse_x <= len_extra_line - 9:   # CLICK ON OUTPUT VOL
                             if self.state["volume_out"]:
                                 self.prev_volume_out = self.state["volume_out"]
@@ -2507,10 +2509,10 @@ class Endcord:
                             if self.state["volume_in"]:
                                 self.prev_volume_in = self.state["volume_in"]
                                 self.state["volume_in"] = 0
-                                self.update_voice_mute_in_call(True)
+                                self.update_voice_state()
                             else:
                                 self.state["volume_in"] = self.prev_volume_in
-                                self.update_voice_mute_in_call(False)
+                                self.update_voice_state()
                             self.voice_gateway.set_volumes(self.state["volume_in"], self.state["volume_out"])
                             utils.save_json(self.state, f"state_{self.profiles["selected"]}.json")
                             self.update_call_extra_line()
@@ -2535,6 +2537,11 @@ class Endcord:
                                 self.add_to_store(self.active_channel["channel_id"], input_text)
                                 self.restore_input_text = ("voice_play_video ", "command")
                                 self.assist("voice_play_video ", 5)
+                        elif streaming and len_extra_line - 28 - videos_len < mouse_x <= len_extra_line - 24 - videos_len:
+                            self.in_call["video"] = False
+                            self.update_voice_state()
+                            self.voice_gateway.stop_video_streaming()
+                            self.update_call_extra_line()
                     elif self.most_recent_incoming_call or self.active_channel["channel_id"] in self.incoming_calls:
                         mouse_x = self.tui.get_x_line_clicked() + (not (self.tui.bordered))*2
                         len_extra_line = len(self.extra_line) + 1
@@ -3222,6 +3229,12 @@ class Endcord:
             return
         if cmd_type > 1000:
             cmd_type -= 1000
+
+        if cmd_type in (56, 88, 89, 90, 91) and not self.voice_gateway:
+            self.reset_states()
+            self.update_status_line()
+            self.update_extra_line("Join a voice call first to use this command", color=19)
+            return
 
         if cmd_type == 1:   # SET
             key = cmd_args["key"]
@@ -4075,10 +4088,10 @@ class Endcord:
                 if self.state["volume_in"]:
                     self.prev_volume_in = self.state["volume_in"]
                     self.state["volume_in"] = 0
-                    self.update_voice_mute_in_call(True)
+                    self.update_voice_state()
                 else:
                     self.state["volume_in"] = self.prev_volume_in
-                    self.update_voice_mute_in_call(False)
+                    self.update_voice_state()
             else:
                 value = min(max(cmd_args["value"], 0), 200)
                 if cmd_args["increment"] == 1:
@@ -4086,9 +4099,9 @@ class Endcord:
                 elif cmd_args["increment"] == -1:
                     value = max(self.state["volume_in"] - value, 0)
                 if self.state["volume_in"] and not value:
-                    self.update_voice_mute_in_call(True)
+                    self.update_voice_state()
                 elif not self.state["volume_in"] and value:
-                    self.update_voice_mute_in_call(False)
+                    self.update_voice_state()
                 self.state["volume_in"] = value
                 self.prev_volume_in = value
                 if cmd_args["value"] > 200:
@@ -4534,6 +4547,31 @@ class Endcord:
 
         elif cmd_type == 89 and self.voice_gateway:   # VOICE_QUIT_VIDEO
             self.voice_gateway.stop_video_player()
+
+        elif cmd_type == 90 and self.voice_gateway and self.in_call:   # VOICE_ENABLE_CAMERA
+            name = cmd_args.get("name").removesuffix(" - Low quality (use voice_start_stream instead)")
+            sources = peripherals.get_video_sources()
+            command = None
+            if not name and sources:
+                command = sources[0][1]
+            else:
+                for device, command in sources:
+                    if device == name:
+                        break
+                else:
+                    self.update_extra_line("Specified video source could not be found", color=19)
+                    command = None
+            if command:
+                self.in_call["video"] = True
+                self.update_voice_state()
+                self.voice_gateway.start_video_streaming(command)
+                self.update_call_extra_line()
+
+        elif cmd_type == 91 and self.voice_gateway and self.in_call:   # VOICE_DISABLE_CAMERA
+            self.in_call["video"] = False
+            self.update_voice_state()
+            self.voice_gateway.stop_video_streaming()
+            self.update_call_extra_line()
 
         if success is None:
             self.gateway.set_offline()
@@ -6354,6 +6392,16 @@ class Endcord:
                     else:
                         extra_format.append(None)
 
+            elif command_lower.startswith("voice_enable_camera "):
+                self.assist_found = search.search_options(
+                    [x + " - Low quality (use voice_start_stream instead)" if x == "Capture Screen" else x for x, _ in peripherals.get_video_sources()],
+                    assist_word[20:],
+                    assist_word[:19],
+                    limit=self.assist_limit,
+                    score_cutoff=self.assist_score_cutoff,
+                )
+                extra_format = [None] * len(self.assist_found)
+
             elif command_lower.startswith("gif "):
                 self.assist_found = search.search_gifs(
                     self.discord.get_settings_proto(2).get("favorite_gifs", {}).get("gifs", []),
@@ -7145,9 +7193,6 @@ class Endcord:
         """Generate extra line and update it in TUI"""
         update_only |= self.extra_window_open
         if permanent:
-            if update_only:
-                self.permanent_extra_line = custom_text
-                return
             if custom_text:
                 self.permanent_extra_line = custom_text
                 self.extra_line = custom_text
@@ -7158,10 +7203,15 @@ class Endcord:
                 else:
                     self.extra_line_format = []
                 self.permanent_extra_line_format = self.extra_line_format
+                if update_only or self.timed_extra_line.is_set():
+                    return
                 self.tui.draw_extra_line(self.extra_line, self.extra_line_format)
             else:
                 self.permanent_extra_line = None
+                self.permanent_extra_line_format = None
                 self.extra_line = None
+                if update_only or self.timed_extra_line.is_set():
+                    return
                 self.tui.remove_extra_line()
             return
         if update_only:
@@ -8361,7 +8411,7 @@ class Endcord:
             denoise=self.config["call_noise_suppression"],
             mpv=self.config["mpv_path"],
         )
-        self.in_call = {"guild_id": guild_id, "channel_id": channel_id}
+        self.in_call = {"guild_id": guild_id, "channel_id": channel_id, "video": False, "stream": False}
         for _ in range(100):   # wait for 10s
             if not self.voice_gateway:
                 self.joining_call = False
@@ -8498,6 +8548,7 @@ class Endcord:
             self.state["volume_in"],
             self.state["volume_out"],
             self.voice_gateway.get_video_users(),
+            self.in_call["video"] or self.in_call["stream"],
             self.voice_gateway.get_rtt() if self.voice_gateway else 999.9,
             self.tui.get_dimensions()[2][1],
             self.tui.bordered,
@@ -8506,14 +8557,14 @@ class Endcord:
         self.update_extra_line(custom_text=self.permanent_extra_line, color=self.permanent_extra_line_format, permanent=True)
 
 
-    def update_voice_mute_in_call(self, value):
-        """Update this client mute state while in voice call"""
+    def update_voice_state(self):
+        """Update this client voice state while in voice call (mute and video values)"""
         if self.in_call and self.voice_gateway:
-            self.gateway.update_mute_in_call(
+            self.gateway.update_voice_state(
                 self.in_call["guild_id"],
                 self.in_call["channel_id"],
-                value,
-                video=False,
+                mute=not bool(self.state["volume_in"]),
+                video=self.in_call["video"],
                 preferred_regions=self.discord.get_best_voice_region(),
             )
 
@@ -8736,7 +8787,7 @@ class Endcord:
         if text:
             if extension_updates and self.config["check_for_updates"] in (2, 4):
                 peripherals.notify_send("Updates available", text)
-            self.update_extra_line(text, timed=False)
+            self.update_extra_line(text, timed=False, color=18)
             logger.info(text)
 
         utils.save_json(last_check, "version.json")
@@ -8959,7 +9010,14 @@ class Endcord:
             else:
                 last_run = (6, 1)
             if self.fun == 3:
-                self.update_extra_line("Snow easter egg can be CPU-heavy, run 'toggle_snow' command to stop it", timed=False)
+                if self.inline_media:
+                    self.update_extra_line("Snow easter egg doesnt work well with inline images, run 'toggle_snow' comand to enable it", timed=False)
+                    self.fun = 1
+                    self.tui.set_fun(1)
+                    self.state["snow"] = False
+                    utils.save_json(self.state, f"state_{self.profiles["selected"]}.json")
+                else:
+                    self.update_extra_line("Snow easter egg can be CPU-heavy, run 'toggle_snow' command to stop it", timed=False)
             if self.fun == 4 and last_run != (4, 1):
                 self.update_extra_line("Personalized ADs will be shown here, click this to opt-out", timed=False, color=20)
 
@@ -9247,6 +9305,7 @@ class Endcord:
                             self.state["volume_in"],
                             self.state["volume_out"],
                             self.voice_gateway.get_video_users(),
+                            self.in_call["video"] or self.in_call["stream"],
                             self.voice_gateway.get_rtt() if self.voice_gateway else 999.9,
                             self.tui.get_dimensions()[2][1],
                             self.tui.bordered,

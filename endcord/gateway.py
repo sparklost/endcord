@@ -2363,7 +2363,7 @@ class Gateway():
         logger.debug("Requesting voice disconnect")
 
 
-    def update_mute_in_call(self, guild_id, channel_id, mute, video, preferred_regions):
+    def update_voice_state(self, guild_id, channel_id, mute, video, preferred_regions):
         """Update this client mute state while in voice call"""
         payload = {
             "op": 4,

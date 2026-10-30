@@ -135,6 +135,10 @@
     Play video from specified streaming user, or first if none is provided.
 - `voice_quit_video`  
     Stop playing video stream.
+- `voice_enable_camera *[device]`  
+    Start sharing video in a voice call. If device is not provided it will default to first one. Available devices are listed in command assist.
+- `voice_disable_camera`  
+    Stop sharing video in a voice call.
 - `send_as_file`  
     Upload currently typed text as txt file attachment.
 - `generate_invite *[duration] *[limit]`  

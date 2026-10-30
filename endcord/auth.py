@@ -106,10 +106,10 @@ class Discord():
                 connection = http.client.HTTPSConnection(host, port, timeout=timeout + 5)   # extra time for tor
                 connection.sock = proxy_sock
             else:
-                logger.warn(f"Invalid proxy: {self.proxy}")
+                logger.warning(f"Invalid proxy: {self.proxy}")
                 connection = http.client.HTTPSConnection(host, port, timeout=timeout, context=ssl_context)
         except Exception as e:
-            logger.warn(f"Error connecting to proxy {self.proxy}: {e}")
+            logger.warning(f"Error connecting to proxy {self.proxy}: {e}")
             connection = http.client.HTTPSConnection(host, port, timeout=timeout, context=ssl_context)
         return connection
 
@@ -515,7 +515,7 @@ class Gateway():
             if heartbeat_sent_time - time.monotonic() >= self.timeout:
                 self.state = 5
                 self.disconnect_ws(timeout=0)
-                logger.warn("Auth gateway timeout")
+                logger.warning("Auth gateway timeout")
                 return
             # sleep(heartbeat_interval * jitter), but jitter is limited to (0.1 - 0.9)
             # in this time heartbeat ack should be received from discord

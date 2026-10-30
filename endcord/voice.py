@@ -87,7 +87,7 @@ def init_microphone(custom_mic):
         except IndexError:
             return soundcard.default_microphone()
     except Exception:
-        logger.warn("Failed to initialize microphone!")
+        logger.warning("Failed to initialize microphone!")
         return None
 
 
@@ -123,7 +123,7 @@ def split_annex_b(data, final=False):
 class Gateway():
     """Methods for fetching and sending data to Discord voice gateway through websocket"""
 
-    def __init__(self, voice_gateway_data, my_id, volume_input, volume_output, user_agent, proxy=None, custom_mic=None, silence=-30, opus_mode="voip", fast_mixer=False, denoise=True, mpv="mpv"):
+    def __init__(self, voice_gateway_data, my_id, volume_input, volume_output, user_agent, proxy=None, custom_mic=None, silence=-30, opus_mode="voip", fast_mixer=False, denoise=True, mpv="mpv", stream=False):
         self.voice_gateway_data = voice_gateway_data
         self.guild_id = voice_gateway_data["guild_id"]
         self.channel_id = voice_gateway_data["channel_id"]
@@ -167,6 +167,7 @@ class Gateway():
         self.fast_mixer = fast_mixer
         self.denoise = denoise
         self.mpv = mpv
+        self.stream = stream   # connection to stream (go live) voice server, only for sending screen video
 
         self.connect()
 
@@ -230,11 +231,11 @@ class Gateway():
                 self.selected_mode,
                 self.volume_input,
                 self.volume_output,
-                custom_mic=(self.custom_mic if self.enable_input else "OFF"),
+                custom_mic=(self.custom_mic if self.enable_input and not self.stream else "OFF"),
                 silence=self.silence_threshold,
                 opus_mode=self.opus_mode,
                 fast_mixer=self.fast_mixer,
-                denoise=self.denoise,
+                denoise=self.denoise and not self.stream,
                 mpv=self.mpv,
             )
             self.call_handler.start()
@@ -280,7 +281,7 @@ class Gateway():
                 http_proxy_auth=(proxy.username, proxy.password) if proxy.username else None,
             )
         else:
-            self.ws.connect(gateway_url + "/?v=8", header=self.header)
+            self.ws.connect(gateway_url + "/?v=9", header=self.header)
 
 
     def connect(self):
@@ -563,7 +564,7 @@ class Gateway():
                 "max_dave_protocol_version": dave.get_max_supported_protocol_version(),
                 "video": True,
                 "streams": [{
-                    "type": "video",
+                    "type": "screen" if self.stream else "video",
                     "rid": "100",
                     "quality": 100,
                 }],
@@ -625,7 +626,7 @@ class Gateway():
         payload = {
             "op": 5,
             "d": {
-                "speaking": 1 if speaking else 0,
+                "speaking": (2 if self.stream else 1) if speaking else 0,   # soundshare flag for stream
                 "delay": 0,
                 "ssrc": self.ssrc,
             },
@@ -757,14 +758,14 @@ class Gateway():
         self.call_handler.stop_video_player()
 
 
-    def start_screen_sharing(self, source=None):
+    def start_video_streaming(self, source=None):
         """Capture screen with ffmpeg and send it as video"""
-        return self.call_handler.start_screen_sharing(source)
+        return self.call_handler.start_video_streaming(source)
 
 
-    def stop_screen_sharing(self):
+    def stop_video_streaming(self):
         """Stop screen sharing"""
-        self.call_handler.stop_screen_sharing()
+        self.call_handler.stop_video_streaming()
 
 
 
@@ -813,7 +814,7 @@ class CallHandler:
                 self.denoiser.process_frame(silence_frame)
             except OSError as e:
                 self.denoiser = None
-                logger.warn(e)
+                logger.warning(e)
         else:
             self.denoiser = None
 
@@ -847,6 +848,10 @@ class CallHandler:
         self.screen_rtx_ssrc = 0
         self.video_sequence = random.randint(0, 0xFFFF)
         self.video_timestamp_base = random.randint(0, 0xFFFFFFFF)
+        self.video_start_time = 0
+        self.video_twcc = 0
+        self.video_packets_sent = 0
+        self.video_bytes_sent = 0
 
 
     def start(self):
@@ -862,7 +867,13 @@ class CallHandler:
         self.transport_counter = 0
         self.rtt_ms = 0.0
 
-        if have_sound:
+        if self.gateway.stream:   # stream connection only sends video
+            self.receiver_thread = threading.Thread(target=self.receiver_loop, daemon=True)
+            self.receiver_thread.start()
+            if RTCP_SR_SEND_DELAY:
+                threading.Thread(target=self.rtcp_sender_report_loop, daemon=True).start()
+
+        elif have_sound:
             # start receiver and player
             self.receiver_thread = threading.Thread(target=self.receiver_loop, daemon=True)
             self.receiver_thread.start()
@@ -891,7 +902,7 @@ class CallHandler:
             return
         self.run = False
         self.stop_video_player(notify=False)
-        self.stop_screen_sharing(notify=False)
+        self.stop_video_streaming(notify=False)
         try:
             self.udp.close()
         except Exception:
@@ -985,7 +996,7 @@ class CallHandler:
             try:
                 data = self.udp.recv(4096)
             except OSError as e:
-                logger.error(f"UDP socket closed or error: {e}")
+                logger.warning(f"UDP socket closed or error: {e}")
                 break
             except Exception as e:
                 logger.error(f"UDP receive error: {e}")
@@ -1193,13 +1204,16 @@ class CallHandler:
 
 
     def rtcp_sender_report_loop(self):
-        """Send RTCP sender report"""
+        """Send RTCP sender reports for audio and video"""
         while self.run:
+            # audio
+            if self.gateway.stream:   # no audio on stream connection
+                time.sleep(RTCP_SR_SEND_DELAY)
+                continue
             now = time.time()
             ntp_seconds = int(now) + 2208988800   # ntp timestamp is seconds since 01.01.1900
             ntp_fraction = int((now % 1) * (1 << 32))
             ntp_timestamp = (ntp_seconds << 32) | ntp_fraction
-
             payload = bytearray(28)
             payload[0] = 0x80   # v2, no padding, RC=0
             payload[1] = 200   # PT=SR
@@ -1218,6 +1232,30 @@ class CallHandler:
                 self.udp.send(payload)
             except Exception:
                 break
+
+            # video
+            if not self.ffmpeg_proc:
+                time.sleep(RTCP_SR_SEND_DELAY)
+                continue
+            now = time.time()
+            ntp_timestamp = ((int(now) + 2208988800) << 32) | int((now % 1) * (1 << 32))
+            rtp_timestamp = (self.video_timestamp_base + int((time.monotonic() - self.video_start_time) * 90000)) & 0xFFFFFFFF
+            payload = bytearray(28)
+            payload[0] = 0x80   # v2, no padding, RC=0
+            payload[1] = 200   # PT=SR
+            struct.pack_into(">H", payload, 2, 6)   # length in 32bit words
+            struct.pack_into(">I", payload, 4, self.screen_ssrc)
+            struct.pack_into(">Q", payload, 8, ntp_timestamp)
+            struct.pack_into(">I", payload, 16, rtp_timestamp)
+            struct.pack_into(">I", payload, 20, self.video_packets_sent)
+            struct.pack_into(">I", payload, 24, self.video_bytes_sent)
+            payload = self.transport_encrypt(payload[:8], payload[8:])
+            if payload:
+                try:
+                    self.udp.send(payload)
+                except Exception:
+                    pass
+
             time.sleep(RTCP_SR_SEND_DELAY)
 
 
@@ -1882,12 +1920,21 @@ class CallHandler:
         for i, packet in enumerate(packets):
             self.video_sequence = (self.video_sequence + 1) & 0xFFFF
             header = bytearray(12)
-            header[0] = 0x80   # v2, no padding, no extension, cc=0
+            header[0] = 0x90   # v2, no padding, extension, cc=0
             header[1] = 0x67 | (0x80 if i == len(packets) - 1 else 0)   # marker on last packet of frame
             struct.pack_into(">H", header, 2, self.video_sequence)
             struct.pack_into(">I", header, 4, timestamp)
             struct.pack_into(">I", header, 8, ssrc)
-            payload = self.transport_encrypt(header, packet)
+            self.video_twcc = (self.video_twcc + 1) & 0xFFFF
+            extension = (
+                bytes([(3 << 4) | 2]) + (int((time.time() % 64) * (1 << 18)) & 0xFFFFFF).to_bytes(3, "big")   # abs-send-time
+                + bytes([(5 << 4) | 1]) + self.video_twcc.to_bytes(2, "big")   # transport-wide sequence number
+                + bytes([(6 << 4) | 2]) + bytes(3)   # playout-delay, min and max 0
+                + bytes([(11 << 4) | 2]) + b"100"   # rtp stream id
+            )
+            extension += bytes(-len(extension) % 4)
+            header += b"\xbe\xde" + struct.pack(">H", len(extension) // 4)   # one-byte extension header, authenticated with rtp header
+            payload = self.transport_encrypt(header, extension + packet)
             if not payload:
                 logger.error(f"Unknown mode: {self.mode}")
                 continue
@@ -1897,6 +1944,8 @@ class CallHandler:
                 pass
             except Exception:
                 return False
+            self.video_packets_sent += 1
+            self.video_bytes_sent += len(packet)
         return True
 
 
@@ -1979,22 +2028,14 @@ class CallHandler:
             self.stop_video_player(notify=self.run)
 
 
-    def start_screen_sharing(self, source=None):
-        """Capture screen with ffmpeg, encode to H264 and send it"""
+    def start_video_streaming(self, source):
+        """Start video stream from provided source (list of ffmpeg args), encode to H264 and send it"""
         if self.ffmpeg_proc:
             return True
         stream = next((s for s in self.gateway.streams if s.get("rid") == "100"), None)
         if not stream:
             logger.error("Server did not provide video stream info")
             return False
-
-        if source is None:
-            if sys.platform == "win32":
-                source = ["-f", "gdigrab", "-framerate", str(VIDEO_FPS), "-i", "desktop"]
-            elif sys.platform == "darwin":
-                source = ["-f", "avfoundation", "-capture_cursor", "1", "-framerate", str(VIDEO_FPS), "-i", "Capture screen 0:none"]
-            else:
-                source = ["-f", "x11grab", "-framerate", str(VIDEO_FPS), "-i", os.environ.get("DISPLAY", ":0")]
 
         command = [
             "ffmpeg", "-v", "error", *source,
@@ -2011,18 +2052,23 @@ class CallHandler:
             logger.error(f"Failed to start ffmpeg: {e}")
             return False
 
+        if self.gateway.video_codec != "H264":
+            logger.warning(f"Server selected {self.gateway.video_codec} video codec for us, but only H264 is sent")
         self.screen_ssrc = int(stream["ssrc"])
         self.screen_rtx_ssrc = int(stream.get("rtx_ssrc", 0))
         if self.gateway.dave_protocol_version > 0:
             self.encryptor.assign_ssrc_to_codec(self.screen_ssrc, dave.Codec.h264)
         self.ffmpeg_proc = ffmpeg_proc
+        self.video_start_time = time.monotonic()
+        self.video_packets_sent = 0
+        self.video_bytes_sent = 0
 
         self.gateway.send_video_sources(True, self.screen_ssrc, self.screen_rtx_ssrc)
-        threading.Thread(target=self.screen_share_loop, args=(ffmpeg_proc, self.screen_ssrc), daemon=True).start()
+        threading.Thread(target=self.video_stream_loop, args=(ffmpeg_proc, self.screen_ssrc), daemon=True).start()
         return True
 
 
-    def stop_screen_sharing(self, notify=True):
+    def stop_video_streaming(self, notify=True):
         """Stop screen capturing and notify server"""
         if not self.ffmpeg_proc:
             return
@@ -2032,11 +2078,11 @@ class CallHandler:
             self.gateway.send_video_sources(False, self.screen_ssrc, self.screen_rtx_ssrc)
 
 
-    def screen_share_loop(self, ffmpeg_proc, ssrc):
+    def video_stream_loop(self, ffmpeg_proc, ssrc):
         """Thread that reads H264 stream from ffmpeg, split it into frames and send them"""
         buffer = bytearray()
         access_unit = []
-        start_time = time.monotonic()
+        start_time = self.video_start_time
         ok = True
 
         while ok and self.run and self.ffmpeg_proc is ffmpeg_proc:
@@ -2056,4 +2102,4 @@ class CallHandler:
                 access_unit.append(nal)
 
         if self.ffmpeg_proc is ffmpeg_proc:   # ffmpeg died or sending failed
-            self.stop_screen_sharing(notify=self.run)
+            self.stop_video_streaming(notify=self.run)

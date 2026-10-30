@@ -225,10 +225,10 @@ class Discord():
                 connection = http.client.HTTPSConnection(host, port, timeout=timeout + 5)   # extra time for tor
                 connection.sock = proxy_sock
             else:
-                logger.warn(f"Invalid proxy: {self.proxy}")
+                logger.warning(f"Invalid proxy: {self.proxy}")
                 connection = http.client.HTTPSConnection(host, port, timeout=timeout, context=ssl_context)
         except Exception as e:
-            logger.warn(f"Error connecting to proxy {self.proxy}: {e}")
+            logger.warning(f"Error connecting to proxy {self.proxy}: {e}")
             connection = http.client.HTTPSConnection(host, port, timeout=timeout, context=ssl_context)
         return connection
 

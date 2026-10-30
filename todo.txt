@@ -1,4 +1,8 @@
-Add camera and screen recording to video calls
+Fix lagging sent video in a call
+Add wayland screen capture
+Make video call work with pyav
+Add stream calls
+Add nightly builds?
 
 CORE EASY:
 Add spellcheck corrections assist
@@ -7,6 +11,7 @@ Add keybinding configuration UI
 Add settings and theme configuration UI
 Add documentation viewer
 Add commands for UI tools
+Add stream calls
 
 CORE HARD:
 Fix issues with wide characters in input line
@@ -17,7 +22,6 @@ Make custom json parser - remove orjson
 Add multiline input line
 Add option to select individual message
 Add TUI video calls with call UI
-Add stage and stream calls
 Add localization
 
 GTKCURSES:
@@ -39,3 +43,4 @@ Add colors to rich embeds vertical line
 EXTENSIONS:
 endcord-kitty-media
 endcord-p2p-network (name subject to change)
+endcord-fluxer

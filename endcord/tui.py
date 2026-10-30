@@ -443,7 +443,7 @@ class TUI():
                 if len(split_binding) == 1:
                     continue
                 elif len(split_binding) > 2:
-                    logger.warn(f"Invalid keybinding: {binding}")
+                    logger.warning(f"Invalid keybinding: {binding}")
                 if split_binding[0] not in self.chainable:
                     self.chainable.append(split_binding[0])
         del self.keybindings   # not needed anymore
