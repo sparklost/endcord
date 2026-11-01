@@ -1332,7 +1332,7 @@ def parser():
         choices=["FULL", "MEDIUM", "LITE", "MINI", "MICRO"],
         help=(
             'Change environment to build a specified level of endcord. Options:\n'
-            '  "FULL"   - Has media support\n'
+            '  "FULL"   - Has media and video stream support\n'
             '  "MEDIUM" - Has call support, no media support, but can display images\n'
             '  "LITE"   - No image, media, nor call support\n'
             '  "MINI"   - like LITE, no sound unless paplay/pw-cat exist, no voice recording\n'

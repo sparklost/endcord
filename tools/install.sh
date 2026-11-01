@@ -319,7 +319,7 @@ if [[ -z "$MODE" ]]; then
     [[ "$METHOD" == "1" ]] && MUST_BUILD="${YELLOW}(NO DOWNLOAD)${NC} " || MUST_BUILD=""
     echo ""
     echo "${CYAN}==>${NC} Which 'level' of $APP_NAME to install?"
-    echo -e "  ${CYAN}1)${NC} FULL     full media support"
+    echo -e "  ${CYAN}1)${NC} FULL     full media and video stream support"
     echo -e "  ${CYAN}2)${NC} MEDIUM   ${MUST_BUILD}call support, no media support except images"
     echo -e "  ${CYAN}3)${NC} LITE     no image, media nor call support"
     echo -e "  ${CYAN}4)${NC} MINI     ${MUST_BUILD}like LITE, no sound unless paplay/pw-cat exist, no voice recording"

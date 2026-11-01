@@ -97,6 +97,8 @@ settings = {
     "call_opus_mode": "voip",
     "call_fast_mixer": False,
     "call_noise_suppression": True,
+    "call_x264_bitrate": 1600,
+    "call_x264_preset": "veryfast",
     "yt_dlp_path": "yt-dlp",
     "yt_dlp_format": 18,
     "mpv_path": "mpv",

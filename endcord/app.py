@@ -49,7 +49,6 @@ from endcord.message import GIF_PROVIDERS
 support_image = importlib.util.find_spec("PIL") is not None
 support_media = support_image and importlib.util.find_spec("av") is not None
 support_call = (
-    support_media and
     importlib.util.find_spec("dave") is not None and
     importlib.util.find_spec("nacl") is not None
 )
@@ -609,8 +608,9 @@ class Endcord:
         while self.run:
             self.timed_extra_line.wait()
             self.stop_event.wait(self.extra_line_delay)   # instead of time.sleep()
-            self.update_extra_line()
-            self.timed_extra_line.clear()
+            if self.timed_extra_line.is_set():   # if something else cleared it
+                self.update_extra_line()
+                self.timed_extra_line.clear()
 
 
     def wait_slowmode(self):
@@ -2565,6 +2565,9 @@ class Endcord:
                         len_extra_line = len(self.extra_line) + 1
                         if len_extra_line - 11 < mouse_x <= len_extra_line:   # JOIN CALL
                             self.join_current_voice_channel()
+                elif self.timed_extra_line.is_set():
+                    self.update_extra_line()
+                    self.timed_extra_line.clear()
                 elif self.fun == 4 and self.extra_line and self.extra_line.startswith("Personalized"):
                     self.download_threads.append(threading.Thread(target=self.download_file, daemon=True, args=(
                         "https://" + "archive.org/download/youtube-" + "/".join(["xvFZjo5PgG0"]*2) + ".mp4",
@@ -4548,9 +4551,10 @@ class Endcord:
         elif cmd_type == 89 and self.voice_gateway:   # VOICE_QUIT_VIDEO
             self.voice_gateway.stop_video_player()
 
-        elif cmd_type == 90 and self.voice_gateway and self.in_call:   # VOICE_ENABLE_CAMERA
+        elif cmd_type == 90 and self.voice_gateway and self.in_call and support_media:   # VOICE_ENABLE_CAMERA
             name = cmd_args.get("name").removesuffix(" - Low quality (use voice_start_stream instead)")
-            sources = peripherals.get_video_sources()
+            from endcord import voice
+            sources = voice.get_video_sources()
             command = None
             if not name and sources:
                 command = sources[0][1]
@@ -6392,9 +6396,10 @@ class Endcord:
                     else:
                         extra_format.append(None)
 
-            elif command_lower.startswith("voice_enable_camera "):
+            elif command_lower.startswith("voice_enable_camera ") and self.in_call:
+                from endcord import voice
                 self.assist_found = search.search_options(
-                    [x + " - Low quality (use voice_start_stream instead)" if x == "Capture Screen" else x for x, _ in peripherals.get_video_sources()],
+                    [x + " - Low quality (use voice_start_stream instead)" if x == "Capture Screen" else x for x, _ in voice.get_video_sources()],
                     assist_word[20:],
                     assist_word[:19],
                     limit=self.assist_limit,
@@ -8410,6 +8415,9 @@ class Endcord:
             fast_mixer=self.config["call_fast_mixer"],
             denoise=self.config["call_noise_suppression"],
             mpv=self.config["mpv_path"],
+            x264_bitrate=self.config["call_x264_bitrate"],
+            x264_preset=self.config["call_x264_preset"],
+            stream=False,
         )
         self.in_call = {"guild_id": guild_id, "channel_id": channel_id, "video": False, "stream": False}
         for _ in range(100):   # wait for 10s
@@ -9163,7 +9171,7 @@ class Endcord:
                         if not self.voice_gateway.get_state():
                             self.leave_call()
 
-                if call_last_update >= 5 / MAIN_LOOP_POLL_DELAY:   # run every 5s
+                if call_last_update >= 2 / MAIN_LOOP_POLL_DELAY:   # run every 2s
                     self.update_call_extra_line()
                     call_last_update = 0
                 call_last_update += 1

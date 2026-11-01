@@ -1,8 +1,5 @@
-Fix lagging sent video in a call
 Add wayland screen capture
-Make video call work with pyav
-Add stream calls
-Add nightly builds?
+Move website to endcord.github.io
 
 CORE EASY:
 Add spellcheck corrections assist
@@ -12,6 +9,7 @@ Add settings and theme configuration UI
 Add documentation viewer
 Add commands for UI tools
 Add stream calls
+Add nightly builds?
 
 CORE HARD:
 Fix issues with wide characters in input line

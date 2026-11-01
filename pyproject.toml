@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "websocket-client>=1.9.2",
-    "python-socks>=3.1.1",
+    "python-socks>=3.2.1",
     "orjson>=3.13.0",
     "soundcard>=0.4.6",
     "soundfile>=0.14.0",
@@ -23,7 +23,7 @@ dependencies = [
 [dependency-groups]
 build = [
     "cython>=3.3.0",
-    "nuitka[onefile]>=4.3.1",
+    "nuitka[onefile]>=4.3.4",
     "pyinstaller>=6.22.3",
     "setuptools>=82.0.0",
 ]
@@ -32,6 +32,7 @@ media = [
     "dave-py>=1.1.0",
     "pillow>=13.0.0",
     "pynacl>=1.6.2",
+    "pygrabber >= 0.2; sys_platform == 'win32'",
 ]
 
 [build]

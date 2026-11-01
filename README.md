@@ -23,12 +23,18 @@ Any third party endcord forks may add features that can lead to account ban, cau
 
 ## Features
 - Extremely low CPU and RAM usage (see [RAM usage](docs/faq.md#ram-usage))
-- Voice and video calls (DM, groups and servers) with video streaming
 - Vim-mode
 - Integrated RPC (only Rich Presence) and game detection
 - Mouse controls
 - Kitty protocol images, pfp, emoji (through extensions: [1](https://github.com/sparklost/endcord-image-inline), [2](https://github.com/sparklost/endcord-image-pfp), [3](https://github.com/sparklost/endcord-image-emoji))
 - Login with email, 2fa, QR code, or paste token
+- Voice calls
+    - Audio noise suppression with RNNoise
+    - View video throug mpv
+    - Stream video from any source (camera, usb, screen share)
+    - Set volues per-user or mute them
+    - Customizable video properties
+    - Push-to-talk-alike binding
 - Desktop notifications
 - Inline images (pixelated/ascii-art/[kitty-protocol](https://github.com/sparklost/endcord-image-inline))
 - View images, gifs, videos, audio, stickers and YouTube with ASCII art or in external app
@@ -112,7 +118,7 @@ Any third party endcord forks may add features that can lead to account ban, cau
     Binaries are built on Ubuntu-like distro with `--custom-python --nuitka` build script options with clang, meaning they are maximally optimized.
 - Arch Linux (AUR):
     - `yay -S endcord-installer` - same install script as explained above
-    - `yay -S endcord` - full version with media support, larger executable
+    - `yay -S endcord` - full version with media and video stream support, larger executable
     - `yay -S endcord-lite` - lite version without voice calls and media support
     - `yay -S endcord-gui` - "gui" windowed version using GTK3
     - `-git` versions will build from source, with latest changes

@@ -200,6 +200,12 @@ Also see [keybindings configuration](keybindings.md#configuring-keybindings).
     If True, call will use faster mixer that uses less CPU but might result in lower audio quality.  
 - `call_noise_suppression = True`  
     Run noise suppression on audio recorded from microphone. Audio will be downmixed to mono. To use this, either install rnnoise on the system, or build endcord with `--bundle-rnnoise` build.py script argument.
+- `call_x264_bitrate = 1600`  
+    Bitrate (Kbps) of libx264-encoded transmitted video in a voice call. On poor network, ping will slowly grow, then decrease this value.
+- `call_x264_preset = "veryfast"`  
+    Faster preset will decrease CPU usage and compression efficiency, which will increase uploaded packet size.  
+    Set to `ultrafast` only on very low-end CPU or when it is under high load. Slower presets will cause stream issues!  
+    Options: `ultrafast`, `superfast`, `veryfast`, `fast`, `medium`, `slow`...
 - `downloads_path = None`  
     Path to custom downloads directory. Set to `None` to use system default.
 - `notifications_pfp = True`  
