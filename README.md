@@ -27,7 +27,7 @@ Any third party endcord forks may add features that can lead to account ban, cau
 - Integrated RPC (only Rich Presence) and game detection
 - Mouse controls
 - Kitty protocol images, pfp, emoji (through extensions: [1](https://github.com/sparklost/endcord-image-inline), [2](https://github.com/sparklost/endcord-image-pfp), [3](https://github.com/sparklost/endcord-image-emoji))
-- Login with email, 2fa, QR code, or paste token
+- Login with email, MFA, QR code, or paste token
 - Voice calls
     - Audio noise suppression with RNNoise
     - View video throug mpv

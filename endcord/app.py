@@ -97,12 +97,14 @@ class Endcord:
             if profile["name"] == profiles["selected"]:
                 self.token = profile["token"]
                 self.last_run = profile["time"]
+                custom_host = profile.get("host")
                 break
         else:
             profiles = profiles["keyring"] + profiles["plaintext"]
             self.token = profiles[0]["token"]
             self.profiles["selected"] = profiles[0]["name"]
             self.last_run = profiles[0]["time"]
+            custom_host = profile.get("host")
 
         # load often used values from config
         self.enable_rpc = config["rpc"]
@@ -237,16 +239,16 @@ class Endcord:
             client_prop = None
         logger.debug(f"User-Agent: {self.user_agent}")
         self.chat = []
-        self.chat.insert(0, f"Connecting to {self.config["custom_host"] or "Discord"}")
-        logger.info(f"Connecting to {self.config["custom_host"] or "Discord"}")
+        self.chat.insert(0, f"Connecting to {custom_host or "Discord"}")
+        logger.info(f"Connecting to {custom_host or "Discord"}")
 
         # initialize stuff
         self.discord = discord.Discord(
             self.token,
-            config["custom_host"],
+            custom_host,
             client_prop,
             self.user_agent,
-            proxy=config["proxy"],
+            proxy=self.config["proxy"],
         )
         # preload chat for faster startup
         self.preloaded = False
@@ -254,10 +256,10 @@ class Endcord:
         threading.Thread(target=self.preload_chat, daemon=True).start()
         self.gateway = gateway.Gateway(
             self.token,
-            config["custom_host"],
+            custom_host,
             client_prop_gateway,
             self.user_agent,
-            proxy=config["proxy"],
+            proxy=self.config["proxy"],
             capablities=config["capabilities"],
         )
         # this takes some time, so let other things init in parallel
@@ -313,7 +315,7 @@ class Endcord:
         self.channel_cache = []   # [[id, msg, is_tab, is_temp, ch_name, guild_name]...]
         self.voice_gateway = None
         self.reset()
-        self.chat.insert(0, f"Connecting to {self.config["custom_host"] or "Discord"}")
+        self.chat.insert(0, f"Connecting to {custom_host or "Discord"}")
         self.gateway_state = self.gateway.get_state()
         self.chat_dim, self.tree_dim, _ = self.tui.get_dimensions()
         self.tree = []

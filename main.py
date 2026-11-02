@@ -144,23 +144,19 @@ def main(args):
 
     if args.proxy:
         config_data["proxy"] = args.proxy
-    if args.host:
-        config_data["custom_host"] = args.host
     if args.debug or config_data["debug"]:
         logging.getLogger().setLevel(logging.DEBUG)
 
     from endcord import profile_manager
     logger.info(f"Started endcord {VERSION}")
     if args.token:
-        profiles = {"selected": "default", "plaintext": [{"name": "default", "token": args.token, "time": int(time.time())}], "keyring": []}
+        host = args.host if args.host else config_data["custom_host"]
+        profiles = {"selected": "default", "plaintext": [{"name": "default", "token": args.token, "time": int(time.time()), "host": host}], "keyring": []}
         proceed = True
     else:
         profiles_path = os.path.join(peripherals.config_path, "profiles.json")
-        if args.profile:
-            selected = args.profile
-        else:
-            selected = None
-        profiles, selected, proceed = profile_manager.manage(profiles_path, selected, config_data, force_open=args.manager)
+        selected = args.profile if args.profile else None
+        profiles, selected, proceed = profile_manager.manage(profiles_path, selected, config_data, args.host, args.manager)
         if not profiles:
             print("Token not provided in profile manager nor as argument", file=sys.stderr)
             utils.wait_term()

@@ -34,6 +34,7 @@ uses_gtkcurses = hasattr(curses, "GTKCURSES")
 bordered = True
 border_corners = "╭╰╮╯"
 
+HOST = "discord.com"
 PART_HINT = "Enter to confirm, Esc to go back."
 FULL_HINT = PART_HINT[:-1] + ", Up/Down to select."
 CHECK_LOG = " Check log for more info."
@@ -45,11 +46,14 @@ NAME_PROMPT_TEXT = f""" Profile name is just an identifier for tokens for differ
  If you are going to use one account, type anything here, or leave it blank.
  If this profile name is same as other profile, the old one will be replaced.
 
+ Host can be changed below, leave default unless you know what you are doing.
  Profile name can be typed/pasted here (with Ctrl+Shift+V on most terminals):
 
 
 
- {PART_HINT}
+
+
+ {FULL_HINT}
 """
 TOKEN_PROMPT_TEXT = f""" Token is required to access Discord through your account without logging-in.
 
@@ -339,7 +343,7 @@ def convert_time(unix_time):
     return "Unknown"
 
 
-def init_auth(config):
+def init_auth(config, host=None):
     """Initialize discord authentication API class"""
     try:
         from endcord import auth, client_properties
@@ -354,12 +358,7 @@ def init_auth(config):
     user_agent = client_prop["browser_user_agent"]
     client_prop = client_properties.encode_properties(client_prop)
     logger.debug(f"User-Agent: {user_agent}")
-    return auth.Discord(
-        config["custom_host"],
-        client_prop,
-        user_agent,
-        proxy=config["proxy"],
-    )
+    return auth.Discord(host, client_prop, user_agent, proxy=config["proxy"])
 
 
 def main_tui(screen, profiles_enc, profiles_plain, selected, have_keyring, config):
@@ -540,11 +539,16 @@ def manage_profile(screen, have_keyring, config, editing_profile=None):
     data = {}
     while run:
         if step == 1:   # profile name
-            name, proceed = text_prompt(screen, NAME_PROMPT_TEXT, ("PROFILE NAME: ", ), init=(profile["name"], ), prompt_idx_back=3)
+            texts, proceed = text_prompt(screen, NAME_PROMPT_TEXT, ("PROFILE NAME: ", "HOST: "), init=(profile["name"], profile.get("host", HOST)), prompt_idx_back=5)
             if proceed:
+                name, host = texts
                 if not name:
                     name = "Default"
                 profile["name"] = name
+                if host and host != HOST:
+                    profile["host"] = host
+                else:
+                    profile.pop("host", None)
                 set_step(2)
             else:
                 return profile, False
@@ -568,7 +572,7 @@ def manage_profile(screen, have_keyring, config, editing_profile=None):
 
         elif step == 200:   # email login
             if not discord_auth:
-                discord_auth = init_auth(config)
+                discord_auth = init_auth(config, profile.get("host", config["custom_host"]))
                 if not discord_auth:
                     key_prompt(screen, FAILED_AUTH_INIT_TEXT)
                     set_step(2, mem=False)
@@ -712,7 +716,7 @@ def manage_profile(screen, have_keyring, config, editing_profile=None):
                     break
 
         elif step == 300:   # qr code login
-            discord_auth = init_auth(config)
+            discord_auth = init_auth(config, profile.get("host", config["custom_host"]))
             if not discord_auth:
                 key_prompt(screen, FAILED_AUTH_INIT_TEXT)
                 set_step(2, mem=False)
@@ -722,7 +726,7 @@ def manage_profile(screen, have_keyring, config, editing_profile=None):
                 user_agent = config["custom_user_agent"]
             else:
                 user_agent = client_properties.get_user_agent(anonymous=(config["client_properties"].lower() == "anonymous"))
-            gateway_auth = auth.Gateway(user_agent, proxy=config["proxy"])
+            gateway_auth = auth.Gateway(user_agent, host=profile.get("host", config["custom_host"]), proxy=config["proxy"])
             success = gateway_auth.connect()
             if not success:
                 key_prompt(screen, NETWORK_ERROR_TEXT)
@@ -1130,7 +1134,16 @@ def update_time(profiles_enc, profiles_plain, profile_name):
             return
 
 
-def manage(profiles_path, external_selected, config, force_open=False):
+def update_host(profiles_enc, profiles_plain, selected, config, force_host):
+    """Set runtime host for selected profile: force_host > profile host > config custom_host"""
+    for profile in profiles_enc + profiles_plain:
+        if profile["name"] == selected:
+            host = force_host or profile.get("host") or config["custom_host"]
+            if host:
+                profile["host"] = host
+
+
+def manage(profiles_path, external_selected, config, force_host=None, force_open=False):
     """Manage and return profiles and selected profile"""
     have_keyring = True
     if sys.platform == "linux" and not shutil.which("secret-tool"):
@@ -1166,6 +1179,7 @@ def manage(profiles_path, external_selected, config, force_open=False):
         if have_keyring:
             save_secret(json.dumps({"selected": selected, "profiles": profiles_enc}))
         save_plain({"selected": selected, "profiles": profiles_plain}, profiles_path)
+        update_host(profiles_enc, profiles_plain, selected, config, force_host)
         profiles = {
             "selected": selected,
             "keyring": profiles_enc,
@@ -1199,6 +1213,7 @@ def manage(profiles_path, external_selected, config, force_open=False):
         if have_keyring:
             save_secret(json.dumps({"selected": selected, "profiles": profiles_enc}))
         save_plain({"selected": selected, "profiles": profiles_plain}, profiles_path)
+        update_host(profiles_enc, profiles_plain, selected, config, force_host)
         profiles = {
             "selected": selected,
             "keyring": profiles_enc,

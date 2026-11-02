@@ -275,7 +275,9 @@ Also see [keybindings configuration](keybindings.md#configuring-keybindings).
     WARNING: Using proxy (especially TOR) might make you more suspicious to discord.  
     Voice and video calls will only work with socks5 proxy and it must support UDP ASSOCIATE.  
 - `custom_host = None`  
-    Custom host to connect to, like `old.server.spacebar.chat`. Set to `None` to use default host (`discord.com`)
+    Custom host to connect to, like `old.server.spacebar.chat`. Set to `None` to use default host (`discord.com`).  
+    Profile manager and `--host` command argument can also set the host.  
+    Priority order (first overrides following): argument, profile, config.
 - `capabilities = None`  
     DO NOT CHANGE, unless you know what you're doing. This might cause some features to not work or client to get unstable.  
     If bot token is used, then this will be used as `intents` parameter instead. See [discord bot documentation](https://discord.com/developers/docs/events/gateway#gateway-intents).  
