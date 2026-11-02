@@ -325,13 +325,14 @@ def get_prompt_y(width, text, index_back):
     return max(used_lines - index_back, 0)
 
 
-def pad_name(name, date, source, w):
+def pad_name(name, host, date, source, w):
     """Add spaces to name so string always fits max width"""
-    text = f" {name} {date:<{20}} {source:<{12}} "
+    host = host[:20]
+    text = f" {name} {host:<{20}} {date:<{20}} {source:<{12}} "
     extra_spaces = w - len(text)
     if extra_spaces > 0:
         name = name + " " * extra_spaces
-    return f" {name} {date:<{20}} {source:<{12}} "
+    return f" {name} {host:<{20}} {date:<{20}} {source:<{12}} "
 
 
 def convert_time(unix_time):
@@ -407,12 +408,13 @@ def main_tui(screen, profiles_enc, profiles_plain, selected, have_keyring, confi
         regenerate = False
         h, w = screen.getmaxyx()
         w -= 2 * x0
-        title_text = pad_name("Name", "Last used", "Save method", w)
+        title_text = pad_name("Name", "Host", "Last used", "Save method", w)
         screen.addstr(4, x0, title_text, curses.color_pair(1) | curses.A_STANDOUT)
 
         for num, profile in enumerate(profiles):
             date = convert_time(profile["time"])
-            text = pad_name(profile["name"], date, profile["source"], w)
+            host = profile.get("host") or HOST
+            text = pad_name(profile["name"], host, date, profile["source"], w)
             if num == selected_num:
                 screen.addstr(num + 5, x0, text, curses.color_pair(1) | curses.A_STANDOUT)
             else:
