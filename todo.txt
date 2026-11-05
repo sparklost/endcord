@@ -2,6 +2,7 @@ Add wayland screen capture
 Move website to endcord.github.io
 
 CORE EASY:
+Add scheduled messages
 Add spellcheck corrections assist
 Add inbox
 Add keybinding configuration UI

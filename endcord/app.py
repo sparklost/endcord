@@ -370,7 +370,10 @@ class Endcord:
             curses.enable_tray()
 
         # init extensions
-        if config["extensions"] and ENABLE_EXTENSIONS:
+        if self.config["extensions"] and ENABLE_EXTENSIONS:
+            self.ext_updates = utils.load_json("version.json")
+            if self.ext_updates:
+                self.ext_updates = self.ext_updates["extensions"]
             self.load_extensions(version)
             self.tui.load_extensions(self.extensions)
             self.gateway.load_extensions(self.extensions)
@@ -478,11 +481,14 @@ class Endcord:
                     COMMAND_ASSISTS += ext_command_assist
                 instance = ext_class(self)
                 self.extensions.append(instance)
+                repo_name = ext_class.EXT_SOURCE.strip("/").split("/")[-1]
+                latest_version = self.ext_updates.get(repo_name, ext_class.EXT_VERSION)
+                ext_outdated = " (OUTDATED)" if latest_version != ext_class.EXT_VERSION else ""
                 if ext_app_version.split(".")[:2] != version.split(".")[:2]:
-                    log_text.append(f"  {ext_name} {ext_version} - WARNING: This extension is built for different endcord version!")
+                    log_text.append(f"  {ext_name} {ext_version}{ext_outdated} - WARNING: This extension is built for different endcord version!")
                     num_outdated += 1
                 else:
-                    log_text.append(f"  {ext_name} {ext_version} - OK")
+                    log_text.append(f"  {ext_name} {ext_version}{ext_outdated} - OK")
             except Exception as e:
                 log_text_invalid.append(f"  {ext_name} - ERROR: {e}")
             finally:   # restore old sys.path
@@ -498,77 +504,74 @@ class Endcord:
         self.chat.insert(0, f"Successfully loaded {len(self.extensions)} extensions ({num_outdated} with mismatched version)")
         self.chat.insert(0, f"Not loaded (invalid) {len(extensions) - len(self.extensions) + len(invalid)} extensions")
         self.tui.update_chat(self.chat, [[[self.colors[0]]]] * len(self.chat))
-        self.extension_cache = []
+        self.extension_cache = {}
 
 
     def execute_extensions_methods(self, method_name, *args, cache=False):
         """Execute specific method for each extension if extension has this method, and chain them"""
         if not self.extensions:
             return args
-
-        # try to load from cache (improves performance with many extensions)
-        if cache:
-            for extension_point in self.extension_cache:
-                data = args
-                if extension_point[0] == method_name:
-                    for method in extension_point[1]:
-                        result = method(*data)
-                        if result is not None:
-                            if not isinstance(result, tuple):
-                                result = (result, )
-                            data = result
-                    if data is not None:
-                        return data
-                    return args
-
-        # try to load method from extensions and add to cache
-        methods = []
         data = args
-        for extension in self.extensions:
-            method = getattr(extension, method_name, None)
-            if callable(method):
-                if cache:
-                    methods.append(method)
-                result = method(*data)
-                if result is not None:
-                    if not isinstance(result, tuple):
-                        result = (result, )
-                    data = result
+
         if cache:
-            self.extension_cache.append((method_name, methods))
-        if data is not None:
-            return data
-        return args
+            methods = self.extension_cache.get(method_name)
+            if methods is None:
+                methods = [m for ext in self.extensions if callable(m := getattr(ext, method_name, None))]
+            self.extension_cache[method_name] = methods
+        else:
+            methods = [m for ext in self.extensions if callable(m := getattr(ext, method_name, None))]
+
+        for method in methods:
+            try:
+                result = method(*data)
+            except Exception:
+                name = method.__self__.EXT_SOURCE.strip("/").split("/")[-1]
+                outdated = self.ext_updates.get(name, method.__self__.EXT_VERSION) != method.__self__.EXT_VERSION
+                logger.error(
+                    f"Extension {name} errored in {method_name}, it will keep running but this should be fixed!\n"
+                    f"{"  This extension is outdated, try updating it\n" if outdated else
+                    "  If many more errors appear, disable it until the bug is fixed"}",
+                    exc_info=True,
+                )
+                hint = "update available, try updating it" if outdated else "see log for details"
+                self.update_extra_line(f"Extension {name.removeprefix("endcord-")} crashed - {hint} (click this)", color=20)
+                continue
+            if result is not None:
+                data = result if isinstance(result, tuple) else (result, )
+        return data
 
 
     def execute_extensions_method_first(self, method_name, *args, cache=False):
-        """Execute specific method for each extension if extension has this method, and chain them, without chaining, stop on first run extension with positive result"""
+        """Execute specific method for each extension, without chaining, stop on first positive result"""
         if not self.extensions:
             return None
-
-        # try to load from cache (improves performance with many extensions)
-        if cache:
-            result = False
-            for extension_point in self.extension_cache:
-                if extension_point[0] == method_name:
-                    for method in extension_point[1]:
-                        result = method(*args)
-                        if result:
-                            return result
-
-        # try to load method from extensions and add to cache
         result = False
-        methods = []
-        for extension in self.extensions:
-            method = getattr(extension, method_name, None)
-            if callable(method):
-                if cache:
-                    methods.append(method)
-                result = method(*args)
-                if result:
-                    break
+
         if cache:
-            self.extension_cache.append((method_name, methods))
+            methods = self.extension_cache.get(method_name)
+            if methods is None:
+                methods = [m for ext in self.extensions if callable(m := getattr(ext, method_name, None))]
+            self.extension_cache[method_name] = methods
+        else:
+            methods = [m for ext in self.extensions if callable(m := getattr(ext, method_name, None))]
+
+        for method in methods:
+            try:
+                result = method(*args)
+            except Exception:
+                name = method.__self__.EXT_SOURCE.strip("/").split("/")[-1]
+                outdated = self.ext_updates.get(name, method.__self__.EXT_VERSION) != method.__self__.EXT_VERSION
+                logger.error(
+                    f"Extension {name} errored in {method_name}, it will keep running but this should be fixed!\n"
+                    f"{"  This extension is outdated, try updating it\n" if outdated else
+                    "  If many more errors appear, disable it until the bug is fixed"}",
+                    exc_info=True,
+                )
+                hint = "update available, try updating it" if outdated else "see log for details"
+                self.update_extra_line(f"Extension {name.removeprefix("endcord-")} crashed - {hint} (click this)", color=20)
+                continue
+            if result:
+                break
         return result
 
 
@@ -2567,17 +2570,23 @@ class Endcord:
                         len_extra_line = len(self.extra_line) + 1
                         if len_extra_line - 11 < mouse_x <= len_extra_line:   # JOIN CALL
                             self.join_current_voice_channel()
-                elif self.timed_extra_line.is_set():
-                    self.update_extra_line()
-                    self.timed_extra_line.clear()
                 elif self.fun == 4 and self.extra_line and self.extra_line.startswith("Personalized"):
                     self.download_threads.append(threading.Thread(target=self.download_file, daemon=True, args=(
                         "https://" + "archive.org/download/youtube-" + "/".join(["xvFZjo5PgG0"]*2) + ".mp4",
                         False, True,
                     )))
                     self.download_threads[-1].start()
+                elif self.extra_line.startswith("Extension ") and self.extra_line.endswith("(click this)"):
+                    if "see log" in self.extra_line:
+                        self.blank_chat()
+                        self.view_log()
+                    elif "try updating" in self.extra_line:
+                        threading.Thread(target=self.update_extensions, daemon=True, args=(True, False, False)).start()
                 elif self.new_version and self.extra_line and self.extra_line.startswith("New endcord version is available:"):
                     webbrowser.open(f"https://github.com/{peripherals.REPO_OWNER}/{peripherals.APP_NAME}/releases/tag/{self.new_version}", new=0, autoraise=True)
+                elif self.timed_extra_line.is_set():
+                    self.update_extra_line()
+                    self.timed_extra_line.clear()
 
             # middle click on tree
             elif action == 49:
@@ -4197,8 +4206,9 @@ class Endcord:
                 if not select_num:
                     select_num = 0
                 emojis = self.get_stuff_from_selected_line(chat_sel, 2)   # get emoji
-                select_num = max(min(select_num-1, len(emojis)-1), 0)
-                self.view_emoji(emojis[select_num])
+                if emojis:
+                    select_num = max(min(select_num-1, len(emojis)-1), 0)
+                    self.view_emoji(emojis[select_num])
 
         elif cmd_type == 58:   # QUIT
             self.add_to_command_history(cmd_text)
@@ -4335,7 +4345,7 @@ class Endcord:
                 status, message = git.install_extension(cmd_args["text"], cli=False, proxy=self.config["proxy"])
                 self.update_extra_line(message)
             else:   # update
-                threading.Thread(target=self.check_for_updates, daemon=True, args=(True, False, False, True, True)).start()
+                threading.Thread(target=self.update_extensions, daemon=True, args=(True, False, False)).start()
 
         elif cmd_type == 73:   # SEARCH_EXTENSIONS
             from endcord import git
@@ -5896,6 +5906,8 @@ class Endcord:
 
     def view_emoji(self, emoji_id):
         """Download and view custom emoji in media player"""
+        if len(emoji_id) < 5:
+            return
         emoji_path = self.discord.get_emoji(emoji_id)
         if emoji_path:
             self.media_thread = threading.Thread(target=self.open_media, daemon=True, args=(emoji_path, ))
@@ -8735,19 +8747,21 @@ class Endcord:
             self.notifications.pop(0)
 
 
-    def check_for_updates(self, force=False, open_web=False, app=True, extensions=True, update=False):
+    def check_for_updates(self, manual=False, open_web=False, app=True, extensions=True, update=False):
         """Periodically check endcord and extensions for updates"""
         from endcord import git
-        if not force and not self.config["check_for_updates"]:
+        if not manual and not self.config["check_for_updates"]:
             return
         last_check = utils.load_json("version.json", {
             "time": int(time.time()),
+            "current": peripherals.VERSION,
             "version": peripherals.VERSION,
             "extensions": {},
         }, create=True)
-        if not force and int(time.time()) - last_check["time"] < self.config["check_update_interval"] * 86400:
+        just_updated = manual or git.ver_to_tuple(peripherals.VERSION) > git.ver_to_tuple(last_check["current"])
+        if not manual and not just_updated and int(time.time()) - last_check["time"] < self.config["check_update_interval"] * 86400:
             return
-        if force or git.ver_to_tuple(peripherals.VERSION) > git.ver_to_tuple(last_check["version"]):
+        if manual or git.ver_to_tuple(peripherals.VERSION) > git.ver_to_tuple(last_check["version"]):
             last_check["version"] = peripherals.VERSION
         last_check["time"] = int(time.time())
         text = ""
@@ -8756,16 +8770,18 @@ class Endcord:
             self.new_version = git.check_for_update(last_check["version"], peripherals.REPO_OWNER, peripherals.APP_NAME, proxy=self.config["proxy"])
             last_check["version"] = self.new_version if self.new_version else last_check["version"]
             if self.new_version:
-                text = "New endcord version is available:" + f" {peripherals.VERSION} -> {self.new_version}; Click to open github releases."
+                self.update_extra_line("New endcord version is available:" + f" {peripherals.VERSION} --> {self.new_version}; Click to open github releases")
+                text = "New endcord version is available:" + f" {peripherals.VERSION} --> {self.new_version}; Click to open github releases"
                 if open_web:
                     webbrowser.open(f"https://github.com/{peripherals.REPO_OWNER}/{peripherals.APP_NAME}/releases/tag/{self.new_version}", new=0, autoraise=True)
-            elif force:
+            elif manual:
                 self.update_extra_line("Endcord is up to date")
 
-        if extensions and self.config["check_for_updates"] <= 2:
-            extension_updates = 0
+        ext_updates = 0
+        if extensions and self.config["extensions"] and ENABLE_EXTENSIONS and self.config["check_for_updates"] <= 2:
+            delay = 1 if len(self.extensions) >= 5 else 0   # to avoid github rate limit
             for extension in self.extensions:
-                if not extension.EXT_SOURCE:
+                if not extension.EXT_SOURCE or "github.com" not in extension.EXT_SOURCE:
                     continue
                 parts = extension.EXT_SOURCE.strip("/").split("/")
                 if len(parts) < 2:
@@ -8773,34 +8789,79 @@ class Endcord:
                 repo_owner = parts[-2]
                 repo_name = parts[-1]
                 ext_version = last_check["extensions"].get(repo_name, extension.EXT_VERSION)
-                if force or git.ver_to_tuple(extension.EXT_VERSION) > git.ver_to_tuple(ext_version):
+                if manual or git.ver_to_tuple(extension.EXT_VERSION) > git.ver_to_tuple(ext_version):
                     ext_version = extension.EXT_VERSION
-                if "github.com" not in extension.EXT_SOURCE:
-                    continue
                 new_version = git.check_for_update(ext_version, repo_owner, repo_name, proxy=self.config["proxy"])
                 last_check["extensions"][repo_name] = new_version if new_version else ext_version
                 if new_version:
-                    if update:
-                        status, status_text = git.install_extension(extension.EXT_SOURCE, prefer_tag=new_version, update=True, proxy=self.config["proxy"])
-                        if status in (0, 1, 3, 4) and force:
-                            self.update_extra_line(status_text.replace("installed", "updated"))
-                            force = False   # to skip next update_extra_line
-                    else:
-                        extension_updates += 1
-            if extension_updates:
+                    ext_updates += 1
+                time.sleep(delay)
+            if ext_updates:
                 if text:
                     text += ". "
-                text += f"{extension_updates} extensions can be updated"
-            elif force and not app:
-                self.update_extra_line("All extensions are up to date")
-
+                text = text.split(";")[0]
+                text += ";" if text else ""
+                if self.config["automatic_extension_update"]:
+                    text += f"{ext_updates} extension{"s" if ext_updates != 1 else ""} will be updated in 10s"
+                else:
+                    text += f"{ext_updates} extension{"s" if ext_updates != 1 else ""} can be updated"
+            elif manual and not app:
+                self.update_extra_line("All extensions are already up to date")
+        if len(extensions) < 5:
+            time.sleep()
         if text:
-            if extension_updates and self.config["check_for_updates"] in (2, 4):
+            if ext_updates and self.config["check_for_updates"] in (2, 4):
                 peripherals.notify_send("Updates available", text)
             self.update_extra_line(text, timed=False, color=18)
             logger.info(text)
 
         utils.save_json(last_check, "version.json")
+
+        if self.config["extensions"] and ENABLE_EXTENSIONS:
+            self.ext_updates = utils.load_json("version.json")
+            if self.ext_updates:
+                self.ext_updates = self.ext_updates["extensions"]
+
+        if ext_updates and (self.config["automatic_extension_update"] or update):
+            self.update_extensions(official=(self.config["automatic_extension_update"] != 2))
+
+
+    def update_extensions(self, manual=False, official=True, sleep=10):
+        """Update all extensions"""
+        time.sleep(sleep)
+        if not self.config["extensions"] or not ENABLE_EXTENSIONS or not shutil.which("git"):
+            return
+        from endcord import git
+        last_check = utils.load_json("version.json")
+        if not last_check:
+            return
+        ext_updates = 0
+        log_text = ""
+        delay = 1 if len(self.extensions) >= 5 else 0   # to avoid github rate limit
+        for extension in self.extensions:
+            if not extension.EXT_SOURCE or "github.com" not in extension.EXT_SOURCE:
+                continue
+            parts = extension.EXT_SOURCE.strip("/").split("/")
+            if len(parts) < 2:
+                continue
+            repo_owner = parts[-2]
+            repo_name = parts[-1]
+            if official and repo_owner != peripherals.REPO_OWNER:   # skip non-official extensions
+                continue
+            new_version = last_check["extensions"].get(repo_name, extension.EXT_VERSION)
+            if manual:
+                new_version = git.check_for_update(extension.EXT_VERSION, repo_owner, repo_name, proxy=self.config["proxy"])
+            new_version = None if new_version == extension.EXT_VERSION else new_version
+            if new_version:
+                status, status_text = git.install_extension(extension.EXT_SOURCE, prefer_tag=new_version, update=True, proxy=self.config["proxy"])
+                ext_updates += 1
+                log_text += f"  {extension.EXT_NAME}: {extension.EXT_VERSION} --> {new_version}\n"
+            time.sleep(delay)
+        if ext_updates:
+            self.update_extra_line(f"{ext_updates} extension{"s" if ext_updates != 1 else ""} ha{"s" if ext_updates != 1 else "ve"} been updated, restart is requred", color=20, permanent=True)
+            logger.info(f"Updated extensions:\n{log_text}")
+        else:
+            self.update_extra_line("All extensions are already up to date", color=18)
 
 
     def main(self):

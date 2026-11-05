@@ -208,7 +208,7 @@ class Gateway():
     def load_extensions(self, extensions):
         """Load already initialized extensions from app class"""
         self.extensions = extensions
-        self.extension_cache = []
+        self.extension_cache = {}
 
 
     def execute_extensions_method_nochain(self, method_name, *args, cache=False):
@@ -216,54 +216,57 @@ class Gateway():
         if not self.extensions:
             return args
 
-        # try to load from cache (improves performance with many extensions)
         if cache:
-            for extension_point in self.extension_cache:
-                if extension_point[0] == method_name:
-                    for method in extension_point[1]:
-                        method(*args)
-            return
+            methods = self.extension_cache.get(method_name)
+            if methods is None:
+                methods = [m for ext in self.extensions if callable(m := getattr(ext, method_name, None))]
+            self.extension_cache[method_name] = methods
+        else:
+            methods = [m for ext in self.extensions if callable(m := getattr(ext, method_name, None))]
 
-        # try to load method from extensions and add to cache
-        methods = []
-        for extension in self.extensions:
-            method = getattr(extension, method_name, None)
-            if callable(method):
-                if cache:
-                    methods.append(method)
+        for method in methods:
+            try:
                 method(*args)
-        if cache:
-            self.extension_cache.append((method_name, methods))
+            except Exception:
+                name = method.__self__.EXT_SOURCE.strip("/").split("/")[-1]
+                outdated = self.ext_updates.get(name, method.__self__.EXT_VERSION) != method.__self__.EXT_VERSION
+                logger.error(
+                    f"Extension {name} errored in {method_name}, it will keep running but this should be fixed!\n"
+                    f"{"  This extension is outdated, try updating it\n" if outdated else
+                    "  If many more errors appear, disable it until the bug is fixed"}",
+                    exc_info=True,
+                )
 
 
     def execute_extensions_method_first(self, method_name, *args, cache=False):
-        """Execute specific method for each extension if extension has this method, and chain them, without chaining, stop on first run extension with positive result"""
+        """Execute specific method for each extension, without chaining, stop on first positive result"""
         if not self.extensions:
             return None
-
-        # try to load from cache (improves performance with many extensions)
-        if cache:
-            result = False
-            for extension_point in self.extension_cache:
-                if extension_point[0] == method_name:
-                    for method in extension_point[1]:
-                        result = method(*args)
-                        if result:
-                            return result
-
-        # try to load method from extensions and add to cache
         result = False
-        methods = []
-        for extension in self.extensions:
-            method = getattr(extension, method_name, None)
-            if callable(method):
-                if cache:
-                    methods.append(method)
-                result = method(*args)
-                if result:
-                    break
+
         if cache:
-            self.extension_cache.append((method_name, methods))
+            methods = self.extension_cache.get(method_name)
+            if methods is None:
+                methods = [m for ext in self.extensions if callable(m := getattr(ext, method_name, None))]
+            self.extension_cache[method_name] = methods
+        else:
+            methods = [m for ext in self.extensions if callable(m := getattr(ext, method_name, None))]
+
+        for method in methods:
+            try:
+                result = method(*args)
+            except Exception:
+                name = method.__self__.EXT_SOURCE.strip("/").split("/")[-1]
+                outdated = self.ext_updates.get(name, method.__self__.EXT_VERSION) != method.__self__.EXT_VERSION
+                logger.error(
+                    f"Extension {name} errored in {method_name}, it will keep running but this should be fixed!\n"
+                    f"{"  This extension is outdated, try updating it\n" if outdated else
+                    "  If many more errors appear, disable it until the bug is fixed"}",
+                    exc_info=True,
+                )
+                continue
+            if result:
+                break
         return result
 
 

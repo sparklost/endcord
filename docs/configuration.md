@@ -255,7 +255,12 @@ Also see [keybindings configuration](keybindings.md#configuring-keybindings).
     4 - Only check endcord, and send desktop notification
 - `check_update_interval = 1`  
     How often to check for endcord and extensions updates, in days.
--  `client_properties = "default"`  
+- `automatic_extension_update = 1`  
+    Automatically update extensions to latest version supporting current endcord version. Will run only after check for updates, meaning it will be affected by `check_for_updates` and `check_update_interval` options.  
+    0 - Do not update automatically  
+    1 - Only update official extensions  
+    2 - Update ALL installed extensions (warning: this will download and execute unverified code!)  
+- `client_properties = "default"`  
     Client properties are used by discord in spam detection system.  
     They contain various system information like operating system and browser user agent. Available options:
     - `"default"` - Approximately what official desktop client sends. Includes: OS version, architecture, Linux window manager, locale.

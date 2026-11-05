@@ -30,7 +30,7 @@ Python is slower than languages like C or Rust, but in this use case it does not
 All CPU-critical components are implemented in Cython with minimal python calls, resulting in near-C speeds.
 Python was chosen because it enables rapid development.
 Additionally if built with nuitka, custom Python is compiled from source (preferably with clang) with custom compiler flags for performance.
-Full list of optimizations made for endcord can be found [here](.github/CONTRIBUTING.md#list-of-optimizations).
+Full list of optimizations made for endcord can be found [here](../.github/CONTRIBUTING.md#list-of-optimizations).
 
 ### Running multiple endcord instances
 To run multiple endcord instances at the same time, while keeping them completely separated, run endcord with `ENDCORD_APP_NAME` environment variable set to something else. This will change "endcord" everywhere: in config and cache paths, notifications, keyring...
@@ -125,7 +125,7 @@ Or, if you don't have a github account, want more interactive support, to share 
 ### Creating and maintaining package for Linux distribution
 Because endcord build script requires network access in order to install dependencies, it is impossible to use it to build endcord packages for many distributions/repositories, because they require build-time network isolation.
 Because of that package maintainers are strongly encouraged to instead create "endcord-installer" package, that will install official bash installer script.
-More info can be found in [contributing.md](.github/CONTRIBUTING.md#recommended-easy-route-for-package-maintainers), along with instructions for actual manual building.
+More info can be found in [contributing.md](../.github/CONTRIBUTING.md#recommended-easy-route-for-package-maintainers), along with instructions for actual manual building.
 After submitting a package to distributions package repository, open an issue here, so I can review it and add it to readme after it gets accepted.
 
 ### Source-available license
