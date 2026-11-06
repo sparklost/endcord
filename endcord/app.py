@@ -482,7 +482,7 @@ class Endcord:
                 instance = ext_class(self)
                 self.extensions.append(instance)
                 repo_name = ext_class.EXT_SOURCE.strip("/").split("/")[-1]
-                latest_version = self.ext_updates.get(repo_name, ext_class.EXT_VERSION)
+                latest_version = self.ext_updates.get(repo_name, ext_class.EXT_VERSION) if self.ext_updates else ext_class.EXT_VERSION
                 ext_outdated = " (OUTDATED)" if latest_version != ext_class.EXT_VERSION else ""
                 if ext_app_version.split(".")[:2] != version.split(".")[:2]:
                     log_text.append(f"  {ext_name} {ext_version}{ext_outdated} - WARNING: This extension is built for different endcord version!")
@@ -8767,7 +8767,7 @@ class Endcord:
         text = ""
 
         if app:
-            self.new_version = git.check_for_update(last_check["version"], peripherals.REPO_OWNER, peripherals.APP_NAME, proxy=self.config["proxy"])
+            self.new_version, _ = git.check_for_update(last_check["version"], peripherals.REPO_OWNER, peripherals.APP_NAME, proxy=self.config["proxy"])
             last_check["version"] = self.new_version if self.new_version else last_check["version"]
             if self.new_version:
                 self.update_extra_line("New endcord version is available:" + f" {peripherals.VERSION} --> {self.new_version}; Click to open github releases")
@@ -8779,7 +8779,6 @@ class Endcord:
 
         ext_updates = 0
         if extensions and self.config["extensions"] and ENABLE_EXTENSIONS and self.config["check_for_updates"] <= 2:
-            delay = 1 if len(self.extensions) >= 5 else 0   # to avoid github rate limit
             for extension in self.extensions:
                 if not extension.EXT_SOURCE or "github.com" not in extension.EXT_SOURCE:
                     continue
@@ -8788,14 +8787,19 @@ class Endcord:
                     continue
                 repo_owner = parts[-2]
                 repo_name = parts[-1]
-                ext_version = last_check["extensions"].get(repo_name, extension.EXT_VERSION)
+                ext_last_check = last_check["extensions"].get(repo_name, extension.EXT_VERSION).rsplit(" ", 1)
+                ext_last_check = (extension.EXT_VERSION, None) if len(ext_last_check) < 2 else ext_last_check
+                ext_version, etag = ext_last_check
                 if manual or git.ver_to_tuple(extension.EXT_VERSION) > git.ver_to_tuple(ext_version):
                     ext_version = extension.EXT_VERSION
-                new_version = git.check_for_update(ext_version, repo_owner, repo_name, proxy=self.config["proxy"])
-                last_check["extensions"][repo_name] = new_version if new_version else ext_version
+                etag = last_check["extensions"].get(repo_name, (None, None))[1]
+                new_version, new_etag = git.check_for_update(ext_version, repo_owner, repo_name, etag, proxy=self.config["proxy"])
+                if new_etag and new_etag == etag:
+                    continue
+                last_check["extensions"][repo_name] = (f"{new_version if new_version else ext_version} {new_etag}")
                 if new_version:
                     ext_updates += 1
-                time.sleep(delay)
+                time.sleep(0.5)
             if ext_updates:
                 if text:
                     text += ". "
@@ -8807,8 +8811,8 @@ class Endcord:
                     text += f"{ext_updates} extension{"s" if ext_updates != 1 else ""} can be updated"
             elif manual and not app:
                 self.update_extra_line("All extensions are already up to date")
-        if len(extensions) < 5:
-            time.sleep()
+        if len(self.extensions) < 5:
+            time.sleep(self.extra_line_delay)
         if text:
             if ext_updates and self.config["check_for_updates"] in (2, 4):
                 peripherals.notify_send("Updates available", text)
@@ -8837,26 +8841,33 @@ class Endcord:
             return
         ext_updates = 0
         log_text = ""
-        delay = 1 if len(self.extensions) >= 5 else 0   # to avoid github rate limit
         for extension in self.extensions:
             if not extension.EXT_SOURCE or "github.com" not in extension.EXT_SOURCE:
                 continue
             parts = extension.EXT_SOURCE.strip("/").split("/")
             if len(parts) < 2:
                 continue
+            ext_version = extension.EXT_VERSION
             repo_owner = parts[-2]
             repo_name = parts[-1]
             if official and repo_owner != peripherals.REPO_OWNER:   # skip non-official extensions
                 continue
-            new_version = last_check["extensions"].get(repo_name, extension.EXT_VERSION)
+            ext_last_check = last_check["extensions"].get(repo_name, extension.EXT_VERSION).rsplit(" ", 1)
+            ext_last_check = (extension.EXT_VERSION, None) if len(ext_last_check) < 2 else ext_last_check
+            new_version, etag = ext_last_check
             if manual:
-                new_version = git.check_for_update(extension.EXT_VERSION, repo_owner, repo_name, proxy=self.config["proxy"])
-            new_version = None if new_version == extension.EXT_VERSION else new_version
+                new_version, new_etag = git.check_for_update(ext_version, repo_owner, repo_name, etag, proxy=self.config["proxy"])
+                if new_etag and new_etag == etag:
+                    continue
+                last_check["extensions"][repo_name] = (f"{new_version if new_version else ext_version} {new_etag}")
+            new_version = None if new_version == ext_version else new_version
             if new_version:
                 status, status_text = git.install_extension(extension.EXT_SOURCE, prefer_tag=new_version, update=True, proxy=self.config["proxy"])
                 ext_updates += 1
-                log_text += f"  {extension.EXT_NAME}: {extension.EXT_VERSION} --> {new_version}\n"
-            time.sleep(delay)
+                log_text += f"  {extension.EXT_NAME}: {ext_version} --> {new_version}\n"
+            time.sleep(0.5)
+        if manual:
+            utils.save_json(last_check, "version.json")
         if ext_updates:
             self.update_extra_line(f"{ext_updates} extension{"s" if ext_updates != 1 else ""} ha{"s" if ext_updates != 1 else "ve"} been updated, restart is requred", color=20, permanent=True)
             logger.info(f"Updated extensions:\n{log_text}")

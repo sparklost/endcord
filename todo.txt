@@ -41,5 +41,6 @@ Add colors to rich embeds vertical line
 
 EXTENSIONS:
 endcord-kitty-media
+endcord-kitty-keyboard ???
 endcord-p2p-network (name subject to change)
 endcord-fluxer

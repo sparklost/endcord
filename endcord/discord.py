@@ -1797,10 +1797,9 @@ class Discord():
         """
         message_data = None
         url = "/api/v9/applications/detectable"
+        header = self.header.copy()
         if etag:
-            header = self.header | {"If-None-Match": f'W/"{etag}"'}
-        else:
-            header = self.header
+            header["If-None-Match"] = f'W/"{etag}"'
         try:
             connection = self.get_connection(self.host, 443)
             connection.request("GET", url, message_data, header)

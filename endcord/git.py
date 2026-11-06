@@ -43,7 +43,7 @@ def install_extension(url, cli=False, prefer_tag=None, update=False, proxy=None)
         # use github api
         if "github.com" in url:
             if not prefer_tag:
-                prefer_tag = check_for_update("0.0.0", ext_owner, ext_name, proxy=proxy)
+                prefer_tag, _ = check_for_update("0.0.0", ext_owner, ext_name, proxy=proxy)
             status = download_gh_repo(ext_owner, ext_name, ext_path, prefer_tag, proxy=proxy)
             if status == 1:
                 setup_extension(ext_path)
@@ -104,25 +104,32 @@ def ver_to_tuple(v):
     return tuple(int(p) for p in v.split("."))
 
 
-def check_for_update(current_version, owner, repo, proxy=None):
+def check_for_update(current_version, owner, repo, etag=None, proxy=None):
     """Check specified repo for update"""
     try:
         connection = peripherals.get_connection("api.github.com", timeout=10, proxy=proxy)
-        connection.request("GET", f"/repos/{owner}/{repo}/releases/latest", headers=HEADER)
+        header = HEADER.copy()
+        if etag:
+            header["If-None-Match"] = f'W/"{etag}"'
+        connection.request("GET", f"/repos/{owner}/{repo}/releases/latest", headers=header)
         response = connection.getresponse()
     except (socket.gaierror, TimeoutError):
         connection.close()
-        return None
+        return None, etag
+    new_etag = response.getheader("ETag")[3:-1] or etag
+    if response.status == 304:
+        connection.close()
+        return None, new_etag
     if response.status == 200:
         data = json.loads(response.read())
         connection.close()
         latest = data["tag_name"].lstrip("v")
         if ver_to_tuple(current_version) < ver_to_tuple(latest):
-            return latest
-        return None
+            return latest, new_etag
+        return None, new_etag
     connection.close()
     logger.error(f"Failed checking for updates for gh repo {owner}/{repo}, http error code: {response.status}")
-    return None
+    return None, new_etag
 
 
 def search_gh_repos(topic, num=30, page=1, official_maintainer=peripherals.REPO_OWNER, proxy=None):
