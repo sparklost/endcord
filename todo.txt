@@ -1,6 +1,3 @@
-Add wayland screen capture
-Move website to endcord.github.io
-
 CORE EASY:
 Add scheduled messages
 Add spellcheck corrections assist
@@ -11,8 +8,10 @@ Add documentation viewer
 Add commands for UI tools
 Add stream calls
 Add nightly builds?
+Move website to projectname.github.io
 
 CORE HARD:
+Add global push to talk
 Fix issues with wide characters in input line
 Allow client to run with invalid token but stay offline
 Provide static binaries built on muslinux
@@ -21,6 +20,7 @@ Make custom json parser - remove orjson
 Add multiline input line
 Add option to select individual message
 Add TUI video calls with call UI
+Add wayland screen capture
 Add localization
 
 GTKCURSES:
@@ -41,6 +41,5 @@ Add colors to rich embeds vertical line
 
 EXTENSIONS:
 endcord-kitty-media
-endcord-kitty-keyboard ???
 endcord-p2p-network (name subject to change)
 endcord-fluxer

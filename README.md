@@ -34,7 +34,6 @@ Any third party endcord forks may add features that can lead to account ban, cau
     - Stream video from any source (camera, usb, screen share)
     - Set volues per-user or mute them
     - Customizable video properties
-    - Push-to-talk-alike binding
 - Desktop notifications
 - Inline images (pixelated/ascii-art/[kitty-protocol](https://github.com/sparklost/endcord-image-inline))
 - View images, gifs, videos, audio, stickers and YouTube with ASCII art or in external app

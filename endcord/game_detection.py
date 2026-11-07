@@ -248,6 +248,7 @@ def find_detectable_apps_file(directory):
 
 def delete_detectable_apps_files(directory, exception_file_path):
     """Delete all files with given prefix and suffix"""
+    directory = os.path.expanduser(directory)
     abs_exception_path = os.path.abspath(exception_file_path)
     for file_path in glob.glob(os.path.join(directory, "detectable_apps_*.ndjson")):
         if os.path.isfile(file_path) and os.path.abspath(file_path) != abs_exception_path:
