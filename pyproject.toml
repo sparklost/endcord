@@ -36,8 +36,8 @@ media = [
 ]
 
 [build]
-python_max = "3.14.8"
-python_freethreaded = "3.14.8"
+python_max = "3.14.10"
+python_freethreaded = "3.14.10"
 python_last_safe = "3.13.14"
 curses_tag = "v6_6_20261024"
 rnnoise_tag = "main"

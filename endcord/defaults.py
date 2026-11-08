@@ -35,7 +35,7 @@ settings = {
     "hide_spam": True,
     "keep_deleted": False,
     "limit_cache_deleted": 30,
-    "max_thumb_cache_age": 7,
+    "max_media_cache_age": 7,
     "syntax_highlight": True,
     "tree_show_folders": True,
     "wrap_around": True,

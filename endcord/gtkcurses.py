@@ -837,7 +837,7 @@ class GtkTerminalWindow(Gtk.Window):
         if unicode_code != 0:
             ch = chr(unicode_code)
             if ch == " " and mod_prefix:
-                event_queue.put(mod_prefix + "SPACE")
+                event_queue.put((" " if mod_prefix == "S-" else mod_prefix + "SPACE"))
                 return True
             if not ctrl and not alt:
                 event_queue.put(ch)
@@ -1066,7 +1066,7 @@ def error_handler(message, unblock_event, report=False):
             if event.keyval in (Gdk.KEY_Control_L, Gdk.KEY_Control_R, Gdk.KEY_Shift_L, Gdk.KEY_Shift_R, Gdk.KEY_Alt_L, Gdk.KEY_Alt_R):
                 return False
             if (event.state & Gdk.ModifierType.CONTROL_MASK) and event.keyval in (Gdk.KEY_c, Gdk.KEY_C):
-                return False
+                return True
             win.destroy()
             return True
         def on_destroy(widget):   # noqa

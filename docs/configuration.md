@@ -86,8 +86,8 @@ Also see [keybindings configuration](keybindings.md#configuring-keybindings).
     Whether to keep deleted messages in the chat, with different color, or remove them.
 - `limit_cache_deleted = 30`  
     Limit number of cached deleted messages per channel.
-- `max_thumb_cache_age = 7`  
-    How long to keep cached thumbs for inline images, in days. Set `0` to clear on each new run.  
+- `max_media_cache_age = 7`  
+    How long to keep cached media: inline images, emoji and pfp, in days. Set `0` to clear on each new run.  
 - `syntax_highlight = True`  
     Whether to enable code block syntax highlighting. Code block needs to have language prefix.  
     For this to work, either GNU `source-highlight` or `python-pygments` needs to be installed.

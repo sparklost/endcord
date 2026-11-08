@@ -23,12 +23,9 @@ Add wayland screen capture
 Add localization
 
 GTKCURSES:
-Add image pfp to gtkcurses
-Add ascii/block image/media viewer
-Add ascii/block inline image/media
-Add full image/media viewer
-Add full inline images/media
-Add video calls (ascii/block/full popup player with call UI)
+Add full/ascii/block image/media viewer
+Add full/ascii/block inline images/media
+Add video calls (full/ascii/block popup player with call UI)
 
 MORE COLORS:
 Patch python 3.14 using python 3.16 curses module to enable 255+ colors

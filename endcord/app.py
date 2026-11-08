@@ -298,6 +298,7 @@ class Endcord:
             from endcord import media_inline
             self.inline_media = media_inline.InlineMedia(self.discord, self.tui, self.config, self.colors_formatted, self.default_msg_alt_color)
             self.tui.load_inline_media(self.inline_media)
+        self.cleanup_cache()
         self.formatter = formatter.ChatGenerator(
             self.config,
             self.colors,
@@ -358,7 +359,6 @@ class Endcord:
         self.prev_volume_in = 100
         self.bg_chanel = None
         self.stats_data = None
-        # threading.Thread(target=self.profiling_auto_exit, daemon=True).start()
 
         # init sigint handler - replaces handler from main.py
         try:
@@ -583,10 +583,12 @@ class Endcord:
         return result
 
 
-    def profiling_auto_exit(self):
-        """Thread that waits then exits cleanly, so profiler can process data"""
-        time.sleep(20)
-        self.exit()
+    def cleanup_cache(self):
+        """Thread that cleans stale cache"""
+        max_cache_age = self.config["max_media_cache_age"]
+        for name in ("emoji", "images", "pfp", "pfp-small"):
+            path = os.path.expanduser(os.path.join(peripherals.cache_path, name))
+            threading.Thread(target=utils.delete_old_files, daemon=True, args=(path, max_cache_age, True)).start()
 
 
     def message_sender(self):

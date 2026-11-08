@@ -12,7 +12,7 @@ import time
 
 from PIL import Image, ImageEnhance
 
-from endcord import peripherals, utils, xterm256
+from endcord import peripherals, xterm256
 
 # like this so build.by can switch terminal_utils and gtkcurses
 from endcord import terminal_utils as terminal_utils
@@ -81,12 +81,6 @@ class InlineMedia:
             self.img_to_term_block = img_to_term_block_truecolor
         else:
             self.img_to_term_block = img_to_term_block
-
-        threading.Thread(target=utils.delete_old_files, daemon=True, args=(   # might delay startup
-            os.path.join(peripherals.cache_path, "images"),
-            config["max_thumb_cache_age"],
-            True,
-        )).start()
         threading.Thread(target=self.downloader, daemon=True).start()
 
 
