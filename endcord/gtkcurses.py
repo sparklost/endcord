@@ -66,14 +66,8 @@ GTK_DARK_THEME = True
 BAR_THICKNESS = 0.5   # fraction of character width
 BG_ALPHA = 1.0
 BG_ALPHA_COLOR = 1.0
+MEDIA_ENABLED = True
 APP_NAME = "endcord"
-try:
-    import __main__
-    APP_NAME = getattr(__main__, "APP_NAME", "endcord")
-except Exception:
-    pass
-APP_ID = f"com.{peripherals.REPO_OWNER}.{peripherals.TRUE_APP_NAME}"
-
 CTRL_SHIFT_V_PASTE = False   # enable Ctrl+Shift+V pasting
 ENABLE_SHIFT_BACKSPACE = False
 ENABLE_TRAY = True
@@ -87,6 +81,13 @@ SYSTEM_COLORS = (
     (128, 128, 128), (255, 0, 0), (0, 255, 0), (255, 255, 0),
     (0, 0, 255), (255, 0, 255), (0, 255, 255), (255, 255, 255),
 )
+
+try:
+    import __main__
+    APP_NAME = getattr(__main__, "APP_NAME", "endcord")
+except Exception:
+    pass
+APP_ID = f"com.{peripherals.REPO_OWNER}.{peripherals.TRUE_APP_NAME}"
 
 # custom path
 if sys.platform == "linux":
@@ -119,6 +120,7 @@ if config_path:
             MULTIPLE_INSTANCES = config.get("multiple_instances", MULTIPLE_INSTANCES)
             GTK_DARK_THEME = config.get("gtk_dark_theme", GTK_DARK_THEME)
             APP_NAME = config.get("app_name", APP_NAME)
+            MEDIA_ENABLED = config.get("media", MEDIA_ENABLED)
             CTRL_SHIFT_V_PASTE = config.get("ctrl_shift_v_paste", CTRL_SHIFT_V_PASTE)
             ENABLE_SHIFT_BACKSPACE = config.get("enable_shif_backspace", ENABLE_SHIFT_BACKSPACE)
             ENABLE_TRAY = config.get("enable_tray", ENABLE_TRAY)
@@ -139,6 +141,7 @@ if config_path:
             "font_name": FONT_NAME,
             "gtk_dark_theme": GTK_DARK_THEME,
             "app_name": APP_NAME,
+            "media": MEDIA_ENABLED,
             "ctrl_shift_v_paste": CTRL_SHIFT_V_PASTE,
             "enable_tray": ENABLE_TRAY,
             "tray_icon_normal": TRAY_ICON_NORMAL,
@@ -513,6 +516,7 @@ class GtkTerminalWindow(Gtk.Window):
 
         # init gtk stuff
         self.curses_window = curses_window
+        self.media = None
         self.set_default_size(*WINDOW_SIZE)
         self.set_resizable(True)
         Gtk.Settings.get_default().set_property("gtk-application-prefer-dark-theme", GTK_DARK_THEME)
@@ -745,6 +749,9 @@ class GtkTerminalWindow(Gtk.Window):
                         cr.set_source_rgb(*rgb_to_cairo(fg_color))
                         cr.rectangle(cursor_px_x, cursor_px_y, bar_w, self.char_height)
                         cr.fill()
+
+        if self.media:
+            self.media.draw(cr)
 
         return True
 
@@ -1135,6 +1142,11 @@ def get_dbus_connection():
     if gtk_app:
         return gtk_app.get_dbus_connection()
     return None
+
+
+def get_window():
+    """Get gtk window instance"""
+    return gtk_window
 
 
 # curses stuff

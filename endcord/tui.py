@@ -421,7 +421,8 @@ class TUI():
 
 
     def load_inline_media(self, inline_media):
-        """Pass inline media drawer reference from app to tui"""
+        """Pass inline/gtkcurses media instance from app to tui"""
+        # if uses_gtkcurses, then this is gtkcurses_media
         self.inline_media = inline_media
 
 
@@ -695,7 +696,7 @@ class TUI():
             self.screen.noutrefresh()   # ??? needed only with windows-curses
             self.need_update.set()
         self.resize()
-        if self.inline_media:
+        if not uses_gtkcurses and self.inline_media:
             self.inline_media.force_redraw()
         self.execute_extensions_methods("on_force_redraw")
 
@@ -761,7 +762,7 @@ class TUI():
             self.screen.refresh()
             self.disable_drawing = False
             self.resize(redraw_only=True)
-            if self.inline_media:
+            if not uses_gtkcurses and self.inline_media:
                 self.inline_media.force_redraw()
             self.execute_extensions_methods("on_force_redraw")
 
@@ -908,7 +909,7 @@ class TUI():
             self.chat_index += change_amount
         if not self.disable_drawing and draw:
             self.draw_chat()
-            if self.inline_media:
+            if not uses_gtkcurses and self.inline_media:
                 self.inline_media.draw_selection(self.chat_selected)
 
 
@@ -983,7 +984,7 @@ class TUI():
                 self.tree_width = 1
         else:
             self.tree_width = value
-        if self.inline_media:
+        if not uses_gtkcurses and self.inline_media:
             self.inline_media.clear_images(force=True)
         self.resize()
 
@@ -997,7 +998,7 @@ class TUI():
                 self.member_list_width = 2
         else:
             self.member_list_width = value
-        if self.inline_media:
+        if not uses_gtkcurses and self.inline_media:
             self.inline_media.clear_images(force=True)
         if not self.win_member_list:
             self.draw_member_list([" "], [None])
@@ -1521,7 +1522,7 @@ class TUI():
 
     def draw_chat(self, refresh=True, inline=True):
         """Draw chat with applied color formatting"""
-        if self.inline_media:
+        if not uses_gtkcurses and self.inline_media:
             self.inline_media.clear_images()
             exclude_selection = self.inline_media.get_images()
         else:
@@ -1980,8 +1981,11 @@ class TUI():
                 self.draw_chat(refresh=False)
                 self.win_extra_window.noutrefresh()
                 self.need_update.set()
-        if self.inline_media and title_txt:   # do here because of refresh=False
-            self.inline_media.draw_images()
+        if self.inline_media:
+            if title_txt:   # do here because of refresh=False
+                self.inline_media.draw_images()
+            if uses_gtkcurses:
+                self.inline_media.draw_extra_window_images()
         self.execute_extensions_methods("on_extra_window_draw", cache=False)
 
 
@@ -2017,6 +2021,8 @@ class TUI():
                 self.draw_scrollbar_chat()
             if self.inline_media:   # gotta be outside lock
                 self.inline_media.draw_images()
+                if uses_gtkcurses:
+                    self.inline_media.remove_extra_window_images()
             self.execute_extensions_methods("on_extra_window_remove")
 
 
@@ -2025,7 +2031,7 @@ class TUI():
         if self.disable_drawing:
             return
 
-        if self.inline_media and (not self.win_member_list or force):
+        if not uses_gtkcurses and self.inline_media and (not self.win_member_list or force):
             self.inline_media.clear_images(force=True)
 
         with self.lock:

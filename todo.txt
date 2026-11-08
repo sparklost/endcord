@@ -23,12 +23,11 @@ Add wayland screen capture
 Add localization
 
 GTKCURSES:
+Add image pfp to gtkcurses
 Add ascii/block image/media viewer
 Add ascii/block inline image/media
 Add full image/media viewer
 Add full inline images/media
-Add image emoji to gtkcurses
-Add pfp to gtkcurses
 Add video calls (ascii/block/full popup player with call UI)
 
 MORE COLORS:

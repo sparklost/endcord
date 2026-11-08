@@ -161,7 +161,7 @@ class Endcord:
         self.font_ratio = config["media_font_aspect_ratio"]
         self.inline_media = config["inline_media"] and importlib.util.find_spec("PIL") is not None and sys.platform != "win32" and not uses_gtkcurses and self.screen
         self.placeholder_emoji = False   # for extensions
-        self.placeholder_images = self.inline_media   # keeping this separated so extension can toggle it
+        self.placeholder_images = bool(self.inline_media)   # for extensions
         self.premium_override_commands = []   # for extensions
         self.keep_avatars = False   # for extensions
 
@@ -296,8 +296,8 @@ class Endcord:
         self.my_id = None   # will be taken from gateway in main()
         if self.inline_media:
             from endcord import media_inline
-            self.inline_media_drawer = media_inline.InlineMedia(self.discord, self.tui, self.config, self.colors_formatted, self.default_msg_alt_color)
-            self.tui.load_inline_media(self.inline_media_drawer)
+            self.inline_media = media_inline.InlineMedia(self.discord, self.tui, self.config, self.colors_formatted, self.default_msg_alt_color)
+            self.tui.load_inline_media(self.inline_media)
         self.formatter = formatter.ChatGenerator(
             self.config,
             self.colors,
@@ -369,6 +369,11 @@ class Endcord:
         # for gtkcurses
         if uses_gtkcurses:
             curses.enable_tray()
+            if curses.MEDIA_ENABLED:
+                from endcord import gtkcurses_media
+                # gtkcurses_media replaces inline_media (with few exceptions in tui.py)
+                self.inline_media = gtkcurses_media.GtkCursesMedia(self, curses.get_window())
+                self.tui.load_inline_media(self.inline_media)
 
         # init extensions
         if self.config["extensions"] and ENABLE_EXTENSIONS:
@@ -410,7 +415,7 @@ class Endcord:
             if self.enable_game_detection and hasattr(self, "game_detection"):
                 self.game_detection.stop()
             if self.inline_media:
-                self.inline_media_drawer.stop()
+                self.inline_media.stop()
             if self.ptt:
                 self.ptt.stop()
             self.message_send_queue.put((None, None, None))
@@ -1078,7 +1083,7 @@ class Endcord:
         self.execute_extensions_methods("on_switch_channel_end")
 
         # update UI
-        if self.tui.inline_media:   # new images will take time to download so clear everything
+        if self.tui.inline_media and not uses_gtkcurses:   # new images will take time to download so clear everything
             self.tui.inline_media.clear_images(force=True)
         if not guild_id:   # no member list in dms
             self.tui.remove_member_list()
@@ -1089,7 +1094,7 @@ class Endcord:
                 self.tui.set_member_list_width(2)
         if not self.forum:
             if self.inline_media:
-                self.inline_media_drawer.clear_queue()   # discard all pending inline image downloads
+                self.inline_media.clear_queue()   # discard all pending inline image downloads
             self.chat_dim = self.tui.get_dimensions()[0]
             self.update_chat(keep_selected=False, select_message_index=select_message_index, select_unread=True)
         else:
@@ -6534,6 +6539,8 @@ class Endcord:
         if (self.search or self.search_gif or self.command) and not (self.assist_word or self.assist_word == " "):
             self.extra_bkp = (self.tui.extra_window_title, self.tui.extra_window_body, self.tui.extra_window_format)
         self.assist_word = assist_word
+        if uses_gtkcurses and self.inline_media:
+            self.inline_media.update_assist(self.assist_found, assist_type)
         self.execute_extensions_methods("on_assist", self.assist_found, assist_type, cache=True)
         self.tui.draw_extra_window(extra_title, extra_body, extra_format, select=True)
 
@@ -6861,7 +6868,7 @@ class Endcord:
             self.tui.set_selected(-1, scroll=scroll, draw=False)   # return to bottom
 
         if self.inline_media:
-            self.inline_media_drawer.update(self.chat_format, self.chat_map, self.messages)
+            self.inline_media.update(self.chat_format, self.chat_map, self.messages)
         self.execute_extensions_methods("on_chat_update", self.chat, self.chat_format, self.chat_map, cache=True)
         self.tui.update_chat(self.chat, self.chat_format)
 

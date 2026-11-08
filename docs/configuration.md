@@ -638,6 +638,8 @@ Note: everything after `%content` may be pushed to newline.
     Whether to use dark GTK theme for the window.
 - `app_name: "Endcord"`  
     Only changes title of the window.
+- `media: true`  
+    Enable media support: image emoji, pfp, inline images
 - `ctrl_shift_v_paste: false`  
     If `true` will enable `Ctrl+Shift+V` for pasting TEXT ONLY. Ctrl+V is already gtk-natively handling smart-paste.
 - `enable_shif_backspace: false`  
