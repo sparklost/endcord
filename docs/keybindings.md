@@ -96,10 +96,15 @@
 - `Alt+Q Q` - Leave currently ongoing voice call
 - `Alt+Q V` - Play video from first user that is streaming video (or selected user in open call list)
 - `Alt+Q L` - Show all call participants and their states in an updated list
-- `Alt+Q I` - Toggle voice call input volume (mute/unmute), something like push-to-talk
+- `Alt+Q I` - Toggle voice call input volume (mute/unmute)
 - `Alt+Q C-UP/DOWN` - Increase/decrease input volume by 10
 - `Alt+Q M` - Toggle mute/unmute of selected user in open call list
 - `Alt+Q UP/DOWN` - Increase/decrease call volume by 10 for selected user in open call list
+
+### Push-To-Talk
+Global push-to-talk is disabled by default. set `oush_to_talk` keybinding to enable it.  
+Currently supported backends: Windows, Linux X11, Linux Wayland (only when endcord is installed with desktop file).  
+Note: On wayland this will bring portal prompt for setting up a global hotkey.  
 
 ### OS specific keybindings
 Some keybindings are used by terminals or OS itself, so they are by default rebound to something else.

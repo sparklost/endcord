@@ -24,9 +24,10 @@ if "bsd" in sys.platform:
 GATEWAY_RATE_LIMIT = 5   # delay between each event that rpc server will send to discord
 GATEWAY_RATE_LIMIT_SAME = 60   # delay between each same activity that rpc server will send to discord
 REQUEST_DELAY = 1.5   # delay to decrease error 429 - too many requests
+LINUX_SOCKET_DIRS = ("XDG_RUNTIME_DIR", "TMPDIR", "TMP", "TEMP")
 logger = logging.getLogger(__name__)
 if sys.platform == "linux":
-    runtime_dir = os.environ.get("XDG_RUNTIME_DIR", "/run/user/{os.getuid()}")
+    runtime_dir = next((os.environ[name] for name in LINUX_SOCKET_DIRS if os.environ.get(name)), "/tmp")
     DISCORD_SOCKET = os.path.join(runtime_dir, "discord-ipc-0")
 else:
     DISCORD_SOCKET = ""

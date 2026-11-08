@@ -3494,26 +3494,28 @@ def generate_extra_window_search(query, messages, roles, channels, blocked, tota
     return title_line, body, body_format, indexes
 
 
-def generate_extra_window_search_ext(extensions, colors, max_len):
+def generate_extra_window_search_ext(extensions, installed, updates, colors, max_len):
     """Generate extra window title and body for extensions search view"""
     title_line = f"Extensions search results: {len(extensions)} extensions"
     color_low = colors[8]
     color_standout = colors[9]
     body = []
     body_format = []
+    installed_ext = [ex.EXT_SOURCE.strip("/").split("/")[-1] for ex in installed if ex.EXT_SOURCE]
     for extension in extensions:
         official = " (official)" if extension[3] else ""
         description = str(extension[2]).replace("An extension for endcord discord TUI client, that ", "")
         description = description.capitalize()
         name = extension[1] + official + " - "
         body.append(normalize_string(name + description, max_len, emoji_safe=True, dots=True, fill=False))
+        line_format = [(color_low, None, len(name) - 1, len(name) + len(description))]
         if extension[3]:
-            body_format.append([
-                (color_standout, None, len(extension[1]) + 1, len(extension[1]) + len(official)),
-                (color_low, None, len(name) - 1, len(name) + len(description)),
-            ])
-        else:
-            body_format.append([(color_low, None, len(name) - 1, len(name) + len(description))])
+            line_format.insert(0, (color_standout, None, len(extension[1]) + 1, len(extension[1]) + len(official)))
+        if extension[1] in updates:
+            line_format.insert(0, (19, None, 0, len(extension[1])))
+        elif extension[1] in installed_ext:
+            line_format.insert(0, (18, None, 0, len(extension[1])))
+        body_format.append(line_format)
     return title_line, body, body_format
 
 

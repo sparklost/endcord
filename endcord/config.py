@@ -194,33 +194,34 @@ def load_keybindings(path, default, section="keybindings", gen_config=False, mer
         config_data_raw = config._sections[section]
         config_data = dict.fromkeys(default)
         for key in default:
-            if key in list(config[section].keys()):
-                try:
-                    eval_value = literal_eval(config_data_raw[key])
-                    if isinstance(default[key], tuple) or isinstance(default[key], list):
-                        check_id = default[key][1]
-                        binding_id = check_id if (not check_id or isinstance(check_id, int)) else default[key][0][1]
-                        if isinstance(eval_value, list) or isinstance(eval_value, list):
-                            config_data[key] = tuple((x, binding_id) for x in eval_value)
-                        elif isinstance(eval_value, int):
-                            config_data[key] = default[key]
-                        else:
-                            config_data[key] = (str(eval_value), binding_id)
-                    elif isinstance(eval_value, int):
-                        config_data[key] = default[key]
-                    else:
-                        config_data[key] = eval_value
-                except ValueError:
-                    config_data[key] = config_data_raw[key]
-            else:
+            if key not in config[section]:
                 config_data[key] = default[key]
+                continue
+            raw_value = config_data_raw[key]
+            try:
+                eval_value = literal_eval(raw_value)
+            except (ValueError, SyntaxError):
+                eval_value = raw_value
+            if isinstance(eval_value, int):
+                config_data[key] = default[key]
+            elif isinstance(default[key], (tuple, list)):
+                default_value = default[key]
+                first = default_value[0]
+                if isinstance(first, (tuple, list)):
+                    binding_id = first[1] if len(first) > 1 else None
+                else:
+                    binding_id = default_value[1] if len(default_value) > 1 else None
+                    if isinstance(eval_value, (list, tuple)):
+                        config_data[key] = tuple((item, binding_id) for item in eval_value)
+                    config_data[key] = (str(eval_value), binding_id)
+            else:
+                config_data[key] = eval_value
         if merge:
             for key, value in config_data_raw.items():
-                clean_key = literal_eval(key) if key.startswith('"') or key.startswith('"') else key
+                clean_key = literal_eval(key) if key.startswith(('"', "'")) else key
                 try:
-                    eval_value = literal_eval(value)
-                    config_data[clean_key] = eval_value
-                except ValueError:
+                    config_data[clean_key] = literal_eval(value)
+                except (ValueError, SyntaxError):
                     config_data[clean_key] = value
     return config_data
 

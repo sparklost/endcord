@@ -232,7 +232,7 @@ theme = {
 
 keybindings = {
     # tree
-    "tree_up": ("C-UP", 500),
+    "tree_up": ("C-UP", 500),   # those with 500+ are handled in tui
     "tree_down": ("C-DOWN", 501),
     "tree_select": ("C-SPACE", 502),
     "tree_collapse_threads": ("M-h", 503),
@@ -307,6 +307,7 @@ keybindings = {
     "toggle_tab": ("M-t", 41),
     "switch_tab_modifier": ("M-NUM", None),
     "open_external_editor": ("M-e", 45),
+    "push_to_talk": (None, 1000),
     "quit": (None, 34),   # already bound to Ctrl+C
 }
 

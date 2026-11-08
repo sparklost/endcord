@@ -314,6 +314,7 @@ class Endcord:
         self.limit_msg_len = LIMIT_MSG_LEN   # same
         self.channel_cache = []   # [[id, msg, is_tab, is_temp, ch_name, guild_name]...]
         self.voice_gateway = None
+        self.ptt = None
         self.reset()
         self.chat.insert(0, f"Connecting to {custom_host or "Discord"}")
         self.gateway_state = self.gateway.get_state()
@@ -410,6 +411,8 @@ class Endcord:
                 self.game_detection.stop()
             if self.inline_media:
                 self.inline_media_drawer.stop()
+            if self.ptt:
+                self.ptt.stop()
             self.message_send_queue.put((None, None, None))
             self.notify_queue.put((None, None))
             self.run = False
@@ -698,7 +701,6 @@ class Endcord:
         self.threads = []
         self.activities = []
         self.search_results = []
-        self.search_extension_results = []
         self.members = []
         self.subscribed_members = []
         self.member_list = []
@@ -4355,7 +4357,7 @@ class Endcord:
                 max_w = self.tui.get_dimensions()[2][1]
                 self.search_ext = True
                 self.search_results = extensions
-                extra_title, extra_body, extra_format = formatter.generate_extra_window_search_ext(extensions, self.colors, max_w)
+                extra_title, extra_body, extra_format = formatter.generate_extra_window_search_ext(extensions, self.extensions, self.ext_updates, self.colors, max_w)
                 self.stop_assist(close=False)
                 self.tui.draw_extra_window(extra_title, extra_body, extra_format, select=True)
                 self.extra_window_open = True
@@ -8415,7 +8417,11 @@ class Endcord:
             self.joining_call = False
             return
 
-        from endcord import voice
+        from endcord import ptt, voice
+        if self.keybindings["push_to_talk"][0]:
+            app_id = f"com.{peripherals.REPO_OWNER}.{peripherals.TRUE_APP_NAME}"
+            dbus = curses.get_dbus_connection() if uses_gtkcurses else None
+            self.ptt = ptt.PushToTalk(self.keybindings["push_to_talk"][0], self.on_ptt, app_id, dbus)
         self.voice_gateway = voice.Gateway(
             voice_gateway_data,
             self.my_id,
@@ -8548,6 +8554,8 @@ class Endcord:
             self.in_call = None
 
         self.stop_ringing()
+        if self.ptt:
+            self.ptt.stop()
 
         # wait for host response then terminate voice gateway
         time.sleep(0.5)
@@ -8589,6 +8597,19 @@ class Endcord:
                 video=self.in_call["video"],
                 preferred_regions=self.discord.get_best_voice_region(),
             )
+
+
+    def on_ptt(self, state):
+        """Executed when push-to-talk hotkey is pressed/released"""
+        if state and not self.state["volume_in"]:
+            self.state["volume_in"] = self.prev_volume_in
+            self.update_voice_state()
+            self.update_call_extra_line()
+        if not state and self.state["volume_in"]:
+            self.prev_volume_in = self.state["volume_in"]
+            self.state["volume_in"] = 0
+            self.update_voice_state()
+            self.update_call_extra_line()
 
 
     def update_summary(self, new_summary):

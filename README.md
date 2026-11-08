@@ -34,6 +34,7 @@ Any third party endcord forks may add features that can lead to account ban, cau
     - Stream video from any source (camera, usb, screen share)
     - Set volues per-user or mute them
     - Customizable video properties
+    - Global push-to-talk (Linux X11 and Windows)
 - Desktop notifications
 - Inline images (pixelated/ascii-art/[kitty-protocol](https://github.com/sparklost/endcord-image-inline))
 - View images, gifs, videos, audio, stickers and YouTube with ASCII art or in external app
@@ -99,6 +100,7 @@ Any third party endcord forks may add features that can lead to account ban, cau
     - Uses only 15MB (linux) more RAM (vs most terminals using 20-100MB)
     - GTK-native pasting and drag n' drop (text and files)
     - Linux desktop integration: app icon, notification count badge, click on notification
+    - Additional Wayland support for global push-to-talk
 
 
 ## Disclaimer

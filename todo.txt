@@ -11,7 +11,6 @@ Add nightly builds?
 Move website to projectname.github.io
 
 CORE HARD:
-Add global push to talk
 Fix issues with wide characters in input line
 Allow client to run with invalid token but stay offline
 Provide static binaries built on muslinux

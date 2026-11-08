@@ -69,11 +69,10 @@ BG_ALPHA_COLOR = 1.0
 APP_NAME = "endcord"
 try:
     import __main__
-    TRUE_APP_NAME = APP_NAME
     APP_NAME = getattr(__main__, "APP_NAME", "endcord")
 except Exception:
     pass
-APP_ID = f"com.{peripherals.REPO_OWNER}.{TRUE_APP_NAME}"
+APP_ID = f"com.{peripherals.REPO_OWNER}.{peripherals.TRUE_APP_NAME}"
 
 CTRL_SHIFT_V_PASTE = False   # enable Ctrl+Shift+V pasting
 ENABLE_SHIFT_BACKSPACE = False
@@ -315,6 +314,7 @@ def load_svg_with_gtk(path, size=(64, 64)):
 
 
 # tray stuff
+
 
 def enable_tray():
     """Enable tray icon setup"""
@@ -1128,6 +1128,13 @@ def notify_remove(notification_id):
             app.withdraw_notification(str(notification_id))
         except GLib.Error:   # fllback
             peripherals.notify_remove(notification_id)
+
+
+def get_dbus_connection():
+    """Get DBus connection of current GTK application"""
+    if gtk_app:
+        return gtk_app.get_dbus_connection()
+    return None
 
 
 # curses stuff

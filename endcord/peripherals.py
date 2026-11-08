@@ -33,6 +33,7 @@ try:
     APP_NAME = __main__.APP_NAME   # set in main.py
 except (AttributeError, NameError):
     APP_NAME = "endcord"
+TRUE_APP_NAME = "endcord"
 VERSION = "1.6.0"
 NO_NOTIFY_SOUND_DE = ("kde", "plasma")   # linux desktops without notification sound
 RUNTIME_TEMP = False   # forces all temp files to be written to runtime dir

@@ -11,7 +11,7 @@ dependencies = [
     "soundcard>=0.4.6",
     "soundfile>=0.14.0",
     "numpy>=2.5.4",
-    "pycryptodome>=4.3.0",
+    "pycryptodome>=4.4.0",
     "pywin32>=312; sys_platform == 'win32'",
     "pywin32-ctypes>=0.2.3; sys_platform == 'win32'",
     "windows-curses>=2.4.2; sys_platform == 'win32'",

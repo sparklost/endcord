@@ -377,6 +377,8 @@ class Gateway():
             self.ws.send(json.dumps(request))
         except (websocket._exceptions.WebSocketException, OSError):
             self.reconnect_requested = True
+        except ValueError:
+            return
 
 
     def add_member_roles(self, guild_id, user_id, roles, nick=None, nonce=None):
