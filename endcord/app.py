@@ -372,7 +372,7 @@ class Endcord:
             if curses.MEDIA_ENABLED:
                 from endcord import gtkcurses_media
                 # gtkcurses_media replaces inline_media (with few exceptions in tui.py)
-                self.inline_media = gtkcurses_media.GtkCursesMedia(self, curses.get_window())
+                self.inline_media = gtkcurses_media.GtkCursesMedia(self, curses.get_window(), self.my_user_data)
                 self.tui.load_inline_media(self.inline_media)
 
         # init extensions
@@ -8105,6 +8105,8 @@ class Endcord:
                 self.limit_msg_len = LIMIT_MSG_LEN_PREMIUM if self.premium else LIMIT_MSG_LEN
                 if self.rpc.run:
                     self.rpc.generate_dispatch(new_user_data)
+                if uses_gtkcurses and self.inline_media:
+                    self.inline_media.set_my_user(self.my_user_data)
             if changed_guild:   # its guild_member_update
                 self.my_roles = self.gateway.get_my_roles()
                 self.clean_permissions(changed_guild)
@@ -8924,6 +8926,8 @@ class Endcord:
         self.formatter.set_my_id(self.my_id)
         self.premium = self.gateway.get_premium()
         self.my_user_data = self.gateway.get_my_user_data()
+        if uses_gtkcurses and self.inline_media:
+            self.inline_media.set_my_user(self.my_user_data)
         self.limit_msg_len = LIMIT_MSG_LEN_PREMIUM if self.premium else LIMIT_MSG_LEN
         self.update_prompt()
         self.reset_states(replying=True)

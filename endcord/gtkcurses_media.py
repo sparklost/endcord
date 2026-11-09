@@ -35,6 +35,8 @@ class GtkCursesMedia:
         self.prev_chat_hw = None
         self.prev_assist_type = None
         self.prev_extra_index = None
+        self.my_id = None
+        self.my_avatar_id = None
 
         # emoji
         self.download_queue = queue.Queue()
@@ -94,6 +96,12 @@ class GtkCursesMedia:
         threading.Thread(target=self.downloader, daemon=True).start()
         threading.Thread(target=self.pfp_downloader, daemon=True).start()
         threading.Thread(target=self.worker, daemon=True).start()
+
+
+    def set_my_user(self, new_data):
+        """Update my user avatar"""
+        self.my_id = new_data["id"]
+        self.my_avatar_id = new_data["extra"].get("avatar")
 
 
     def redraw(self):
@@ -289,6 +297,8 @@ class GtkCursesMedia:
                         user_id = None
                     if user_id:
                         avatar_id = message.get("avatar")
+                        if not avatar_id and user_id == self.my_id:
+                            avatar_id = self.my_avatar_id
                         key = avatar_id or user_id
                         with self.pfp_lock:
                             if key not in self.pfp_images:
