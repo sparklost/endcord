@@ -1997,7 +1997,7 @@ class ChatGenerator:
                 embed_marker_ranges.append([len(content), len(content) + 13])
                 content += f"[rich embed]:\n{embed_url}"
             else:
-                if self.show_embed_names:
+                if self.show_embed_names and "youtube." not in embed["main_url"]:
                     name = embed.get("name")
                     embed_url = trim_string(name if name else "Unnamed", self.trim_embed_url_size)
                 elif embed.get("proxy_url") and embed_url == " " and not self.placeholder_images:

@@ -10,8 +10,11 @@ PLATFORM_TYPES = ("Desktop", "Xbox", "Playstation", "IOS", "Android", "Nitendo",
 CONTENT_TYPES = ("Played Game", "Watched Media", "Top Game", "Listened Media", "Listened Session", "Top Artist", "Custom Status", "Launched Activity", "Leaderboard")
 DISCORDAPP_CDN_ATTACHMENTS = ("https://cdn.discordapp.com/attachments/", "https://media.discordapp.net/attachments")
 GIF_PROVIDERS = ("tenor.com/", "giphy.com/", "klipy.com/")
+YOUTUBE_DOMAINS = ("youtube.", "youtu.be")
+
 match_discord_attachment_url = re.compile(r"https:\/\/(?:cdn|media)\.discord(?:app)?\.(?:com|net)\/attachments\/\d+\/\d+\/([^\?\s)\]>]+)(?:\?.+)?")
 match_url = re.compile(r"https?:\/\/[\w-]+(\.[\w-])+[^\s)\]>]*")
+
 
 
 def generate_timestamp(timestamp, timestamp_format, unix=False):
@@ -42,67 +45,76 @@ def prepare_embeds(embeds, message_content):
         media = []
         embed_type = embed.get("type", "unknown")
         url = embed.get("url", "")
-        author = None
+        title = embed.get("title")
+        video_url = embed.get("video", {}).get("url", "")
+        is_gif = any(domain in url for domain in GIF_PROVIDERS)
+        is_yt = any(domain in url + video_url for domain in YOUTUBE_DOMAINS)
 
-        if url and not any(domain in url for domain in GIF_PROVIDERS):
+        if url and not is_gif:
             # dont repeat unless its not discord attachment and handle x=twitter
-            if (embed_type != "rich" and ".discordapp." not in embed["url"]) or embed["url"] not in message_content.replace("https://x.com", "https://twitter.com") or embed_type == "image":
+            already_shown = url in message_content.replace("https://x.com", "https://twitter.com")
+            if embed_type == "image" or (embed_type != "rich" and ".discordapp." not in url) or not already_shown:
                 main_url = url
                 skip_main_url = True
 
-        if "name" in embed.get("author", {}) and not any(domain in url for domain in GIF_PROVIDERS):
-            author = quote(f"*— By: {embed["author"]["name"]}*")
-        if "title" in embed:
-            if main_url:
-                content = [" ", quote(f"[{embed["title"]}]({main_url})")]
+        author_name = embed.get("author", {}).get("name")
+        if author_name and not is_gif:
+            provider = embed.get("provider", {}).get("name")
+            on_provider = f" on {provider}" if provider and embed_type == "video" else ""
+            author = quote(f"*— By: {author_name}{on_provider}*")
+
+        if title:
+            if embed_type == "video" and main_url:
+                content = [f"[{title}]({main_url})"]
+            elif main_url:
+                content = [" ", quote(f"[{title}]({main_url})")]
             else:
-                content.append(quote(embed["title"]))
-        if "description" in embed and (not main_url or "youtube." not in main_url):   # skip long descriptions for yt
+                content.append(quote(title))
+        # skip long descriptions for yt
+        if embed.get("description") and not is_yt:
             content.append(quote(embed["description"]))
 
         # check for all urls in content so far and set to media = false
         for line in content:
             media += [False] * len(re.findall(match_url, line))
 
-        if "fields" in embed:
-            for field in embed["fields"]:
-                content.append(quote(field["name"]))
-                content.append(quote(field["value"]))
+        for field in embed.get("fields", []):
+            content.append(quote(field["name"]))
+            content.append(quote(field["value"]))
             media += [False] * len(re.findall(match_url, field["name"] + "\n" + field["value"]))
-        if "thumbnail" in embed:
-            proxy_url = embed["thumbnail"]["proxy_url"]
-            hw = (embed["thumbnail"]["height"], embed["thumbnail"]["width"])
-        if "image" in embed and "url" in embed["image"]:
-            if embed["image"]["url"] not in content:
+
+        thumbnail = embed.get("thumbnail")
+        if thumbnail:
+            proxy_url = thumbnail.get("proxy_url")
+            hw = (thumbnail.get("height"), thumbnail.get("width"))
+
+        for key in ("image", "video"):
+            media_url = embed.get(key, {}).get("url")
+            if not media_url:
+                continue
+            # yt url is just embed player link, dont show it
+            if not (key == "video" and is_yt) and not any(media_url in line for line in content):
                 if embed_type == "rich":
-                    content.append(quote(embed["image"]["url"]))
-                elif embed_type.startswith("gif") and "title" in embed:
-                    content = [f"[{embed["title"]}]({embed["image"]["url"]})"]
+                    content.append(quote(media_url))
+                elif embed_type.startswith("gif") and title:
+                    content = [f"[{title}]({media_url})"]
+                    media = []
                 else:
-                    content.append(embed["image"]["url"])
-            main_url = embed["image"]["url"]
-            if not proxy_url and "proxy_url" in embed["image"]:
-                proxy_url = embed["image"]["proxy_url"]
-                hw = (embed["image"]["height"], embed["image"]["width"])
-            media.append(True)
-        if "video" in embed and "url" in embed["video"]:
-            if "youtube." not in embed["video"]["url"] and embed["video"]["url"] not in content:
-                if embed_type == "rich":
-                    content.append(quote(embed["video"]["url"]))
-                elif embed_type.startswith("gif") and "title" in embed:
-                    content = [f"[{embed["title"]}]({embed["video"]["url"]})"]
-                else:
-                    content.append(embed["video"]["url"])
-            if not skip_main_url:
-                main_url = embed["video"]["url"]
-            if not proxy_url and "proxy_url" in embed["video"]:
-                proxy_url = embed["video"]["proxy_url"]
-                hw = (embed["video"]["height"], embed["video"]["width"])
-            media.append(True)
-        if "footer" in embed and "text" in embed["footer"]:
-            content.append(quote(embed["footer"]["text"]))
-            media += [False] * len(re.findall(match_url, embed["footer"]["text"]))
-        if author and content[-1].startswith("> "):
+                    content.append(media_url)
+                # only urls that are in content get a media flag
+                media.append(True)
+            if key == "image" or not skip_main_url:
+                main_url = media_url
+            if not proxy_url and "proxy_url" in embed[key]:
+                proxy_url = embed[key]["proxy_url"]
+                hw = (embed[key].get("height"), embed[key].get("width"))
+
+        footer_text = embed.get("footer", {}).get("text")
+        if footer_text:
+            content.append(quote(footer_text))
+            media += [False] * len(re.findall(match_url, footer_text))
+
+        if author and content and (embed_type == "video" or content[-1].startswith("> ")):
             content.append(author)
         content = "\n".join(content)
         if content or proxy_url:
@@ -110,7 +122,11 @@ def prepare_embeds(embeds, message_content):
                 content = " "
             if content == message_content:
                 message_content = ""
-            if message_content.startswith("https://") and " " not in message_content and "\n" not in message_content and ((main_url and main_url in message_content) or any(domain in content for domain in GIF_PROVIDERS)):
+            if (
+                message_content.startswith("https://")
+                and " " not in message_content and "\n" not in message_content
+                and ((main_url and main_url in message_content) or any(domain in content for domain in GIF_PROVIDERS))
+            ):
                 message_content = ""
             ready_data = {
                 "type": embed_type,

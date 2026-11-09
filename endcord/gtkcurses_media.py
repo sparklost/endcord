@@ -3,11 +3,13 @@
 # Redistribution of modified versions is not permitted.
 
 import glob
+import importlib.util
 import logging
 import os
 import queue
 import threading
 
+import cairo
 import gi
 
 from endcord import formatter, gtkcurses, peripherals, utils
@@ -19,6 +21,26 @@ from gi.repository import Gdk, GdkPixbuf, GLib   # noqa
 logger = logging.getLogger(__name__)
 
 IMAGE_SIZES = [16, 20, 22, 24, 28, 32, 40, 44, 48, 56, 60, 64, 80, 96, 100, 128, 160, 240, 254]
+
+WEBP_PIXBUF = "webp" in [pixbuf_format.get_name() for pixbuf_format in GdkPixbuf.Pixbuf.get_formats()]
+USE_PILLOW = False
+if not WEBP_PIXBUF and importlib.util.find_spec("PIL"):
+    from PIL import Image, features
+    USE_PILLOW = features.check("webp")
+IMAGE_FORMAT = "webp" if WEBP_PIXBUF or USE_PILLOW else "png"
+logger.debug(f"Media image format: {IMAGE_FORMAT}, loader: {"pillow" if USE_PILLOW else "pixbuf"}")
+
+
+def load_surface(path, w, h, scale):
+    """Load image into cairo surface using best available loader"""
+    if USE_PILLOW:
+        img = Image.open(path).convert("RGBA").resize((w * scale, h * scale), Image.Resampling.LANCZOS)
+        data = bytearray(img.convert("RGBa").tobytes("raw", "BGRa"))
+        surface = cairo.ImageSurface.create_for_data(data, cairo.FORMAT_ARGB32, img.width, img.height)
+        surface.set_device_scale(scale, scale)
+        return surface
+    pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(path, w * scale, h * scale, True)
+    return Gdk.cairo_surface_create_from_pixbuf(pixbuf, scale, None)
 
 
 class GtkCursesMedia:
@@ -468,11 +490,10 @@ class GtkCursesMedia:
                 continue
             scale = self.gtk_window.get_scale_factor()
             try:
-                pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(image_path, self.size * scale, self.size * scale, True)
-            except GLib.Error:
+                surface = load_surface(image_path, self.size, self.size, scale)
+            except (GLib.Error, OSError):
                 logger.warning(f"Failed loading emoji: {emoji_id}")
                 continue
-            surface = Gdk.cairo_surface_create_from_pixbuf(pixbuf, scale, None)
             with self.images_lock:
                 if emoji_id not in self.images:
                     continue
@@ -494,7 +515,7 @@ class GtkCursesMedia:
             # check if cached
             image_path = utils.search_pfp_cache(self.pfp_cache_path, f"{avatar_id}*", avatar_id)
             if not image_path:
-                image_path = self.app.discord.get_pfp(user_id, avatar_id, size=image_size, img_type="png", save_path=self.pfp_cache_path, keepalive=True)
+                image_path = self.app.discord.get_pfp(user_id, avatar_id, size=image_size, img_type=IMAGE_FORMAT, save_path=self.pfp_cache_path, keepalive=True)
                 if image_path and not avatar_id:
                     image_path = peripherals.resize_image(image_path, h=image_size, w=image_size)
             if not image_path:
@@ -507,11 +528,10 @@ class GtkCursesMedia:
                     logger.error(f"Error converting image: {e}")
 
             try:
-                pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(image_path, pixel_size, pixel_size, True)
-            except GLib.Error:
+                surface = load_surface(image_path, self.pfp_side, self.pfp_side, scale)
+            except (GLib.Error, OSError):
                 logger.warning(f"Failed loading profile picture: {key}")
                 continue
-            surface = Gdk.cairo_surface_create_from_pixbuf(pixbuf, scale, None)
             with self.pfp_lock:
                 if key not in self.pfp_images:
                     continue
@@ -551,22 +571,22 @@ class GtkCursesMedia:
 
             # download
             if not image_path:
+                img_quality = "lossless" if IMAGE_FORMAT == "webp" and "//media." in img_url else self.inline_quality
                 if img_url.endswith("&"):
                     img_url += "="
                 if "?" not in img_url:
                     img_url += "?"
-                img_url = f"{img_url}&format=png&quality={self.inline_quality}&width={req_w}&height={req_h}"
-                img_name = f"{image_id}_{req_w}_{req_h}.png"
+                img_url = f"{img_url}&format={IMAGE_FORMAT}&quality={img_quality}&width={req_w}&height={req_h}"
+                img_name = f"{image_id}_{req_w}_{req_h}.{IMAGE_FORMAT}"
                 image_path = self.app.discord.get_file(img_url, self.inline_cache_path, file_name=img_name, cache=True, keepalive=True)
             if not image_path:
                 continue
 
             try:
-                pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(image_path, view_w * scale, view_h * scale, True)
-            except GLib.Error:
+                surface = load_surface(image_path, view_w, view_h, scale)
+            except (GLib.Error, OSError):
                 logger.warning(f"Failed loading inline image: {image_id}")
                 continue
-            surface = Gdk.cairo_surface_create_from_pixbuf(pixbuf, scale, None)
             with self.inline_lock:
                 if key not in self.inline_images:
                     continue

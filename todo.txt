@@ -1,7 +1,3 @@
-Add ascii/block inline images
-Add webp support to gtkcurses_media
-Fix youtube showing video embed sign
-
 CORE EASY:
 Add scheduled messages
 Add spellcheck corrections assist
@@ -27,6 +23,7 @@ Add wayland screen capture
 Add localization
 
 GTKCURSES:
+Add ascii/block inline media
 Add full/ascii/block media viewer
 Add full/ascii/block inline media
 Add full/ascii/block video calls (popup player with call UI)
