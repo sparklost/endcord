@@ -360,31 +360,29 @@ class InlineMedia:
                 with self.tui.lock:
                     self.draw_single_image(data, rel_x, rel_y, w, h, mention, slow=False)
 
+            # reuse larger cached image or delete smaller
+            image_path = None
+            for path in glob.glob(os.path.join(self.image_cache_path, f"{image_id}_*")):
+                try:
+                    cached_w = int(os.path.splitext(os.path.basename(path))[0].split("_")[-2])
+                except ValueError:
+                    continue
+                if cached_w >= img_h:
+                    image_path = path
+                else:
+                    os.remove(path)
+                break
+
+            # download
             img_quality = "lossless" if "//media." in img_url else self.inline_media_quality
             if img_url.endswith("&"):
                 img_url += "="
             if "?" not in img_url:
                 img_url += "?"
-
-            # reuse larger cached image and delete smaller
-            for path in glob.glob(os.path.join(self.image_cache_path, f"{image_id}_*")):
-                try:
-                    filename = os.path.splitext(os.path.basename(path))[0]
-                    _, _, new_w, new_h = filename.split(".")[0].split("_")
-                    if int(new_w) >= img_w:
-                        img_w = int(new_w)
-                        img_h = int(new_h)
-                        break
-                    else:
-                        os.remove(path)
-                        break   # assuming only one can exist
-                except Exception:
-                    pass
-
-            # download
-            img_url = f"{img_url}&format=webp&quality={img_quality}&width={img_w}&height={img_h}"
-            img_name = f"{image_id}_{img_w}_{img_h}.webp"
-            image_path = self.discord.get_file(img_url, self.image_cache_path, file_name=img_name, cache=True, keepalive=True)
+            if not image_path:
+                img_url = f"{img_url}&format=webp&quality={img_quality}&width={img_w}&height={img_h}"
+                img_name = f"{image_id}_{img_w}_{img_h}.webp"
+                image_path = self.discord.get_file(img_url, self.image_cache_path, file_name=img_name, cache=True, keepalive=True)
 
             # use latest data, in case something changed during download
             with self.image_cache_lock:

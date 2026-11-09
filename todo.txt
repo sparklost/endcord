@@ -1,3 +1,7 @@
+Add ascii/block inline images
+Add webp support to gtkcurses_media
+Fix youtube showing video embed sign
+
 CORE EASY:
 Add scheduled messages
 Add spellcheck corrections assist
@@ -23,9 +27,9 @@ Add wayland screen capture
 Add localization
 
 GTKCURSES:
-Add full/ascii/block image/media viewer
-Add full/ascii/block inline images/media
-Add video calls (full/ascii/block popup player with call UI)
+Add full/ascii/block media viewer
+Add full/ascii/block inline media
+Add full/ascii/block video calls (popup player with call UI)
 
 MORE COLORS:
 Patch python 3.14 using python 3.16 curses module to enable 255+ colors

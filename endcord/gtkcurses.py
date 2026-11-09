@@ -66,7 +66,9 @@ GTK_DARK_THEME = True
 BAR_THICKNESS = 0.5   # fraction of character width
 BG_ALPHA = 1.0
 BG_ALPHA_COLOR = 1.0
-MEDIA_ENABLED = True
+EMOJI_MEDIA = True
+PFP_MEDIA = True
+INLINE_MEDIA = True
 APP_NAME = "endcord"
 CTRL_SHIFT_V_PASTE = False   # enable Ctrl+Shift+V pasting
 ENABLE_SHIFT_BACKSPACE = False
@@ -120,7 +122,9 @@ if config_path:
             MULTIPLE_INSTANCES = config.get("multiple_instances", MULTIPLE_INSTANCES)
             GTK_DARK_THEME = config.get("gtk_dark_theme", GTK_DARK_THEME)
             APP_NAME = config.get("app_name", APP_NAME)
-            MEDIA_ENABLED = config.get("media", MEDIA_ENABLED)
+            EMOJI_MEDIA = config.get("emoji_media", EMOJI_MEDIA)
+            PFP_MEDIA = config.get("pfp_media", PFP_MEDIA)
+            INLINE_MEDIA = config.get("inline_media", INLINE_MEDIA)
             CTRL_SHIFT_V_PASTE = config.get("ctrl_shift_v_paste", CTRL_SHIFT_V_PASTE)
             ENABLE_SHIFT_BACKSPACE = config.get("enable_shif_backspace", ENABLE_SHIFT_BACKSPACE)
             ENABLE_TRAY = config.get("enable_tray", ENABLE_TRAY)
@@ -141,7 +145,9 @@ if config_path:
             "font_name": FONT_NAME,
             "gtk_dark_theme": GTK_DARK_THEME,
             "app_name": APP_NAME,
-            "media": MEDIA_ENABLED,
+            "emoji_media": EMOJI_MEDIA,
+            "pfp_media": PFP_MEDIA,
+            "inlin_media": INLINE_MEDIA,
             "ctrl_shift_v_paste": CTRL_SHIFT_V_PASTE,
             "enable_tray": ENABLE_TRAY,
             "tray_icon_normal": TRAY_ICON_NORMAL,

@@ -369,11 +369,13 @@ class Endcord:
         # for gtkcurses
         if uses_gtkcurses:
             curses.enable_tray()
-            if curses.MEDIA_ENABLED:
-                from endcord import gtkcurses_media
-                # gtkcurses_media replaces inline_media (with few exceptions in tui.py)
-                self.inline_media = gtkcurses_media.GtkCursesMedia(self, curses.get_window(), self.my_user_data)
-                self.tui.load_inline_media(self.inline_media)
+            from endcord import gtkcurses_media
+            # gtkcurses_media replaces inline_media (with few exceptions in tui.py)
+            self.inline_media = gtkcurses_media.GtkCursesMedia(
+                self, curses.get_window(),
+                curses.EMOJI_MEDIA, curses.PFP_MEDIA, curses.INLINE_MEDIA,
+            )
+            self.tui.load_inline_media(self.inline_media)
 
         # init extensions
         if self.config["extensions"] and ENABLE_EXTENSIONS:
