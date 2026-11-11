@@ -144,29 +144,33 @@ cpdef list fix_line_format(list line_format, str text):
 
 
 cpdef list fix_map_ranges(list map_ranges, str text):
-    cdef list wide_positions, corrected, item
+    cdef list wide_positions, corrected, new_item
     cdef Py_ssize_t i, start, end, start_shift, end_shift
     cdef Py_UCS4 codepoint
-    cdef object data
+    cdef object item, data
 
     if not map_ranges:
-        return map_ranges
+      return map_ranges
 
     wide_positions = []
     for i, codepoint in enumerate(text):
-        if (codepoint < 0x20 or codepoint >= 0x7f) and binary_search(codepoint):
-            wide_positions.append(i)
+      if (codepoint < 0x20 or codepoint >= 0x7f) and binary_search(codepoint):
+        wide_positions.append(i)
     if not wide_positions:
-        return map_ranges
+      return map_ranges
 
     corrected = []
     for item in map_ranges:
-        start = item[0]
-        end = item[1]
-        data = item[2]
-        start_shift = bisect_left_c(wide_positions, start)
-        end_shift = bisect_left_c(wide_positions, end)
-        corrected.append([start + start_shift, end + end_shift, data])
+      start = item[0]
+      end = item[1]
+      data = item[2]
+      start_shift = bisect_left_c(wide_positions, start)
+      end_shift = bisect_left_c(wide_positions, end)
+      new_item = [start + start_shift, end + end_shift, data]
+      if len(item) > 3:
+        new_item.extend(item[3:])
+
+      corrected.append(new_item)
 
     return corrected
 
