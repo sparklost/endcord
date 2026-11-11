@@ -69,7 +69,7 @@ def prepare_embeds(embeds, message_content):
             if embed_type == "video" and main_url:
                 content = [f"[{title}]({main_url})"]
             elif main_url:
-                content = [" ", quote(f"[{title}]({main_url})")]
+                content = [f"[{title}]({main_url})"]
             else:
                 content.append(quote(title))
         # skip long descriptions for yt

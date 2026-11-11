@@ -335,9 +335,9 @@ class RPC:
                         # prepare other data
                         if "timestamps" in activity:
                             if "start" in activity["timestamps"]:
-                                to_milliseconds(activity["timestamps"]["start"])
+                                activity["timestamps"]["start"] = to_milliseconds(activity["timestamps"]["start"])
                             if "end" in activity["timestamps"]:
-                                to_milliseconds(activity["timestamps"]["end"])
+                                activity["timestamps"]["start"] = to_milliseconds(activity["timestamps"]["end"])
                         if "buttons" in activity:
                             buttons = activity.pop("buttons")
                             activity["buttons"] = []

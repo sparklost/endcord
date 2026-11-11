@@ -400,10 +400,10 @@ def fix_map_ranges(map_ranges, text):
         return map_ranges
 
     corrected = []
-    for start, end, data in map_ranges:
+    for start, end, data, *optional in map_ranges:
         start_shift = bisect_left(wide_positions, start)
         end_shift = bisect_left(wide_positions, end)
-        corrected.append((start + start_shift, end + end_shift, data))
+        corrected.append((start + start_shift, end + end_shift, data, *optional))
 
     return corrected
 
