@@ -40,6 +40,14 @@ DISCORD_ASSETS_WHITELIST = (   # assets passed from RPC app to discord as text
 )
 
 
+def to_milliseconds(timestamp):
+    """Safely convert unix timestamp to milliseconds"""
+    # timestamps in seconds are currently less than a trillion
+    if timestamp < 1_000_000_000_000:
+        return int(timestamp * 1000)
+    return int(timestamp)
+
+
 def receive_data_linux(connection):
     """Receive and decode nicely packed json data"""
     try:
@@ -51,13 +59,13 @@ def receive_data_linux(connection):
         while len(data) < length:
             chunk = connection.recv(length - len(data))
             if not chunk:
-                return None
+                return None, None
             data += chunk
         return op, json.loads(data)
-    except struct.error as e:
+    except (struct.error, ValueError) as e:
         logger.error(e)
         return None, None
-    except ConnectionResetError:
+    except OSError:
         return None, None
 
 
@@ -70,7 +78,10 @@ def send_data_linux(connection, op, data):
     """
     payload = json.dumps(data, separators=(",", ":"))
     package = struct.pack("<ii", op, len(payload)) + payload.encode("utf-8")
-    connection.sendall(package)
+    try:
+        connection.sendall(package)
+    except OSError as e:
+        logger.error(e)
 
 
 def receive_data_win(pipe):
@@ -80,7 +91,7 @@ def receive_data_win(pipe):
         op, length = struct.unpack("<II", header)
         data = win32file.ReadFile(pipe, length)[1]
         return op, json.loads(data.decode("utf-8"))
-    except (struct.error, pywintypes.error) as e:
+    except (struct.error, pywintypes.error, ValueError) as e:
         logger.error(e)
         return None, None
 
@@ -118,6 +129,7 @@ class RPC:
         self.activities = []
         self.not_exist = []
         self.connections = []
+        self.lock = threading.Lock()
         self.server = None
         if user["bot"]:
             logger.warning("RPC server cannot be started for bot accounts")
@@ -196,7 +208,7 @@ class RPC:
             response = {
                 "cmd": data["cmd"],
                 "data": {
-                    "evt": data["evt"],
+                    "evt": data.get("evt"),
                 },
                 "evt": None,
                 "nonce": data["nonce"],
@@ -204,10 +216,22 @@ class RPC:
         return response
 
 
+    def remove_activity(self, activity):
+        """Remove one activity matched by identity"""
+        with self.lock:
+            for num, app in enumerate(self.activities):
+                if app is activity:
+                    self.activities.pop(num)
+                    self.changed = True
+                    break
+
+
     def client_thread(self, connection):
         """Thread that handles receiving and sending data from one client"""
         app_id = None
         rpc_data = None
+        own_activity = None   # activity of this connection, as stored in self.activities
+        pid = None
 
         try:   # lets keep server running even if there is error in one thread
             self.connections.append(connection)
@@ -215,18 +239,11 @@ class RPC:
             if op is None or init_data is None:
                 return
             if isinstance(init_data, str):   # discord client sends a number string for unknown reason
-                if sys.platform == "win32":
-                    win32file.CloseHandle(connection)
-                else:
-                    connection.close()
                 return
             app_id = init_data["client_id"]
 
             if app_id in self.not_exist:
-                if sys.platform == "win32":
-                    win32file.CloseHandle(connection)
-                else:
-                    connection.close()
+                send_data(connection, 2, {"code": 4000, "message": "Invalid Client ID"})
                 return
 
             logger.debug(f"RPC app id: {app_id}")
@@ -239,24 +256,45 @@ class RPC:
                 prev_activity = None
                 while self.run:
                     op, data = receive_data(connection)
-                    if not data:
+                    if op == 3:   # ping
+                        send_data(connection, 4, data)
+                        continue
+                    if op == 2 or not data:   # close
                         break
                     logger.debug(f"Received: {json.dumps(data, indent=2)}")
 
                     if data["cmd"] == "SET_ACTIVITY":
+                        pid = data["args"].get("pid", pid)
                         if "activity" not in data["args"]:
+                            response = {
+                                "cmd": data["cmd"],
+                                "data": {"code": 4000, "message": "Invalid payload"},
+                                "evt": "ERROR",
+                                "nonce": data.get("nonce"),
+                            }
+                            send_data(connection, op, response)
                             continue
-                        # prevent sending presences too often
+
+                        # activity cleared by client
+                        if not data["args"]["activity"]:
+                            if own_activity:
+                                self.remove_activity(own_activity)
+                                own_activity = None
+                            prev_activity = None
+                            response = self.build_response(data)
+                            send_data(connection, op, response)
+                            continue
+
+                        # dont send presences too often
                         delay = GATEWAY_RATE_LIMIT_SAME if data["args"]["activity"] == prev_activity else GATEWAY_RATE_LIMIT
                         if time.monotonic() - sent_time < delay:
                             response = self.build_response(data)
                             send_data(connection, op, response)
-                            prev_activity = data["args"]["activity"]
-                            sent_time = time.monotonic()
+                            continue
+                        prev_activity = dict(data["args"]["activity"])
+                        sent_time = time.monotonic()
 
                         activity = data["args"]["activity"]
-                        if not activity:
-                            continue
                         activity_type = activity.get("type", 0)
 
                         # add everything thats missing
@@ -264,7 +302,7 @@ class RPC:
                         if not activity.get("name"):
                             activity["name"] = rpc_data["name"]
                         assets = {}
-                        for asset_client in activity["assets"]:
+                        for asset_client in activity.get("assets", {}):
 
                             # check if asset is external link
                             if activity["assets"][asset_client][:8] == "https://":
@@ -297,9 +335,9 @@ class RPC:
                         # prepare other data
                         if "timestamps" in activity:
                             if "start" in activity["timestamps"]:
-                                activity["timestamps"]["start"] *= 1000
+                                to_milliseconds(activity["timestamps"]["start"])
                             if "end" in activity["timestamps"]:
-                                activity["timestamps"]["end"] *= 1000
+                                to_milliseconds(activity["timestamps"]["end"])
                         if "buttons" in activity:
                             buttons = activity.pop("buttons")
                             activity["buttons"] = []
@@ -316,15 +354,18 @@ class RPC:
                         activity.pop("instance", None)
 
                         # self.changed will be true only when presence data has been updated
-                        for num, app in enumerate(self.activities):
-                            if app["application_id"] == app_id:
-                                if activity != self.activities[num]:
-                                    self.activities[num] = activity
-                                    self.changed = True
-                                break
-                        else:
-                            self.activities.append(activity)
-                            self.changed = True
+                        with self.lock:
+                            for num, app in enumerate(self.activities):
+                                if app is own_activity:
+                                    if activity != app:
+                                        self.activities[num] = activity
+                                        own_activity = activity
+                                        self.changed = True
+                                    break
+                            else:
+                                self.activities.append(activity)
+                                own_activity = activity
+                                self.changed = True
 
                         response = {
                             "cmd": data["cmd"],
@@ -340,7 +381,7 @@ class RPC:
                         response = {
                             "cmd": data["cmd"],
                             "data": {
-                                "evt": data["evt"],
+                                "evt": data.get("evt"),
                             },
                             "evt": None,
                             "nonce": data["nonce"],
@@ -350,26 +391,28 @@ class RPC:
             else:
                 if status == 2:   # not found
                     self.not_exist.append(app_id)
+                    send_data(connection, 2, {"code": 4000, "message": "Invalid Client ID"})
                 logger.warning("Failed retrieving RPC app data from discord")
         except Exception:
             logger.exception("RPC server error:")
 
-        # remove presence from list
-        if app_id:
-            for num, app in enumerate(self.activities):
-                if app["application_id"] == app_id:
-                    self.activities.pop(num)
-                    self.changed = True
-                    break
-        if sys.platform == "win32":
-            win32file.CloseHandle(connection)
-        else:
-            connection.close()
-        try:
-            self.connections.remove(connection)
-        except ValueError:
-            pass
-        logger.info(f"RPC client disconnected: {rpc_data["name"] if rpc_data else "Unknown"}")
+        finally:
+            # remove presence from list
+            if own_activity:
+                self.remove_activity(own_activity)
+            if sys.platform == "win32":
+                try:
+                    win32pipe.DisconnectNamedPipe(connection)
+                except pywintypes.error:
+                    pass
+                win32file.CloseHandle(connection)
+            else:
+                connection.close()
+            try:
+                self.connections.remove(connection)
+            except ValueError:
+                pass
+            logger.info(f"RPC client disconnected: {rpc_data["name"] if rpc_data else "Unknown"} (pid {pid})")
 
 
     def server_thread_win(self):

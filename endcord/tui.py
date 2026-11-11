@@ -202,7 +202,11 @@ class TUI():
     """Methods used to draw terminal user interface"""
 
     def __init__(self, screen, config, keybindings, command_bindings, draw_tree, draw_member_list):
-        self.spellchecker = peripherals.SpellCheck(config["aspell_mode"], config["aspell_lang"])
+        self.spellchecker = peripherals.SpellCheck(
+            config["aspell_mode"],
+            config["aspell_lang"],
+            os.path.join(peripherals.config_path, "aspell-personal.dict"),
+        )
         acs_map = acs.get_map()
         curses.use_default_colors()
         curses.curs_set(0)   # using custom cursor
@@ -361,6 +365,7 @@ class TUI():
         self.enable_autocomplete = False
         self.spelling_range = (0, 0, 0)
         self.misspelled = []
+        self.spell_suggestions = []
         self.delta_store = []
         self.last_action = None
         self.delta_cache = ""
@@ -869,6 +874,7 @@ class TUI():
                 self.assist_start = -1
                 return None, 100
         if self.assist_start == -2:
+            self.assist_start = -1
             return None, 100
         if self.enable_autocomplete and self.input_buffer:
             return self.input_buffer, 7
@@ -887,6 +893,11 @@ class TUI():
     def get_focused(self):
         """Get whether chat is focused or not"""
         return self.focused and not self.disable_drawing
+
+
+    def get_spell_suggestions(self):
+        """Get spell suggestions for current mispelled word"""
+        return self.spell_suggestions
 
 
     def set_selected(self, selected, change_amount=0, scroll=True, draw=True):
@@ -924,9 +935,7 @@ class TUI():
         """Set cursor position on input line"""
         self.input_index = index
         _, w = self.input_hw
-        self.cursor_pos = self.input_index - max(0, len(self.input_buffer) - w + 1 - self.input_line_index)
-        self.cursor_pos = max(self.cursor_pos, 0)
-        self.cursor_pos = min(w - 1, self.cursor_pos)
+        self.update_cursor_pos()
         self.input_select_start = None
         self.show_cursor()
 
@@ -2458,6 +2467,55 @@ class TUI():
         self.spelling_range = spelling_range
 
 
+    def jump_misspelled(self, forward):
+        """Move cursor to end of previous or next misspelled word, highlight it, return False if no misspelled"""
+        self.spell_suggestions = []
+        words = list(re.finditer(r"[\w']+", self.input_buffer))
+        flags = self.spellchecker.check_list([match.group() for match in words])
+        wrong = [match for match, flag in zip(words, flags) if flag]
+        if forward:
+            at_end = self.input_index == len(self.input_buffer)
+            found = [match for match in wrong if match.end() > self.input_index or (at_end and match.end() == self.input_index)]
+        else:
+            found = [match for match in wrong if match.end() < self.input_index]
+        if not found:
+            return False
+        match = found[0] if forward else found[-1]
+        self.input_index = match.end()
+        self.input_select_start = match.start()
+        self.input_select_end = match.end()
+        self.ensure_cursor_visible()
+        self.update_cursor_pos()
+        self.spell_suggestions = self.spellchecker.get_suggestions(match.group())
+        self.spellcheck()
+        return True
+
+
+    def add_to_aspell_dict(self, word):
+        """Add word to aspell dictionary"""
+        self.spellchecker.add_word(word)
+        self.spelling_range = None
+        self.spell_suggestions = []
+        return True
+
+
+    def do_spell_correct(self, index):
+        """Apply spellcheck correction from specified index (0 is add to dict)"""
+        if index == 0:
+            self.add_to_aspell_dict(resplit(self.input_buffer[:self.input_index])[-1])
+        else:
+            wrong_word = resplit(self.input_buffer[:self.input_index])[-1]
+            new_text = self.input_buffer[:self.input_index - len(wrong_word)] + self.spell_suggestions[index-1]
+            new_input_index = len(new_text)
+            new_text += self.input_buffer[self.input_index:]
+            self.input_buffer = new_text
+            self.input_index = new_input_index
+            self.ensure_cursor_visible()
+            self.update_cursor_pos()
+        self.input_select_start = None
+        self.spellcheck()
+
+
     def add_to_delta_store(self, key, character=None):
         """Add input line delta to delta_store"""
         if key not in ("BACKSPACE", "DELETE", " ", "UNDO", "REDO"):
@@ -2665,12 +2723,20 @@ class TUI():
         return tmp, self.chat_selected, self.tree_selected_abs, code
 
 
+    def update_cursor_pos(self):
+        """Calculate new cursor position from input index"""
+        w = self.input_hw[1]
+        self.cursor_pos = self.input_index - max(0, len(self.input_buffer) - w + 1 - self.input_line_index)
+        self.cursor_pos = max(self.cursor_pos, 0)
+        self.cursor_pos = min(w - 1, self.cursor_pos)
+
+
     def wait_input(self, prompt="", init_text=None, reset=True, keep_cursor=False, autocomplete=False, clear_delta=False, forum=False, command=False, press=None):
         """
         Take input from user, and show it on screen.
         Return typed text, absolute_tree_position and whether channel is changed.
         """
-        _, w = self.input_hw
+        w = self.input_hw[1]
         self.enable_autocomplete = autocomplete
         if reset:
             self.input_buffer = ""
@@ -2683,9 +2749,7 @@ class TUI():
             if not keep_cursor:
                 w += self.prompt_len - formatter.len_wch(prompt)
                 self.input_index = len(self.input_buffer)
-                self.cursor_pos = self.input_index - max(0, len(self.input_buffer) - w + 1 - self.input_line_index)
-                self.cursor_pos = max(self.cursor_pos, 0)
-                self.cursor_pos = min(w - 1, self.cursor_pos)
+                self.update_cursor_pos()
         if not self.disable_drawing:
             self.update_prompt(prompt)
             self.spellcheck()
@@ -2726,6 +2790,9 @@ class TUI():
             # regular characters
             if len(key) == 1 and self.insert_mode:
                 if self.input_select_start is not None:
+                    if self.spell_suggestions and key.isdigit():
+                        self.do_spell_correct(int(key))
+                        return self.return_input_code(55)
                     self.delete_selection()
                     self.input_select_start = None
                 self.input_buffer = self.input_buffer[:self.input_index] + key + self.input_buffer[self.input_index:]
@@ -2747,12 +2814,11 @@ class TUI():
                             self.assist_start = self.input_index
                     elif self.assist_stop_space and key == " ":
                         self.assist_start = -2
-
                 self.spellcheck()
-                self.cursor_pos = self.input_index - max(0, len(self.input_buffer) - w + 1 - self.input_line_index)
-                self.cursor_pos = max(self.cursor_pos, 0)
-                self.cursor_pos = min(w - 1, self.cursor_pos)
+                self.update_cursor_pos()
                 self.draw_input_line()
+                if self.spell_suggestions:
+                    break
                 continue
 
             # switching tab with Binding+Num
@@ -3075,6 +3141,14 @@ class TUI():
                         self.add_to_delta_store("DELETE", char)
                     self.spellcheck()
 
+            elif key == 530 and not command:   # spellcheck left
+                if self.jump_misspelled(False):
+                    return self.return_input_code(54)
+
+            elif key == 531 and not command:   # spellcheck right
+                if self.jump_misspelled(True):
+                    return self.return_input_code(54)
+
             elif key == 513:   # undo
                 self.add_to_delta_store("UNDO")
                 if self.undo_index is None:
@@ -3128,9 +3202,7 @@ class TUI():
             elif key == 517 and self.input_select_start is not None:   # cut
                 self.delete_selection()
                 self.input_select_start = None
-                self.cursor_pos = self.input_index - max(0, len(self.input_buffer) - w + 1 - self.input_line_index)
-                self.cursor_pos = max(self.cursor_pos, 0)
-                self.cursor_pos = min(w - 1, self.cursor_pos)
+                self.update_cursor_pos()
                 self.draw_input_line()
                 return self.return_input_code(20)
 
@@ -3189,16 +3261,14 @@ class TUI():
             # terminal reserved keys: CTRL+ C, I, J, M, Q, S, Z
 
             # keep index inside screen
-            self.cursor_pos = self.input_index - max(0, len(self.input_buffer) - w + 1 - self.input_line_index)
-            self.cursor_pos = max(self.cursor_pos, 0)
-            self.cursor_pos = min(w - 1, self.cursor_pos)
+            self.update_cursor_pos()
             self.draw_input_line()
 
             # unmatched keybinding chain
             if self.keybinding_chain is False:
                 return self.return_input_code(2002)
 
-            if press:
+            if press or (self.spell_suggestions and not (key >= 521 and key <= 524)):
                 break
         return self.return_input_code(None)
 

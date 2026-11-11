@@ -712,10 +712,11 @@ def find_aspell():
 class SpellCheck():
     """Sentence and word spellchecker"""
 
-    def __init__(self, aspell_mode, aspell_language):
+    def __init__(self, aspell_mode, aspell_language, dict_path):
         self.aspell = None
         self.aspell_mode = aspell_mode
         self.aspell_language = aspell_language
+        self.dict_path = os.path.expanduser(dict_path)
         self.enable = False
         self.first_run = True
         self.lock = threading.Lock()
@@ -724,6 +725,8 @@ class SpellCheck():
             if aspell_path:
                 self.aspell_path = aspell_path
                 self.enable = True
+                if self.dict_path:
+                    os.makedirs(os.path.dirname(self.dict_path) or ".", exist_ok=True)
                 self.start_aspell()
             else:
                 logger.info("Spellchecking disabled: Aspell not found")
@@ -732,13 +735,16 @@ class SpellCheck():
 
 
     def start_aspell(self):
-        """Start aspell with selected mode and language"""
+        """Start aspell with selected mode, language and dict"""
         if self.aspell:
             return
         try:
             start = time.monotonic()
+            command = [self.aspell_path, "-a", "--sug-mode", self.aspell_mode, "--lang", self.aspell_language]
+            if self.dict_path:
+                command += ["--personal", self.dict_path]
             self.aspell = subprocess.Popen(
-                [self.aspell_path, "-a", "--sug-mode", self.aspell_mode, "--lang", self.aspell_language],
+                command,
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -758,12 +764,10 @@ class SpellCheck():
             self.enable = False
 
 
-    def check_word(self, word):
-        """Spellcheck single word using aspell"""
+    def query(self, word):
+        """Send word to aspell and return its first result line"""
         if not self.aspell:
-            return False
-        if word.isdigit():
-            return False   # dont spellcheck numbers
+            return None
         try:
             with self.lock:
                 self.aspell.stdin.write(word + "\n")
@@ -772,9 +776,8 @@ class SpellCheck():
                 next_line = result
                 while next_line and next_line != "\n":   # read until it prints empty line
                     next_line = self.aspell.stdout.readline()
-                if result.startswith("*"):
-                    return False
-                return True
+            self.first_run = False
+            return result
         except Exception as e:
             if self.aspell.poll() is not None:
                 aspell_error = self.aspell.stderr.read()
@@ -786,25 +789,19 @@ class SpellCheck():
             if self.enable:
                 self.stop_aspell()
                 self.start_aspell()
-            return False
-        self.first_run = False
+            return None
 
 
-    def stop_aspell(self):
-        """Nicely stop aspell process"""
-        if not self.aspell:
-            return
-        self.aspell.stdin.close()
-        self.aspell.terminate()
-        self.aspell.wait()
-        self.aspell = None
+    def check_word(self, word):
+        """Spellcheck single word using aspell"""
+        if word.isdigit():
+            return False   # dont spellcheck numbers
+        result = self.query(word)
+        return result is not None and not result.startswith("*")
 
 
     def check_list(self, words):
-        """
-        Spellcheck a list of words with aspell.
-        Return list of bools representing whether each word is misspelled or not.
-        """
+        """Spellcheck a list of words, return list of bools representing whether each word is misspelled or not"""
         misspelled = []
         if self.enable:
             for word in words:
@@ -815,6 +812,36 @@ class SpellCheck():
         else:
             return [False] * len(words)
         return misspelled
+
+
+    def get_suggestions(self, word):
+        """Return list of suggestions for mispelled word"""
+        result = self.query(word)
+        if result and result[0] in "&?" and ": " in result:
+            return result.split(": ", 1)[1].split(", ")
+        return []
+
+
+    def add_word(self, word):
+        """Add word to personal aspell dictionary and save it, return True on success"""
+        if not self.aspell:
+            return
+        try:
+            with self.lock:
+                self.aspell.stdin.write(f"*{word}\n#\n")
+                self.aspell.stdin.flush()
+        except Exception as e:
+            logger.error(f"Aspell add word error: {e}")
+
+
+    def stop_aspell(self):
+        """Nicely stop aspell process"""
+        if not self.aspell:
+            return
+        self.aspell.stdin.close()
+        self.aspell.terminate()
+        self.aspell.wait()
+        self.aspell = None
 
 
 def get_audio_input_devices():

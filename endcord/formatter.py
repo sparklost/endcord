@@ -3577,6 +3577,19 @@ def generate_extra_window_reactions(reaction, details, colors, max_len):
     return title_line[:max_len], body, body_format
 
 
+def generate_extra_window_spell(word, suggestions, colors, max_len):
+    """Generate extra window title and body for spell suggestions"""
+    title_line = f"Spelling assist: {len(suggestions)} candidates, use number row or select correction"
+    color_standout = colors[9]
+    body = [f'0 - Add "{word}" to dictionary']
+    body_format = [[(color_standout, None, 9, 9 + len(word))]]
+    for num, sug in enumerate(suggestions):
+        line = f"{num + 1} - {sug}"[:max_len]
+        body.append(line)
+        body_format.append([(color_standout, None, 3 + int(num > 9), len(line))])
+    return title_line[:max_len], body, body_format
+
+
 def generate_extra_window_whkey(keybindings, command_bindings, prefix, colors, max_len):
     """Generate extra window title and body for which-key"""
     title_line = f"Available bindings with {prefix} prefix"

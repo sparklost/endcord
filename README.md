@@ -56,7 +56,7 @@ Any third party endcord forks may add features that can lead to account ban, cau
     - Folders (can be renamed)
 - Show reactions, replied message, forwarded message
 - Show embeds, attachment types and links, code blocks (with syntax highlighting)
-- Spellchecking
+- Spellchecking with corrections
 - Advanced input line operations and ability to use external editor
 - Configurable bar or block shaped cursor
 - Tabs and temporary tabs with mouse controls (click, double click, middle click)
@@ -94,6 +94,7 @@ Any third party endcord forks may add features that can lead to account ban, cau
 - Run bots, with interactions
 - Lots of easter eggs
 - Endcord-GUI features
+    - Image emoji, image profile pictures, inline images  
     - Customizable tray icons, window can be minimized to tray
     - All bindings work, Ctrl+C, Ctrl+Z, Shift+Enter
     - Window can be transparent, and background colors can also have alpha value

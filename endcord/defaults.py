@@ -252,6 +252,8 @@ keybindings = {
     "select_word_right": ("C-S-RIGHT", 511),
     "select_end_left": ("S-HOME", 528),
     "select_end_right": ("S-END", 529),
+    "spellcheck_left": ("M-[", 530),
+    "spellcheck_right": ("M-]", 531),
     "insert_newline": ("C-n", 512),
     "undo": ("M-z", 513),
     "redo": ("M-S-z", 514),

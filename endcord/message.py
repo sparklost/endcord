@@ -62,6 +62,8 @@ def prepare_embeds(embeds, message_content):
             provider = embed.get("provider", {}).get("name")
             on_provider = f" on {provider}" if provider and embed_type == "video" else ""
             author = quote(f"*— By: {author_name}{on_provider}*")
+        else:
+            author = None
 
         if title:
             if embed_type == "video" and main_url:

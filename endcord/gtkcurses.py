@@ -126,7 +126,7 @@ if config_path:
             PFP_MEDIA = config.get("pfp_media", PFP_MEDIA)
             INLINE_MEDIA = config.get("inline_media", INLINE_MEDIA)
             CTRL_SHIFT_V_PASTE = config.get("ctrl_shift_v_paste", CTRL_SHIFT_V_PASTE)
-            ENABLE_SHIFT_BACKSPACE = config.get("enable_shif_backspace", ENABLE_SHIFT_BACKSPACE)
+            ENABLE_SHIFT_BACKSPACE = config.get("enable_shift_backspace", ENABLE_SHIFT_BACKSPACE)
             ENABLE_TRAY = config.get("enable_tray", ENABLE_TRAY)
             TRAY_ICON_NORMAL = config.get("tray_icon_normal", TRAY_ICON_NORMAL)
             TRAY_ICON_UNREAD = config.get("tray_icon_unread", TRAY_ICON_UNREAD)

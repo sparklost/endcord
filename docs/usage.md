@@ -139,6 +139,12 @@ Select post and `Enter` to open it. While in a thread run `toggle_thread` comman
 Posts are treated same as threads in channel tree, but only participated posts will be shown.
 If there are no posts in the forum (this will happen when switching to forum in never opened server), switch to some channel in the same server, (client must subscribe to some channel so discord can send thread list sync).
 
+### Spell corrections
+If spellchecker is enabled, press `Alt+[` to highlight previous misspelled word (`Alt+]` for next).  
+This will bring up spelling assist. Navigate it with Up/Down arrows and press enter to replace misspelled word with selected one.  
+First option will instead add this word to personal aspell dictionary, it can be found in endcord config dir, and easily edited with text editor.  
+Alternatively while spelling assist is active press any num key (0-9) to insert word with that index (0 will add to dictionary).  
+
 ### Redraw
 If UI ever gets messed up, redraw it with command: press `Ctrl+/` then type `redraw`, and press `Enter` to execute it.
 

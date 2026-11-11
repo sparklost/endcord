@@ -492,7 +492,7 @@ class Endcord:
                 instance = ext_class(self)
                 self.extensions.append(instance)
                 repo_name = ext_class.EXT_SOURCE.strip("/").split("/")[-1]
-                latest_version = self.ext_updates.get(repo_name, ext_class.EXT_VERSION) if self.ext_updates else ext_class.EXT_VERSION
+                latest_version = self.ext_updates.get(repo_name, ext_class.EXT_VERSION).split(" ")[0] if self.ext_updates else ext_class.EXT_VERSION
                 ext_outdated = " (OUTDATED)" if latest_version != ext_class.EXT_VERSION else ""
                 if ext_app_version.split(".")[:2] != version.split(".")[:2]:
                     log_text.append(f"  {ext_name} {ext_version}{ext_outdated} - WARNING: This extension is built for different endcord version!")
@@ -1123,6 +1123,16 @@ class Endcord:
             self.state["last_channel_id"] = channel_id
         utils.save_json(self.state, f"state_{self.profiles["selected"]}.json")
 
+        # reset input line
+        self.command = False
+        self.tui.instant_assist = False
+        self.close_extra_window()
+        self.stop_assist()
+        if self.vim_mode:
+            self.tui.set_vim_insert(False)
+            self.update_status_line()
+        self.reset_states(replying=True)
+
         self.remove_running_task("Switching channel", 1)   # updates all title, subtitle and status line
         logger.debug("Channel switching complete")
 
@@ -1673,10 +1683,8 @@ class Endcord:
             self.previous_input_context = self.restore_input_text[1]
             if ephemeral:
                 break
-            if self.editing and not self.command:
-                restore_text, input_index = self.load_from_store(self.active_channel["channel_id"])
-                restore_text = self.restore_input_text[0] if not restore_text else restore_text
-                self.restore_input_text = (restore_text, "edit")
+            if self.editing and not self.command and self.restore_input_text[1][:4] != "edit":
+                self.restore_input_text = (self.restore_input_text[0], "edit")
             if self.reacting["id"]:
                 self.restore_input_text = (self.restore_input_text[0], "react")
             if forced_binding:   # externally forced binding
@@ -1707,9 +1715,17 @@ class Endcord:
                 init_text = self.restore_input_text[0]
                 self.restore_input_text = (None, None)
                 input_text, chat_sel, tree_sel, action = self.tui.wait_input(self.custom_prompt("PATH"), init_text=init_text, autocomplete=True, forum=self.forum)
-            elif self.restore_input_text[1] in ("search", "command", "react", "edit"):
+            elif self.restore_input_text[1] in ("search", "command", "react", "edit", "edit1"):
                 init_text = self.restore_input_text[0]
                 prompt_text = self.restore_input_text[1]
+                reset = True
+                keep_cursor = bool(self.tui.spell_suggestions)
+                if prompt_text == "edit":
+                    reset = False
+                    keep_cursor = True
+                elif prompt_text == "edit1":
+                    prompt_text = "edit"
+                    keep_cursor = False
                 autocomplete = False
                 if self.search_gif and prompt_text == "search":
                     autocomplete = True
@@ -1717,7 +1733,7 @@ class Endcord:
                 prompt_text = prompt_text.upper()
                 command = self.restore_input_text[1] == "command"
                 self.restore_input_text = (None, None)
-                input_text, chat_sel, tree_sel, action = self.tui.wait_input(self.custom_prompt(prompt_text), init_text=init_text, autocomplete=autocomplete, forum=self.forum, command=command)
+                input_text, chat_sel, tree_sel, action = self.tui.wait_input(self.custom_prompt(prompt_text), init_text=init_text, autocomplete=autocomplete, keep_cursor=keep_cursor, reset=reset, forum=self.forum, command=command)
             else:
                 restore_text, input_index = self.load_from_store(self.active_channel["channel_id"])
                 if restore_text:
@@ -1745,16 +1761,27 @@ class Endcord:
                 self.restore_input_text = (input_text, "command" if self.command else "standard extra")
                 self.tui.keybinding_chain = None
 
+            if self.tui.spell_suggestions and action not in (54, 27, 0, 2000, 2001):
+                self.tui.spell_suggestions = []
+                self.stop_extra_window()
+                if action == 5:   # dont passthrough escape
+                    self.restore_input_text = (input_text, "standard")
+                    continue
+
             logger.debug(f"Input code: {action}")
+
+            if action is None:
+                self.restore_input_text = (input_text, "standard")
+                continue
 
             # switch channel
             if action == 4:
-                if input_text and input_text != "\n":
+                if input_text and input_text != "\n" and not self.editing and not self.command:
                     self.add_to_store(self.active_channel["channel_id"], input_text)
                 sel_channel = self.tree_metadata[tree_sel]
                 guild_id, parent_id, _ = self.find_parents_from_tree(tree_sel)
                 self.switch_channel(sel_channel["id"], guild_id, parent_hint=parent_id)
-                self.reset_states(replying=True)
+                self.restore_input_text = (None, None)
 
             # reply
             elif action == 1 and self.messages:
@@ -1796,8 +1823,9 @@ class Endcord:
                     self.reset_states(replying=bool(self.replying["id"]))
                     self.editing = message["id"]
                     self.add_to_store(self.active_channel["channel_id"], input_text)
-                    self.restore_input_text = (utils.demojize(message["content"], safe=True), "edit")
+                    self.restore_input_text = (utils.demojize(message["content"], safe=True), "edit1")
                     self.update_status_line()
+                    self.tui.input_select_start = None
 
             # delete
             elif action == 3 and self.messages:
@@ -2270,8 +2298,9 @@ class Endcord:
             elif action == 42:
                 pressed_num_key = self.tui.pressed_num_key
                 if pressed_num_key:
+                    if input_text and input_text != "\n" and not self.editing and not self.command:
+                        self.add_to_store(self.active_channel["channel_id"], input_text)
                     self.switch_tab(pressed_num_key - 1)
-                    self.add_to_store(self.active_channel["channel_id"], input_text)
                     self.restore_input_text = (None, None)
 
             # show pinned
@@ -2625,18 +2654,17 @@ class Endcord:
             elif action == 51 and "%tabs" in self.format_subtitle_line and self.tab_string_map:
                 self.restore_input_text = (input_text, "standard")
                 mouse_x = self.tui.get_x_line_clicked() - bool(self.tui.bordered)
-                active_channel_id = self.active_channel["channel_id"]
                 for tab in self.tab_string_map:
                     if tab[0] <= mouse_x < tab[1]:
+                        if input_text and input_text != "\n" and not self.editing and not self.command:
+                            self.add_to_store(self.active_channel["channel_id"], input_text)
                         if tab[2] == -1:
-                            success = self.switch_tab("prev")
+                            self.switch_tab("prev")
                         elif tab[2] == -2:
-                            success = self.switch_tab("next")
+                            self.switch_tab("next")
                         else:
-                            success = self.switch_tab(tab[2])
-                        if success:
-                            self.add_to_store(active_channel_id, input_text)
-                            self.restore_input_text = (None, None)
+                            self.switch_tab(tab[2])
+                        self.restore_input_text = (None, None)
                         break
 
             # double click and middle click on subtitle line
@@ -2663,6 +2691,29 @@ class Endcord:
                         guild_id = self.find_parents_from_id(channel_id)[2]
                         self.toggle_tab(channel_id, guild_id)
                     break
+
+            # start spellcheck assist
+            elif action == 54:
+                self.restore_input_text = (input_text, "standard extra")
+                suggestions = self.tui.get_spell_suggestions()
+                self.assist_word = tui.resplit(input_text[:self.tui.input_index])[-1]
+                max_w = self.tui.get_dimensions()[2][1]
+                extra_title, extra_body, extra_format = formatter.generate_extra_window_spell(self.assist_word, suggestions, self.colors, max_w)
+                self.tui.draw_extra_window(extra_title, extra_body, extra_format, select=True)
+                self.assist_found = []
+                self.assist_type = 9
+                self.extra_window_open = True
+                for line in extra_body:
+                    if line.startswith("0"):
+                        self.assist_found.append(["DICT", self.assist_word])
+                    else:
+                        self.assist_found.append([None, line[4:]])
+
+            # insert spellchecker assist (done in tui.py, here just close assists)
+            elif action == 55:
+                self.tui.spell_suggestions = []
+                self.stop_extra_window()
+                self.restore_input_text = (input_text, "edit" if self.editing else "standard")
 
             # escape in main UI
             elif action == 5:
@@ -2694,6 +2745,8 @@ class Endcord:
                     else:
                         self.restore_input_text = (input_text, "standard")
                 elif self.extra_window_open:
+                    if not self.command and not self.search and not self.search_gif:
+                        self.restore_input_text = (input_text, "standard")
                     self.stop_extra_window(update=False)
                 elif self.replying["id"]:
                     self.reset_states(replying=True)
@@ -2739,12 +2792,11 @@ class Endcord:
                 )
                 skip = True
                 if self.assist_which_key:
-                    max_w = self.tui.get_dimensions()[2][1]
                     extra_title, extra_body, extra_format = formatter.generate_extra_window_whkey(
                         self.keybindings,
                         self.tui.command_bindings,
                         self.tui.keybinding_chain,
-                        self.colors, max_w,
+                        self.colors, self.tui.get_dimensions()[2][1],
                     )
                     if len(extra_body) > 1:
                         if self.extra_window_open:
@@ -3738,9 +3790,10 @@ class Endcord:
         elif cmd_type == 31:   # SWITCH_TAB
             # if its number its already converted to index (num-1)
             if not reset:   # means its from command bindings
-                self.add_to_store(self.active_channel["channel_id"], self.restore_input_text[0])
-                self.restore_input_text = (None, None)
+                if self.tui.input_buffer and self.tui.input_buffer != "\n" and not self.editing and not self.command:
+                    self.add_to_store(self.active_channel["channel_id"], self.tui.input_buffer)
             self.switch_tab(cmd_args.get("num", 0))
+            self.restore_input_text = (None, None)
 
         elif cmd_type == 32:   # MARK_AS_READ:
             target_id = cmd_args.get("channel_id")
@@ -6551,7 +6604,7 @@ class Endcord:
 
     def stop_assist(self, close=True):
         """Stop assisting and hide assist UI"""
-        if self.assist_word:
+        if self.assist_word is not None:
             if close:
                 self.close_extra_window()
             self.assist_word = None
@@ -6699,6 +6752,18 @@ class Endcord:
             self.insert_into_input_store(self.assist_found[index][1])
             self.stop_extra_window()
             return None, None
+
+        elif self.assist_type == 9:   # spellcheck
+            if self.assist_found[index][0]:   # add to dict
+                self.tui.add_to_aspell_dict(self.assist_found[index][1])
+                return input_text, self.tui.input_index
+            # replace word behind cursor
+            wrong_word = tui.resplit(input_text[:self.tui.input_index])[-1]
+            new_text = input_text[:self.tui.input_index - len(wrong_word)] + self.assist_found[index][1]
+            new_pos = len(new_text)
+            new_text += input_text[self.tui.input_index:]
+            self.stop_extra_window()
+            return new_text, new_pos
 
         if not end:
             end = len(input_text)
@@ -8898,7 +8963,7 @@ class Endcord:
             if new_version:
                 status, status_text = git.install_extension(extension.EXT_SOURCE, prefer_tag=new_version, update=True, proxy=self.config["proxy"])
                 ext_updates += 1
-                log_text += f"  {extension.EXT_NAME}: {ext_version} --> {new_version}\n"
+                log_text += f"  {repo_name}: {ext_version} --> {new_version}\n"
             time.sleep(0.5)
         if manual:
             utils.save_json(last_check, "version.json")

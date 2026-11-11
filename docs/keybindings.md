@@ -16,6 +16,7 @@
 - `Shift+Left/Right` - select character left/right
 - `Ctrl+Shift+Left/Right` - select word left/right
 - `Shift+HOME/END` - select to start/end of input line
+- `Alt+[` / `Alt+]` - fix previous/next mispelled word
 - `Ctrl+N` - Insert newline in input line (warning `Shift+Enter` doesn't work in terminals)
 - `Alt+Z` - Undo
 - `Alt+Shift+Z` - Redo

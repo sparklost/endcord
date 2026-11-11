@@ -1,11 +1,11 @@
 CORE EASY:
-Add scheduled messages
-Add spellcheck corrections assist
-Add inbox
 Add keybinding configuration UI
 Add settings and theme configuration UI
 Add documentation viewer
 Add commands for UI tools
+Add inbox
+Add scheduled messages
+Add reminders
 Add stream calls
 Add nightly builds?
 Move website to projectname.github.io
@@ -23,9 +23,9 @@ Add wayland screen capture
 Add localization
 
 GTKCURSES:
-Add ascii/block inline media
+Add ascii/block inline images
+Add full inline media
 Add full/ascii/block media viewer
-Add full/ascii/block inline media
 Add full/ascii/block video calls (popup player with call UI)
 
 MORE COLORS:
