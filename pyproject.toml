@@ -23,7 +23,7 @@ dependencies = [
 [dependency-groups]
 build = [
     "cython>=3.3.1",
-    "nuitka[onefile]>=4.3.4",
+    "nuitka[onefile]==4.2.2",   # https://github.com/Nuitka/Nuitka/issues/4170
     "pyinstaller>=6.22.3",
     "setuptools>=82.0.0",
 ]
@@ -42,7 +42,7 @@ python_last_safe = "3.13.14"
 curses_tag = "v6_6_20261024"
 rnnoise_tag = "main"
 libopus_ver = "1.5.2"
-gvsbuild_release = "2026.10.0"
+gvsbuild_release = "2026.8.0"   # latter versions are for py 3.15
 mini_exclude_deps = ["numpy", "soundfile", "soundcard"]
 micro_exclude_deps = ["numpy", "soundfile", "soundcard", "orjson", "pycryptodome"]
 medium_deps = ["pillow", "dave-py", "pynacl"]

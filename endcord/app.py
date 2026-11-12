@@ -80,6 +80,7 @@ ASSISTED_COMMANDS = ("set ", "string_select ", "set_notifications ", "game_detec
 STATS_COMMAND_TEXT = ("Run time", "Gateway events/h", "Gateway messages/h", "Gateway ping time", "Message buffer size", "Total API requests", "API response time", "Cache sizes", "  Cached members", "  Deleted messages", "  Summaries", "  Image cache")
 match_youtube = re.compile(r"(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)[a-zA-Z0-9_-]{11}")
 match_last_parentheses = re.compile(r"\([^()]*\)(?!.*\([^()]*\))")
+match_url = re.compile(r"https?:\/\/[\w-]+(?:\.[\w-])+[^\s)\]>]*")   # same as in message.py
 
 
 class Endcord:
@@ -5041,12 +5042,20 @@ class Endcord:
     def get_embed_type(self, msg_index, url):
         """Get kind of embed by its url: "media" - playable, "file" - downloadable, None - not embed"""
         for embed in self.messages[msg_index]["embeds"]:
-            if url in (embed["url"], embed.get("main_url")) or (embed["type"] == "rich" and url in embed["url"]):
-                if embed["type"].split("/")[0] in MEDIA_EMBEDS:
+            if "media" not in embed:
+                continue
+            embed_type = embed["type"]
+            if embed_type == "rich":
+                urls = re.findall(match_url, embed["url"])
+                for embed_url, is_media in zip(urls, embed["media"]):
+                    if url == embed_url:
+                        return "media" if is_media else None
+                continue
+            if url in (embed.get("url"), embed.get("main_url")):
+                if embed_type.split("/")[0] in MEDIA_EMBEDS:
                     return "media"
                 if "main_url" not in embed:
                     return "file"
-                return None
         return None
 
 

@@ -116,7 +116,11 @@ def check_for_update(current_version, owner, repo, etag=None, proxy=None):
     except (socket.gaierror, TimeoutError):
         connection.close()
         return None, etag
-    new_etag = response.getheader("ETag")[3:-1] or etag
+    new_etag = response.getheader("ETag")
+    if new_etag:
+        new_etag = new_etag[3:-1]
+    else:
+        new_etag = etag
     if response.status == 304:
         connection.close()
         return None, new_etag

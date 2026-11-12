@@ -13,7 +13,7 @@ GIF_PROVIDERS = ("tenor.com/", "giphy.com/", "klipy.com/")
 YOUTUBE_DOMAINS = ("youtube.", "youtu.be")
 
 match_discord_attachment_url = re.compile(r"https:\/\/(?:cdn|media)\.discord(?:app)?\.(?:com|net)\/attachments\/\d+\/\d+\/([^\?\s)\]>]+)(?:\?.+)?")
-match_url = re.compile(r"https?:\/\/[\w-]+(\.[\w-])+[^\s)\]>]*")
+match_url = re.compile(r"https?:\/\/[\w-]+(?:\.[\w-])+[^\s)\]>]*")
 
 
 
@@ -51,8 +51,14 @@ def prepare_embeds(embeds, message_content):
         is_yt = any(domain in url + video_url for domain in YOUTUBE_DOMAINS)
 
         if url and not is_gif:
-            # dont repeat unless its not discord attachment and handle x=twitter
-            already_shown = url in message_content.replace("https://x.com", "https://twitter.com")
+            normalized_content = message_content.replace("https://x.com", "https://twitter.com")
+            normalized_url = url.rstrip("/")
+            matches = re.findall(match_url, normalized_content)
+            matching_url = next((match for match in matches if match.rstrip("/") == normalized_url), None)
+            already_shown = matching_url is not None
+            if already_shown and embed_type == "rich":
+                message_content = re.sub(re.escape(matching_url), "", message_content, count=1)
+                already_shown = False
             if embed_type == "image" or (embed_type != "rich" and ".discordapp." not in url) or not already_shown:
                 main_url = url
                 skip_main_url = True
@@ -116,7 +122,7 @@ def prepare_embeds(embeds, message_content):
             content.append(quote(footer_text))
             media += [False] * len(re.findall(match_url, footer_text))
 
-        if author and content and (embed_type == "video" or content[-1].startswith("> ")):
+        if author and content and (embed_type in ("video", "rich") or content[-1].startswith("> ")):
             content.append(author)
         content = "\n".join(content)
         if content or proxy_url:
