@@ -13,13 +13,16 @@
 <hr><br>
 <b>Standard theme:</b><br>
 <img src="./screenshots/01.png" alt="Standard theme" width="864">
-<br>(Note: kitty protocol inline images can be setup with <a href="github.com/sparklost/endcord-image-inline">this</a> extension, and <a href="github.com/sparklost/endcord-image-emoji">this</a> for emoji)
+<br>(Note: kitty protocol images can be setup with this extensions: <a href="github.com/sparklost/endcord-image-inline">1</a>, <a href="github.com/sparklost/endcord-image-pfp">2</a>, <a href="github.com/sparklost/endcord-image-emoji">3</a>)
+<br><br>
+<b>Endcord-GUI:</b><br>
+<img src="./screenshots/09.png" alt="Endcord-GUI" width="800">
 <br><br>
 <b>Client command assist above input line:</b><br>
-<img src="./screenshots/02.png" alt="Client command assist above input line:" width="800">
+<img src="./screenshots/02.png" alt="Client command assist above input line" width="800">
 <br><br>
 <b>Emoji assist while typing:<br>
-<img src="./screenshots/03.png" alt="Emoji assist while typing (with favorite emojis):" width="800">
+<img src="./screenshots/03.png" alt="Emoji assist while typing (with favorite emojis)" width="800">
 <br><br>
 <b>Message search:</b><br>
 <img src="./screenshots/04.png" alt="Message search" width="800">

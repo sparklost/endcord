@@ -118,6 +118,7 @@ class GtkCursesMedia:
         if self.inline:
             app.placeholder_images = True
             app.formatter.placeholder_images = app.config["inline_media_height"]
+            app.formatter.show_embed_names = app.config["show_embed_names"] or not app.formatter.placeholder_images
             app.inline_media = False
 
         self.gtk_window.media = self
