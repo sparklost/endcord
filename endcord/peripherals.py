@@ -742,7 +742,8 @@ class SpellCheck():
             start = time.monotonic()
             command = [self.aspell_path, "-a", "--sug-mode", self.aspell_mode, "--lang", self.aspell_language]
             if self.dict_path:
-                command += ["--personal", self.dict_path]
+                repl_path = self.dict_path.rsplit(".", 1)[0] + ".prepl"
+                command += ["--personal", self.dict_path, "--repl", repl_path]
             self.aspell = subprocess.Popen(
                 command,
                 stdin=subprocess.PIPE,

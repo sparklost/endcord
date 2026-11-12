@@ -3790,8 +3790,9 @@ class Endcord:
         elif cmd_type == 31:   # SWITCH_TAB
             # if its number its already converted to index (num-1)
             if not reset:   # means its from command bindings
-                if self.tui.input_buffer and self.tui.input_buffer != "\n" and not self.editing and not self.command:
-                    self.add_to_store(self.active_channel["channel_id"], self.tui.input_buffer)
+                input_text = self.restore_input_text[0]
+                if input_text and input_text != "\n" and not self.editing and not self.command:
+                    self.add_to_store(self.active_channel["channel_id"], input_text)
             self.switch_tab(cmd_args.get("num", 0))
             self.restore_input_text = (None, None)
 

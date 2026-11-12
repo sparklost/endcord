@@ -1,3 +1,6 @@
+Add endcord-gui screenshot
+Update main screenshot for youtube embed
+
 CORE EASY:
 Add keybinding configuration UI
 Add settings and theme configuration UI
