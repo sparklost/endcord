@@ -265,18 +265,9 @@ class RPC:
 
                     if data["cmd"] == "SET_ACTIVITY":
                         pid = data["args"].get("pid", pid)
-                        if "activity" not in data["args"]:
-                            response = {
-                                "cmd": data["cmd"],
-                                "data": {"code": 4000, "message": "Invalid payload"},
-                                "evt": "ERROR",
-                                "nonce": data.get("nonce"),
-                            }
-                            send_data(connection, op, response)
-                            continue
 
                         # activity cleared by client
-                        if not data["args"]["activity"]:
+                        if not data["args"].get("activity"):
                             if own_activity:
                                 self.remove_activity(own_activity)
                                 own_activity = None
