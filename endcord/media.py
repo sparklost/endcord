@@ -32,7 +32,7 @@ try:
 except (AssertionError, RuntimeError):
     have_soundcard = False
 
-# like this so build.by can switch terminal_utils and gtkcurses
+# like this so build.by can switch terminal_utils with gtkcurses
 from endcord import terminal_utils as terminal_utils
 from endcord import xterm256
 
@@ -527,6 +527,8 @@ class TerminalMedia():
 
     def play_audio(self, path, loop=False, loop_delay=0.7, loop_max=60):
         """Play only audio"""
+        if not video_support:
+            return
         if self.ui:
             self.show_ui()
         if not have_sound:
@@ -628,6 +630,8 @@ class TerminalMedia():
 
     def play_video(self, path, loop=False):
         """Decode video and audio frames and manage queues"""
+        if not video_support:
+            return
         if loop:
             self.ui = False
         if self.ui:
