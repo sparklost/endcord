@@ -200,7 +200,7 @@ class RPC:
         if data["cmd"] == "SET_ACTIVITY":
             response = {
                 "cmd": data["cmd"],
-                "data": data["args"]["activity"],
+                "data": data["args"].get("activity"),
                 "evt": None,
                 "nonce": data["nonce"],
             }
