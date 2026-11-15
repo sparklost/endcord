@@ -1,18 +1,17 @@
-CORE EASY:
 Add keybinding configuration UI
-Add settings and theme configuration UI
 Add documentation viewer
 Add commands for UI tools
+Move website to projectname.github.io
+
+CORE EASY:
 Add inbox
 Add scheduled messages
 Add reminders
 Add stream calls
 Add nightly builds?
-Move website to projectname.github.io
 
 CORE HARD:
 Fix issues with wide characters in input line
-Allow client to run with invalid token but stay offline
 Provide static binaries built on muslinux
 Make build.py work with and without uv
 Make custom json parser - remove orjson
@@ -25,8 +24,8 @@ Add localization
 GTKCURSES:
 Add ascii/block inline images
 Add full inline media
-Add full/ascii/block media viewer
-Add full/ascii/block video calls (popup player with call UI)
+Add full/ascii/block media viewer (standalone popup player with UI)
+Add full/ascii/block video calls (standalone popup player with UI)
 
 MORE COLORS:
 Patch python 3.14 using python 3.16 curses module to enable 255+ colors
@@ -36,6 +35,5 @@ Add color to embed quote line
 Add colors to rich embeds vertical line
 
 EXTENSIONS:
-endcord-kitty-media
 endcord-p2p-network (name subject to change)
-endcord-fluxer
+endflux

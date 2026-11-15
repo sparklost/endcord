@@ -1,4 +1,6 @@
 ## Configuration
+Settings can be edited in endcord UI with `endcord --settings` argument.  
+Theme can be edited in endcord UI with `endcord --settings-theme` argument.  
 Settings, logs, state, themes, extensions etc. location:
 - On Linux: `~/.config/endcord/` or `$XDG_DATA_HOME/endcord/`  
 - On Windows: `%USERPROFILE%/AppData/Local/endcord/`  
@@ -161,11 +163,11 @@ Also see [keybindings configuration](keybindings.md#configuring-keybindings).
 - `remember_collapsed_channels = True`  
     Whether to persist collapsed state for forums and channels with threads.
 - `dm_activity_in_tree = True`  
-    Wether to show DM rich presence activity icon instead of status dot (`tree_dm_status` in theme) in tree. Uses characters from `activity_icons` in thme.
+    Whether to show DM rich presence activity icon instead of status dot (`tree_dm_status` in theme) in tree. Uses characters from `activity_icons` in thme.
 - `assist = True`  
     Assist when typing @username, @role, #channel, :emoji:, ;sticker;
 - `assist_stop_space = True`  
-    Wether to stop assist when space character is typed.
+    Whether to stop assist when space character is typed.
  - `assist_swap_binding = True`  
     Whether to swap `chat_up` and `chat_down` with `extra_up` and `extra_down` when popup window is open.
 - `assist_skip_app_command = False`  

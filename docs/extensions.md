@@ -104,6 +104,7 @@ Method names can be searched in `./endcord/app.py` code to see where they are ex
 - `on_gateway_event` - at the start of loop in receiver in gateway.py, arguments: event_data
 - `on_message_event_is_irrelevant` - in gateway.py near `elif optext == "MESSAGE_CREATE"` decides if these events are relevant and should be further processed. Has **raw** message event and event optext at input and is expected to return `True` if message is relevant (doesn't override already relevant messages).
 
+
 ## Adding a command
 1. Add method named `on_execute_command` to extension class, it takes 3 arguments: `command_text` (str), `chat_sel` (int) - line selected in the chat, `tree_sel` (int) -  line selected in the channel tree.
     - Match keyword usually with `command_text.startswith("some_text")`, and if needed, use regex to match arguments like channel id, numbers etc.
@@ -143,6 +144,11 @@ tree_sel = self.app.tui.get_tree_selected()
 self.app.execute_command(command_type, command_args, command_text, chat_sel, tree_sel)
 ```
 
+## Loading extensions early
+Normally, extensions are loaded after some of the core components have already been initialized.  
+But extension can be configured to modify them (e.g. replacing Discord or Gateway classes before they are initialized), by loading early.  
+To enable early loading, simply add an `early_load` file to the extension's root directory.  
+**Note:** Early-loaded extensions have much greater impact on initialization time than regular extensions. Use this only when absolutely necessary.  
 
 ## Modifying existing code
 Existing code in endcord `app` class can be modified, by replacing `app` class methods with custom methods.  

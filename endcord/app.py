@@ -98,14 +98,14 @@ class Endcord:
             if profile["name"] == profiles["selected"]:
                 self.token = profile["token"]
                 self.last_run = profile["time"]
-                custom_host = profile.get("host")
+                self.custom_host = profile.get("host")
                 break
         else:
             profiles = profiles["keyring"] + profiles["plaintext"]
             self.token = profiles[0]["token"]
             self.profiles["selected"] = profiles[0]["name"]
             self.last_run = profiles[0]["time"]
-            custom_host = profile.get("host")
+            self.custom_host = profile.get("host")
 
         # load often used values from config
         self.enable_rpc = config["rpc"]
@@ -189,7 +189,6 @@ class Endcord:
 
         # variables
         self.run = False
-        self.extensions = []
         self.active_channel = {
             "guild_id": None,
             "channel_id": None,
@@ -214,6 +213,14 @@ class Endcord:
         self.deleted_cache = []
         self.last_summary_save = time.monotonic() - SUMMARY_SAVE_INTERVAL - 1
         self.new_version = None
+
+        # early load extensions
+        self.extensions = []
+        if self.config["extensions"] and ENABLE_EXTENSIONS:
+            self.ext_updates = utils.load_json("version.json")
+            if self.ext_updates:
+                self.ext_updates = self.ext_updates["extensions"]
+            self.load_extensions(version, early=True)
 
         # load state
         if self.config["remember_state"]:   # loading this early to set tree_width and use in preload_chat
@@ -240,13 +247,13 @@ class Endcord:
             client_prop = None
         logger.debug(f"User-Agent: {self.user_agent}")
         self.chat = []
-        self.chat.insert(0, f"Connecting to {custom_host or "Discord"}")
-        logger.info(f"Connecting to {custom_host or "Discord"}")
+        self.chat.insert(0, f"Connecting to {self.custom_host or "Discord"}")
+        logger.info(f"Connecting to {self.custom_host or "Discord"}")
 
         # initialize stuff
         self.discord = discord.Discord(
             self.token,
-            custom_host,
+            self.custom_host,
             client_prop,
             self.user_agent,
             proxy=self.config["proxy"],
@@ -257,7 +264,7 @@ class Endcord:
         threading.Thread(target=self.preload_chat, daemon=True).start()
         self.gateway = gateway.Gateway(
             self.token,
-            custom_host,
+            self.custom_host,
             client_prop_gateway,
             self.user_agent,
             proxy=self.config["proxy"],
@@ -318,7 +325,7 @@ class Endcord:
         self.voice_gateway = None
         self.ptt = None
         self.reset()
-        self.chat.insert(0, f"Connecting to {custom_host or "Discord"}")
+        self.chat.insert(0, f"Connecting to {self.custom_host or "Discord"}")
         self.gateway_state = self.gateway.get_state()
         self.chat_dim, self.tree_dim, _ = self.tui.get_dimensions()
         self.tree = []
@@ -378,11 +385,8 @@ class Endcord:
             )
             self.tui.load_inline_media(self.inline_media)
 
-        # init extensions
+        # init standard extensions
         if self.config["extensions"] and ENABLE_EXTENSIONS:
-            self.ext_updates = utils.load_json("version.json")
-            if self.ext_updates:
-                self.ext_updates = self.ext_updates["extensions"]
             self.load_extensions(version)
             self.tui.load_extensions(self.extensions)
             self.gateway.load_extensions(self.extensions)
@@ -455,13 +459,22 @@ class Endcord:
             sys.exit(0)
 
 
-    def load_extensions(self, version):
+    def load_extensions(self, version, early=False):
         """Load extensions and initialize them"""
         # get extensions
         path = os.path.expanduser(os.path.join(peripherals.config_path, "Extensions"))
         if not os.path.exists(path):
             os.makedirs(os.path.expanduser(path), exist_ok=True)
         extensions, invalid = utils.get_extensions(path)
+
+        # early pass loads only early extensions, normal pass loads the rest
+        extensions = [
+            ext for ext in extensions
+            if os.path.exists(os.path.join(os.path.dirname(os.path.abspath(ext[0])), "early_load")) == early
+        ]
+        if early and not extensions:
+            return
+        start = len(self.extensions)
 
         # load extensions
         log_text = []
@@ -506,14 +519,21 @@ class Endcord:
                 sys.path[:] = original_path
 
         # log stuff
+        loaded = len(self.extensions) - start
+        if early:   # chat and tui are not ready yet, so only log
+            if log_text:
+                logger.info(f"Early loaded {loaded} extensions:\n" + "\n".join(log_text))
+            if log_text_invalid:
+                logger.warning("Invalid early extensions:\n" + "\n".join(log_text_invalid))
+            return
         for ext_file, ext_name in invalid:
             log_text_invalid.append(f"  {ext_name} - ERROR: Invalid extension structure")
         if log_text:
-            logger.info(f"Loaded {len(self.extensions)} extensions:\n" + "\n".join(log_text))
+            logger.info(f"Loaded {loaded} extensions:\n" + "\n".join(log_text))
         if log_text_invalid:
             logger.warning("Invalid extensions:\n" + "\n".join(log_text_invalid))
         self.chat.insert(0, f"Successfully loaded {len(self.extensions)} extensions ({num_outdated} with mismatched version)")
-        self.chat.insert(0, f"Not loaded (invalid) {len(extensions) - len(self.extensions) + len(invalid)} extensions")
+        self.chat.insert(0, f"Not loaded (invalid) {len(extensions) - loaded + len(invalid)} extensions")
         self.tui.update_chat(self.chat, [[[self.colors[0]]]] * len(self.chat))
         self.extension_cache = {}
 

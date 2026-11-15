@@ -76,6 +76,7 @@ Any third party endcord forks may add features that can lead to account ban, cau
 - Change server/channel/category notification settings
 - Partial markdown support (underline, bold, italic, spoiler, quote)
 - Generate server invite link
+- Settings, theme and keybindings editor UI
 - Theming
 - Customizable status, title and prompt lines
 - Customizable chat lines (message, newline, reaction, reply)
@@ -88,7 +89,7 @@ Any third party endcord forks may add features that can lead to account ban, cau
 - Proxy support
 - Profile manager for multiple accounts
 - Store token in system keyring
-- Works in termux, with android notifications
+- Works on Android in termux, with notifications
 - Automatic endcord and extensions check for updates
 - Headless mode
 - Run bots, with interactions

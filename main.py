@@ -109,6 +109,17 @@ def main(args):
             curses.enable_tray = False
         color.color_palette(config_data)
         sys.exit(0)
+    elif args.settings or args.settings_theme:
+        from endcord import settings
+        if uses_gtkcurses:
+            curses.enable_tray = False
+        if args.settings_theme:
+            if config_data["theme_path"]:   # theme is in separate file
+                config_data["config_path"] = config_data["theme_path"]
+            settings.settings(config_data, defaults.theme, "Theme")
+        else:
+            settings.settings(config_data, defaults.settings, "Settings")
+        sys.exit(0)
     elif args.keybinding:
         from endcord import keybinding
         if uses_gtkcurses:

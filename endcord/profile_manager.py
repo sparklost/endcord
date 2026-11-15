@@ -367,6 +367,8 @@ def main_tui(screen, profiles_enc, profiles_plain, selected, have_keyring, confi
     global bordered, border_corners
     curses.use_default_colors()
     curses.curs_set(0)
+    curses.mousemask(curses.ALL_MOUSE_EVENTS)
+    curses.mouseinterval(0)
     curses.init_pair(2, -1, 241)
 
     bordered = not (config["compact"])
@@ -403,7 +405,7 @@ def main_tui(screen, profiles_enc, profiles_plain, selected, have_keyring, confi
     run = True
     proceed = False
     x0 = int(bordered)
-    draw_buttons(screen, selected_button, screen.getmaxyx()[0] - 1, screen.getmaxyx()[1])
+    spans = draw_buttons(screen, selected_button, screen.getmaxyx()[0] - 1, screen.getmaxyx()[1])
     while run:
         regenerate = False
         h, w = screen.getmaxyx()
@@ -421,6 +423,41 @@ def main_tui(screen, profiles_enc, profiles_plain, selected, have_keyring, confi
                 screen.addstr(num + 5, x0, text, curses.color_pair(1))
 
         key = screen.getch()
+        if key == curses.KEY_MOUSE or isinstance(key, tuple):   # translate mouse to keys
+            if isinstance(key, tuple):   # from gtkcurses
+                my, mx, key_type, pressed = key
+            else:
+                try:
+                    _, mx, my, _, state = curses.getmouse()
+                except curses.error:
+                    continue
+                pressed = True
+                if state & curses.BUTTON4_PRESSED:
+                    key_type = 64
+                elif state & getattr(curses, "BUTTON5_PRESSED", 0):
+                    key_type = 65
+                elif state & (curses.BUTTON1_CLICKED | curses.BUTTON1_PRESSED):
+                    key_type = 0
+                else:
+                    key_type = None
+            key = None
+            if pressed and key_type == 64:   # SCROLL UP
+                key = curses.KEY_UP
+            elif pressed and key_type == 65:   # SCROLL DOWN
+                key = curses.KEY_DOWN
+            elif pressed and key_type == 0:   # LEFT CLICK
+                if 5 <= my < 5 + len(profiles):
+                    if my - 5 == selected_num:   # click on selected profile loads it
+                        selected_button = 0
+                        key = 10
+                    selected_num = my - 5
+                elif my == h - 1:
+                    for num, (start, end) in enumerate(spans):
+                        if start <= mx < end:
+                            selected_button = num
+                            key = 10   # same as Enter on that button
+        if key in (27, "ESC", "C-c"):
+            break
         if key in (27, "ESC", "C-c"):
             break
         if key in (10, "ENTER"):
@@ -498,7 +535,7 @@ def main_tui(screen, profiles_enc, profiles_plain, selected, have_keyring, confi
 
         if bordered:
             draw_border(screen, 1)
-        draw_buttons(screen, selected_button, h - 1, w + 2*x0)
+        spans = draw_buttons(screen, selected_button, h - 1, w + 2*x0)
         screen.refresh()
     screen.clear()
     screen.refresh()
@@ -1088,7 +1125,7 @@ def draw_text(screen, text, center=False):
 
 
 def draw_buttons(screen, selected, y, w):
-    """Draw buttons"""
+    """Draw buttons and return list of their x spans"""
     # build button strings
     buttons = []
     for button in ("Load", "Add", "Edit", "Delete", "Quit"):
@@ -1100,12 +1137,13 @@ def draw_buttons(screen, selected, y, w):
 
     # draw buttons
     x = start_x
+    spans = []
     for num, button in enumerate(buttons):
-        if num == selected:
-            screen.addstr(y, x, button, curses.color_pair(1) | curses.A_STANDOUT)
-        else:
-            screen.addstr(y, x, button, curses.color_pair(1))
+        attr = curses.color_pair(1) | (curses.A_STANDOUT if num == selected else 0)
+        screen.addstr(y, x, button, attr)
+        spans.append((x, x + len(button)))
         x += len(button) + 2
+    return spans
 
 
 def draw_border(screen, color):

@@ -37,7 +37,7 @@ To run multiple endcord instances at the same time, while keeping them completel
 
 ### No emoji
 If emoji are drawn as empty box or similar, it means emoji font is not installed, its misconfigured in terminal config, or emoji are not supported by this terminal.
-If case emoji cant be configured, enable `emoji_as_text` in eendcord `config.ini`.
+If case emoji cant be configured, enable `emoji_as_text` in endcord `config.ini`.
 
 ### Sticker cannot be opened
 This is very likely "lottie sticker". These stickers have special vector way of drawing (not svg) and will not be supported.
