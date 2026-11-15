@@ -1439,12 +1439,20 @@ class Endcord:
 
     def insert_into_input_store(self, text):
         """Insert text at cursor position for current channel input store"""
+        channel_id = self.active_channel["channel_id"]
         for num, channel in enumerate(self.input_store):
             if channel["id"] == self.active_channel["channel_id"]:
                 input_text = self.input_store[num]["content"]
                 input_index = self.input_store[num]["index"]
                 self.input_store[num]["content"] = input_text[:input_index] + text + input_text[input_index:]
                 self.input_store[num]["index"] = len(input_text[:input_index] + text)
+        else:
+            self.input_store.append({
+                "id": channel_id,
+                "content": text,
+                "index": len(text),
+                "reply": self.replying if self.replying["id"] else None,
+            })
 
 
     def add_to_command_history(self, command):
@@ -3828,6 +3836,9 @@ class Endcord:
         elif cmd_type == 33:   # INSERT_TIMESTAMP
             timestamp = cmd_args["timestamp"]
             self.insert_into_input_store(timestamp)
+            reset = False
+            self.restore_input_text = (None, None)
+            return
 
         elif cmd_type == 34:   # VOTE
             select_num = max(cmd_args.get("num", 0), 0)
@@ -4018,6 +4029,8 @@ class Endcord:
             search_text = search_text.strip()
             if search_text[8:].startswith("tenor.com/") or search_text[8:].startswith("klipy.com/"):
                 self.insert_into_input_store(search_text)
+                reset = False
+                self.restore_input_text = (None, None)
             elif not self.search:
                 reset = False
                 self.reset_states(editing=False)
