@@ -39,7 +39,7 @@ KEY_CODES = {
     b"\x1b[H": "HOME",
     b"\x1b[F": "END",
     b"\x1b[3~": "DEL",
-    b" ": "SPC",
+    b" ": "SPACE",
     b"\t": "TAB",
     b"\r": "ENTER",
     b"\n": "ENTER",

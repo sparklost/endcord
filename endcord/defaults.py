@@ -238,7 +238,7 @@ keybindings = {
     "tree_collapse_threads": ("M-h", 503),
     "tree_join_thread": ("M-j", 21),
     "channel_info": ("M-i", 25),
-    "copy_channel_link": ("M-u", 30),
+    "copy_channel_link": (None, 30),
     # input line
     "input_left": ("LEFT", 504),
     "input_right": ("RIGHT", 505),
@@ -294,7 +294,7 @@ keybindings = {
     "extra_select": ("M-ENTER", 27),
     "preview_upload": ("M-v", 22),
     # media
-    "media_pause": ("SPC", None),
+    "media_pause": ("SPACE", None),
     "media_replay": ("z", None),
     "media_seek_forward": ("RIGHT", None),
     "media_seek_backward": ("LEFT", None),
@@ -306,7 +306,7 @@ keybindings = {
     "cycle_status": ("M-d", 33),
     "toggle_member_list": ("M-m", 35),
     "toggle_tree": ("M-t", 32),
-    "toggle_tab": ("M-t", 41),
+    "toggle_tab": ("C-t", 41),
     "switch_tab_modifier": ("M-NUM", None),
     "open_external_editor": ("M-e", 45),
     "push_to_talk": (None, 1000),

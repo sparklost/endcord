@@ -121,10 +121,10 @@ def main(args):
             settings.settings(config_data, defaults.settings, "Settings")
         sys.exit(0)
     elif args.keybinding:
-        from endcord import keybinding
+        from endcord import keybinding_settings
         if uses_gtkcurses:
             curses.enable_tray = False
-        keybinding.picker(keybindings, command_bindings, config_data)
+        keybinding_settings.bindings(config_data)
         sys.exit(0)
     elif args.vumeter:
         from endcord import vumeter

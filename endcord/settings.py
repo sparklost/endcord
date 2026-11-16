@@ -14,7 +14,7 @@ else:
     BACKSPACE = curses.KEY_BACKSPACE
 
 BUTTONS = ("Edit", "Reset", "Save", "Save and Exit", "Discard")
-HINT = "Type or Enter to edit, Left/Right for buttons, Esc to revert selected or exit"
+HINT = "Type or Enter to edit, Left/Right/Space for buttons, Esc to revert selected or exit"
 COLOR_SELECTED = (233, 255)
 COLOR_CURSOR = (255, 242)
 
@@ -73,18 +73,18 @@ def valid_setting(text, ref, kind):
     return True
 
 
-def draw_border(screen, corners):
+def draw_border(screen, corners, color):
     """Draw border at screen borders with custom corners"""
     h, w = screen.getmaxyx()
     try:
-        screen.hline(0, 1, curses.ACS_HLINE, w - 2, curses.color_pair(1))
-        screen.hline(h - 1, 1, curses.ACS_HLINE, w - 2, curses.color_pair(1))
-        screen.vline(1, 0, curses.ACS_VLINE, h - 2, curses.color_pair(1))
-        screen.vline(1, w - 1, curses.ACS_VLINE, h - 2, curses.color_pair(1))
-        screen.addstr(0, 0, corners[0], curses.color_pair(1))
-        screen.addstr(0, w - 1, corners[2], curses.color_pair(1))
-        screen.addstr(h - 1, 0, corners[1], curses.color_pair(1))
-        screen.addstr(h - 1, w - 1, corners[3], curses.color_pair(1))
+        screen.hline(0, 1, curses.ACS_HLINE, w - 2, curses.color_pair(color))
+        screen.hline(h - 1, 1, curses.ACS_HLINE, w - 2, curses.color_pair(color))
+        screen.vline(1, 0, curses.ACS_VLINE, h - 2, curses.color_pair(color))
+        screen.vline(1, w - 1, curses.ACS_VLINE, h - 2, curses.color_pair(color))
+        screen.addstr(0, 0, corners[0], curses.color_pair(color))
+        screen.addstr(0, w - 1, corners[2], curses.color_pair(color))
+        screen.addstr(h - 1, 0, corners[1], curses.color_pair(color))
+        screen.addstr(h - 1, w - 1, corners[3], curses.color_pair(color))
     except curses.error:   # errors randomly when resizing
         pass
 
@@ -106,7 +106,7 @@ def main_tui(screen, config, defaults, title):
     original = dict(values)
     changed = False
     bordered = not config["compact"]
-    corners = config["border_corners"]
+    border_corners = config["border_corners"]
     x0 = int(bordered)
     names = list(defaults)
     key_w = len(max(names, key=len))
@@ -166,16 +166,17 @@ def main_tui(screen, config, defaults, title):
 
         # draw buttons
         buttons = [f"[{name.center(8)}]" for name in BUTTONS]
-        x = max((w - len("  ".join(buttons))) // 2, 0)
-        spans = []
+        left_space = w - len("  ".join(buttons))
+        x = max(left_space // 2, 0)
+        button_spans = []
         for num, button in enumerate(buttons):
             attr = curses.color_pair(1) | (curses.A_STANDOUT if num == selected_button else 0)
             screen.addstr(button_y, x, button, attr)
-            spans.append((x, x + len(button)))
+            button_spans.append((x, x + len(button)))
             x += len(button) + 2
 
         if bordered:
-            draw_border(screen, corners)
+            draw_border(screen, border_corners, 1)
         screen.refresh()
 
         # input
@@ -220,7 +221,7 @@ def main_tui(screen, config, defaults, title):
                     target = top + my - list_y
                     action = 0   # EDIT
                 elif my == button_y:
-                    for num, (start, end) in enumerate(spans):
+                    for num, (start, end) in enumerate(button_spans):
                         if start <= mx < end:
                             selected_button = num
                             action = num
