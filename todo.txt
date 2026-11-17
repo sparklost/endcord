@@ -1,14 +1,14 @@
-Add documentation viewer
+Add extension manager
 Add commands for UI tools
 New project name ???
 Move website to projectname.github.io
+Add nightly builds?
 
 CORE EASY:
 Add inbox
 Add scheduled messages
 Add reminders
 Add stream calls
-Add nightly builds?
 
 CORE HARD:
 Fix issues with wide characters in input line

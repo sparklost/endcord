@@ -246,7 +246,7 @@ jobs:
         run: |
           version=${GITHUB_REF#refs/tags/}
           version=${version#refs/heads/}
-          extra="README.md LICENSE docs/commands.md docs/configuration.md docs/extensions.md docs/keybindings.md"
+          extra="README.md LICENSE com.sparklost.endcord.desktop endcord.svg docs/*.md"
           cd dist && mkdir -p docs && cp ../README.md ../LICENSE . && cp ../docs/*.md docs/
           7z a "endcord-$version-windows.zip" endcord.exe $extra
           7z a "endcord-lite-$version-windows.zip" endcord-lite.exe $extra
@@ -325,7 +325,7 @@ jobs:
         run: |
           version=${GITHUB_REF#refs/tags/}
           version=${version#refs/heads/}
-          extra="README.md LICENSE docs/commands.md docs/configuration.md docs/extensions.md docs/keybindings.md"
+          extra="README.md LICENSE com.sparklost.endcord.desktop endcord.svg docs/*.md"
           cd dist && mkdir -p docs && cp ../README.md ../LICENSE . && cp ../docs/*.md docs/
           zip "endcord-$version-macos-arm64.zip" endcord $extra
           zip "endcord-lite-$version-macos-arm64.zip" endcord-lite $extra
@@ -403,7 +403,7 @@ jobs:
         run: |
           version=${GITHUB_REF#refs/tags/}
           version=${version#refs/heads/}
-          extra="README.md LICENSE docs/commands.md docs/configuration.md docs/extensions.md docs/keybindings.md"
+          extra="README.md LICENSE com.sparklost.endcord.desktop endcord.svg docs/*.md"
           cd dist && mkdir -p docs && cp ../README.md ../LICENSE . && cp ../docs/*.md docs/
           zip "endcord-$version-macos-x86_64.zip" endcord $extra
           zip "endcord-lite-$version-macos-x86_64.zip" endcord-lite $extra

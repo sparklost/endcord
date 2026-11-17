@@ -120,6 +120,12 @@ def main(args):
         else:
             settings.settings(config_data, defaults.settings, "Settings")
         sys.exit(0)
+    elif args.doc:
+        from endcord import documentation
+        if uses_gtkcurses:
+            curses.enable_tray = False
+        documentation.documentation(config_data)
+        sys.exit(0)
     elif args.keybinding:
         from endcord import keybinding_settings
         if uses_gtkcurses:

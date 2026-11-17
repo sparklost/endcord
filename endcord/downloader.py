@@ -40,27 +40,35 @@ def get_tenor_gif(url, header=None, proxy=None):
 
 
 def extract_file_name(headers, url_path):
-    """Extract file name from Content-Disposition header, fallback to extracting from url + extension from Content-Type"""
-    content_disposition = headers.get("Content-Disposition")
-    if content_disposition:
-        parts = content_disposition.split(";")
-        for part in parts:
-            if part.strip().startswith("filename*="):
-                value = part.split("=", 1)[1]
-                if "''" in value:
-                    _, encoded_filename = value.split("''", 1)
-                    return urllib.parse.unquote(encoded_filename)
-        for part in parts:
-            if part.strip().startswith("filename="):
-                return part.strip().split("=", 1)[1].strip('"\'')
+    """Extract filename from Content-Disposition, falling back to URL and Content-Type."""
+    content_disposition = headers.get("Content-Disposition", "")
+    match = re.search(r"filename\*\s*=\s*(?:UTF-8'')?([^;]+)", content_disposition, re.IGNORECASE)
+    if match:
+        filename = urllib.parse.unquote(match.group(1).strip().strip("\"'"))
+        if filename:
+            return os.path.basename(filename)
+    match = re.search(r'filename\s*=\s*("(?:[^"\\]|\\.)*"|[^;]+)', content_disposition, re.IGNORECASE)
+    if match:
+        filename = match.group(1).strip().strip("\"'")
+        if filename:
+            return os.path.basename(filename)
 
-    filename = os.path.basename(url_path) or "downloaded_file"
-    extension = headers.get("Content-Type", None).split("/")[-1].replace("jpeg", "jpg")
-    if extension:
-        if os.path.splitext(filename)[-1] != "":
-            return f"{"".join(os.path.splitext(filename)[:-1])}.{extension}"
-        return f"{filename}.{extension}"
-    return "file"
+    filename = os.path.basename(urllib.parse.unquote(url_path.rstrip("/"))) or "downloaded_file"
+    content_type = headers.get("Content-Type", "")
+    mime_type = content_type.split(";", 1)[0].strip().lower()
+    extension = mime_type.split("/", 1)[-1].strip() if "/" in mime_type else ""
+    ignored_extensions = {"plain", "octet-stream", "unknown"}
+
+    if extension and extension not in ignored_extensions:
+        extension = {
+            "jpeg": "jpg",
+            "svg+xml": "svg",
+            "x-msdownload": "exe",
+        }.get(extension, extension)
+        filename = os.path.splitext(filename)[0] + "." + extension
+
+    return filename
+
 
 
 class Downloader:

@@ -62,7 +62,13 @@ def parser(app_name, version, default_config_path, log_path, level):
         "-k",
         "--keybinding",
         action="store_true",
-        help="launch keybinding resolver",
+        help="launch keybinding editor",
+    )
+    parser.add_argument(
+        "--doc",
+        "--documentation",
+        action="store_true",
+        help="launch documentation viewer",
     )
     parser.add_argument(
         "-o",
