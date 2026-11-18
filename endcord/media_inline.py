@@ -367,7 +367,7 @@ class InlineMedia:
                     cached_w = int(os.path.splitext(os.path.basename(path))[0].split("_")[-2])
                 except ValueError:
                     continue
-                if cached_w >= img_h:
+                if cached_w >= img_w:
                     image_path = path
                 else:
                     os.remove(path)
@@ -423,10 +423,14 @@ class InlineMedia:
         img = Image.open(path)
         img = img.resize((w, h*(1+self.use_blocks)), Image.Resampling.LANCZOS)
 
-        if img.mode != "RGB" and img.mode != "L":
-            background = Image.new("RGB", img.size, (0, 0, 0))
-            background.paste(img, mask=img.split()[3])
-            img = background
+        if img.mode != "RGB":
+            if "A" in img.getbands():
+                alpha = img.getchannel("A")
+                background = Image.new("RGB", img.size, (0, 0, 0))
+                background.paste(img.convert("RGB"), mask=alpha)
+                img = background
+            else:
+                img = img.convert("RGB")
 
         if self.use_blocks:
             if self.truecolor:

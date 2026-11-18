@@ -368,18 +368,23 @@ class TerminalMedia():
                 height = hsize
 
             img = img.resize((width, height), Image.Resampling.LANCZOS)
+
+        # remove alpha
+        if remove_alpha and img.mode != "RGB":
+            if "A" in img.getbands():
+                alpha = img.getchannel("A")
+                background = Image.new("RGB", img.size, (0, 0, 0))
+                background.paste(img.convert("RGB"), mask=alpha)
+                img = background
+            else:
+                img = img.convert("RGB")
+
         img_gray = img.convert("L")
 
         # increase saturation
         if self.saturation:
             sat = ImageEnhance.Color(img)
             img = sat.enhance(self.saturation)
-
-        # remove alpha
-        if remove_alpha and img.mode != "RGB" and img.mode != "L":
-            background = Image.new("RGB", img.size, (0, 0, 0))
-            background.paste(img, mask=img.split()[3])
-            img = background
 
         # apply xterm256 palette
         img_palette = Image.new("P", (16, 16))

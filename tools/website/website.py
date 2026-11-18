@@ -200,10 +200,10 @@ def parse(text, width):
         elif raw_strip.startswith(">"):
             items.append(["q", "| ", "| ", raw_strip[1:].strip()])
         elif body[:2] in ("- ", "* ", "+ "):
-            items.append(["li", ind + "• ", ind + "  ", body[2:]])
+            items.append(["li", ind + "• ", ind + "  ", body[2:].strip() + ("\n" if raw.endswith("  ") else " ")])
         elif 0 < dot <= 3 and body[:dot].isdigit():
-            items.append(["li", ind + body[:dot + 2], ind + " " * (dot + 2), body[dot + 2:]])
-        elif items and items[-1] and items[-1][0] == "p":
+            items.append(["li", ind + body[:dot + 2], ind + " " * (dot + 2), body[dot + 2:].strip() + ("\n" if raw.endswith("  ") else " ")])
+        elif items and items[-1] and items[-1][0] in ("p", "li"):
             items[-1][3] += raw_strip + ("\n" if raw.endswith("  ") else " ")
         else:
             items.append(["p", "", "", raw_strip + ("\n" if raw.endswith("  ") else " ")])
@@ -213,7 +213,7 @@ def parse(text, width):
         if not item:
             continue
         kind, first, rest, source = item
-        if kind == "p":
+        if kind in ("p", "li"):
             source = source.rstrip(" \n")
         if lines and not (kind == prev and kind in ("li", "q", "code")):
             lines.append("")
