@@ -8899,9 +8899,9 @@ class Endcord:
             "extensions": {},
         }, create=True)
         just_updated = manual or git.ver_to_tuple(peripherals.VERSION) > git.ver_to_tuple(last_check["current"])
-        if just_updated and os.path.exists(os.path.join(peripherals.config_dir, "docs")):   # clean docs after update
-            shutil.rmtree(os.path.join(peripherals.config_dir, "docs"))
-            os.makedirs(os.path.join(peripherals.config_dir, "docs"), exist_ok=True)
+        if just_updated and os.path.exists(os.path.join(peripherals.config_path, "docs")):   # clean docs after update
+            shutil.rmtree(os.path.join(peripherals.config_path, "docs"))
+            os.makedirs(os.path.join(peripherals.config_path, "docs"), exist_ok=True)
         if not manual and not just_updated and int(time.time()) - last_check["time"] < self.config["check_update_interval"] * 86400:
             return
         if manual or git.ver_to_tuple(peripherals.VERSION) > git.ver_to_tuple(last_check["version"]):

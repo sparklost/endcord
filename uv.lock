@@ -240,7 +240,7 @@ wheels = [
 
 [[package]]
 name = "endcord"
-version = "1.6.0"
+version = "1.6.1"
 source = { virtual = "." }
 dependencies = [
     { name = "certifi", marker = "sys_platform == 'darwin'" },
