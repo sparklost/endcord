@@ -90,6 +90,10 @@ wget -nc "https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VE
 tar xf "Python-${PYTHON_VERSION}.tgz"
 cd "Python-${PYTHON_VERSION}"
 
+# fix for https://github.com/python/cpython/issues/146207
+wget https://github.com/python/cpython/commit/3364e7e62fa24d0e19133fb0f90b1c24ef1110c5.patch -O openssl4.patch
+patch -p1 < openssl4.patch
+
 PREFIX="../../.cpython"
 export PREFIX=$(realpath -m "$PREFIX")
 mkdir -p "$PREFIX"
@@ -155,8 +159,7 @@ EOF
     --with-system-libmpdec \
     --without-ensurepip \
     --without-doc-strings \
-    --without-remote-debug \
-    --without-readline
+    --without-remote-debug
 make -j"$(nproc)"
 make install
 

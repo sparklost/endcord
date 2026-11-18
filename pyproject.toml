@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "websocket-client>=1.9.2",
-    "python-socks>=3.2.1",
+    "python-socks>=3.2.2",
     "orjson>=3.13.0",
     "soundcard>=0.4.6",
     "soundfile>=0.14.0",
@@ -39,7 +39,7 @@ media = [
 python_max = "3.14.10"
 python_freethreaded = "3.14.10"
 python_last_safe = "3.13.14"
-curses_tag = "v6_6_20261024"
+curses_tag = "v6_6_20261114"
 rnnoise_tag = "main"
 libopus_ver = "1.5.2"
 gvsbuild_release = "2026.8.0"   # latter versions are for py 3.15

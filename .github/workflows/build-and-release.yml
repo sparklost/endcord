@@ -57,7 +57,7 @@ jobs:
   build-linux:
     name: Build (Linux)
     if: github.event_name == 'push' || inputs.build_linux
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04   # for compatibility with older glibc
     permissions:
       contents: read
       actions: write
