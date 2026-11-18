@@ -132,6 +132,12 @@ def main(args):
             curses.enable_tray = False
         keybinding_settings.bindings(config_data)
         sys.exit(0)
+    elif args.extensions:
+        from endcord import extension_manager
+        if uses_gtkcurses:
+            curses.enable_tray = False
+        extension_manager.manage(config_data)
+        sys.exit(0)
     elif args.vumeter:
         from endcord import vumeter
         vumeter.vumeter_runner(config_data)

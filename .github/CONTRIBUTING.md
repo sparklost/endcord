@@ -24,11 +24,6 @@ Why? Because this is one-person project, and this person is greedily taking all 
 - If you know how to do it, and it's not really hard, do it yourself, don't import large libraries for that.
 
 
-## Running from source
-1. setup uv environment if not already: `uv sync --all-groups`
-2. Run main.py: `uv run main.py`
-
-
 ## Architecture
 Endcord is developed in "Modular composition and component-based architecture using singleton services with a central orchestrator".  
 Explanation:

@@ -77,6 +77,7 @@ Any third party endcord forks may add features that can lead to account ban, cau
 - Partial markdown support (underline, bold, italic, spoiler, quote)
 - Generate server invite link
 - Settings, theme and keybindings editor UI
+- Builtin documentation viewer
 - Theming
 - Customizable status, title and prompt lines
 - Customizable chat lines (message, newline, reaction, reply)
@@ -84,7 +85,7 @@ Any third party endcord forks may add features that can lead to account ban, cau
 - Show discord emoji as `:emoji_name:` and view them in media player
 - Show mentions as `@username`, `@role`, `#channel_name`
 - Channel chat caching
-- Extension API, builtin extensions search
+- Extension API, builtin extensions manager with github search
 - Macro keybindings support (bind key to chain of commands)
 - Proxy support
 - Profile manager for multiple accounts

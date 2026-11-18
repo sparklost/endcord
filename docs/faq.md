@@ -67,6 +67,12 @@ Then press key combination and see printed code. Put this code in settings to us
 This mostly happens with `Ctrl+Arrow` and `Alt+Arrow` combinations, on some non-standard terminal emulators like kitty or cmder.
 As a last resort try setting `fallback_keybinding_parser = True` in config.
 
+## Running from source
+1. Install [uv](https://docs.astral.sh/uv/getting-started/installation/) and [Python](https://www.python.org/downloads/) 3.14
+2. Download endcord source code, extract the zip, open terminal in that folder
+2. Enable gui mode (optional): `uv run build.py --toggle windowed`
+2. Every time to start endcord run: `uv run main.py`
+
 ### Running in tty
 Linux tty doesnt support 256-colors endcord will try to run anyways (and may still crash) but UI lines will be drawn wrongly and colors will be mixed up.
 But endcord can run inside [fbterm](https://salsa.debian.org/debian/fbterm), [kmscon](https://github.com/kmscon/kmscon) or [yaft](https://github.com/uobikiemukot/yaft).
@@ -105,7 +111,7 @@ If that happens, use [legacy theme](themes/legacy.ini). It is used by default on
 ### Virus scanners are flagging endcord binaries as malware
 These are false positives. Binaries are built using nuitka, the problem is that its regularly used by other people to distribute malware. So some AVs flag all nuitka-built binaries as malware. [Ref](https://nuitka.net/user-documentation/common-issue-solutions.html#windows-virus-scanners).
 Its the same with all other python freezing tools, like pyinstaller, cx-freeze...
-So to run endcord, either allow it in anti-virus/windows-defender or run it from source.
+So to run endcord, either allow it in anti-virus/windows-defender or [run it from source](#running-from-source).
 
 ### Debug mode
 Debug mode can be enabled with `-d` flag.

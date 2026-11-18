@@ -4454,7 +4454,7 @@ class Endcord:
                 max_w = self.tui.get_dimensions()[2][1]
                 self.search_ext = True
                 self.search_results = extensions
-                extra_title, extra_body, extra_format = formatter.generate_extra_window_search_ext(extensions, self.extensions, self.ext_updates, self.colors, max_w)
+                extra_title, extra_body, extra_format = formatter.generate_extra_window_search_ext(extensions, self.extensions, self.colors, max_w)
                 self.stop_assist(close=False)
                 self.tui.draw_extra_window(extra_title, extra_body, extra_format, select=True)
                 self.extra_window_open = True

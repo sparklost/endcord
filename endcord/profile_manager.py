@@ -405,7 +405,7 @@ def main_tui(screen, profiles_enc, profiles_plain, selected, have_keyring, confi
     run = True
     proceed = False
     x0 = int(bordered)
-    button_spans = draw_buttons(screen, selected_button, screen.getmaxyx()[0] - 1, screen.getmaxyx()[1])
+    button_spans = draw_buttons(screen, selected_button, screen.getmaxyx()[0] - int(bordered) - 1, screen.getmaxyx()[1])
     while run:
         regenerate = False
         h, w = screen.getmaxyx()
@@ -535,7 +535,7 @@ def main_tui(screen, profiles_enc, profiles_plain, selected, have_keyring, confi
 
         if bordered:
             draw_border(screen, 1)
-        button_spans = draw_buttons(screen, selected_button, h - 1, w + 2*x0)
+        button_spans = draw_buttons(screen, selected_button, h - int(bordered) - 1, w + 2*x0)
         screen.refresh()
     screen.clear()
     screen.refresh()

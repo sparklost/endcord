@@ -82,6 +82,11 @@ def parser(app_name, version, default_config_path, log_path, level):
         help="launch vumeter used to configure voice call silence detection",
     )
     parser.add_argument(
+        "--extensions",
+        action="store_true",
+        help="launch extension manager",
+    )
+    parser.add_argument(
         "-i",
         "--install-extension",
         type=str,

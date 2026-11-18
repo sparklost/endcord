@@ -20,3 +20,5 @@
 - [Extensions](usage.md) - How to install and create endcord extensions
 - [Search extensions](https://github.com/topics/endcord-extension) - Search endcord extensions on GitHub
 - [Official Discord server](https://discord.gg/judQSxw5K2)
+
+All of this can always be viewed inside endcord using `endcord --doc` command argument.

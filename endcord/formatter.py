@@ -3494,7 +3494,7 @@ def generate_extra_window_search(query, messages, roles, channels, blocked, tota
     return title_line, body, body_format, indexes
 
 
-def generate_extra_window_search_ext(extensions, installed, updates, colors, max_len):
+def generate_extra_window_search_ext(extensions, installed, colors, max_len):
     """Generate extra window title and body for extensions search view"""
     title_line = f"Extensions search results: {len(extensions)} extensions"
     color_low = colors[8]
@@ -3511,8 +3511,6 @@ def generate_extra_window_search_ext(extensions, installed, updates, colors, max
         line_format = [(color_low, None, len(name) - 1, len(name) + len(description))]
         if extension[3]:
             line_format.insert(0, (color_standout, None, len(extension[1]) + 1, len(extension[1]) + len(official)))
-        if extension[1] in updates:
-            line_format.insert(0, (19, None, 0, len(extension[1])))
         elif extension[1] in installed_ext:
             line_format.insert(0, (18, None, 0, len(extension[1])))
         body_format.append(line_format)
