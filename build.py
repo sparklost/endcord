@@ -1225,6 +1225,7 @@ def build_with_nuitka(level, onedir, clang, mingw, compile_deps, print_cmd=False
         hidden_imports += [
             "--include-module=av.sidedata.encparams",
             "--include-module=av.utils",
+            "--include-module=av._cyutil",
         ]
     if level not in ("MINI", "MICRO"):
         package_data += ["--include-package-data=soundcard"]

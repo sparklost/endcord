@@ -8899,6 +8899,8 @@ class Endcord:
             "extensions": {},
         }, create=True)
         just_updated = manual or git.ver_to_tuple(peripherals.VERSION) > git.ver_to_tuple(last_check["current"])
+        if just_updated:
+            last_check["current"] = peripherals.VERSION
         if just_updated and os.path.exists(os.path.join(peripherals.config_path, "docs")):   # clean docs after update
             shutil.rmtree(os.path.join(peripherals.config_path, "docs"))
             os.makedirs(os.path.join(peripherals.config_path, "docs"), exist_ok=True)
