@@ -193,10 +193,10 @@ def format_seconds(seconds, nice=False, pad=True):
     fmt = "02d" if pad else "d"
     if hours:
         parts.append(f"{hours:{fmt}}" + ("h" if nice else ""))
-    if minutes or hours:
-        if pad:
-            parts.append(f"{minutes:{fmt}}" + ("m" if nice else ""))
-    parts.append(f"{secs:{fmt}}" + ("s" if nice else ""))
+    if minutes:
+        parts.append(f"{minutes:{fmt}}" + ("m" if nice else ""))
+    if seconds or not (hours or minutes):
+        parts.append(f"{secs:{fmt}}" + ("s" if nice else ""))
     if nice:
         return " ".join(parts)
     return ":".join(parts)

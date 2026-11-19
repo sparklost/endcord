@@ -541,29 +541,50 @@ class TerminalMedia():
             return
         if self.ui:
             self.draw_blank()
+        self.seek = None
         container = av.open(path)
         self.ended = False
+        self.video_time = 0
         all_audio_streams = container.streams.audio
         if not all_audio_streams:   # no audio?
             return
         audio_stream = all_audio_streams[0]
+        if audio_stream.duration:
+            self.video_duration = float(audio_stream.duration * audio_stream.time_base)
+        else:
+            self.video_duration = (container.duration or 0) / av.time_base
+        if self.video_duration == 0:
+            self.video_duration = 1   # just in case
 
         with speaker.player(samplerate=audio_stream.rate, channels=audio_stream.channels, blocksize=1152) as stream:
             start = int(time.monotonic())
             while self.playing:
                 for frame in container.decode(audio=0):
+                    if self.seek is not None:
+                        container.seek(int(self.seek / audio_stream.time_base), stream=audio_stream)
+                        self.video_time = self.seek
+                        self.seek = None
+                        if self.pause_after_seek:
+                            self.pause_after_seek = False
+                            self.pause = True
+                            self.ui_line = self.build_ui_string()
+                        continue
                     if not self.playing:
                         break
                     while self.pause:
                         time.sleep(0.1)
+                    if self.pause_after_seek:
+                        continue
                     audio = frame.to_ndarray().astype("float32").T
                     audio *= self.gain
                     stream.play(audio)
+                    self.video_time += frame.samples / audio_stream.rate
                 if loop:
                     if int(time.monotonic()) - start > loop_max:
                         break
                     time.sleep(loop_delay)
                     container.seek(0)
+                    self.video_time = 0
                 else:
                     break
         self.ended = True
