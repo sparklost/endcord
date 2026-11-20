@@ -6709,11 +6709,13 @@ class Endcord:
             insert_string = f"<@{self.assist_found[index][1]}>"
 
         elif self.assist_type == 3:   # emoji
-            # default emoji - :emoji_name:
+            # default emoji - unicode character / :emoji_name:
             # discord emoji format: "<:name:ID>"
             insert_string = self.assist_found[index][1]
             if input_text.startswith("+:") and start == 2 and insert_string.startswith("<:"):
                 insert_string = ":" + insert_string
+            if not self.emoji_as_text:
+                insert_string = utils.emojize(insert_string)
 
         elif self.assist_type == 4:   # sticker
             insert_string = f"<;{self.assist_found[index][1]};>"   # format: "<;ID;>"

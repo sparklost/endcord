@@ -990,6 +990,8 @@ class TUI():
         for key in text:
             self.add_to_delta_store(key)
         self.show_cursor()
+        self.ensure_cursor_visible()
+        self.update_cursor_pos()
         self.spellcheck()
         self.draw_input_line()
 
@@ -1520,47 +1522,47 @@ class TUI():
         """Draw text input line"""
         with self.lock:
             w = self.input_hw[1]
-            # show only part of line when longer than screen
-            offset = w - 1 + self.input_line_index
-            start = max(0, len(self.input_buffer) - offset)
-            end = start + w - 1
-            line_text = self.input_buffer[start:end].replace("\n", "␤")
+            start = max(0, len(self.input_buffer) - formatter.split_index_wch(self.input_buffer[:-w:-1], w - 1) - self.input_line_index)
+            line_text = self.input_buffer[start:start + w - 1]
+            line_text = line_text[:formatter.split_index_wch(line_text, w - 1)].replace("\n", "␤")
 
             # prepare selected range
             if self.input_select_start is not None:
-                selected_start_screen = self.input_select_start - max(0, len(self.input_buffer) - offset)
-                selected_end_screen = self.input_select_end - max(0, len(self.input_buffer) - offset)
+                selected_start_screen = self.input_select_start - start
+                selected_end_screen = self.input_select_end - start
                 if selected_start_screen > selected_end_screen:
                     # swap so start is always left side
                     selected_start_screen, selected_end_screen = selected_end_screen, selected_start_screen
 
-            if self.bar_cursor and not line_text:   # clear previous character
+            # clear previous character
+            if self.bar_cursor and not line_text:
                 line_text = " "
 
             # draw
-            character = " "
-            pos = 0
+            col = 0
+            cursor_char = self.input_index - start
             cursor_drawn = bool(self.bar_cursor)
             for pos, character in enumerate(line_text):
                 # cursor in the string
-                if not cursor_drawn and self.cursor_pos == pos:
-                    safe_insch(self.win_input_line, 0, self.cursor_pos, character, curses.color_pair(15) | self.attrib_map[15])
+                if not cursor_drawn and cursor_char == pos:
+                    safe_insch(self.win_input_line, 0, col, character, curses.color_pair(15) | self.attrib_map[15])
                     cursor_drawn = True
                 # selected part of string
                 elif self.input_select_start is not None and selected_start_screen <= pos < selected_end_screen:
-                    safe_insch(self.win_input_line, 0, pos, character, curses.color_pair(15) | self.attrib_map[15])
+                    safe_insch(self.win_input_line, 0, col, character, curses.color_pair(15) | self.attrib_map[15])
                 elif pos + start in self.red_list:
-                    safe_insch(self.win_input_line, 0, pos, character, curses.color_pair(20))
+                    safe_insch(self.win_input_line, 0, col, character, curses.color_pair(20))
                 else:
                     for bad_range in self.misspelled:
-                        if bad_range[0] <= pos < sum(bad_range) and (bad_range[0] > self.cursor_pos or self.cursor_pos >= sum(bad_range)+1):
-                            safe_insch(self.win_input_line, 0, pos, character, curses.color_pair(10) | self.attrib_map[10])
+                        if bad_range[0] <= pos < sum(bad_range) and (bad_range[0] > cursor_char or cursor_char >= sum(bad_range)+1):
+                            safe_insch(self.win_input_line, 0, col, character, curses.color_pair(10) | self.attrib_map[10])
                             break
                     else:
-                        safe_insch(self.win_input_line, 0, pos, character, curses.color_pair(14) | self.attrib_map[14])
-            self.win_input_line.insch(0, pos + 1, "\n", curses.color_pair(0))
+                        safe_insch(self.win_input_line, 0, col, character, curses.color_pair(14) | self.attrib_map[14])
+                col += formatter.len_wch(character)
+            self.win_input_line.insch(0, max(col, 1), "\n", curses.color_pair(0))
             # cursor at the end of string
-            if (not cursor_drawn and self.cursor_pos >= len(line_text)) or self.bar_cursor:
+            if (not cursor_drawn and cursor_char >= len(line_text)) or self.bar_cursor:
                 self.show_cursor()
             self.win_input_line.noutrefresh()
             self.need_update.set()
@@ -2191,13 +2193,10 @@ class TUI():
         """Changes cursor color"""
         with self.lock:
             w = self.input_hw[1]
-            start = max(0, len(self.input_buffer) - w + 1 - self.input_line_index)
-            end = start + w - 1
-            line_text = self.input_buffer[start:end].replace("\n", "␤")
-            character = " "
+            character = self.input_buffer[self.input_index:self.input_index + 1].replace("\n", "␤") or " "
+            if self.cursor_pos + formatter.len_wch(character) > w:   # wide character doesnt fit
+                character = " "
             if self.cursor_pos < w:
-                if self.cursor_pos < len(line_text):
-                    character = line_text[self.cursor_pos]
                 if self.cursor_pos == w - 1:
                     self.win_input_line.insch(0, self.cursor_pos, character, curses.color_pair(color_id) | self.attrib_map[color_id])
                 else:
@@ -2247,16 +2246,14 @@ class TUI():
     def ensure_cursor_visible(self):
         """Adjust input_line_index so cursor is on-screen"""
         _, w = self.input_hw
-        buf_len = len(self.input_buffer)
-        x = self.input_index - max(0, buf_len - w + 1 - self.input_line_index)
+        base = len(self.input_buffer) - formatter.split_index_wch(self.input_buffer[:-w:-1], w - 1)
+        start = max(0, base - self.input_line_index)
         margin = min(INPUT_LINE_JUMP, w - 3)
-        if x < 0:   # off the left edge
-            new_start = max(0, self.input_index - margin)
-            self.input_line_index = buf_len - w + 1 - new_start
-        elif x > w - 1:   # off the right edge
-            new_start = self.input_index - (w - 1) + margin
-            self.input_line_index = buf_len - w + 1 - new_start
-        self.input_line_index = min(max(0, self.input_line_index), max(0, buf_len - w + 1))
+        if self.input_index < start:   # off the left edge
+            start = max(0, self.input_index - margin)
+        elif formatter.len_wch(self.input_buffer[start:self.input_index]) > w - 1:   # off the right edge
+            start = self.input_index - formatter.split_index_wch(self.input_buffer[:self.input_index][::-1], w - 1 - margin)
+        self.input_line_index = min(max(0, base - start), base)
 
 
     def update_status_line(self, text_l, text_r=None, text_l_format=[], text_r_format=[]):
@@ -2476,21 +2473,21 @@ class TUI():
         if not self.input_buffer or self.enable_autocomplete:
             return
         w = self.input_hw[1]
-        line_start = max(0, len(self.input_buffer) - w + 1 - self.input_line_index)
-        # first space before line_start in self.input_buffer
-        if split_char_in(self.input_buffer[:line_start]):
-            range_word_start = len(rersplit_0(self.input_buffer[:line_start])) + bool(line_start)
+        start = max(0, len(self.input_buffer) - formatter.split_index_wch(self.input_buffer[:-w:-1], w - 1) - self.input_line_index)
+        # first space before start in self.input_buffer
+        if split_char_in(self.input_buffer[:start]):
+            range_word_start = len(rersplit_0(self.input_buffer[:start])) + bool(start)
         else:
             range_word_start = 0
         # when input buffer cant fit on screen
         if len(self.input_buffer) > w:
-            # first space after line_start + input_line_w in self.input_buffer
-            range_word_end = line_start + w + len(resplit(self.input_buffer[line_start+w:])[0])
+            # first space after start + input_line_w in self.input_buffer
+            range_word_end = start + w + len(resplit(self.input_buffer[start+w:])[0])
         else:
             # first space before last word
             range_word_end = len(self.input_buffer) - len(resplit(self.input_buffer)[-1]) - split_char_in(self.input_buffer)
         # indexes of words visible on screen
-        spelling_range = (range_word_start, range_word_end, line_start)
+        spelling_range = (range_word_start, range_word_end, start)
         if spelling_range != self.spelling_range:
             words_on_screen = resplit(self.input_buffer[range_word_start:range_word_end])
             misspelled_words_on_screen = self.spellchecker.check_list(words_on_screen)
@@ -2498,7 +2495,7 @@ class TUI():
             # loop over all words visible on screen
             self.misspelled = []
             index = 0
-            for num, word in enumerate(resplit(self.input_buffer[line_start:line_start+w])):
+            for num, word in enumerate(resplit(self.input_buffer[start:start+w])):
                 word_len = len(word)
                 if misspelled_words_on_screen[num]:
                     self.misspelled.append([index, word_len])
@@ -2766,9 +2763,9 @@ class TUI():
     def update_cursor_pos(self):
         """Calculate new cursor position from input index"""
         w = self.input_hw[1]
-        self.cursor_pos = self.input_index - max(0, len(self.input_buffer) - w + 1 - self.input_line_index)
-        self.cursor_pos = max(self.cursor_pos, 0)
-        self.cursor_pos = min(w - 1, self.cursor_pos)
+        start = max(0, len(self.input_buffer) - formatter.split_index_wch(self.input_buffer[:-w:-1], w - 1) - self.input_line_index)
+        self.cursor_pos = formatter.len_wch(self.input_buffer[start:self.input_index])
+        self.cursor_pos = min(max(self.cursor_pos, 0), w - 1)
 
 
     def wait_input(self, prompt="", init_text=None, reset=True, keep_cursor=False, autocomplete=False, clear_delta=False, forum=False, command=False, press=None):
@@ -2854,6 +2851,7 @@ class TUI():
                             self.assist_start = self.input_index
                     elif self.assist_stop_space and key == " ":
                         self.assist_start = -2
+                self.ensure_cursor_visible()
                 self.spellcheck()
                 self.update_cursor_pos()
                 self.draw_input_line()
@@ -2985,30 +2983,18 @@ class TUI():
             elif key == 504:   # input_left
                 if self.input_select_start is not None:
                     self.input_index = min(self.input_select_start, self.input_select_end)
-                    self.ensure_cursor_visible()
-                    self.show_cursor()
                 elif self.input_index > 0:
-                    # if index hits left screen edge, but there is more text to left, move line right
-                    if self.input_index - max(0, len(self.input_buffer) - w + 1 - self.input_line_index) == 0:
-                        self.input_line_index += min(INPUT_LINE_JUMP, w - 3)
-                    else:
-                        self.input_index -= 1
-                    self.show_cursor()
+                    self.input_index -= 1
+                self.show_cursor()
                 self.input_select_start = None
                 self.spellcheck()
 
             elif key == 505:   # input_right
                 if self.input_select_start is not None:
                     self.input_index = max(self.input_select_start, self.input_select_end)
-                    self.ensure_cursor_visible()
-                    self.show_cursor()
                 elif self.input_index < len(self.input_buffer):
-                    # if index hits right screen edge, but there is more text to right, move line right
-                    if self.input_index - max(0, len(self.input_buffer) - w - self.input_line_index) == w:
-                        self.input_line_index -= min(INPUT_LINE_JUMP, w - 3)
-                    else:
-                        self.input_index += 1
-                    self.show_cursor()
+                    self.input_index += 1
+                self.show_cursor()
                 self.input_select_start = None
                 self.spellcheck()
 
@@ -3054,22 +3040,14 @@ class TUI():
                 if self.input_select_start is None:
                     self.input_select_start = self.input_index
                 if self.input_index > 0:
-                    # if index hits left screen edge, but there is more text to left, move line right
-                    if self.input_index - max(0, len(self.input_buffer) - w + 1 - self.input_line_index) == 0:
-                        self.input_line_index += min(INPUT_LINE_JUMP, w - 3)
-                    else:
-                        self.input_index -= 1
+                    self.input_index -= 1
                 self.input_select_end = self.input_index
 
             elif key == 509:   # select_right
                 if self.input_select_start is None:
                     self.input_select_start = self.input_index
                 if self.input_index < len(self.input_buffer):
-                    # if index hits right screen edge, but there is more text to right, move line right
-                    if self.input_index - max(0, len(self.input_buffer) - w - self.input_line_index) == w:
-                        self.input_line_index -= min(INPUT_LINE_JUMP, w - 3)
-                    else:
-                        self.input_index += 1
+                    self.input_index += 1
                 self.input_select_end = self.input_index
 
             elif key == 510:   # select_word_left
@@ -3301,6 +3279,8 @@ class TUI():
             # terminal reserved keys: CTRL+ C, I, J, M, Q, S, Z
 
             # keep index inside screen
+            self.ensure_cursor_visible()
+            self.spellcheck()
             self.update_cursor_pos()
             self.draw_input_line()
 
@@ -3386,8 +3366,9 @@ class TUI():
 
         elif self.mouse_in_window(x, y, self.win_input_line):
             x, y = self.mouse_rel_pos(x, y, self.win_input_line)
-            input_index = min(x + max(0, len(self.input_buffer) - self.input_hw[1] + 1 - self.input_line_index), len(self.input_buffer))
-            self.set_input_index(input_index)
+            w = self.input_hw[1]
+            start = max(0, len(self.input_buffer) - formatter.split_index_wch(self.input_buffer[:-w:-1], w - 1) - self.input_line_index)
+            self.set_input_index(start + formatter.split_index_wch(self.input_buffer[start:start + x], x))
             self.draw_input_line()
 
         elif self.win_extra_window and self.mouse_in_window(x, y, self.win_extra_window) and self.extra_select:

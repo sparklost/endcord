@@ -9,7 +9,6 @@ Add reminders
 Add stream calls
 
 CORE HARD:
-Fix issues with wide characters in input line
 Provide static binaries built on muslinux
 Make build.py work with and without uv
 Make custom json parser - remove orjson
