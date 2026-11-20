@@ -2837,13 +2837,14 @@ class TUI():
                     with self.fun_lock:
                         self.red_list.append(self.input_index)
                 self.input_index += 1
+                self.input_buffer, self.input_index, converted = utils.emojize_cursor(self.input_buffer, self.input_index)
                 self.typing = int(time.monotonic())
                 if self.enable_autocomplete:
                     selected_completion = 0
                 self.add_to_delta_store(key)
                 self.show_cursor()
                 if self.assist:
-                    if key in ASSIST_TRIGGERS:
+                    if key in ASSIST_TRIGGERS or converted:
                         # stop assist when same trigger is typed while assist is active
                         if self.assist_start >= 0 and key == self.input_buffer[self.assist_start - 1]:
                             self.assist_start = -2

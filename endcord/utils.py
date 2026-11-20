@@ -488,24 +488,53 @@ def load_emoji(path="emoji.json"):
         EMOJI_DATA = json.load(f)
 
 
+def replace_shortcode(name):
+    """Return emoji for given shortcode, or the shortcode itself if unknown"""
+    for emoji, data in EMOJI_DATA.items():
+        if name in data:
+            break
+    else:
+        return name
+    # remove existing variation selector and force emoji
+    if ord(emoji[-1]) in (0xFE0E, 0xFE0F):
+        return emoji[:-1] + chr(0xFE0F)
+    return emoji
+
+
 def emojize(text):
     """Convert all emoji shortcodes in given string to actual emoji"""
     if not text:
         return text
+    return re.sub(match_emoji, lambda match: replace_shortcode(match.group()), text)
 
-    def replace_emoji(match):
-        name = match.group()
-        for emoji, data in EMOJI_DATA.items():
-            if name in data:
-                break
-        else:
-            return name
-        # remove existing variation selector and force emoji
-        if emoji[-1] == 0xFE0E or emoji[-1] == 0xFE0F:
-            return emoji[0:-1] + 0xFE0F
-        return emoji
 
-    return re.sub(match_emoji, replace_emoji, text)
+def emojize_cursor(text, cursor):
+    """Convert emoji shortcodes in text and return new text and fixed cursor index"""
+    if text.count(":") < 2:
+        return text, cursor, False
+    out = []
+    last = 0
+    shift = 0
+    new_cursor = cursor
+    for match in re.finditer(match_emoji, text):
+        old = match.group()
+        new = replace_shortcode(old)
+        if new == old:
+            continue
+        start, end = match.span()
+        out.append(text[last:start])
+        out.append(new)
+        last = end
+        diff = len(new) - len(old)
+        if cursor >= end:
+            new_cursor += diff
+            shift += diff
+        elif cursor > start:
+            new_cursor = start + shift + len(new)
+    if last == 0:
+        return text, cursor, False
+    out.append(text[last:])
+    return "".join(out), new_cursor, True
 
 
 def is_potential_emoji(cluster):
