@@ -432,9 +432,9 @@ def main_tui(screen, config):
         elif key in ("ESC", "C-c"):
             break
         elif key in ("UP", "DOWN"):
-            scroll_idx = scroll_idx + 1 if key == "DOWN" else -1
+            scroll_idx = scroll_idx + (1 if key == "DOWN" else -1)
         elif key in ("PGUP", "PGDN"):
-            scroll_idx = scroll_idx + screen_h if key == "PGDN" else -screen_h
+            scroll_idx = scroll_idx + (screen_h if key == "PGDN" else -screen_h)
         elif key == "HOME":
             scroll_idx = 0
         elif key == "END":

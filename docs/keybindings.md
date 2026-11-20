@@ -158,7 +158,7 @@ On Windows, double click isn't working, use triple click instead.
 
 
 ## Configuring keybindings
-There is UI for editing keybindings sheets. Run `endcord --keybinding` to open it.  
+There is UI for editing keybindings sheets. Run `endcord --keybinding` to open it or use `keybinding` command inside endcord.  
 Still, read the following as it will help understand how keybindings work.  
 
 ### Standard keybindings

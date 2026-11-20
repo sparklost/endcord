@@ -1,4 +1,3 @@
-Add commands for UI tools (remove extension search command)
 New project name ???
 Move website to projectname.github.io
 Add nightly builds?

@@ -824,7 +824,7 @@ def setup_compiler(clang, clear=False, overwrite=False, cflags=[], ldflags=[], c
         unsafe_flags += ["-g0", "-O3", "-mtune=generic", "-fno-semantic-interposition", "-fno-strict-overflow"]
         safe = True
     skip_mtune = "-mtune=" in CFLAGS_OLD
-    custom_cflags = [item for item in CUSTOM_CFLAGS if item not in unsafe_flags and not (skip_mtune and item.starswith("-mtune"))] if safe else CUSTOM_CFLAGS
+    custom_cflags = [item for item in CUSTOM_CFLAGS if item not in unsafe_flags and not (skip_mtune and item.startswith("-mtune"))] if safe else CUSTOM_CFLAGS
     custom_ldflgs = [item for item in CUSTOM_LDFLAGS if "exclude-libs" not in item] if not exclude else CUSTOM_LDFLAGS
     cflags = ([] if overwrite else CFLAGS_OLD.split(" ")) + custom_cflags + cflags
     cxxflags = ([] if overwrite else CXXFLAGS_OLD.split(" ")) + CUSTOM_CXXFLAGS + cxxflags

@@ -62,7 +62,7 @@ This happens with `Alt+Key` keybindings, but may happen with other modifiers too
 But this also means that it can be added to keybinding config. See [keybinding](#keybinding) for instructions on how to add multiple keybindings for same action.
 
 ### If some keybindings still don't work
-Its probably terminal emulator sending different key codes than those in default settings. Check this by running endcord with `-k` or `--keybinding` to start keybinding resolver.
+Its probably terminal emulator sending different key codes than those in default settings. Check this by running endcord with `-k` or `--keybinding` to start keybinding settings.
 Then press key combination and see printed code. Put this code in settings to use it.
 This mostly happens with `Ctrl+Arrow` and `Alt+Arrow` combinations, on some non-standard terminal emulators like kitty or cmder.
 As a last resort try setting `fallback_keybinding_parser = True` in config.

@@ -234,6 +234,7 @@ class TUI():
         screen.clear()
         self.last_free_id = 1   # last free color pair id
         self.color_pairs = {}
+        self.protected_pairs = {}
         self.attrib_map = [0]   # has 0 so its index starts from 1 to be matched with color pairs
         self.protected_colors = 26   # first N colors that must not be reused
         self.init_pair((255, -1))   # white on default
@@ -770,6 +771,42 @@ class TUI():
             if not uses_gtkcurses and self.inline_media:
                 self.inline_media.force_redraw()
             self.execute_extensions_methods("on_force_redraw")
+
+
+    def pause_tui(self):
+        """Pause drawing but keep curses running"""
+        self.disable_drawing = True
+        self.screen.keypad(False)
+        self.screen.timeout(-1)
+        curses.curs_set(1)
+        self.hibernate_cursor = 10
+        with self.lock:
+            self.screen.clear()
+            self.screen.refresh()
+        return self.screen
+
+
+    def resume_tui(self):
+        """Resume drawing from already running curses"""
+        for key, pair_id in self.color_pairs.items():
+            if pair_id <= 0 or pair_id >= curses.COLOR_PAIRS:
+                continue
+            fg = key & 0x1FF
+            bg = (key >> 9) & 0x1FF
+            if fg == 0x1FF or fg >= curses.COLORS or fg < 0:
+                fg = -1
+            if bg == 0x1FF or bg >= curses.COLORS or bg < 0:
+                bg = -1
+            curses.init_pair(pair_id, fg, bg)
+        for pair_id, (fg, bg) in self.protected_pairs.items():
+            if pair_id < curses.COLOR_PAIRS:
+                curses.init_pair(pair_id, fg if fg < curses.COLORS else -1, bg if bg < curses.COLORS else -1)
+        self.screen.timeout(250)
+        self.disable_drawing = False
+        self.resize(redraw_only=True)
+        if not uses_gtkcurses and self.inline_media:
+            self.inline_media.force_redraw()
+        self.execute_extensions_methods("on_force_redraw")
 
 
     def get_dimensions(self):
@@ -2322,6 +2359,7 @@ class TUI():
             return 0
         if force_id > 0:
             curses.init_pair(force_id, fg, bg)
+            self.protected_pairs[force_id] = (fg, bg)
             self.attrib_map = set_list_item(self.attrib_map, attribute, force_id)
             return force_id
 
@@ -2329,6 +2367,8 @@ class TUI():
         if key in self.color_pairs and self.last_free_id > self.protected_colors:
             return self.color_pairs[key]
         self.color_pairs[key] = self.last_free_id
+        if self.last_free_id <= self.protected_colors:
+            self.protected_pairs[self.last_free_id] = (fg, bg)
 
         curses.init_pair(self.last_free_id, fg, bg)
         self.attrib_map.append(attribute)

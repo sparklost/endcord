@@ -9,10 +9,11 @@ import shutil
 import sys
 import time
 
-from endcord import git, peripherals, utils
+from endcord import git, keybinding, peripherals, utils
 
 BUTTONS = ("Install/Update", "Uninstall", "Update All", "Quit")
 EXT_PATH = os.path.expanduser(os.path.join(peripherals.config_path, "Extensions"))
+uses_gtkcurses = hasattr(curses, "GTKCURSES")
 
 
 def read_extension(ext_file):
@@ -161,6 +162,23 @@ def main_tui(screen, config):
     screen.bkgd(" ", curses.color_pair(1))
     screen.bkgd(" ", curses.color_pair(1))
 
+    # select parser
+    try:
+        backspace_code = 8 if (curses.erasechar() == 8 or "XTERM_VERSION" in os.environ or sys.platform == "win32") else 127
+    except Exception:
+        backspace_code = 127
+    fallback_keybinding_parser = (config["fallback_keybinding_parser"] or sys.platform == "win32") and not uses_gtkcurses
+    if fallback_keybinding_parser:
+        screen.keypad(True)
+        get_key = keybinding.get_key_fallback
+        backspace_code = 263 if backspace_code == 127 else 8
+    elif uses_gtkcurses:
+        curses.set_nice_exit(True)
+        get_key = keybinding.get_key_passthrough
+    else:
+        screen.keypad(False)
+        get_key = keybinding.get_key
+
     bordered = not config["compact"]
     border_corners = config["border_corners"]
     x0 = int(bordered)
@@ -242,7 +260,7 @@ def main_tui(screen, config):
         # input
         action = None
         target = selected
-        key = screen.getch()
+        key = get_key(screen)   # screen.getch()
         message = ""
 
         # mouse

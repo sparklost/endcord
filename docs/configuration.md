@@ -1,6 +1,6 @@
 ## Configuration
-Settings can be edited in endcord UI with `endcord --settings` argument.  
-Theme can be edited in endcord UI with `endcord --settings-theme` argument.  
+Settings can be edited in endcord UI with `endcord --settings` argument or `settings` command inside endcord.  
+Theme can be edited in endcord UI with `endcord --settings-theme` argument or `settings-theme` command inside endcord.  
 Settings, logs, state, themes, extensions etc. location:
 - On Linux: `~/.config/endcord/` or `$XDG_DATA_HOME/endcord/`  
 - On Windows: `%USERPROFILE%/AppData/Local/endcord/`  

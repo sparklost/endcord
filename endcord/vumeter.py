@@ -4,11 +4,19 @@
 
 import curses
 import math
+import os
 import sys
 import threading
 
 import numpy as np
 import soundcard
+
+try:
+    from endcord import keybinding
+except ImportError:
+    keybinding = None
+
+uses_gtkcurses = hasattr(curses, "GTKCURSES")
 
 BAR_WIDTH = 50
 MIN_DB = -60
@@ -62,7 +70,6 @@ class VUMeter:
         curses.use_default_colors()
         curses.curs_set(0)
         self.screen = screen
-        self.screen.timeout(50)
         curses.mousemask(curses.ALL_MOUSE_EVENTS)
 
         curses.init_pair(1, -1, 40)   # bar
@@ -75,6 +82,28 @@ class VUMeter:
         self.color_bar = curses.color_pair(2)
         self.color_knob_bar = curses.color_pair(3) | curses.A_BOLD
         self.color_knob_bg = curses.color_pair(4) | curses.A_BOLD
+
+        # select parser
+        if keybinding:
+            try:
+                backspace_code = 8 if (curses.erasechar() == 8 or "XTERM_VERSION" in os.environ or sys.platform == "win32") else 127
+            except Exception:
+                backspace_code = 127
+            fallback_keybinding_parser = (config["fallback_keybinding_parser"] or sys.platform == "win32") and not uses_gtkcurses
+            if fallback_keybinding_parser:
+                screen.keypad(True)
+                self.get_key = keybinding.get_key_fallback
+                backspace_code = 263 if backspace_code == 127 else 8
+            elif uses_gtkcurses:
+                curses.set_nice_exit(True)
+                self.get_key = keybinding.get_key_passthrough
+            else:
+                screen.keypad(False)
+                self.get_key = keybinding.get_key
+        else:
+            self.get_key = lambda _: screen.getch()
+
+        self.screen.timeout(50)
 
         self.config = config
         self.bordered = not (config["compact"])
@@ -123,7 +152,9 @@ class VUMeter:
 
     def handle_input(self):
         """Process input events"""
-        key = self.screen.getch()
+        key = self.get_key(self.screen)
+        if keybinding:
+            self.screen.timeout(50)
 
         if key in (ord("q"), 27, "q", "ESC", "C-c"):
             self.run = False
@@ -286,5 +317,6 @@ def vumeter_runner(config):
         app = VUMeter
         curses.wrapper(app, config)
     except curses.error as e:
-        if str(e) != "endwin() returned ERR":
-            sys.exit("Curses error")
+        if str(e) == "addwstr() returned ERR":
+            sys.exit("There was no enough space to render the TUI, please increase the terminal size")
+        return config, False

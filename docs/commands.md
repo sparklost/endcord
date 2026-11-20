@@ -173,8 +173,6 @@
     Switch to different local profile, as available in profile manager. Profiles will be shown in assist. Current session will be ended and new one will be initialized. Log will be cleaned because this completely restarts endcord.
 - `check_for_updates *open`  
     Check endcord and extensions for updates and optionally open github release for new endcord version.
-- `search_extensions`  
-    Search all endcord extensions on GitHub. `Alt+Enter` to install selected one.
 - `install_extension *[url]`  
     Install extension from specified git url. Or use `repo_owner/repo_name`, which assumes github.  
     If url is not provided it will update all installed extensions.
@@ -191,6 +189,20 @@
 - `set [key] = [value]` / `set [key]=[value]`  
     Change settings and save them. Usually restart is required.  
     External theme won't be changed, and it can override changed settings.  
+- `settings`  
+    Open settings editor.
+- `settings_theme`  
+    Open theme editor.
+- `keybinding`  
+    Open keybinding editor.
+- `extensions_manager`  
+    Open extension manager.
+- `vumeter`  
+    Open interactive silence detection configuration.
+- `color_palette`  
+    Open interactive color palette.
+- `documentation`  
+    Open documentation viewer.
 - `about`  
     Show info about endcord.
 - `quit`  

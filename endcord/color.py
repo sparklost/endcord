@@ -178,10 +178,11 @@ def draw_border(screen, corners, color):
         pass
 
 
-def color_palette_internal(screen, corners):
+def color_palette_tui(screen, config):
     """Show all available colors and their codes, wait for input, then exit"""
     curses.use_default_colors()
     curses.curs_set(0)
+    corners = None if config["compact"] else config["border_corners"]
     if corners:
         draw_border(screen, corners, 0)
     draw_bg = False
@@ -212,10 +213,10 @@ def color_palette_internal(screen, corners):
 
 
 def color_palette(config):
-    """Show all available colors and their codes, wait for input, then exit"""
-    corners = None if config["compact"] else config["border_corners"]
+    """Run color palette app"""
     try:
-        curses.wrapper(color_palette_internal, corners)
+        curses.wrapper(color_palette_tui, config)
     except curses.error as e:
-        if str(e) != "endwin() returned ERR":
-            sys.exit("Curses error")
+        if str(e) == "addwstr() returned ERR":
+            sys.exit("There was no enough space to render the TUI, please increase the terminal size")
+        return config, False

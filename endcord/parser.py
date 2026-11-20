@@ -1155,10 +1155,6 @@ def command_string(text):
         cmd_type = 72
         cmd_args = {"text": text[18:]}
 
-    # 73 - SEARCH_EXTENSIONS
-    elif text_lower.startswith("search_extensions"):
-        cmd_type = 73
-
     # 74 - RESIZE_POPUP_WINDOW
     elif text_lower.startswith("resize_popup_window"):
         cmd_type = 74
@@ -1289,6 +1285,26 @@ def command_string(text):
     # 91 - VOICE_DISABLE_CAMERA
     elif text_lower.startswith("voice_disable_camera"):
         cmd_type = 91
+
+    # 92 - SETTINGS/SETTINGS-THEME/KEYBINDING/EXTENSION_MANAGER/VUMETER/COLOR_PALETTE/DOCUMENTATION
+    elif text_lower.startswith("settings"):
+        cmd_type = 92
+        cmd_args = {"ui": 2 if text_lower.startswith("settings_theme") else 1}
+    elif text_lower.startswith("keybinding"):
+        cmd_type = 92
+        cmd_args = {"ui": 3}
+    elif text_lower.startswith("extensions_manager"):
+        cmd_type = 92
+        cmd_args = {"ui": 4}
+    elif text_lower.startswith("vumeter"):
+        cmd_type = 92
+        cmd_args = {"ui": 5}
+    elif text_lower.startswith("color_palette"):
+        cmd_type = 92
+        cmd_args = {"ui": 6}
+    elif text_lower.startswith("documentation"):
+        cmd_type = 92
+        cmd_args = {"ui": 7}
 
     if not forum:
         cmd_type += 1000

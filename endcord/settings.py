@@ -3,9 +3,12 @@
 # Redistribution of modified versions is not permitted.
 
 import curses
+import logging
+import os
 import sys
 from ast import literal_eval
 
+from endcord import keybinding
 from endcord.config import update_config
 
 if sys.platform == "win32":
@@ -17,6 +20,8 @@ BUTTONS = ("Edit", "Reset", "Save", "Save and Exit", "Discard")
 HINT = "Type or Enter to edit, Left/Right/Space for buttons, Esc to revert selected or exit"
 COLOR_SELECTED = (233, 255)
 COLOR_CURSOR = (255, 242)
+logger = logging.getLogger(__name__)
+uses_gtkcurses = hasattr(curses, "GTKCURSES")
 
 
 def get_kind(ref):
@@ -95,12 +100,28 @@ def main_tui(screen, config, defaults, title):
     curses.curs_set(0)
     curses.mousemask(curses.ALL_MOUSE_EVENTS)
     curses.mouseinterval(0)
-    curses.mouseinterval(0)
     curses.init_pair(1, config["color_default"][0], config["color_default"][1])
     curses.init_pair(2, COLOR_SELECTED[0], COLOR_SELECTED[1])
     curses.init_pair(3, COLOR_CURSOR[0], COLOR_CURSOR[1])
     curses.init_pair(4, 196, COLOR_SELECTED[1])   # invalid text on selected row
     screen.bkgd(" ", curses.color_pair(1))
+
+    # select parser
+    try:
+        backspace_code = 8 if (curses.erasechar() == 8 or "XTERM_VERSION" in os.environ or sys.platform == "win32") else 127
+    except Exception:
+        backspace_code = 127
+    fallback_keybinding_parser = (config["fallback_keybinding_parser"] or sys.platform == "win32") and not uses_gtkcurses
+    if fallback_keybinding_parser:
+        screen.keypad(True)
+        get_key = keybinding.get_key_fallback
+        backspace_code = 263 if backspace_code == 127 else 8
+    elif uses_gtkcurses:
+        curses.set_nice_exit(True)
+        get_key = keybinding.get_key_passthrough
+    else:
+        screen.keypad(False)
+        get_key = keybinding.get_key
 
     values = {key: config.get(key, defaults[key]) for key in defaults}
     original = dict(values)
@@ -182,7 +203,7 @@ def main_tui(screen, config, defaults, title):
         # input
         action = None
         target = selected
-        key = screen.getch()
+        key = get_key(screen)   # screen.getch()
         printable = ""
         edited = False
         if key in (32, " "):

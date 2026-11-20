@@ -752,7 +752,6 @@ class Endcord:
         self.search = False
         self.search_end = False
         self.search_gif = False
-        self.search_ext = False
         self.command = False
         self.app_command_autocomplete = ""
         self.app_command_autocomplete_resp = []
@@ -2129,17 +2128,6 @@ class Endcord:
                         url = self.assist_found[extra_index][3]
                         self.download_threads.append(threading.Thread(target=self.download_file, daemon=True, args=(url, False, True)))
                         self.download_threads[-1].start()
-                        continue
-                    elif self.search_ext:
-                        extra_selected = self.tui.get_extra_selected()
-                        if extra_selected < 0:
-                            continue
-                        repo = self.search_results[extra_selected]
-                        from endcord import git
-                        status, message = git.install_extension(repo[0] + "/" + repo[1], cli=False, proxy=self.config["proxy"])
-                        self.stop_extra_window()
-                        self.update_extra_line(message)
-                        self.restore_input_text = (input_text, "standard")
                         continue
                     elif self.assist_found:
                         new_input_text, new_input_index = self.insert_assist(
@@ -4446,21 +4434,6 @@ class Endcord:
             else:   # update
                 threading.Thread(target=self.update_extensions, daemon=True, args=(True, False, False)).start()
 
-        elif cmd_type == 73:   # SEARCH_EXTENSIONS
-            from endcord import git
-            extensions = git.search_gh_repos("endcord-extension", proxy=self.config["proxy"])
-            if extensions:
-                self.tui.disable_wrap_around(True)
-                max_w = self.tui.get_dimensions()[2][1]
-                self.search_ext = True
-                self.search_results = extensions
-                extra_title, extra_body, extra_format = formatter.generate_extra_window_search_ext(extensions, self.extensions, self.colors, max_w)
-                self.stop_assist(close=False)
-                self.tui.draw_extra_window(extra_title, extra_body, extra_format, select=True)
-                self.extra_window_open = True
-            else:
-                self.update_extra_line("Extension search failed", color=20)
-
         elif cmd_type == 74:   # RESIZE_POPUP_WINDOW
             self.tui.set_extra_height(cmd_args["value"])
 
@@ -4687,6 +4660,45 @@ class Endcord:
             self.update_voice_state()
             self.voice_gateway.stop_video_streaming()
             self.update_call_extra_line()
+
+        elif cmd_type == 92:   # SETTINGS/SETTINGS-THEME/KEYBINDING/EXTENSION_MANAGER/VUMETER/COLOR_PALETTE/DOCUMENTATION
+            ui = cmd_args["ui"]
+            if ui == 5 and self.in_call:
+                self.update_extra_line("First leave the call", color=self.colors[9])
+                return
+            screen = self.tui.pause_tui()
+            need_restart = False
+            if ui == 1:   # settings
+                from endcord import settings
+                need_restart = settings.main_tui(screen, self.config, defaults.settings, title="Settings")
+            if ui == 2:   # settings_theme
+                from endcord import settings
+                bkp_path = self.config["config_path"]
+                if self.config["theme_path"]:   # theme is in separate file
+                    self.config["config_path"] = self.config["theme_path"]
+                need_restart = settings.main_tui(screen, config, defaults.theme, title="Theme")
+                self.config["config_path"] = bkp_path
+            elif ui == 3:   # keybinding
+                from endcord import keybinding_settings
+                need_restart = keybinding_settings.main_tui(screen, self.config)
+            elif ui == 4:   # extensions_manager
+                from endcord import extension_manager
+                need_restart = extension_manager.main_tui(screen, self.config)
+            elif ui == 5:   # vumeter
+                from endcord import vumeter
+                vumeter_app = vumeter.VUMeter(screen, self.config)
+                if vumeter_app.do_denoise is not None:
+                    self.config["call_noise_suppression"] = vumeter_app.do_denoise
+                    self.config["call_silence_threshold"] = vumeter_app.threshold_db
+            elif ui == 6:   # color_palette
+                from endcord import color
+                color.color_palette_tui(screen, self.config)
+            elif ui == 7:   # documentation
+                from endcord import documentation
+                documentation.main_tui(screen, self.config)
+            self.tui.resume_tui()
+            if need_restart:
+                self.update_extra_line("Restart needed for changes to take effect", color=self.colors[9])
 
         if success is None:
             self.gateway.set_offline()
@@ -6670,7 +6682,6 @@ class Endcord:
             self.tui.typing = time.monotonic() - 5
         self.search = False
         self.search_gif = False
-        self.search_ext = False
         self.tui.disable_wrap_around(False)
         self.search_end = False
         self.search_results = []
