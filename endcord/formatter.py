@@ -21,6 +21,7 @@ try:
 except (AttributeError, NameError):
     APP_NAME = "endcord"
 uses_gtkcurses = hasattr(curses, "GTKCURSES")
+many_colors = uses_gtkcurses
 
 DAY_MS = 24 * 60 * 60 * 1000
 DISCORD_EPOCH_MS = 1420070400000
@@ -1959,6 +1960,7 @@ class ChatGenerator:
         image_locations = []
         embed_marker_ranges = []
         embed_spans = []   # [start, end, real_url] of embed text, to mark urls found inside as embed urls
+        quote_spans = []   # [start, end, color_id] of rich embed text with color, to color its quote character
         for num_e, embed in enumerate(message["embeds"]):
             embed_url = embed["url"]
             embed_type = embed["type"]
@@ -1990,12 +1992,17 @@ class ChatGenerator:
             elif embed_type == "rich":
                 embed_url = embed_url.replace("\r\n", "\n").strip(" \n")
                 embed_url, url_ranges = replace_markdown_urls(embed_url, ())
+                embed_color = embed.get("color") if many_colors else None
                 if url_ranges:
-                    pre_embed_len = pre_content_len + len(content) + len(embed_type) + 10
+                    pre_embed_len = pre_content_len + len(content)
                     for url_range in url_ranges:
                         urls.append([pre_embed_len + url_range[0], pre_embed_len + url_range[1], url_range[2], True])
-                embed_marker_ranges.append([len(content), len(content) + 13])
-                content += f"[rich embed]:\n{embed_url}"
+                if many_colors:
+                    embed_color += (6500 if mentioned else 6000)
+                else:
+                    embed_color = self.color_separator[0]
+                quote_spans.append([len(content), len(content) + len(embed_url), embed_color])
+                content += embed_url
             else:
                 if self.show_embed_names and "youtube." not in embed["main_url"] and embed_type != "article":
                     name = embed.get("name")
@@ -2063,8 +2070,8 @@ class ChatGenerator:
             self.dyn_limit_username, emoji_safe=False,
             fill=not (self.dynamic_name_len)),
         )
-        if embed_marker_ranges:
-            shift_ranges_all(pre_content_len, embed_marker_ranges)
+        if embed_marker_ranges or quote_spans:
+            shift_ranges_all(pre_content_len, embed_marker_ranges, quote_spans)
         message_line = lazy_replace(message_line, "%global_name", lambda: normalize_string(global_name, self.dyn_limit_username, emoji_safe=True, fill=not (self.dynamic_name_len)))
         message_line = lazy_replace(message_line, "%timestamp", lambda: generate_timestamp(message["timestamp"], self.format_timestamp, self.convert_timezone))
         message_line = message_line.replace("%edited", self.edited_string if edited else "")
@@ -2303,6 +2310,7 @@ class ChatGenerator:
                 channel_ranges,
                 timestamp_ranges,
                 embed_marker_ranges,
+                quote_spans,
             )
             standout_ranges = chain(timestamp_ranges, mention_ranges, channel_ranges, emoji_ranges, embed_marker_ranges)
             quote_nl = False
@@ -2357,6 +2365,9 @@ class ChatGenerator:
             if code_block_format:
                 new_line = new_line.ljust(max_length-1)
             code_block_format += format_multiline_one_line_format(code_blocks_tokens, len_new_line, self.newline_len, this_quote)
+            if this_quote:   # color quote character of colored rich embeds
+                new_line = new_line[:self.newline_len] + "▌" + new_line[self.newline_len+1:]
+                code_block_format += [[span[2], self.newline_len, self.newline_len + 1] for span in quote_spans if span[0] < len_new_line and span[1] > self.newline_len]
 
             len_new_line = len(new_line)
             chat.append(new_line)

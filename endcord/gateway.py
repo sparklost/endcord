@@ -972,7 +972,7 @@ class Gateway():
                     time_log_string += f"    blocked users - {round((time.monotonic() - ready_time_mid) * 1000, 3)} ms\n"
                     ready_time_mid = time.monotonic()
                     # get user settings
-                    if "user_settings_proto" in data and not self.legacy:
+                    if "user_settings_proto" in data:
                         self.user_settings_proto = protobuf.parse_message(base64.b64decode(data["user_settings_proto"]), protobuf_schemata.USER_SETTINGS)
                     else:
                         self.legacy = True

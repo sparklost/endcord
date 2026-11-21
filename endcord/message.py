@@ -6,6 +6,8 @@ import os
 import re
 from datetime import datetime
 
+from endcord import color
+
 PLATFORM_TYPES = ("Desktop", "Xbox", "Playstation", "IOS", "Android", "Nitendo", "Linux", "MacOS")
 CONTENT_TYPES = ("Played Game", "Watched Media", "Top Game", "Listened Media", "Listened Session", "Top Artist", "Custom Status", "Launched Activity", "Leaderboard")
 DISCORDAPP_CDN_ATTACHMENTS = ("https://cdn.discordapp.com/attachments/", "https://media.discordapp.net/attachments")
@@ -14,7 +16,6 @@ YOUTUBE_DOMAINS = ("youtube.", "youtu.be")
 
 match_discord_attachment_url = re.compile(r"https:\/\/(?:cdn|media)\.discord(?:app)?\.(?:com|net)\/attachments\/\d+\/\d+\/([^\?\s)\]>]+)(?:\?.+)?")
 match_url = re.compile(r"https?:\/\/[\w-]+(?:\.[\w-])+[^\s)\]>]*")
-
 
 
 def generate_timestamp(timestamp, timestamp_format, unix=False):
@@ -146,6 +147,7 @@ def prepare_embeds(embeds, message_content):
             }
             if embed_type == "rich":
                 ready_data["media"] = media
+                ready_data["color"] = color.closest_color(color.int_to_rgb(embed.get("color")))[0]
             ready_embeds.append(ready_data)
 
     return ready_embeds, message_content

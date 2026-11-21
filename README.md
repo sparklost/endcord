@@ -104,6 +104,7 @@ Any third party endcord forks may add features that can lead to account ban, cau
     - GTK-native pasting and drag n' drop (text and files)
     - Linux desktop integration: app icon, notification count badge, click on notification
     - Additional Wayland support for global push-to-talk
+    - More colors in UI
 
 
 ## Disclaimer

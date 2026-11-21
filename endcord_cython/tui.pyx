@@ -28,8 +28,7 @@ cpdef void draw_chat(
     list chat_format,
     int chat_index,
     int chat_selected,
-    list attrib_map,
-    int color_default,
+    dict attrib_map,
     list exclude_selection,
 ):
     cdef int num, pos
@@ -69,8 +68,6 @@ cpdef void draw_chat(
             if color >= 0x00010000:
                 color_ready = (<unsigned int>curses.color_pair(default_color_id if not selected else 16)) | color
             else:
-                if color > 255:
-                    color = color_default
                 color_ready = (<unsigned int>curses.color_pair(color if not selected else 16)) | (<unsigned int>attrib_map[color])
             win_chat.chgat(y, start, end - start, color_ready)
 

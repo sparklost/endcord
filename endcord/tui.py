@@ -15,6 +15,7 @@ from endcord import acs, formatter, keybinding, peripherals, utils
 
 logger = logging.getLogger(__name__)
 uses_gtkcurses = hasattr(curses, "GTKCURSES")
+many_colors = uses_gtkcurses
 INPUT_LINE_JUMP = 20   # jump size when moving input line
 MAX_DELTA_STORE = 50   # limit undo size
 MIN_ASSIST_LETTERS = 2
@@ -55,14 +56,6 @@ def rersplit_0(text, pattern=match_split):
 def split_char_in(text):
     """Check if split character is in text"""
     return bool(re.search(match_split, text))
-
-
-def set_list_item(input_list, item, index):
-    """Replace existing item or build list if it doesnt exist"""
-    if index >= len(input_list):
-        input_list.extend([0] * (index - len(input_list) + 1))
-    input_list[index] = item
-    return input_list
 
 
 def trim_with_dash(text, dash=True):
@@ -145,7 +138,7 @@ def draw_formatted_line(window, y, x, text, text_format, default_color, attrib_m
             pass   # some other draw function will call self.resize()
 
 
-def draw_chat(win_chat, h, w, chat_buffer, chat_format, chat_index, chat_selected, attrib_map, color_default, exclude_selection):
+def draw_chat(win_chat, h, w, chat_buffer, chat_format, chat_index, chat_selected, attrib_map, exclude_selection):
     """Draw chat with applied color formatting"""
     y = h
     # drawing from down to up
@@ -178,8 +171,6 @@ def draw_chat(win_chat, h, w, chat_buffer, chat_format, chat_index, chat_selecte
                 # using base color because it is in message content anyway
                 color_ready = curses.color_pair(default_color_id if not selected else 16) | color
             else:
-                if color > 255:   # set all colors after 255 to default color
-                    color = color_default
                 color_ready = curses.color_pair(color if not selected else 16) | attrib_map[color]
             win_chat.chgat(y, start, end - start, color_ready)
 
@@ -231,11 +222,22 @@ class TUI():
         else:
             screen.keypad(False)
             self.get_key = keybinding.get_key
+        self.keybindings = keybindings
+        self.key_map = keybinding.build_key_map(keybindings)
+        if uses_gtkcurses:   # add ctrl+c if its free
+            if "C-c" not in self.key_map:
+                self.key_map["C-c"] = 34
+        self.switch_tab_modifier = keybindings["switch_tab_modifier"][0][:-3]
+        self.command_bindings = command_bindings
         screen.clear()
+        self.screen = screen
+        self.extensions = []
+
+        # colors
         self.last_free_id = 1   # last free color pair id
         self.color_pairs = {}
         self.protected_pairs = {}
-        self.attrib_map = [0]   # has 0 so its index starts from 1 to be matched with color pairs
+        self.attrib_map = {}
         self.protected_colors = 26   # first N colors that must not be reused
         self.init_pair((255, -1))   # white on default
         self.init_pair((233, 255))   # black on white
@@ -264,18 +266,19 @@ class TUI():
         self.init_pair(config["color_tree_server"])
         self.init_pair(config["color_scrollbar"])
         curses.init_pair(255, config["color_default"][0], config["color_default"][1])   # temporary
+        if many_colors:
+            self.init_pair((config["color_green"][0], config["color_tree_selected"][1]), force_id=5000)
+            self.init_pair((config["color_orange"][0], config["color_tree_selected"][1]), force_id=5001)
+            self.init_pair((config["color_red"][0], config["color_tree_selected"][1]), force_id=5002)
+            self.init_pair((config["color_green"][0], config["color_tree_active"][1]), force_id=5003)
+            self.init_pair((config["color_orange"][0], config["color_tree_active"][1]), force_id=5004)
+            self.init_pair((config["color_red"][0], config["color_tree_active"][1]), force_id=5005)
+            for i in range(255):
+                self.init_pair((i, config["color_default"][1]), force_id=6000+i)
+                self.init_pair((i, config["color_chat_mention"][1]), force_id=6500+i)
         self.default_color = 255
         self.tree_unread_inherit_color = config["color_tree_unseen"][0] == -2 and config["color_tree_unseen"][1] == -2
         self.role_color_start_id = self.last_free_id   # starting id for role colors
-        self.keybindings = keybindings
-        self.key_map = keybinding.build_key_map(keybindings)
-        if uses_gtkcurses:   # add ctrl+c if its free
-            if "C-c" not in self.key_map:
-                self.key_map["C-c"] = 34
-        self.switch_tab_modifier = keybindings["switch_tab_modifier"][0][:-3]
-        self.command_bindings = command_bindings
-        self.screen = screen
-        self.extensions = []
 
         # load config
         self.bordered = not (config["compact"])
@@ -1586,7 +1589,6 @@ class TUI():
                     self.chat_index,
                     self.chat_selected,
                     self.attrib_map,
-                    self.default_color,
                     exclude_selection,
                 )
                 self.win_chat.noutrefresh()
@@ -1805,9 +1807,14 @@ class TUI():
                     self.win_tree.insstr(y, 0, line[:text_start], color_line)
                     self.win_tree.insstr(y, text_start, line[text_start:], color)
                     # if this is dm, set color for status sign
-                    if 300 <= code < 399 and second_digit == 0 and not selected and 2 <= first_digit <= 4:
+                    if 300 <= code < 399 and second_digit in (0, 2, 3, 4, 5) and 2 <= first_digit <= 4:
                         # status character is always at position 4 (set in formatter)
-                        self.win_tree.chgat(y, 4, 1, curses.color_pair(first_digit + 16))
+                        if selected and many_colors:
+                            self.win_tree.chgat(y, 4, 1, curses.color_pair(first_digit + 5000-2))
+                        elif second_digit in (4, 5) and many_colors:
+                            self.win_tree.chgat(y, 4, 1, curses.color_pair(first_digit + 5000+1))
+                        else:
+                            self.win_tree.chgat(y, 4, 1, curses.color_pair(first_digit + 16))
                 y += 1
                 while y < h:
                     # curses optimizes scrolling, so large empty space will cause flickering when scrolling member list
@@ -2357,7 +2364,7 @@ class TUI():
         if force_id > 0:
             curses.init_pair(force_id, fg, bg)
             self.protected_pairs[force_id] = (fg, bg)
-            self.attrib_map = set_list_item(self.attrib_map, attribute, force_id)
+            self.attrib_map[force_id] = attribute
             return force_id
 
         key = (fg & 0x1FF) | ((bg & 0x1FF) << 9) | (attribute << 18)
@@ -2368,7 +2375,7 @@ class TUI():
             self.protected_pairs[self.last_free_id] = (fg, bg)
 
         curses.init_pair(self.last_free_id, fg, bg)
-        self.attrib_map.append(attribute)
+        self.attrib_map[self.last_free_id] = attribute
         self.last_free_id += 1
         return self.last_free_id - 1
 
@@ -2666,9 +2673,10 @@ class TUI():
         # tree_select
         elif key == 502:
             # if selected tree entry is channel
-            if 300 <= self.tree_format[self.tree_selected_abs] <= 399 and not mouse:
+            logger.info(self.tree_format[self.tree_selected_abs])
+            if 300 <= self.tree_format[self.tree_selected_abs] <= 399:
                 # stop wait_input and return so new prompt can be loaded
-                return 4
+                return 4 if not mouse else None
             # if selected tree entry is dms drop down
             if self.tree_selected_abs == 0 and not switch:   # for dms
                 if (self.tree_format[self.tree_selected_abs] % 10):
@@ -2681,9 +2689,9 @@ class TUI():
                 # this will trigger open_guild() in app.py that will update and expand tree
                 return 19
             # if selected tree entry is threads drop-down
-            elif 400 <= self.tree_format[self.tree_selected_abs] <= 599 and not mouse:
+            elif 400 <= self.tree_format[self.tree_selected_abs] <= 599:
                 # stop wait_input and return so new prompt can be loaded
-                return 4
+                return 4 if not mouse else None
             # if selected tree entry is category drop-down
             elif self.tree_selected_abs >= 0 and not switch:
                 if (self.tree_format[self.tree_selected_abs] % 10):
