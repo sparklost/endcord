@@ -2844,13 +2844,15 @@ class TUI():
                 self.add_to_delta_store(key)
                 self.show_cursor()
                 if self.assist:
-                    if key in ASSIST_TRIGGERS or converted:
+                    if key in ASSIST_TRIGGERS:
                         # stop assist when same trigger is typed while assist is active
                         if self.assist_start >= 0 and key == self.input_buffer[self.assist_start - 1]:
                             self.assist_start = -2
                         else:
                             self.assist_start = self.input_index
                     elif self.assist_stop_space and key == " ":
+                        self.assist_start = -2
+                    if converted:
                         self.assist_start = -2
                 self.ensure_cursor_visible()
                 self.spellcheck()

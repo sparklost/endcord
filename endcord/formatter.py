@@ -3611,6 +3611,32 @@ def generate_extra_window_stats(data, texts, colors, max_len):
     return title_line[:max_len], body, body_format
 
 
+def generate_command_assist(commands, bindings, colors, max_w):
+    """Add key bindings to command assist lines and generate their color format"""
+    color_low = colors[8]
+    color_standout = colors[9]
+    keys = {}
+    for key, command in bindings.items():
+        if " " not in command:   # skip commands with arguments
+            keys.setdefault(command, key)
+    assist_found = []
+    extra_format = []
+    for line in commands:
+        name, desc = line[0].split(" - ", 1)
+        line_format = [(color_standout, None, 0, len(name.split(" ", 1)[0]))]
+        start = len(name) + 3
+        key = keys.get(line[1])
+        if key:
+            end = start + len(key) + 2
+            line = (f"{name} - ({key}) - {desc}", line[1])   # noqa
+            line_format.append((18, None, start, end))
+            start = end + 3
+        line_format.append((color_low, None, start, max_w))
+        assist_found.append(line)
+        extra_format.append(line_format)
+    return assist_found, extra_format
+
+
 def generate_forum(threads, blocked, max_length, colors, colors_formatted, config):
     """
     Generate forum according to provided formatting.

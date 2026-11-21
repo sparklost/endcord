@@ -165,6 +165,7 @@ class Endcord:
         self.placeholder_images = bool(self.inline_media)   # for extensions
         self.premium_override_commands = []   # for extensions
         self.keep_avatars = False   # for extensions
+        self.command_bindings = command_bindings
 
         if not self.font_ratio:
             self.font_w, self.font_h = terminal_utils.get_font_size()
@@ -6554,18 +6555,17 @@ class Endcord:
                         extra_format.append(None)
 
             elif assist_word:
-                self.assist_found = search.search_client_commands(
+                commands = search.search_client_commands(
                     COMMAND_ASSISTS,
                     assist_word,
                     limit=self.assist_limit,
                     score_cutoff=self.assist_score_cutoff,
                 )
-                for line in self.assist_found:
-                    extra_format.append([(color_standout, None, 0, len(line[0].split(" ", 1)[0])), (color_low, None, line[0].find(" - ") + 3, max_w)])
+                self.assist_found, new_format = formatter.generate_command_assist(commands, self.command_bindings, self.colors, max_w)
+                extra_format.extend(new_format)
             else:
-                self.assist_found = COMMAND_ASSISTS
-                for line in self.assist_found:
-                    extra_format.append([(color_standout, None, 0, len(line[0].split(" ", 1)[0])), (color_low, None, line[0].find(" - ") + 3, max_w)])
+                self.assist_found, new_format = formatter.generate_command_assist(COMMAND_ASSISTS, self.command_bindings, self.colors, max_w)
+                extra_format.extend(new_format)
 
         elif assist_type == 6:   # app commands
             assist_words = assist_word[1:].split(" ")
