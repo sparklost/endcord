@@ -179,10 +179,10 @@ To toggle [windowed mode](docs/faq.md#gui-windowed-mode) run: `python build.py -
 
 ### Build steps
 1. Install [Python](https://www.python.org/) 3.12 or later
-2. Install [uv](https://docs.astral.sh/uv/getting-started/installation/)
+2. Install [uv](https://docs.astral.sh/uv/getting-started/installation/) (optional)
 1. Clone this repository: `git clone https://github.com/sparklost/endcord.git` or download zip and unzip it
 3. `cd endcord`
-4. On BSD systems, rust might be required to build some dependencies, if thats not possible - run `uv remove orjson`
+4. On BSD systems, rust might be required to build some dependencies, check [building-without-rust](#building-without-rust).
 5. run build script: `python build.py`
 
 ### Nuitka
@@ -209,8 +209,9 @@ To make it use freethreaded python run `python build.py` (not `uv`!) with `--fre
 
 ### Building without rust
 If you want to build without any rust dependencies, just run `uv remove orjson` for the first time, before running anything else.  
-This will make it fallback to standard json (more CPU usage by game detection).  
-Optionally it can use `ujson`, run `uv add ujson` to install it.  
+If uv is not installed then manually edit pyproject.toml and remove orjson line from dependencies.  
+This will make it fallback to standard json (more CPU usage).  
+Optionally endcord can use `ujson`, run `uv add ujson` to install it.  
 
 
 ## Planned features

@@ -68,10 +68,12 @@ This mostly happens with `Ctrl+Arrow` and `Alt+Arrow` combinations, on some non-
 As a last resort try setting `fallback_keybinding_parser = True` in config.
 
 ## Running from source
-1. Install [uv](https://docs.astral.sh/uv/getting-started/installation/) and [Python](https://www.python.org/downloads/) 3.14
-2. Download endcord source code, extract the zip, open terminal in that folder
-2. Enable gui mode (optional): `uv run build.py --toggle windowed`
-2. Every time to start endcord run: `uv run main.py`
+1. Install [Python](https://www.python.org/downloads/) 3.14
+2. Install [uv](https://docs.astral.sh/uv/getting-started/installation/) (optional)
+3. Download endcord source code, extract the zip, open terminal in that folder
+4. Enable gui mode (optional): `python build.py --toggle windowed`
+5. Every time to start endcord run: `uv run main.py`
+    - if uv is not installed then either `source .venv/bin/activate; python main.py` or `python build.py --run`
 
 ### Running in tty
 Linux tty doesnt support 256-colors endcord will try to run anyways (and may still crash) but UI lines will be drawn wrongly and colors will be mixed up.
@@ -97,8 +99,7 @@ Tray icon will be enabled, so closing window will only minimize it to tray.
 If using external editor, use editor with graphical interface. TUI editors will not work, as this is no longer in terminal.
 Also, endcord built-in media player will not work because its standalone TUI thats not using curses. All media will be opened in native player.
 Building with pyinstaller is not recommended because it generates huge binary.
-You can toggle windowed mode by running: `python build.py --toggle-windowed`.
-Then run endcord from source: `uv run main.py`.
+You can toggle windowed mode by running: `python build.py --toggle-windowed`. See [running-from-source](#running-from-source)
 After first run in windowed mode, extra config will be generated in endcord config path, a file called `gtkcurses.json`. More info in [configuration](configuration.md).
 All keybindings will work in windowed mode, even those not available in terminal (eg. `Shift+Enter`, `Ctrl+Z`).
 Note: To have tray icon on Linux, [ayatana appindicator](https://github.com/AyatanaIndicators/libayatana-appindicator) must be installed.

@@ -476,9 +476,6 @@ if [[ "$METHOD" == "2" ]]; then
             echo -e "${CYAN}==>${NC} Installing uv..."
             curl -LsSf https://astral.sh/uv/install.sh | sh
             export PATH="$HOME/.cargo/bin:$PATH"
-        else
-            echo -e "${RED}Error:${NC} 'uv' is required. Install it or run with --install-uv"
-            exit 1
         fi
     fi
 
