@@ -2,6 +2,7 @@
 # Source-available under the Endcord License. See LICENSE for terms.
 # Redistribution of modified versions is not permitted.
 
+import glob
 import json
 import logging
 import os
@@ -20,6 +21,7 @@ if sys.platform.startswith("android"):
 if "bsd" in sys.platform:
     sys.platform = "linux"
 
+from endcord import peripherals
 
 GATEWAY_RATE_LIMIT = 5   # delay between each event that rpc server will send to discord
 GATEWAY_RATE_LIMIT_SAME = 60   # delay between each same activity that rpc server will send to discord
@@ -46,6 +48,38 @@ def to_milliseconds(timestamp):
     if timestamp < 1_000_000_000_000:
         return int(timestamp * 1000)
     return int(timestamp)
+
+
+def find_detectable_apps_file(directory):
+    """Find detectable_apps_[etag].ndjson path and extract etag"""
+    pattern = os.path.expanduser(os.path.join(directory, "detectable_apps_*.ndjson"))
+    matches = glob.glob(pattern)
+    if not matches:
+        return None, None, 0
+    path = matches[0]
+    filename_parts = os.path.basename(path)[:-7].split("_")
+    etag = filename_parts[2]
+    save_time = int(filename_parts[3]) * 1000 if len(filename_parts) >= 4 else 0
+    return path, etag, save_time
+
+
+def search_detectable_apps(list_path, app_id):
+    """Search app_id in detectable apps ndjson"""
+    try:
+        f = open(list_path, "r", encoding="utf-8")
+    except Exception:
+        return None
+    try:
+        for line in f:
+            try:
+                app = json.loads(line)   # [id, name, [os, app_path]]
+            except Exception:
+                continue
+            if app[0] == app_id:
+                return app[1]
+    finally:
+        f.close()
+    return None
 
 
 def receive_data_linux(connection):
@@ -131,6 +165,8 @@ class RPC:
         self.connections = []
         self.lock = threading.Lock()
         self.server = None
+        self.detectable = None
+        self.passthrough_apps = config["rpc_passthrough"]
         if user["bot"]:
             logger.warning("RPC server cannot be started for bot accounts")
             self.run = False
@@ -233,7 +269,7 @@ class RPC:
         own_activity = None   # activity of this connection, as stored in self.activities
         pid = None
 
-        try:   # lets keep server running even if there is error in one thread
+        try:   # keep server running even if there is error in one thread
             self.connections.append(connection)
             op, init_data = receive_data(connection)
             if op is None or init_data is None:
@@ -248,7 +284,19 @@ class RPC:
 
             logger.debug(f"RPC app id: {app_id}")
             status, rpc_data = self.discord.get_rpc_app(app_id)
-            rpc_assets = self.discord.get_rpc_app_assets(app_id)
+            if rpc_data:
+                rpc_assets = self.discord.get_rpc_app_assets(app_id)
+            else:
+                if not self.detectable or not os.path.exists(self.detectable):
+                    self.detectable = find_detectable_apps_file(peripherals.config_path)
+                app_name = search_detectable_apps(self.detectable, app_id)
+                if app_name:
+                    rpc_data = {"id": app_id, "name": app_name, "description": ""}
+                    rpc_assets = []
+                elif self.passthrough_apps:
+                    rpc_data = {"id": app_id, "name": "Unknown", "description": ""}
+                    rpc_assets = []
+
             if rpc_data and rpc_assets not in (None, False):
                 logger.info(f"RPC client connected: {rpc_data["name"]}")
                 send_data(connection, 1, self.dispatch)
@@ -261,7 +309,7 @@ class RPC:
                         continue
                     if op == 2 or not data:   # close
                         break
-                    logger.debug(f"Received: {json.dumps(data, indent=2)}")
+                    logger.info(f"Received: {json.dumps(data, indent=2)}")
 
                     if data["cmd"] == "SET_ACTIVITY":
                         pid = data["args"].get("pid", pid)
@@ -455,5 +503,5 @@ class RPC:
         cache = self.changed
         if self.changed:
             self.changed = False
-            logger.debug(f"Sending: {json.dumps(self.activities, indent=2)}")
+            logger.info(f"Sending: {json.dumps(self.activities, indent=2)}")
         return self.activities, cache

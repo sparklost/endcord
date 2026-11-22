@@ -1844,7 +1844,7 @@ class Gateway():
                             "name": new_channel["name"],
                             "topic": new_channel.get("topic"),
                             "parent_id": new_channel.get("parent_id"),
-                            "position": new_channel["position"],
+                            "position": new_channel.get("position", 0),
                             "permission_overwrites": new_channel["permission_overwrites"],
                             "hidden": False,
                         }
@@ -2177,9 +2177,6 @@ class Gateway():
 
     def update_presence(self, status, custom_status=None, custom_status_emoji=None, activities=None, afk=False):
         """Update client status. Statuses: online, idle, dnd, invisible, offline"""
-        if self.legacy:
-            return   # spacebar_fix - gateway returns error if this event is sent
-
         all_activities = []
         if custom_status:
             all_activities.append({

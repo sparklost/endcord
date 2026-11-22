@@ -57,6 +57,7 @@ settings = {
     "inline_media_height": 14,
     "inline_media_quality": "low",
     "rpc_external": True,
+    "rpc_passthrough": False,
     "emoji_as_text": False,
     "message_spacing": True,
     "message_grouping": True,

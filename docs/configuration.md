@@ -143,6 +143,8 @@ Also see [keybindings configuration](keybindings.md#configuring-keybindings).
     Quality of downloaded image thumb for chat inline media. Has no effect in endcord-lite. Possible options are: `lossless`, `high`, `'low`.
 - `rpc_external = True`  
     Whether to use external resources for Rich Presence (like custom pictures).
+- `rpc_passthrough = False`  
+    Allow any RPC app to set Rich Presence even if its not registered with discord.
 - `emoji_as_text = False`  
     Will convert emoji characters to their names. Enable if emoji are not supported by terminal.
 - `message_spacing = True`  
