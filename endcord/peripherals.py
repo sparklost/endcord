@@ -667,10 +667,10 @@ def get_connection(host, port=443, timeout=2, proxy=None):
     if not proxy:
         return http.client.HTTPSConnection(host, port, timeout=timeout, context=ssl_context)
     try:
-        if proxy.startswith("http://") or proxy.startswith("http://"):
+        if proxy.startswith("http://") or proxy.startswith("https://"):
             proxy = urllib.parse.urlsplit(proxy)
             if proxy.startswith("http://"):
-                connection = http.client.HTTPConnection(proxy.hostname, proxy.port, timeout=timeout, context=ssl_context)
+                connection = http.client.HTTPConnection(proxy.hostname, proxy.port, timeout=timeout)
             else:
                 connection = http.client.HTTPSConnection(proxy.hostname, proxy.port, timeout=timeout, context=ssl_context)
             connection.set_tunnel(host, port=port)

@@ -1997,7 +1997,7 @@ class ChatGenerator:
                     pre_embed_len = pre_content_len + len(content)
                     for url_range in url_ranges:
                         urls.append([pre_embed_len + url_range[0], pre_embed_len + url_range[1], url_range[2], True])
-                if many_colors:
+                if many_colors and embed_color is not None:
                     embed_color += (6500 if mentioned else 6000)
                 else:
                     embed_color = self.color_separator[0]
@@ -2366,8 +2366,11 @@ class ChatGenerator:
                 new_line = new_line.ljust(max_length-1)
             code_block_format += format_multiline_one_line_format(code_blocks_tokens, len_new_line, self.newline_len, this_quote)
             if this_quote:   # color quote character of colored rich embeds
-                new_line = new_line[:self.newline_len] + "▌" + new_line[self.newline_len+1:]
-                code_block_format += [[span[2], self.newline_len, self.newline_len + 1] for span in quote_spans if span[0] < len_new_line and span[1] > self.newline_len]
+                for span in quote_spans:
+                    if span[0] < len_new_line and span[1] > self.newline_len:
+                        code_block_format.append([span[2], self.newline_len, self.newline_len + 1])
+                        new_line = new_line[:self.newline_len] + "▌" + new_line[self.newline_len+1:]
+                        break
 
             len_new_line = len(new_line)
             chat.append(new_line)

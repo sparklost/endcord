@@ -5369,7 +5369,6 @@ class Endcord:
         at_index = len(self.ready_attachments[channel_id]) - 1
         self.selected_attachment = at_index
 
-        self.add_running_task("Uploading file", 2)
         time.sleep(0.01)   # time for tui to clear extra window before drawing extra line
         self.update_extra_line()
         upload_data, code = self.discord.request_attachment_url(channel_id, path)
@@ -5378,14 +5377,12 @@ class Endcord:
             self.update_extra_line("Network error", color=20)
         if channel_id not in self.ready_attachments:
             self.update_extra_line()
-            self.remove_running_task("Uploading file", 2)
             return
         try:
             if upload_data:
                 uploaded = self.discord.upload_attachment(upload_data["upload_url"], path)
                 if uploaded is None:
                     self.update_extra_line()
-                    self.remove_running_task("Uploading file", 2)
                     return
                 if uploaded:
                     self.ready_attachments[channel_id][at_index]["upload_url"] = upload_data["upload_url"]
@@ -5405,7 +5402,6 @@ class Endcord:
         if delete:
             os.remove(path)
         self.update_extra_line()
-        self.remove_running_task("Uploading file", 2)
 
 
     def cancel_upload(self):

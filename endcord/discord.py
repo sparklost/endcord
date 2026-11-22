@@ -53,13 +53,14 @@ def ceil(x):
 def log_api_error(data, status, function_name):
     """Add api response error to log"""
     text = f"{function_name}: Response code {status}"
+    error_code = error_message = None
     if data:
         try:
-            data = json.loads(data)
-            error_message = data.get("message")
-            error_code = data.get("code")
-            if "captcha_key" in data:
-                error_message = data.get("captcha_key")
+            body = json.loads(data)
+            error_message = body.get("message")
+            error_code = body.get("code")
+            if "captcha_key" in body:
+                error_message = body.get("captcha_key")
         except json.JSONDecodeError:
             error_code = "None"
             error_message = data.decode("utf-8").strip()
@@ -113,8 +114,8 @@ class Discord():
     def __init__(self, token, host, client_prop, user_agent, proxy=None):
         if host:
             host_obj = urllib.parse.urlsplit(host)
-            if host_obj.netloc:
-                self.host = host_obj.netloc
+            if host_obj.hostname:
+                self.host = host_obj.hostname
             else:
                 self.host = host_obj.path
             host_netloc = self.host.lstrip("api.")
@@ -183,7 +184,7 @@ class Discord():
     def check_expired_attachment_url(self, url):
         """Check if provided url is attachment and return its queries"""
         parsed_url = urllib.parse.urlsplit(url)
-        if self.cdn_host in parsed_url.netloc or (self.cdn_host == DISCORD_CDN_HOST and DYN_DISCORD_CDN_HOST in parsed_url.netloc):
+        if self.cdn_host in parsed_url.hostname or (self.cdn_host == DISCORD_CDN_HOST and DYN_DISCORD_CDN_HOST in parsed_url.hostname):
             return dict(urllib.parse.parse_qsl(parsed_url.query))
         return None
 
@@ -191,7 +192,7 @@ class Discord():
     def get_file_id(self, url):
         """Get file id from attachment url"""
         parsed_url = urllib.parse.urlsplit(url)
-        if self.cdn_host in parsed_url.netloc or (self.cdn_host == DISCORD_CDN_HOST and DYN_DISCORD_CDN_HOST in parsed_url.netloc):
+        if self.cdn_host in parsed_url.hostname or (self.cdn_host == DISCORD_CDN_HOST and DYN_DISCORD_CDN_HOST in parsed_url.hostname):
             path_parts = parsed_url.path.strip("/").split("/")
             if len(path_parts) >= 3:
                 return path_parts[2]
@@ -209,10 +210,10 @@ class Discord():
         if not self.proxy:
             return http.client.HTTPSConnection(host, port, timeout=timeout, context=ssl_context)
         try:
-            if self.proxy.startswith("http://") or self.proxy.startswith("http://"):
+            if self.proxy.startswith("http://") or self.proxy.startswith("https://"):
                 proxy = urllib.parse.urlsplit(self.proxy)
                 if self.proxy.startswith("http://"):
-                    connection = http.client.HTTPConnection(proxy.hostname, proxy.port, timeout=timeout, context=ssl_context)
+                    connection = http.client.HTTPConnection(proxy.hostname, proxy.port, timeout=timeout)
                 else:
                     connection = http.client.HTTPSConnection(proxy.hostname, proxy.port, timeout=timeout, context=ssl_context)
                 connection.set_tunnel(host, port=port)
@@ -242,7 +243,7 @@ class Discord():
 
         # get first free connection or create new one
         with self.connection_pool_lock:
-            for num, e in enumerate(self.connection_pool):
+            for e in self.connection_pool:
                 if not e[1]:
                     entry = e
                     connection = e[0]
@@ -305,8 +306,8 @@ class Discord():
 
     def get_my_id(self, exit_on_error=False):
         """Get my discord user ID"""
-        message_data = None
-        data, status = self.request("GET", "/api/v9/users/@me", message_data, self.header, exit_on_error=exit_on_error)
+        url = "/api/v9/users/@me"
+        data, status = self.request("GET", url, None, self.header, exit_on_error=exit_on_error)
         if not status:
             return None
         if status == 200:
@@ -321,9 +322,8 @@ class Discord():
 
     def get_user(self, user_id, extra=False):
         """Get relevant information about specified user"""
-        message_data = None
         url = f"/api/v9/users/{user_id}/profile"
-        data, status = self.request("GET", url, message_data, self.header)
+        data, status = self.request("GET", url, None, self.header)
         if not status:
             return None
         if status == 200:
@@ -368,9 +368,8 @@ class Discord():
 
     def get_user_guild(self, user_id, guild_id):
         """Get relevant information about specified user in a guild"""
-        message_data = None
         url = f"/api/v9/users/{user_id}/profile?with_mutual_guilds=true&with_mutual_friends=true&guild_id={guild_id}"
-        data, status = self.request("GET", url, message_data, self.header)
+        data, status = self.request("GET", url, None, self.header)
         if not status:
             return None
         if status == 200:
@@ -424,9 +423,8 @@ class Discord():
         1 - single person text
         3 - group DM (name is not None)
         """
-        message_data = None
         url = f"/api/v9/users/{self.my_id}/channels"
-        data, status = self.request("GET", url, message_data, self.header)
+        data, status = self.request("GET", url, None, self.header)
         if not status:
             return None
         if status == 200:
@@ -468,9 +466,8 @@ class Discord():
         11/12 - thread
         15 - forum (contains only threads)
         """
-        message_data = None
         url = f"/api/v9/guilds/{guild_id}/channels"
-        data, status = self.request("GET", url, message_data, self.header)
+        data, status = self.request("GET", url, None, self.header)
         if not status:
             return None
         if status == 200:
@@ -492,7 +489,6 @@ class Discord():
 
     def get_messages(self, channel_id, num=50, before=None, after=None, around=None, avatars=False):
         """Get specified number of messages, optionally number before and after message ID"""
-        message_data = None
         url = f"/api/v9/channels/{channel_id}/messages?limit={num}"
         if before:
             url += f"&before={before}"
@@ -500,7 +496,7 @@ class Discord():
             url += f"&after={after}"
         if around:
             url += f"&around={around}"
-        data, status = self.request("GET", url, message_data, self.header)
+        data, status = self.request("GET", url, None, self.header)
         if not status:
             return None
         if status == 200:
@@ -514,23 +510,21 @@ class Discord():
 
 
     def get_reactions(self, channel_id, message_id, reaction):
-        """Get reaction for specified message"""
+        """Get reaction users for specified message"""
         encoded_reaction = urllib.parse.quote(reaction)
-        message_data = None
         url = f"/api/v9/channels/{channel_id}/messages/{message_id}/reactions/{encoded_reaction}?limit=50&type=0"
-        data, status = self.request("GET", url, message_data, self.header)
+        data, status = self.request("GET", url, None, self.header)
         if not status:
             return None
         if status == 200:
-            data = json.loads(data)
-            reaction = []
-            for user in data:
-                reaction.append({
+            users = []
+            for user in json.loads(data):
+                users.append({
                     "id": user["id"],
                     "username": user["username"],
                     "global_name": user["global_name"],
                 })
-            return reaction
+            return users
         log_api_error(data, status, "get_reactions")
         return []
 
@@ -542,8 +536,7 @@ class Discord():
             url += "&roles=true"
         if everyone:
             url += "&everyone=true"
-        message_data = None
-        data, status = self.request("GET", url, message_data, self.header)
+        data, status = self.request("GET", url, None, self.header)
         if not status:
             return None
         if status == 200:
@@ -569,8 +562,7 @@ class Discord():
         if self.stickers:
             return self.stickers
         url = "/api/v9/sticker-packs?locale=en-US"
-        message_data = None
-        data, status = self.request("GET", url, message_data, self.header)
+        data, status = self.request("GET", url, None, self.header)
         if not status:
             return []
         if status == 200:
@@ -603,9 +595,8 @@ class Discord():
             return self.protos[num-1]
         if self.bot and num == 2:
             return {}
-        message_data = None
         url = f"/api/v9/users/@me/settings-proto/{num}"
-        data, status = self.request("GET", url, message_data, self.header)
+        data, status = self.request("GET", url, None, self.header)
         if not status:
             return {}
         if status == 200:
@@ -625,7 +616,8 @@ class Discord():
         """
         Patch account settings
         num=1 - General user settings
-        num=2 - frecency and favorites storage for various things"""
+        num=2 - frecency and favorites storage for various things
+        """
         if not self.protos[num-1]:
             self.get_settings_proto(num)
         self.protos[num-1].update(data)
@@ -662,9 +654,8 @@ class Discord():
 
     def get_rpc_app(self, app_id):
         """Get data about Discord RPC application"""
-        message_data = None
         url = f"/api/v9/oauth2/applications/{app_id}/rpc"
-        data, status = self.request("GET", url, message_data, self.header)
+        data, status = self.request("GET", url, None, self.header)
         if not status:
             return 1, None
         if status == 200:
@@ -682,9 +673,8 @@ class Discord():
 
     def get_rpc_app_assets(self, app_id):
         """Get Discord application assets list"""
-        message_data = None
         url = f"/api/v9/oauth2/applications/{app_id}/assets"
-        data, status = self.request("GET", url, message_data, self.header)
+        data, status = self.request("GET", url, None, self.header)
         if not status:
             return None
         if status == 200:
@@ -839,9 +829,8 @@ class Discord():
 
     def delete_message(self, channel_id, message_id):
         """Delete the message from the channel"""
-        message_data = None
         url = f"/api/v9/channels/{channel_id}/messages/{message_id}"
-        data, status = self.request("DELETE", url, message_data, self.header)
+        data, status = self.request("DELETE", url, None, self.header)
         if not status:
             return None
         if status == 204:
@@ -863,7 +852,6 @@ class Discord():
                 "token": None,
             })
         url = f"/api/v9/channels/{channel_id}/messages/{message_id}/ack"
-        logger.debug("Sending message ack")
         data, status = self.request("POST", url, message_data, self.header)
         if not status:
             return None
@@ -882,7 +870,6 @@ class Discord():
             channel["read_state_type"] = 0
         message_data = json.dumps({"read_states": channels})
         url = "/api/v9/read-states/ack-bulk"
-        logger.debug("Sending bulk message ack")
         data, status = self.request("POST", url, message_data, self.header)
         if not status:
             return None
@@ -893,10 +880,9 @@ class Discord():
 
 
     def send_typing(self, channel_id):
-        """Set '[username] is typing...' status on specified channel"""
-        message_data = None
+        """Set '[username] is typing...' status on specified channel and return slowmode seconds"""
         url = f"/api/v9/channels/{channel_id}/typing"
-        data, status = self.request("POST", url, message_data, self.header)
+        data, status = self.request("POST", url, None, self.header)
         if not status:
             return None
         if status == 204:
@@ -911,9 +897,8 @@ class Discord():
     def send_reaction(self, channel_id, message_id, reaction):
         """Send reaction to specified message"""
         encoded_reaction = urllib.parse.quote(reaction)
-        message_data = None
         url = f"/api/v9/channels/{channel_id}/messages/{message_id}/reactions/{encoded_reaction}/%40me?location=Message%20Reaction%20Picker&type=0"
-        data, status = self.request("PUT", url, message_data, self.header)
+        data, status = self.request("PUT", url, None, self.header)
         if not status:
             return None
         if status == 204:
@@ -925,9 +910,8 @@ class Discord():
     def remove_reaction(self, channel_id, message_id, reaction):
         """Remove reaction from specified message"""
         encoded_reaction = urllib.parse.quote(reaction)
-        message_data = None
         url = f"/api/v9/channels/{channel_id}/messages/{message_id}/reactions/{encoded_reaction}/0/%40me?location=Message%20Inline%20Button&burst=false"
-        data, status = self.request("DELETE", url, message_data, self.header)
+        data, status = self.request("DELETE", url, None, self.header)
         if not status:
             return None
         if status == 204:
@@ -1088,7 +1072,6 @@ class Discord():
 
     def get_threads(self, channel_id, number=25, offset=0, archived=None):
         """Get specified number of threads with offset for one forum"""
-        message_data = None
         url = f"/api/v9/channels/{channel_id}/threads/search?&sort_by=last_message_time&sort_order=desc&limit={number}&tag_setting=match_some&offset={offset}"
         if archived is not None:
             url += "&archived={archived}"
@@ -1096,7 +1079,7 @@ class Discord():
             for channel in self.threads:
                 if channel["channel_id"] == channel_id:
                     return len(channel["threads"]), channel["threads"]
-        data, status = self.request("GET", url, message_data, self.header)
+        data, status = self.request("GET", url, None, self.header)
         if not status:
             return 0, []
         if status == 200:
@@ -1136,10 +1119,9 @@ class Discord():
 
     def join_thread(self, thread_id):
         """Join a thread"""
-        message_data = None
         # location is not necessarily "Sidebar Overflow"
         url = f"/api/v9/channels/{thread_id}/thread-members/@me?location=Sidebar%20Overflow"
-        data, status = self.request("POST", url, message_data, self.header)
+        data, status = self.request("POST", url, None, self.header)
         if not status:
             return None
         if status == 204:
@@ -1150,10 +1132,9 @@ class Discord():
 
     def leave_thread(self, thread_id):
         """Leave a thread"""
-        message_data = None
         # location is not necessarily "Sidebar Overflow"
         url = f"/api/v9/channels/{thread_id}/thread-members/@me?location=Sidebar%20Overflow"
-        data, status = self.request("DELETE", url, message_data, self.header)
+        data, status = self.request("DELETE", url, None, self.header)
         if not status:
             return None
         if status == 204:
@@ -1175,7 +1156,6 @@ class Discord():
         content     - search query
         offset      - starting number
         """
-        message_data = None
         url = f"/api/v9/{"channels" if channel else "guilds"}/{object_id}/messages/search?"
         if "true" in pinned:
             pinned = "true"
@@ -1193,7 +1173,7 @@ class Discord():
                 if item:
                     url += f"{SEARCH_PARAMS[num]}={urllib.parse.quote(item)}&"
         url = url.rstrip("&")
-        data, status = self.request("GET", url, message_data, self.header)
+        data, status = self.request("GET", url, None, self.header)
         if not status:
             return None, []
         if status == 200:
@@ -1212,9 +1192,8 @@ class Discord():
         if self.my_commands:
             return self.my_commands, self.my_apps
 
-        message_data = None
         url = "/api/v9/users/@me/application-command-index"
-        data, status = self.request("GET", url, message_data, self.header)
+        data, status = self.request("GET", url, None, self.header)
         if not status:
             return [], []
         if status == 200:
@@ -1262,9 +1241,8 @@ class Discord():
             if guild["guild_id"] == guild_id:
                 return guild["commands"], guild["apps"]
 
-        message_data = None
         url = f"/api/v9/guilds/{guild_id}/application-command-index"
-        data, status = self.request("GET", url, message_data, self.header)
+        data, status = self.request("GET", url, None, self.header)
         if not status:
             return [], []
         if status == 200:
@@ -1368,10 +1346,7 @@ class Discord():
 
     def block_user(self, user_id, ignore=False):
         """Block/ignore specified user"""
-        if ignore:
-            message_data = None
-        else:
-            message_data = json.dumps({"type": 2})
+        message_data = None if ignore else json.dumps({"type": 2})
         url = f"/api/v9/users/@me/relationships/{user_id}"
         if ignore:
             url = url + "/ignore"
@@ -1386,11 +1361,10 @@ class Discord():
 
     def unblock_user(self, user_id, ignore=False):
         """Unblock specified user (and unignore)"""
-        message_data = None
         url = f"/api/v9/users/@me/relationships/{user_id}"
         if ignore:
             url = url + "/ignore"
-        data, status = self.request("DELETE", url, message_data, self.header)
+        data, status = self.request("DELETE", url, None, self.header)
         if not status:
             return None
         if status == 204:
@@ -1401,9 +1375,8 @@ class Discord():
 
     def get_pinned(self, channel_id):
         """Get pinned messages for specified channel"""
-        message_data = None
         url = f"/api/v9/channels/{channel_id}/pins"
-        data, status = self.request("GET", url, message_data, self.header)
+        data, status = self.request("GET", url, None, self.header)
         if not status:
             return None
         if status == 200:
@@ -1415,9 +1388,8 @@ class Discord():
 
     def send_pin(self, channel_id, message_id):
         """Send what message should be pinned in specified channel"""
-        message_data = None
         url = f"/api/v9/channels/{channel_id}/pins/{message_id}"
-        data, status = self.request("PUT", url, message_data, self.header)
+        data, status = self.request("PUT", url, None, self.header)
         if not status:
             return None
         if status == 204:
@@ -1428,10 +1400,9 @@ class Discord():
 
     def search_gifs(self, query):
         """Search gifs from query and return their links with preview"""
-        message_data = None
         query = urllib.parse.quote(query)
         url = f"/api/v9/gifs/search?q={query}&media_format=webm&provider=tenor&locale=en-US"
-        data, status = self.request("GET", url, message_data, self.header)
+        data, status = self.request("GET", url, None, self.header)
         if not status:
             return []
         if status == 200:
@@ -1485,9 +1456,7 @@ class Discord():
 
 
     def upload_attachment(self, upload_url, path):
-        """
-        Upload a file to provided url
-        """
+        """Upload a file to provided url"""
         # will load whole file into RAM, but discord limits upload size anyways
         # and this function wont be run if request_attachment_url() is not successful
         header = {
@@ -1497,11 +1466,11 @@ class Discord():
             "Sec-Fetch-Site": "cross-site",
             "User-Agent": self.user_agent,
         }
-        url = urllib.parse.urlsplit(upload_url)
-        upload_url_path = f"{url.path}?{url.query}"
+        parsed_url = urllib.parse.urlsplit(upload_url)
+        upload_url_path = f"{parsed_url.path}?{parsed_url.query}"
         with open(path, "rb") as f:
             try:
-                connection = self.get_connection(url.netloc, 443, timeout=120)
+                connection = self.get_connection(parsed_url.hostname, parsed_url.port or 443, timeout=120)
                 self.uploading.append((upload_url, connection))
                 connection.request("PUT", upload_url_path, f, header)
                 response = connection.getresponse()
@@ -1536,16 +1505,15 @@ class Discord():
                     connection.sock.shutdown(socket.SHUT_RDWR)
                     connection.sock.close()
                 except Exception:
-                    logger.debug("Cancel upload: upload socket already closed.")
+                    logger.debug("Cancel upload: upload socket already closed")
                 self.uploading.remove(upload)
 
 
     def cancel_attachment(self, attachment_name):
         """Cancel uploaded attachments"""
         attachment_name = urllib.parse.quote(attachment_name, safe="")
-        message_data = None
         url = f"/api/v9/attachments/{attachment_name}"
-        data, status = self.request("DELETE", url, message_data, self.header)
+        data, status = self.request("DELETE", url, None, self.header)
         if not status:
             return None
         if status == 204:
@@ -1631,9 +1599,8 @@ class Discord():
 
     def check_ring(self, channel_id):
         """Check if user can ring call in DM"""
-        message_data = None
         url = f"/api/v9/channels/{channel_id}/call"
-        data, status = self.request("GET", url, message_data, self.header)
+        data, status = self.request("GET", url, None, self.header)
         if not status:
             return None
         if status == 200:
@@ -1697,9 +1664,8 @@ class Discord():
         3 - At risk
         4 - Suspended
         """
-        message_data = None
         url = "/api/v9/safety-hub/@me"
-        data, status = self.request("GET", url, message_data, self.header)
+        data, status = self.request("GET", url, None, self.header)
         if not status:
             return None
         if status == 200:
@@ -1736,9 +1702,8 @@ class Discord():
         """Get voice regions list"""
         if self.voice_regions:
             return self.voice_regions
-        message_data = None
         url = "/api/v9/voice/regions"
-        data, status = self.request("GET", url, message_data, self.header)
+        data, status = self.request("GET", url, None, self.header)
         if not status:
             return None
         if status == 200:
@@ -1765,12 +1730,11 @@ class Discord():
         # TOKEN IS NOT USED
         if self.ranked_voice_regions:
             return self.ranked_voice_regions
-        message_data = None
         url = "/rtc"
         try:
             media_host = re.sub(r"(?<=\.)[^./]+(?=/|$)", "media", self.host)
             connection = self.get_connection(f"latency.{media_host}", 443)
-            connection.request("GET", url, message_data, {"User-Agent": self.header["User-Agent"]})
+            connection.request("GET", url, None, {"User-Agent": self.header["User-Agent"]})
             response = connection.getresponse()
         except (socket.gaierror, TimeoutError):
             if connection:
@@ -1795,14 +1759,13 @@ class Discord():
         Use etag to skip downloading same cached resource.
         File is saved in format: detectable_apps_{etag}_{current_time}.ndjson, where current_time is unix_time/1000
         """
-        message_data = None
         url = "/api/v9/applications/detectable"
         header = self.header.copy()
         if etag:
             header["If-None-Match"] = f'W/"{etag}"'
         try:
             connection = self.get_connection(self.host, 443)
-            connection.request("GET", url, message_data, header)
+            connection.request("GET", url, None, header)
             response = connection.getresponse()
         except (socket.gaierror, TimeoutError):
             if connection:
@@ -1869,7 +1832,6 @@ class Discord():
         if os.path.exists(destination):
             return destination
 
-        message_data = None
         if isinstance(avatar_id, str):
             url = f"/avatars/{user_id}/{avatar_id}.{img_type}?size={size}"
         else:
@@ -1880,18 +1842,7 @@ class Discord():
             "Sec-Fetch-Site": "cross-site",
             "User-Agent": self.user_agent,
         }
-
-        if keepalive:
-            response = self.request_cdn_keepalive("GET", self.cdn_host, 443, url, headers=header)
-        else:
-            try:
-                connection = self.get_connection(self.cdn_host, 443)
-                connection.request("GET", url, message_data, header)
-                response = connection.getresponse()
-            except (socket.gaierror, TimeoutError):
-                if connection:
-                    connection.close()
-                return None
+        response, connection = self.download_cdn(self.cdn_host, 443, url, header, keepalive)
         if not response:
             if retry:
                 time.sleep(RETRY_DELAY)
@@ -1929,7 +1880,6 @@ class Discord():
         if os.path.exists(destination):
             return destination
 
-        message_data = None
         url = f"/emojis/{emoji_id}.{img_type}"
         if size:
             url = url + f"?size={size}"
@@ -1940,16 +1890,7 @@ class Discord():
             "User-Agent": self.user_agent,
         }
 
-        if keepalive:
-            response = self.request_cdn_keepalive("GET", self.cdn_host, 443, url, headers=header)
-        else:
-            try:
-                connection = self.get_connection(self.cdn_host, 443)
-                connection.request("GET", url, message_data, header)
-                response = connection.getresponse()
-            except (BrokenPipeError, ConnectionResetError, http.client.RemoteDisconnected, TimeoutError):
-                connection.close()
-                return None
+        response, connection = self.download_cdn(self.cdn_host, 443, url, header, keepalive)
         if not response:
             if retry:
                 time.sleep(RETRY_DELAY)
@@ -1989,22 +1930,12 @@ class Discord():
             if os.path.exists(destination):
                 return destination
 
-        message_data = None
         url_object = urllib.parse.urlsplit(url)
         if not file_name:
             file_name = os.path.basename(url_object.path)
 
-        if keepalive:
-            response = self.request_cdn_keepalive("GET", url_object.netloc, 443, url_object.path + "?" + url_object.query, headers=self.header, timeout=10)
-        else:
-            connection = self.get_connection(url_object.netloc, 443)
-            try:
-                connection.request("GET", url_object.path + "?" + url_object.query, message_data, self.header)
-            except (BrokenPipeError, ConnectionResetError, http.client.RemoteDisconnected, TimeoutError) as e:
-                connection.close()
-                logger.error("get_file" + f" error: {e}")
-                return None
-            response = connection.getresponse()
+        target = url_object.path + (f"?{url_object.query}" if url_object.query else "")
+        response, connection = self.download_cdn(url_object.hostname, url_object.port or 443, target, self.header, keepalive, timeout=10)
         if not response:
             if retry:
                 time.sleep(RETRY_DELAY)
@@ -2038,9 +1969,22 @@ class Discord():
         return None
 
 
+    def download_cdn(self, host, port, path, header, keepalive, timeout=CONNECTION_TIMEOUT):
+        """Perform GET on cdn host, returns response and connection (connection is None for keepalive)"""
+        if keepalive:
+            return self.request_cdn_keepalive("GET", host, port, path, headers=header, timeout=timeout), None
+        connection = self.get_connection(host, port, timeout=timeout)
+        try:
+            connection.request("GET", path, None, header)
+            return connection.getresponse(), connection
+        except (BrokenPipeError, ConnectionResetError, http.client.RemoteDisconnected, socket.gaierror, TimeoutError):
+            connection.close()
+            logger.error("download_cdn error: {e}")
+            return None, None
+
+
     def request_cdn_keepalive(self, method, host, port, path, body=None, headers=None, timeout=CONNECTION_TIMEOUT):
         """Download file from discord with proper header, using keepalive connection"""
-        # get connection and do request
         with self.cdn_connection_lock:
             now = int(time.monotonic())
             if not self.cdn_connection:
@@ -2063,7 +2007,7 @@ class Discord():
                     except Exception:
                         pass
                     self.cdn_connection = self.get_connection(host, port)
-                    self.cdn_connection.request(method, path, headers)
+                    self.cdn_connection.request(method, path, body, headers)
                     return self.cdn_connection.getresponse()
             except Exception as e:   # connection is probably unusable so remove it
                 try:
@@ -2123,12 +2067,11 @@ class Discord():
 
     def bot_delete_command(self, command_id, guild_id=None):
         """Delete command for this bot. This endpoint works ONLY FOR BOTS!"""
-        message_data = None
         if guild_id:
             url = f"/api/v9/applications/{self.my_id}/guilds/{guild_id}/commands/{command_id}"
         else:
             url = f"/api/v9/applications/{self.my_id}/commands/{command_id}"
-        data, status = self.request("DELETE", url, message_data, self.header)
+        data, status = self.request("DELETE", url, None, self.header)
         if not status:
             return None
         if status == 204:
@@ -2168,9 +2111,8 @@ class Discord():
 
     def bot_delete_interaction(self, interaction_token):
         """Delete already sent interaction"""
-        message_data = None
         url = f"/api/v9/webhooks/{self.my_id}/{interaction_token}/messages/@original"
-        data, status = self.request("DELETE", url, message_data, self.header)
+        data, status = self.request("DELETE", url, None, self.header)
         if not status:
             return None
         if status == 200:

@@ -147,7 +147,8 @@ def prepare_embeds(embeds, message_content):
             }
             if embed_type == "rich":
                 ready_data["media"] = media
-                ready_data["color"] = color.closest_color(color.int_to_rgb(embed.get("color")))[0]
+                if embed.get("color"):
+                    ready_data["color"] = color.closest_color(color.int_to_rgb(embed["color"]))[0]
             ready_embeds.append(ready_data)
 
     return ready_embeds, message_content
@@ -183,7 +184,7 @@ def prepare_message(message):
     if "referenced_message" in message:
         if message["referenced_message"]:
             reference_nick = None
-            for mention in message["mentions"]:
+            for mention in message.get("mentions"):
                 if mention["id"] == message["referenced_message"]["id"]:
                     if "member" in mention:
                         reference_nick = mention["member"]["nick"]
@@ -280,15 +281,15 @@ def prepare_message(message):
             data["duration"] = round(attachment["duration_secs"])
         embeds.append(data)   # keep attachments in same place as embeds (attachments have no "main_url")
     message, embeds = content_to_attachment(message, embeds)
+
     # mentions
     mentions = []
-    if message["mentions"]:
-        for mention in message["mentions"]:
-            mentions.append({
-                "username": mention.get("username"),   # spacebar_fix - get
-                "global_name": mention.get("global_name"),   # spacebar_fix - get
-                "id": mention["id"],
-            })
+    for mention in message.get("mentions"):
+        mentions.append({
+            "username": mention.get("username"),   # spacebar_fix - get
+            "global_name": mention.get("global_name"),   # spacebar_fix - get
+            "id": mention["id"],
+        })
 
     # interactions
     if message.get("interaction"):   # spacebar_fix - get
@@ -742,7 +743,7 @@ def prepare_poll(poll):
 
 def is_relevant_message(op, message, current_channel_id, channel_cache, guilds, my_id, my_all_roles):
     """
-    Check of message is relevant and should be further processed.
+    Check if message is relevant and should be further processed.
     - Message is in current or cached channel
     - Message should ping
     """

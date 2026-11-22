@@ -57,8 +57,8 @@ class Discord():
     def __init__(self, host, client_prop, user_agent, proxy=None):
         if host:
             host_obj = urllib.parse.urlsplit(host)
-            if host_obj.netloc:
-                self.host = host_obj.netloc
+            if host_obj.hostname:
+                self.host = host_obj.hostname
             else:
                 self.host = host_obj.path
             host_netloc = self.host.lstrip("api.")
@@ -307,8 +307,8 @@ class Gateway():
     def __init__(self, user_agent, host=None, proxy=None):
         if host:
             host_obj = urllib.parse.urlsplit(host)
-            if host_obj.netloc:
-                self.gateway_url = host_obj.netloc
+            if host_obj.host:
+                self.gateway_url = host_obj.host
             else:
                 self.gateway_url = host_obj.path
         else:
