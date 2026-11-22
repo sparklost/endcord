@@ -389,9 +389,9 @@ class Discord():
             if extra:   # extra data for rpc
                 extra_data = {
                     "avatar": data["user"]["avatar"],
-                    "avatar_decoration_data": data["user"].get("avatar_decoration_data"),   # spacebar_fix - get
+                    "avatar_decoration_data": data["user"]["avatar_decoration_data"],
                     "discriminator": data["user"]["discriminator"],
-                    "flags": data["user"].get("flags"),   # spacebar_fix - get
+                    "flags": data["user"]["flags"],
                     "premium_type": data["premium_type"],
                 }
             else:
@@ -404,13 +404,13 @@ class Discord():
                 if data["user_profile"].get("pronouns"):
                     pronouns = data["user_profile"].get("pronouns")
             tag = None
-            if data["user"].get("primary_guild") and "tag" in data["user"]["primary_guild"]:   # spacebar_fix - get
+            if data["user"]["primary_guild"] and "tag" in data["user"]["primary_guild"]:
                 tag = data["user"]["primary_guild"]["tag"]
             return {
                 "id": data["user"]["id"],
                 "guild_id": None,
                 "username": data["user"]["username"],
-                "global_name": data["user"].get("global_name"),   # spacebar_fix - get
+                "global_name": data["user"].get("global_name"),
                 "nick": None,
                 "bio": bio,
                 "pronouns": pronouns,
@@ -454,13 +454,13 @@ class Discord():
                 if "bio" in guild_profile and guild_profile["bio"]:
                     bio = data["guild_member_profile"]["bio"]
             tag = None
-            if data["user"].get("primary_guild") and "tag" in data["user"]["primary_guild"]:   # spacebar_fix - get
+            if data["user"]["primary_guild"] and "tag" in data["user"]["primary_guild"]:
                 tag = data["user"]["primary_guild"]["tag"]
             return {
                 "id": data["user"]["id"],
                 "guild_id": guild_id,
                 "username": data["user"]["username"],
-                "global_name": data["user"].get("global_name"),   # spacebar_fix - get
+                "global_name": data["user"].get("global_name"),
                 "nick": nick,
                 "bio": bio,
                 "pronouns": pronouns,
@@ -495,12 +495,12 @@ class Discord():
                     recipients.append({
                         "id": recipient["id"],
                         "username": recipient["username"],
-                        "global_name": recipient.get("global_name"),   # spacebar_fix - get
+                        "global_name": recipient.get("global_name"),
                     })
                 if "name" in dm:
                     name = dm["name"]
                 else:
-                    name = recipients[0].get("global_name")   # spacebar_fix - get
+                    name = recipients[0].get("global_name")
                 dms.append({
                     "id": dm["id"],
                     "type": dm["type"],
@@ -609,7 +609,7 @@ class Discord():
                     "content": mention["content"],
                     "user_id": mention["author"]["id"],
                     "username": mention["author"]["username"],
-                    "global_name": mention["author"].get("global_name"),   # spacebar_fix - get
+                    "global_name": mention["author"].get("global_name"),
                 })
             return mentions
         log_api_error(data, status, "get_mentions")
@@ -698,8 +698,8 @@ class Discord():
         return False
 
 
-    def patch_settings_old(self, setting, value):   # spacebar_fix - using old user_settings
-        """Patch account settings, used only for spacebar compatibility"""
+    def patch_settings_old(self, setting, value):
+        """Patch account settings using old API"""
         url = "/api/v9/users/@me/settings"
         message_data = json.dumps({str(setting): value})
         data, status = self.request("PATCH", url, message_data, self.header)
@@ -827,7 +827,7 @@ class Discord():
                     "content": data["referenced_message"]["content"],
                     "user_id": data["referenced_message"]["author"]["id"],
                     "username": data["referenced_message"]["author"]["username"],
-                    "global_name": data["referenced_message"]["author"].get("global_name"),   # spacebar_fix - get
+                    "global_name": data["referenced_message"]["author"].get("global_name"),
                 }
             else:
                 reference = None
@@ -843,7 +843,7 @@ class Discord():
                 "mention_everyone": data["mention_everyone"],
                 "user_id": data["author"]["id"],
                 "username": data["author"]["username"],
-                "global_name": data["author"].get("global_name"),   # spacebar_fix - get
+                "global_name": data["author"].get("global_name"),
                 "referenced_message": reference,
                 "reactions": [],
                 "stickers": data.get("sticker_items", []),

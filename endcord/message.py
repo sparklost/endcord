@@ -192,8 +192,8 @@ def prepare_message(message):
             if message["referenced_message"]["mentions"]:
                 for ref_mention in message["referenced_message"]["mentions"]:
                     ref_mentions.append({
-                        "username": ref_mention.get("username"),   # spacebar_fix - get
-                        "global_name": ref_mention.get("global_name"),   # spacebar_fix - get
+                        "username": ref_mention["username"],
+                        "global_name": ref_mention.get("global_name"),
                         "id": ref_mention["id"],
                     })
             if message["referenced_message"].get("message_snapshots"):
@@ -220,7 +220,7 @@ def prepare_message(message):
                 "mentions": ref_mentions,
                 "user_id": message["referenced_message"]["author"]["id"],
                 "username": message["referenced_message"]["author"]["username"],
-                "global_name": message["referenced_message"]["author"].get("global_name"),   # spacebar_fix - get
+                "global_name": message["referenced_message"]["author"].get("global_name"),
                 "nick": reference_nick,
                 "embeds": reference_embeds,
                 "stickers": message["referenced_message"].get("sticker_items", []),
@@ -239,7 +239,7 @@ def prepare_message(message):
         for reaction in message["reactions"]:
             reactions.append({
                 "emoji": reaction["emoji"]["name"],
-                "emoji_id": reaction["emoji"].get("id"),   # spacebar_fix - get
+                "emoji_id": reaction["emoji"].get("id"),
                 "count": reaction["count"],
                 "me": reaction.get("me"),
             })
@@ -259,7 +259,7 @@ def prepare_message(message):
 
     # special message types
     message = prepare_special_message_types(message)
-    if message.get("poll"):   # spacebar_fix - get
+    if message.get("poll"):
         poll = prepare_poll(message["poll"])
     else:
         poll = None
@@ -286,13 +286,13 @@ def prepare_message(message):
     mentions = []
     for mention in message.get("mentions"):
         mentions.append({
-            "username": mention.get("username"),   # spacebar_fix - get
-            "global_name": mention.get("global_name"),   # spacebar_fix - get
+            "username": mention["username"],
+            "global_name": mention.get("global_name"),
             "id": mention["id"],
         })
 
     # interactions
-    if message.get("interaction"):   # spacebar_fix - get
+    if message.get("interaction"):
         interaction = {
             "username": message["interaction"]["user"]["username"],
             "global_name": message["interaction"]["user"].get("global_name"),
@@ -320,14 +320,14 @@ def prepare_message(message):
         "channel_id": message["channel_id"],
         "guild_id": message.get("guild_id"),
         "timestamp": message["timestamp"],
-        "edited": bool(message.get("edited_timestamp")),   # spacebar_fix - get
+        "edited": bool(message["edited_timestamp"]),
         "content": message["content"],
         "mentions": mentions,
         "mention_roles": message["mention_roles"],
         "mention_everyone": message["mention_everyone"],
         "user_id": message["author"]["id"],
         "username": message["author"]["username"],
-        "global_name": message["author"].get("global_name"),   # spacebar_fix - get
+        "global_name": message["author"].get("global_name"),
         "nick": nick,
         "referenced_message": reference,
         "reactions": reactions,

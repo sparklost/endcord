@@ -4107,10 +4107,7 @@ class Endcord:
                 settings["status"]["custom_status"]["text"] = self.my_status["custom_status"]
             if self.my_status["custom_status_emoji"]:
                 settings["status"]["custom_status"]["emoji_name"] = self.my_status["custom_status_emoji"]["name"]
-            if not self.gateway.legacy:
-                success = self.discord.patch_settings_proto(1, settings)
-            else:
-                success = self.discord.patch_settings_old("custom_status", {"text": self.my_status["custom_status"]})
+            success = self.discord.patch_settings_proto(1, settings)
             if success:
                 self.gateway.update_presence(
                     self.my_status["status"],
@@ -5205,7 +5202,7 @@ class Endcord:
             "mention_everyone": None,
             "user_id": self.my_id,
             "username": self.my_user_data["username"],
-            "global_name": self.my_user_data["global_name"],   # spacebar_fix - get
+            "global_name": self.my_user_data["global_name"],
             "nick": self.my_user_data["nick"],
             "referenced_message": referenced_message,
             "reactions": [],
@@ -5740,10 +5737,7 @@ class Endcord:
                 },
             }
             if not temp:
-                if not self.gateway.legacy:
-                    self.discord.patch_settings_proto(1, settings)
-                else:   # spacebar_fix - using old user_settings
-                    self.discord.patch_settings_old("status", status)
+                self.discord.patch_settings_proto(1, settings)
             self.update_status_line()
 
 
@@ -6947,12 +6941,6 @@ class Endcord:
             selected_line = 0
             selected_msg = 0
             remainder = 0
-
-        # spacebar_fix - message/referenced_message is always null, instead only for deleted message
-        if self.gateway.legacy:
-            for message in self.messages:
-                if message["referenced_message"] and not message["referenced_message"]["id"]:
-                    message["referenced_message"] = None
 
         # find message id for last acked line
         last_seen_msg = None

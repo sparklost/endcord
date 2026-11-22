@@ -4304,14 +4304,13 @@ def generate_tree(dms, guilds, threads, read_state, guild_folders, activities, c
                     mention_count = generate_count(category["ping"])
                     tree.append(normalize_string_with_suffix(f"{intersection} {name}", mention_count, max_width, emoji_safe=not (safe_emoji)))
                     code = 300
-                    if muted and not category["active"]:
+                    if category["muted"] and not category["active"]:
                         code += 10
                     elif category["ping"]:
                         code += 20
                     elif category["unseen"]:
                         code += 30
                     tree_format.append(code)
-                    category["muted"] = muted
                     tree_metadata.append({
                         "id": category["id"],
                         "type": 0,

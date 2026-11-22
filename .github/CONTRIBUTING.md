@@ -118,52 +118,10 @@ print(json.dumps(decoded, indent=2))
 ```
 
 ### Spacebar differences
-In the code, all spacebar fixes can be found as `# spacebar_fix - [note]`.  
-`[note]` contains some information on what is changed.  
-- `/api/v9/users/@me/mentions`:
-    /global_name - missing
-- `/api/v9/users/{my_id}/channels`:
-    /recipients/global_name - missing
-- `/api/v9/users/{user_id}/profile`:  
-    /user/avatar_decoration_data - missing  
-    user/flags - missing  
-    /user/global_name - missing  
-    /user/primary_guild - missing  
-- `MESSAGE_CREATE`, `MESSAGE_UPDATE`, `/api/v9/channels/{channel_id}/messages`, `/api/v9/guilds/{guild_id}/messages/search` and `/api/v9/channels/{channel_id}/pins`:
-    /author/global_name - missing  
-    /referenced_message - should be null only if its pointing to deleted message, otherwise remove this field  
-    /referenced_message/author/global_name - missing  
-    /reactions/emoji/id - missing  
-    /poll - should be removed if its `null`  
-    /interaction - should be removed if its `null`  
-    /mentions/username - missing  
-    /embeds/type - missing  
-    /edited_timestamp - missing for some messages
-- `READY`:  
-    /merged_members/id - should be /merged_members/user_id  
-    /read_state/entries/mention_count - should be `0`, not `null`  
-    /private_channels/recipient_ids - missing, have recipients list instead
-    /users/global_name - missing  
-    /user_guild_settings/entries/channel_overrides/collapsed - missing  
-- `TYPING_START`:
-/member/user/global_name - missing
-- `GUILD_MEMBER_LIST_UPDATE`:
-    /items/member/user/global_name - missing  
-    /item/member/user/global_name - missing  
-- `MESSAGE_REACTION_ADD`:
-    /member/user - missing  
-    /emoji/id - missing when its standard emoji  
-- `MESSAGE_REACTION_REMOVE`:
-    /emoji/id - missing when its standard emoji
-- `GUILD_MEMBERS_CHUNK`:
-    /members/user/global_name - missing
-- `PRESENCE_UPDATE`:
-    /status - missing
-
-- Misc:
-Spacebar is still using old `user_settings` instead new protobuf settings.  
-Gateway returns error code 4000 if event "update presence" (opcode 3) is sent.
-
+- `status` is missing in `PRESENCE_UPDATE` event after sending OP 3
+- `guild_id` is missing in `PRESENCE_UPDATE` event after sending OP 37 with `members`
+- `global_name` is missing everywhere
+- `DEDUPE_USER_OBJECTS` gateway capability is not handled by server
 
 ## List of optimizations
 - All received message events are weighted if they are relevant before any "deep" processing
