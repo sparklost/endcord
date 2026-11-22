@@ -423,7 +423,7 @@ def check_deps(*deps):
     return True
 
 
-def setup_dependencies(level, set_dev):
+def setup_dependencies(level, set_dev, silent=False):
     """Setup first stage of dependencies based on provided level"""
     restore_file("pyproject.toml", ".pyproject.toml.bak")
 
@@ -456,7 +456,8 @@ def setup_dependencies(level, set_dev):
             uvcompat.run(["uv", "sync", "--group=build"], check=True)
         fprint("WARNING: pyproject.toml is modified! Backup is '.pyproject.toml.bak'", color=RED)
 
-    fprint(f"Environment configured to endcord-{level} with{"" if set_dev else "out"} build dependencies")
+    if not silent:
+        fprint(f"Environment configured to endcord-{level} with{"" if set_dev else "out"} build dependencies")
 
 
 def force_ujson():
@@ -1483,19 +1484,13 @@ if __name__ == "__main__":
             uvcompat.execvp("uv", ["uv", "run", "--no-sync", *sys.argv])
         sys.exit(0)
 
-    if args.run:
-        try:
-            sys.exit(subprocess.run([sys.executable, "main.py", *args.run_args], check=False).returncode)
-        except KeyboardInterrupt:
-            sys.exit(0)
-
     if args.freethreaded:
         force_ujson()
 
     if args.toggle_windowed:
         toggle_windowed()
         sys.exit(0)
-    setup_dependencies(args.level, not args.nobuild)
+    setup_dependencies(args.level, not args.nobuild, silent=args.run)
 
     windowed = toggle_windowed(check_only=True)
     if windowed:
@@ -1504,7 +1499,13 @@ if __name__ == "__main__":
             install_local_wheels(ensure_gtk())
         fprint("Windowed mode enabled!")
 
-    enable_extensions(enable=(not args.disable_extensions))
+    enable_extensions(enable=(not args.disable_extensions), silent=args.run)
+
+    if args.run:
+        try:
+            sys.exit(subprocess.run([sys.executable, "main.py", *args.run_args], check=False).returncode)
+        except KeyboardInterrupt:
+            sys.exit(0)
 
     if sys.platform not in ("linux", "win32", "darwin"):
         fprint(f"This platform is not supported: {sys.platform}", color=RED, prefix="", file=sys.stderr)

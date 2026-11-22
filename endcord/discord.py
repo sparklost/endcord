@@ -14,6 +14,7 @@ import threading
 import time
 import urllib.parse
 import uuid
+from functools import lru_cache
 
 try:
     import orjson as json
@@ -29,6 +30,9 @@ from endcord.message import prepare_messages
 DISCORD_HOST = "discord.com"
 DISCORD_CDN_HOST = "cdn.discordapp.com"
 DYN_DISCORD_CDN_HOST = "media.discordapp.net"
+DISCORD_GATEWAY_HOST = "gateway.discord.gg"
+DISCORD_AUTH_GATEWAY_HOST = "remote-auth-gateway.discord.gg"
+WELL_KNOWN_SPACEBAR = "/.well-known/spacebar/client"
 DISCORD_EPOCH = 1420070400
 MAX_CONNECTION_POOL = 10
 MAX_CONNECTION_AGE = 55 * 30  # discord closes keepalive connection after ?? min
@@ -38,6 +42,7 @@ SEARCH_PARAMS = ("content", "channel_id", "author_id", "mentions", "has", "max_i
 SEARCH_HAS_OPTS = ("link", "embed", "poll", "file", "video", "image", "sound", "sticker", "forward")
 PING_OPTIONS = ["all", "mentions", "nothing", "default"]   # must be list
 SUPPRESS_OPTIONS = ("suppress_everyone", "suppress_roles")
+
 logger = logging.getLogger(__name__)
 
 
@@ -108,23 +113,74 @@ def safe_read(response):
         return None
 
 
+def split_url(url, default_tls=True):
+    """Split url or host into (hostname, port, tls)"""
+    normalized = url if "://" in url else f"//{url}"
+    parsed = urllib.parse.urlsplit(normalized)
+    if parsed.scheme in ("https", "wss"):
+        tls = True
+    elif parsed.scheme in ("http", "ws"):
+        tls = False
+    else:
+        tls = default_tls
+    default_port = 443 if tls else 80
+    return parsed.hostname, parsed.port or default_port, tls
+
+
+@lru_cache(maxsize=1)
+def get_hosts(host=None, proxy=None, user_agent="endcord"):
+    """Get api, cdn, dyn_cdn and gateway endpoints"""
+    if not host or split_url(host)[0] == DISCORD_HOST:
+        return (
+            (DISCORD_HOST, 443, True),
+            (DISCORD_CDN_HOST, 443, True),
+            (DYN_DISCORD_CDN_HOST, 443, True),
+            (DISCORD_GATEWAY_HOST, 443, True),
+            (DISCORD_AUTH_GATEWAY_HOST, 443, True),
+        )
+
+    hostname, port, tls = split_url(host)
+    connection = None
+    try:
+        connection = peripherals.get_connection(hostname, port, timeout=CONNECTION_TIMEOUT, proxy=proxy, tls=tls)
+        connection.request("GET", WELL_KNOWN_SPACEBAR, None, {"Accept": "application/json", "User-Agent": user_agent})
+        response = connection.getresponse()
+        data = response.read()
+        status = response.status
+    except Exception as e:
+        logger.warning(f"Instance discovery failed for {host}: {e}")
+        return None
+    finally:
+        if connection:
+            connection.close()
+    if status != 200:
+        log_api_error(data, status, "get_hosts")
+        return None
+
+    try:
+        well_known = json.loads(data)
+        api_url = well_known["api"]["baseUrl"]
+        cdn_url = well_known["cdn"]["baseUrl"]
+        gateway_url = well_known.get("gateway", {}).get("baseUrl")
+    except (ValueError, KeyError, TypeError, AttributeError):
+        logger.warning("Instance discovery failed: invalid well-known response")
+        return None
+    api = split_url(api_url)
+    cdn = split_url(cdn_url)
+    gateway = split_url(gateway_url) if gateway_url else None
+    logger.debug(f"Endpoints: API={api}, CDN={cdn}, gateway={gateway}")
+    return api, cdn, cdn, gateway, None   # no auth gateway for spacebar
+
+
 class Discord():
     """Methods for fetching and sending data to Discord using REST API"""
 
-    def __init__(self, token, host, client_prop, user_agent, proxy=None):
-        if host:
-            host_obj = urllib.parse.urlsplit(host)
-            if host_obj.hostname:
-                self.host = host_obj.hostname
-            else:
-                self.host = host_obj.path
-            host_netloc = self.host.lstrip("api.")
-            self.cdn_host = f"cdn.{host_netloc}"
-            self.dyn_cdn_host = self.cdn_host
-        else:
-            self.host = DISCORD_HOST
-            self.cdn_host = DISCORD_CDN_HOST
-            self.dyn_cdn_host = DYN_DISCORD_CDN_HOST
+    def __init__(self, token, api, cdn, dyn_cdn, client_prop, user_agent, proxy=None):
+        # api, cdn and dyn_cdn are (hostname, port, tls) tuples from get_hosts()
+        self.hostname, self.port, self.tls = api
+        self.host = self.hostname if self.port in (80, 443) else f"{self.hostname}:{self.port}"   # used for links and header
+        self.cdn_host, self.cdn_port, _ = cdn
+        self.dyn_cdn_host, self.dyn_cdn_port, _ = dyn_cdn
         logger.debug(f"Endpoints: API={self.host}, CDN={self.cdn_host}")
         self.token = token
         self.header = {
@@ -184,7 +240,7 @@ class Discord():
     def check_expired_attachment_url(self, url):
         """Check if provided url is attachment and return its queries"""
         parsed_url = urllib.parse.urlsplit(url)
-        if self.cdn_host in parsed_url.hostname or (self.cdn_host == DISCORD_CDN_HOST and DYN_DISCORD_CDN_HOST in parsed_url.hostname):
+        if self.cdn_host in parsed_url.netloc or (self.cdn_host == DISCORD_CDN_HOST and DYN_DISCORD_CDN_HOST in parsed_url.netloc):
             return dict(urllib.parse.parse_qsl(parsed_url.query))
         return None
 
@@ -192,7 +248,7 @@ class Discord():
     def get_file_id(self, url):
         """Get file id from attachment url"""
         parsed_url = urllib.parse.urlsplit(url)
-        if self.cdn_host in parsed_url.hostname or (self.cdn_host == DISCORD_CDN_HOST and DYN_DISCORD_CDN_HOST in parsed_url.hostname):
+        if self.cdn_host in parsed_url.netloc or (self.cdn_host == DISCORD_CDN_HOST and DYN_DISCORD_CDN_HOST in parsed_url.netloc):
             path_parts = parsed_url.path.strip("/").split("/")
             if len(path_parts) >= 3:
                 return path_parts[2]
@@ -201,6 +257,8 @@ class Discord():
 
     def get_connection(self, host, port, timeout=CONNECTION_TIMEOUT):
         """Get connection object and handle proxying"""
+        if not self.tls:
+            return http.client.HTTPConnection(host, port, timeout=timeout)
         if sys.platform == "darwin":
             import certifi
             ssl_context = ssl.create_default_context(cafile=certifi.where())
@@ -210,10 +268,10 @@ class Discord():
         if not self.proxy:
             return http.client.HTTPSConnection(host, port, timeout=timeout, context=ssl_context)
         try:
-            if self.proxy.startswith("http://") or self.proxy.startswith("https://"):
+            if self.proxy.startswith("http://") or self.proxy.startswith("http://"):
                 proxy = urllib.parse.urlsplit(self.proxy)
                 if self.proxy.startswith("http://"):
-                    connection = http.client.HTTPConnection(proxy.hostname, proxy.port, timeout=timeout)
+                    connection = http.client.HTTPConnection(proxy.hostname, proxy.port, timeout=timeout, context=ssl_context)
                 else:
                     connection = http.client.HTTPSConnection(proxy.hostname, proxy.port, timeout=timeout, context=ssl_context)
                 connection.set_tunnel(host, port=port)
@@ -253,12 +311,12 @@ class Discord():
                             connection.close()
                         except Exception:
                             pass
-                        connection = self.get_connection(self.host, 443, timeout)
+                        connection = self.get_connection(self.hostname, self.port, timeout)
                         e[0] = connection
                     break
             if entry is None:
                 if len(self.connection_pool) < MAX_CONNECTION_POOL:
-                    connection = self.get_connection(self.host, 443, timeout)
+                    connection = self.get_connection(self.hostname, self.port, timeout)
                     entry = [connection, True, now]
                     self.connection_pool.append(entry)
                 else:   # all connections busy
@@ -278,7 +336,7 @@ class Discord():
                     connection.close()
                 except Exception:
                     pass
-                connection = self.get_connection(self.host, 443, timeout)
+                connection = self.get_connection(self.hostname, self.port, timeout)
                 entry[0] = connection
                 connection.request(method, path, body, headers)
                 response = connection.getresponse()
@@ -510,21 +568,22 @@ class Discord():
 
 
     def get_reactions(self, channel_id, message_id, reaction):
-        """Get reaction users for specified message"""
+        """Get reaction for specified message"""
         encoded_reaction = urllib.parse.quote(reaction)
         url = f"/api/v9/channels/{channel_id}/messages/{message_id}/reactions/{encoded_reaction}?limit=50&type=0"
         data, status = self.request("GET", url, None, self.header)
         if not status:
             return None
         if status == 200:
-            users = []
-            for user in json.loads(data):
-                users.append({
+            data = json.loads(data)
+            reaction = []
+            for user in data:
+                reaction.append({
                     "id": user["id"],
                     "username": user["username"],
                     "global_name": user["global_name"],
                 })
-            return users
+            return reaction
         log_api_error(data, status, "get_reactions")
         return []
 
@@ -1461,7 +1520,7 @@ class Discord():
         # and this function wont be run if request_attachment_url() is not successful
         header = {
             "Content-Type": "application/octet-stream",
-            "Origin": f"https://{self.host}",
+            "Origin": f"{"https" if self.tls else "http"}://{self.host}",
             "Sec-Fetch-Mode": "cors",
             "Sec-Fetch-Site": "cross-site",
             "User-Agent": self.user_agent,
@@ -1648,7 +1707,7 @@ class Discord():
         if status == 200:
             data = json.loads(data)
             if data["code"]:
-                return f"https://{self.host}/invite/{data["code"]}"
+                return f"{"https" if self.tls else "http"}://{self.host}/invite/{data["code"]}"
             return None
         log_api_error(data, status, "get_invite_url")
         return False
@@ -1764,7 +1823,7 @@ class Discord():
         if etag:
             header["If-None-Match"] = f'W/"{etag}"'
         try:
-            connection = self.get_connection(self.host, 443)
+            connection = self.get_connection(self.hostname, self.port)
             connection.request("GET", url, None, header)
             response = connection.getresponse()
         except (socket.gaierror, TimeoutError):
@@ -1837,12 +1896,12 @@ class Discord():
         else:
             url = f"/embed/avatars/{avatar_id}.png"
         header = {
-            "Origin": f"https://{self.host}",
+            "Origin": f"{"https" if self.tls else "http"}://{self.host}",
             "Sec-Fetch-Mode": "no-cors",
             "Sec-Fetch-Site": "cross-site",
             "User-Agent": self.user_agent,
         }
-        response, connection = self.download_cdn(self.cdn_host, 443, url, header, keepalive)
+        response, connection = self.download_cdn(self.cdn_host, self.cdn_port, url, header, keepalive)
         if not response:
             if retry:
                 time.sleep(RETRY_DELAY)
@@ -1884,13 +1943,13 @@ class Discord():
         if size:
             url = url + f"?size={size}"
         header = {
-            "Origin": f"https://{self.host}",
+            "Origin": f"{"https" if self.tls else "http"}://{self.host}",
             "Sec-Fetch-Mode": "no-cors",
             "Sec-Fetch-Site": "cross-site",
             "User-Agent": self.user_agent,
         }
 
-        response, connection = self.download_cdn(self.cdn_host, 443, url, header, keepalive)
+        response, connection = self.download_cdn(self.cdn_host, self.cdn_port, url, header, keepalive)
         if not response:
             if retry:
                 time.sleep(RETRY_DELAY)

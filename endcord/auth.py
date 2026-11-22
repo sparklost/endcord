@@ -3,7 +3,6 @@
 # Redistribution of modified versions is not permitted.
 
 import base64
-import http.client
 import json
 import logging
 import random
@@ -20,10 +19,9 @@ from Crypto.Cipher import PKCS1_OAEP
 from Crypto.Hash import SHA256
 from Crypto.PublicKey import RSA
 
-DISCORD_HOST = "discord.com"
-DISCORD_HOST_GATEWY = "wss://remote-auth-gateway.discord.gg/"
-DISCORD_CDN_HOST = "cdn.discordapp.com"
-DYN_DISCORD_CDN_HOST = "media.discordapp.net"
+from endcord import peripherals
+from endcord.discord import get_hosts
+
 logger = logging.getLogger(__name__)
 status_unpacker = struct.Struct("!H")
 
@@ -55,18 +53,14 @@ class Discord():
     """Methods for fetching and sending data to Discord using REST API"""
 
     def __init__(self, host, client_prop, user_agent, proxy=None):
-        if host:
-            host_obj = urllib.parse.urlsplit(host)
-            if host_obj.hostname:
-                self.host = host_obj.hostname
-            else:
-                self.host = host_obj.path
-            host_netloc = self.host.lstrip("api.")
-            self.cdn_host = f"cdn.{host_netloc}"
-        else:
-            self.host = DISCORD_HOST
-            self.cdn_host = DISCORD_CDN_HOST
-        logger.debug(f"Endpoints: API={self.host}, CDN={self.cdn_host}")
+        hosts = get_hosts(host, proxy=proxy)
+        if not hosts:
+            raise SystemExit(f"Could not get endpoints for host: {host}")
+        api, cdn = hosts[:2]
+        self.hostname, self.port, self.tls = api
+        self.host = self.hostname if self.port in (80, 443) else f"{self.hostname}:{self.port}"   # used for links and header
+        self.cdn_host = cdn[0]
+        logger.debug(f"Endpoints: API={self.hostname}:{self.port}, CDN={self.cdn_host}")
         self.header = {
             "Accept": "*/*",
             "Content-Type": "application/json",
@@ -82,36 +76,9 @@ class Discord():
         self.proxy = proxy
 
 
-    def get_connection(self, host, port, timeout=2):
-        """Get connection object and handle proxying"""
-        if sys.platform == "darwin":
-            import certifi
-            ssl_context = ssl.create_default_context(cafile=certifi.where())
-        else:
-            ssl_context = ssl.create_default_context()
-        ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
-        if not self.proxy:
-            return http.client.HTTPSConnection(host, port, timeout=timeout, context=ssl_context)
-        try:
-            if self.proxy.startswith("http://"):
-                proxy = urllib.parse.urlsplit(self.proxy)
-                connection = http.client.HTTPSConnection(proxy.hostname, proxy.port, timeout=timeout, context=ssl_context)
-                connection.set_tunnel(host, port=port)
-            elif self.proxy.startswith("socks5://"):
-                from python_socks.sync import Proxy
-                proxy = Proxy.from_url(self.proxy)
-                raw_sock = proxy.connect(dest_host=host, dest_port=port, timeout=10)
-                ssl_context = ssl.create_default_context()
-                proxy_sock = ssl_context.wrap_socket(raw_sock, server_hostname=host)
-                connection = http.client.HTTPSConnection(host, port, timeout=timeout + 5)   # extra time for tor
-                connection.sock = proxy_sock
-            else:
-                logger.warning(f"Invalid proxy: {self.proxy}")
-                connection = http.client.HTTPSConnection(host, port, timeout=timeout, context=ssl_context)
-        except Exception as e:
-            logger.warning(f"Error connecting to proxy {self.proxy}: {e}")
-            connection = http.client.HTTPSConnection(host, port, timeout=timeout, context=ssl_context)
-        return connection
+    def get_connection(self, timeout=2):
+        """Get api connection object and handle proxying"""
+        return peripherals.get_connection(self.hostname, self.port, timeout=timeout, proxy=self.proxy, tls=self.tls)
 
 
     def login(self, email, password):
@@ -137,7 +104,7 @@ class Discord():
         url = "/api/v9/auth/login"
         message_data = json.dumps(message_dict)
         try:
-            connection = self.get_connection(self.host, 443)
+            connection = self.get_connection()
             connection.request("POST", url, message_data, self.header)
             response = connection.getresponse()
         except (socket.gaierror, TimeoutError):
@@ -193,7 +160,7 @@ class Discord():
         url = "/api/v9/phone-verifications/verify"
         message_data = json.dumps(message_dict)
         try:
-            connection = self.get_connection(self.host, 443)
+            connection = self.get_connection()
             connection.request("POST", url, message_data, self.header)
             response = connection.getresponse()
         except (socket.gaierror, TimeoutError):
@@ -213,7 +180,7 @@ class Discord():
         url = "/auth/mfa/sms/send"
         message_data = json.dumps({"ticket": mfa_ticket})
         try:
-            connection = self.get_connection(self.host, 443)
+            connection = self.get_connection()
             connection.request("POST", url, message_data, self.header)
             response = connection.getresponse()
         except (socket.gaierror, TimeoutError):
@@ -233,7 +200,7 @@ class Discord():
         url = "/api/v9/phone-verifications/verify"
         message_data = json.dumps({"token": auth_token})
         try:
-            connection = self.get_connection(self.host, 443)
+            connection = self.get_connection()
             connection.request("POST", url, message_data, self.header)
             response = connection.getresponse()
         except (socket.gaierror, TimeoutError):
@@ -257,7 +224,7 @@ class Discord():
         url = "/api/v9/auth/mfa/" + auth_type
         message_data = json.dumps(message_dict)
         try:
-            connection = self.get_connection(self.host, 443)
+            connection = self.get_connection()
             connection.request("POST", url, message_data, self.header)
             response = connection.getresponse()
         except (socket.gaierror, TimeoutError):
@@ -281,7 +248,7 @@ class Discord():
         url = "/api/v9/users/@me/remote-auth/login"
         message_data = json.dumps(message_dict)
         try:
-            connection = self.get_connection(self.host, 443)
+            connection = self.get_connection()
             connection.request("POST", url, message_data, self.header)
             response = connection.getresponse()
         except (socket.gaierror, TimeoutError):
@@ -305,20 +272,24 @@ class Discord():
 class Gateway():
     """Methods for fetching and sending data to Discord gateway through websocket"""
     def __init__(self, user_agent, host=None, proxy=None):
-        if host:
-            host_obj = urllib.parse.urlsplit(host)
-            if host_obj.host:
-                self.gateway_url = host_obj.host
-            else:
-                self.gateway_url = host_obj.path
+        hosts = get_hosts(host, proxy=proxy)
+        if not hosts:
+            raise SystemExit(f"Could not get endpoints for host: {host}")
+        auth_gateway = hosts[4]
+        if auth_gateway:
+            hostname, port, tls = auth_gateway
+            port_suffix = "" if port in (80, 443) else f":{port}"
+            self.gateway_url = f"{"wss" if tls else "ws"}://{hostname}{port_suffix}"
         else:
-            self.gateway_url = DISCORD_HOST_GATEWY
+            self.gateway_url = None   # remote auth is not supported on this host
+        self.enabled = bool(self.gateway_url)
         self.header = [
             "Connection: keep-alive, Upgrade",
             "Sec-WebSocket-Extensions: permessage-deflate",
             "Origin: https://discord.com",
             f"User-Agent: {user_agent}",
         ]
+        self.ws = None
         self.proxy = proxy
         self.run = True
         self.state = 0
@@ -334,13 +305,16 @@ class Gateway():
 
     def connect_ws(self):
         """Connect to websocket"""
-        if sys.platform == "darwin":
-            import certifi
-            ssl_context = ssl.create_default_context(cafile=certifi.where())
-        else:
-            ssl_context = ssl.create_default_context()
-        ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
-        self.ws = websocket.WebSocket(sslopt={"context": ssl_context})
+        sslopt = {}
+        if not self.gateway_url.startswith("ws://"):   # plain ws:// is used for local instances
+            if sys.platform == "darwin":
+                import certifi
+                ssl_context = ssl.create_default_context(cafile=certifi.where())
+            else:
+                ssl_context = ssl.create_default_context()
+            ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
+            sslopt = {"context": ssl_context}
+        self.ws = websocket.WebSocket(sslopt=sslopt)
         if self.proxy:
             proxy = urllib.parse.urlsplit(self.proxy)
             scheme = proxy.scheme
@@ -371,9 +345,11 @@ class Gateway():
 
     def connect(self):
         """Create initial connection to Discord gateway"""
+        if not self.enabled:
+            return False
         try:
             self.connect_ws()
-        except websocket._exceptions.WebSocketAddressException:
+        except (websocket._exceptions.WebSocketException, OSError):
             return False
         self.state = 0
         self.receiver_thread = threading.Thread(target=self.receiver, daemon=True)

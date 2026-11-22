@@ -252,9 +252,13 @@ class Endcord:
         logger.info(f"Connecting to {self.custom_host or "Discord"}")
 
         # initialize stuff
+        hosts = discord.get_hosts(self.custom_host, proxy=self.config["proxy"])
+        if not hosts or not hosts[3]:
+            raise SystemExit(f"Could not get endpoints for host: {self.custom_host}")
+        api, cdn, dyn_cdn, gateway_host, _ = hosts
         self.discord = discord.Discord(
             self.token,
-            self.custom_host,
+            api, cdn, dyn_cdn,
             client_prop,
             self.user_agent,
             proxy=self.config["proxy"],
@@ -265,7 +269,7 @@ class Endcord:
         threading.Thread(target=self.preload_chat, daemon=True).start()
         self.gateway = gateway.Gateway(
             self.token,
-            self.custom_host,
+            api, gateway_host,
             client_prop_gateway,
             self.user_agent,
             proxy=self.config["proxy"],

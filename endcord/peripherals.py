@@ -656,8 +656,10 @@ def native_open(path, mpv_path="", yt_in_mpv=True):
     )
 
 
-def get_connection(host, port=443, timeout=2, proxy=None):
-    """Get connection object and handle proxying"""
+def get_connection(host, port=443, timeout=2, proxy=None, tls=True):
+    """Get connection object and handle proxying, plain http is used when tls is false"""
+    if not tls:
+        return http.client.HTTPConnection(host, port, timeout=timeout)
     if sys.platform == "darwin":
         import certifi
         ssl_context = ssl.create_default_context(cafile=certifi.where())

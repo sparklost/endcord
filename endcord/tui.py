@@ -2673,7 +2673,6 @@ class TUI():
         # tree_select
         elif key == 502:
             # if selected tree entry is channel
-            logger.info(self.tree_format[self.tree_selected_abs])
             if 300 <= self.tree_format[self.tree_selected_abs] <= 399:
                 # stop wait_input and return so new prompt can be loaded
                 return 4 if not mouse else None
