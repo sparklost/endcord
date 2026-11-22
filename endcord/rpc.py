@@ -309,7 +309,7 @@ class RPC:
                         continue
                     if op == 2 or not data:   # close
                         break
-                    logger.info(f"Received: {json.dumps(data, indent=2)}")
+                    logger.debug(f"Received: {json.dumps(data, indent=2)}")
 
                     if data["cmd"] == "SET_ACTIVITY":
                         pid = data["args"].get("pid", pid)
@@ -503,5 +503,5 @@ class RPC:
         cache = self.changed
         if self.changed:
             self.changed = False
-            logger.info(f"Sending: {json.dumps(self.activities, indent=2)}")
+            logger.debug(f"Sending: {json.dumps(self.activities, indent=2)}")
         return self.activities, cache
