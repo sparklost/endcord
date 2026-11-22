@@ -144,7 +144,9 @@ Also see [keybindings configuration](keybindings.md#configuring-keybindings).
 - `rpc_external = True`  
     Whether to use external resources for Rich Presence (like custom pictures).
 - `rpc_passthrough = False`  
-    Allow any RPC app to set Rich Presence even if its not registered with discord.
+    Allow any RPC app to set Rich Presence even if its not registered with discord.  
+    THis option can be set to string representing one-line json: a dictionary where string app_id is key and string custom app name is value.  
+    Simply add app id (can be obtained from the log) and pair it with custom name to rename the app.  
 - `emoji_as_text = False`  
     Will convert emoji characters to their names. Enable if emoji are not supported by terminal.
 - `message_spacing = True`  

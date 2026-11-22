@@ -165,13 +165,19 @@ class RPC:
         self.connections = []
         self.lock = threading.Lock()
         self.server = None
-        self.detectable = None
         self.passthrough_apps = config["rpc_passthrough"]
         if user["bot"]:
             logger.warning("RPC server cannot be started for bot accounts")
             self.run = False
             return
         self.run = True
+
+        self.detectable = None
+        if isinstance(self.passthrough_apps, str):
+            try:
+                self.passthrough_apps = json.loads(self.passthrough_apps)
+            except Exception:
+                pass
 
         self.generate_dispatch(user)
 
@@ -292,13 +298,15 @@ class RPC:
                 app_name = search_detectable_apps(self.detectable, app_id)
                 if app_name:
                     rpc_data = {"id": app_id, "name": app_name, "description": ""}
-                    rpc_assets = []
+                elif isinstance(self.passthrough_apps, dict) and app_id in self.passthrough_apps:
+                    rpc_data = {"id": app_id, "name": self.passthrough_apps[app_id], "description": ""}
                 elif self.passthrough_apps:
                     rpc_data = {"id": app_id, "name": "Unknown", "description": ""}
-                    rpc_assets = []
+                rpc_assets = [] if rpc_data else None
 
             if rpc_data and rpc_assets not in (None, False):
-                logger.info(f"RPC client connected: {rpc_data["name"]}")
+                id_text = f" ({app_id})" if rpc_data["name"] in (None, "Unknown") else ""
+                logger.info(f"RPC client connected: {rpc_data["name"]}{id_text}")
                 send_data(connection, 1, self.dispatch)
                 sent_time = time.monotonic() - (GATEWAY_RATE_LIMIT + 1)
                 prev_activity = None
