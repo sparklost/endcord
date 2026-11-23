@@ -461,7 +461,7 @@ class Gateway():
                 "message_notifications": channel["message_notifications"],
                 "muted": channel["muted"],
                 "hidden": hidden,
-                "collapsed": channel["collapsed"],
+                "collapsed": channel.get("collapsed"),
                 "flags": flags,
             })
 
@@ -1004,6 +1004,8 @@ class Gateway():
                             for member in guild:
                                 if member.get("user_id") == self.my_id or member.get("user", {}).get("id") == self.my_id:
                                     roles = member["roles"]
+                            if guild_id not in roles:
+                                roles.append(guild_id)   # this is @everyone role
                             self.my_roles.append({
                                 "guild_id": guild_id,
                                 "roles": roles,
