@@ -164,6 +164,7 @@ Optional dependency for spellchecking: `aspell`. Can be installed with: `brew as
 - `libsecret` - Store token in system keyring (secret service provider is also required (eg. `gnome-keyring`, `KWallet`, `KeePassXC`), with `dbus` as dependency)
 - `libappindicator-gtk3` - Tray support under wayland, for [windowed mode](docs/faq.md#gui-windowed-mode) only.
 - `imagemagick` - To make notification images round; only needed for endcord-lite.
+- `x11-utils` - Screen share on X11 Linux desktop
 - `source-highlight` or `python-pygments` - Code block syntax highlighting (Alternatively use [this extension](https://github.com/sparklost/endcord-pygments-syntax)).
 - `rnnoise` - Noise suppression in voice calls (or use `--bundle-rnnoise` build.py arg)
 - `libopus` - Needed for voice calls only if endcord is built without bundled libopus

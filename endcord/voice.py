@@ -2353,19 +2353,20 @@ def get_video_sources(fps=30, height=720, delay=1):
     if time.monotonic() < video_sources_query_time + delay:
         return video_sources_cache
     sources = []
+    cam_size = f"{height * 16 // 9}x{height}"
     try:
         if sys.platform == "win32":
             try:
                 from pygrabber.dshow_graph import FilterGraph
                 cameras = FilterGraph().get_input_devices()
-            except (ImportError, Exception):
+            except Exception:
                 cameras = ["Integrated Camera", "USB Camera"]
             for name in cameras:
                 sources.append((
                     name, {
                         "target": f"video={name}",
                         "format": "dshow",
-                        "options": {"framerate": str(fps), "video_size": f"{height * 16 // 9}x{height}"},
+                        "options": {"framerate": str(fps), "video_size": cam_size},
                     },
                 ))
             sources.append(("Capture Screen", {"target": "desktop", "format": "gdigrab", "options": {"framerate": str(fps)}}))
@@ -2404,14 +2405,21 @@ def get_video_sources(fps=30, height=720, delay=1):
                         f"{name} ({device})", {
                             "target": f"/dev/{device}",
                             "format": "v4l2",
-                            "options": {
-                                "input_format": "mjpeg",
-                                "framerate": str(fps),
-                                "video_size": f"{height * 16 // 9}x{height}",
-                            },
+                            "options": {"input_format": "mjpeg", "framerate": str(fps), "video_size": cam_size},
                         },
                     ))
-            sources.append(("Capture Screen", {"target": "desktop", "format": "gdigrab", "options": {"framerate": str(fps)}}))
+            display = os.environ.get("DISPLAY")
+            if display:
+                options = {"framerate": str(fps), "draw_mouse": "1"}
+                try:
+                    output = subprocess.run(["xdpyinfo"], capture_output=True, text=True, timeout=2, check=True).stdout
+                except (OSError, subprocess.SubprocessError):
+                    size = None
+                match = re.search(r"dimensions:\s+(\d+x\d+)", output)
+                size = match.group(1) if match else None
+                if size:
+                    options["video_size"] = size
+                sources.append(("Capture Screen", {"target": f"{display}+0,0", "format": "x11grab", "options": options}))
 
     except Exception:
         pass

@@ -1685,7 +1685,7 @@ class Gateway():
                                 self.voice_gateway_data["channel_id"] = channel_id
                                 self.voice_gateway_data_ready += 1
                         else:
-                            if "member" in data:
+                            if "member" in data and "user" in data["member"]:
                                 username = data["member"]["user"]["username"]
                                 global_name = data["member"]["user"].get("global_name")
                                 nick = data["member"].get("nick")

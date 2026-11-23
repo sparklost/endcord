@@ -2546,10 +2546,12 @@ class Endcord:
                             if embed_name and embed_name.startswith("SPOILER_") and 1000 + clicked_id not in self.messages[msg_index].get("spoiled", []):
                                 self.spoil(msg_index, 1000 + clicked_id)
                             else:
-                                if embed["type"] in ("article", "rich"):
+                                if embed["type"] in ("article", "rich", "link") and embed.get("proxy_url"):
                                     url = embed["proxy_url"] or embed["main_url"]
                                 else:
                                     url = embed["main_url"] if not embed["url"].startswith("https://") else embed["url"]
+                                if not url and embed.get("proxy_url"):   # fallback just in case
+                                    url = embed.get("proxy_url")
                                 self.download_threads.append(threading.Thread(target=self.download_file, daemon=True, args=(url, False, True)))
                                 self.download_threads[-1].start()
 
@@ -5259,6 +5261,8 @@ class Endcord:
 
     def download_file(self, url, move=True, open_media=False, open_move=False, copy=False):
         """Thread that downloads and moves file to downloads dir"""
+        if not url:
+            return
         is_gif = any(domain in url for domain in GIF_PROVIDERS)
         if is_gif:
             url = utils.convert_gif_type(url, self.gif_download_type)
