@@ -8,6 +8,7 @@ import os
 import queue
 import random
 import re
+import shutil
 import socket
 import ssl
 import struct
@@ -25,6 +26,7 @@ import numpy as np
 import websocket
 
 from endcord import opus, peripherals, socks
+from endcord.portal import SCREENCAST_IFACE, Portal
 
 # safely import soundcard, in case there is no sound system
 try:
@@ -168,7 +170,7 @@ def create_video_encoder(av, width, height, bitrate=1600, preset="veryfast"):
 class Gateway():
     """Methods for fetching and sending data to Discord voice gateway through websocket"""
 
-    def __init__(self, voice_gateway_data, my_id, volume_input, volume_output, user_agent, proxy=None, custom_mic=None, silence=-30, opus_mode="voip", fast_mixer=False, denoise=True, mpv="mpv", x264_bitrate=1600, x264_preset="veryfast", stream=False):
+    def __init__(self, voice_gateway_data, my_id, volume_input, volume_output, user_agent, proxy=None, custom_mic=None, silence=-30, opus_mode="voip", fast_mixer=False, denoise=True, mpv="mpv", x264_bitrate=1600, x264_preset="veryfast", stream=False, dbus=None):
         self.voice_gateway_data = voice_gateway_data
         self.guild_id = voice_gateway_data["guild_id"]
         self.channel_id = voice_gateway_data["channel_id"]
@@ -213,6 +215,7 @@ class Gateway():
         self.denoise = denoise
         self.mpv = mpv
         self.stream = stream   # connection to stream (go live) voice server, only for sending screen video
+        self.dbus = dbus
 
         self.x264_bitrate = x264_bitrate
         self.x264_preset = x264_preset
@@ -287,6 +290,7 @@ class Gateway():
                 mpv=self.mpv,
                 x264_bitrate=self.x264_bitrate,
                 x264_preset=self.x264_preset,
+                dbus=self.dbus,
             )
             self.call_handler.start()
 
@@ -820,9 +824,9 @@ class Gateway():
 
 
 class CallHandler:
-    """Voice call sound receiver, transmitter, player and recorder"""
+    """Call audio and video receiver, transmitter, player and recorder"""
 
-    def __init__(self, gateway, my_id, my_ssrc, udp, secret_key, encryption_mode, volume_input, volume_output, custom_mic=None, silence=-30, opus_mode="voip", fast_mixer=False, denoise=True, mpv="mpv", x264_bitrate=1600, x264_preset="veryfast"):
+    def __init__(self, gateway, my_id, my_ssrc, udp, secret_key, encryption_mode, volume_input, volume_output, custom_mic=None, silence=-30, opus_mode="voip", fast_mixer=False, denoise=True, mpv="mpv", x264_bitrate=1600, x264_preset="veryfast", dbus=None):
         self.gateway = gateway
         self.my_id = my_id
         self.my_ssrc = my_ssrc
@@ -883,6 +887,7 @@ class CallHandler:
         # video stuff
         self.x264_bitrate = x264_bitrate
         self.x264_preset = x264_preset
+        self.dbus = dbus   # gtk app dbus connection, used for wayland screen capture
         self.video_ssrc_to_userid = {}
         self.watch_user = None
         self.watch_ssrc = None
@@ -896,6 +901,7 @@ class CallHandler:
         self.last_pli = 0
         self.reset_video_receiver()
         self.video_capture = None
+        self.video_cleanup = None   # releases portal screencast, if used
         self.video_keyframe_event = threading.Event()
         self.screen_ssrc = 0
         self.screen_rtx_ssrc = 0
@@ -2166,7 +2172,15 @@ class CallHandler:
         if not stream:
             logger.error("Server did not provide video stream info")
             return False
+        if self.gateway.video_codec != "H264":
+            logger.warning(f"Server selected {self.gateway.video_codec} video codec, but only H264 can be encoded")
+            return False
         import av
+        cleanup = None
+        if source.get("portal"):   # wayland screen capture
+            source, cleanup = start_portal_capture(self.dbus)
+            if not source:
+                return False
         target = source.get("target")
         input_format = source.get("format")
         options = source.get("options", {})
@@ -2177,18 +2191,17 @@ class CallHandler:
                 raise ValueError("source has no video stream")
         except Exception as e:
             logger.error(f"Failed to open video source: {e}")
+            if cleanup:
+                cleanup()
             return False
         capture = VideoCapture(container)
-
-        if self.gateway.video_codec != "H264":
-            logger.warning(f"Server selected {self.gateway.video_codec} video codec, but only H264 can be encoded")
-            return False
 
         self.screen_ssrc = int(stream["ssrc"])
         self.screen_rtx_ssrc = int(stream.get("rtx_ssrc", 0))
         if self.gateway.dave_protocol_version > 0:
             self.encryptor.assign_ssrc_to_codec(self.screen_ssrc, dave.Codec.h264)
         self.video_capture = capture
+        self.video_cleanup = cleanup
         self.video_start_time = time.monotonic()
         self.video_packets_sent = 0
         self.video_bytes_sent = 0
@@ -2210,6 +2223,10 @@ class CallHandler:
             return
         self.video_capture = None
         capture.stop.set()
+        cleanup = self.video_cleanup
+        self.video_cleanup = None
+        if cleanup:
+            cleanup()
         if notify:
             self.gateway.send_video_sources(False, self.screen_ssrc, self.screen_rtx_ssrc)
 
@@ -2343,6 +2360,61 @@ class CallHandler:
             self.stop_video_streaming(notify=self.run)
 
 
+def start_portal_capture(dbus):
+    """Start wayland screen capture with xdg-desktop-portal and gstreamer, return pyav source dict and cleanup function"""
+    portal = None
+    session = None
+    proc = None
+    try:
+        portal = Portal(dbus)
+        options = {"session_handle_token": ("s", f"endcord_{random.randint(0, 0xFFFFFFFF)}")}
+        session = portal.request(SCREENCAST_IFACE, "CreateSession", "", (), options)["session_handle"]
+        options = {"types": ("u", 3), "multiple": ("b", False), "cursor_mode": ("u", 2)}
+        portal.request(SCREENCAST_IFACE, "SelectSources", "o", (session,), options)
+
+        results = portal.request(SCREENCAST_IFACE, "Start", "os", (session, ""), {}, 120)   # wait 2min for user to pick
+        if not results.get("streams"):
+            return None, None
+        node_id, props = results["streams"][0]
+        w, h = props.get("size", (16, 9))
+        fd = portal.open_pipewire(session)
+        width = max(2, round(w * VIDEO_HEIGHT / h / 2) * 2)
+        cmd = [
+            "gst-launch-1.0", "-q",
+            "pipewiresrc", f"fd={fd}", f"path={node_id}", "do-timestamp=true", "keepalive-time=100",
+            "!", "videorate", "drop-only=true", f"max-rate={VIDEO_FPS}",
+            "!", "videoscale", "!", "videoconvert",
+            "!", f"video/x-raw,format=I420,width={width},height={VIDEO_HEIGHT}",
+            "!", "fdsink", "fd=1",
+        ]
+        try:
+            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, pass_fds=(fd,))
+        finally:
+            os.close(fd)
+
+    except Exception as e:
+        logger.error(f"Failed to start screen capture portal: {e}")
+        if portal:
+            portal.close(session)
+        return None, None
+
+    source = {
+        "target": proc.stdout, "format": "rawvideo",
+        "options": {"video_size": f"{width}x{VIDEO_HEIGHT}", "pixel_format": "yuv420p", "framerate": str(VIDEO_FPS)},
+    }
+
+    def cleanup():
+        """Stop gstreamer and close portal session"""
+        proc.terminate()
+        try:
+            proc.wait(2)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+        portal.close(session)
+
+    return source, cleanup
+
+
 video_sources_cache = []
 video_sources_query_time = 0
 
@@ -2409,12 +2481,14 @@ def get_video_sources(fps=30, height=720, delay=1):
                         },
                     ))
             display = os.environ.get("DISPLAY")
-            if display:
+            if os.environ.get("WAYLAND_DISPLAY") and shutil.which("gst-launch-1.0"):
+                sources.append(("Capture Screen", {"portal": True}))   # portal is opened only when source is started
+            elif display:
                 options = {"framerate": str(fps), "draw_mouse": "1"}
                 try:
                     output = subprocess.run(["xdpyinfo"], capture_output=True, text=True, timeout=2, check=True).stdout
                 except (OSError, subprocess.SubprocessError):
-                    size = None
+                    output = ""
                 match = re.search(r"dimensions:\s+(\d+x\d+)", output)
                 size = match.group(1) if match else None
                 if size:

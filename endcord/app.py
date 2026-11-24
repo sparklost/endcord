@@ -4640,7 +4640,7 @@ class Endcord:
             self.voice_gateway.stop_video_player()
 
         elif cmd_type == 90 and self.voice_gateway and self.in_call and support_media:   # VOICE_ENABLE_CAMERA
-            name = cmd_args.get("name").removesuffix(" - Low quality (use voice_start_stream instead)")
+            name = cmd_args.get("name")
             from endcord import voice
             sources = voice.get_video_sources()
             command = None
@@ -4654,9 +4654,8 @@ class Endcord:
                     self.update_extra_line("Specified video source could not be found", color=19)
                     command = None
             if command:
-                self.in_call["video"] = True
+                self.in_call["video"] = self.voice_gateway.start_video_streaming(command)
                 self.update_voice_state()
-                self.voice_gateway.start_video_streaming(command)
                 self.update_call_extra_line()
 
         elif cmd_type == 91 and self.voice_gateway and self.in_call:   # VOICE_DISABLE_CAMERA
@@ -6529,12 +6528,13 @@ class Endcord:
             elif command_lower.startswith("voice_enable_camera ") and self.in_call:
                 from endcord import voice
                 self.assist_found = search.search_options(
-                    [x + " - Low quality (use voice_start_stream instead)" if x == "Capture Screen" else x for x, _ in voice.get_video_sources()],
+                    [x for x, _ in voice.get_video_sources()],
                     assist_word[20:],
                     assist_word[:19],
                     limit=self.assist_limit,
                     score_cutoff=self.assist_score_cutoff,
                 )
+                self.assist_found = [(x + " - Low quality (use voice_start_stream instead)", y) if x == "Capture Screen" else (x, y) for x, y, z in self.assist_found]
                 extra_format = [None] * len(self.assist_found)
 
             elif command_lower.startswith("gif "):
@@ -8562,6 +8562,7 @@ class Endcord:
             x264_bitrate=self.config["call_x264_bitrate"],
             x264_preset=self.config["call_x264_preset"],
             stream=False,
+            dbus=(curses.get_dbus_connection() if uses_gtkcurses else None),
         )
         self.in_call = {"guild_id": guild_id, "channel_id": channel_id, "video": False, "stream": False}
         for _ in range(100):   # wait for 10s

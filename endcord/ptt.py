@@ -9,9 +9,8 @@ import os
 import re
 import sys
 import threading
-import time
 
-from endcord import tui
+from endcord.portal import PORTAL_PATH, Portal
 
 MODIFIERS = {"C": "ctrl", "M": "alt", "S": "shift", "s": "super"}
 KEY_NAMES = {"SPACE": "space", "ENTER": "Return", "RETURN": "Return", "ESC": "Escape", "ESCAPE": "Escape", "TAB": "Tab",
@@ -22,8 +21,6 @@ WIN_KEYS = {"space": 0x20, "Return": 0x0D, "Escape": 0x1B, "Tab": 0x09, "BackSpa
 WIN_MODIFIERS = {"ctrl": (0x11,), "shift": (0x10,), "alt": (0x12,), "super": (0x5B, 0x5C)}
 X11_MODIFIERS = {"ctrl": "Control", "shift": "Shift", "alt": "Alt", "super": "Super"}
 PORTAL_MODIFIERS = (("ctrl", "CTRL"), ("shift", "SHIFT"), ("alt", "ALT"), ("super", "LOGO"))
-PORTAL_BUS = "org.freedesktop.portal.Desktop"
-PORTAL_PATH = "/org/freedesktop/portal/desktop"
 PORTAL_IFACE = "org.freedesktop.portal.GlobalShortcuts"
 SHORTCUT_ID = "push-to-talk"
 logger = logging.getLogger(__name__)
@@ -64,17 +61,14 @@ class PushToTalk:
             setup = self.setup_windows
         elif sys.platform.startswith("linux"):
             if os.environ.get("XDG_SESSION_TYPE", "").lower() == "wayland" or os.environ.get("WAYLAND_DISPLAY"):
-                if not tui.uses_gtkcurses:
-                    self.backend = "disabled"
-                    logger.warn("Wayland session detected but endcord is running in TUI mode, use GUI mode instead")
-                    return
                 self.backend = "portal"
                 setup = self.setup_portal
             else:
                 self.backend = "x11"
                 setup = self.setup_x11
         else:
-            logger.warn(f"unsupported platform: {sys.platform}")
+            logger.warning(f"unsupported platform: {sys.platform}")
+        poll = None
         try:
             poll = setup()
         except Exception as e:
@@ -136,6 +130,7 @@ class PushToTalk:
         lib = ctypes.util.find_library("X11")
         if not lib:
             logger.error("libX11 not found")
+            return
         xlib = ctypes.CDLL(lib)
         xlib.XOpenDisplay.restype = ctypes.c_void_p
         xlib.XOpenDisplay.argtypes = [ctypes.c_char_p]
@@ -148,11 +143,12 @@ class PushToTalk:
         display = xlib.XOpenDisplay(None)
         if not display:
             logger.error("cannot open X display. Is DISPLAY set?")
+            return
 
         key = xlib.XKeysymToKeycode(display, xlib.XStringToKeysym(self.key.encode()))
         if not key:
             xlib.XCloseDisplay(display)
-            logger.errorr(f"key {self.key!r} not found in the keyboard layout")
+            logger.error(f"key {self.key!r} not found in the keyboard layout")
             return
         mod_codes = {
             mod: (
@@ -180,89 +176,38 @@ class PushToTalk:
 
     def setup_portal(self):
         """Bind the shortcut through the GlobalShortcuts portal and prepare polling"""
-        from gi.repository import Gio, GLib
-        variant = GLib.Variant
-        tokens = 0
-        context = GLib.MainContext()
-        context.push_thread_default()
-        connection = self.dbus if self.dbus else Gio.bus_get_sync(Gio.BusType.SESSION, None)
-        subscriptions = []
-        responses = {}
+        portal = Portal(self.dbus)   # uses gtk connection if provided, otherwise jeepney
         session = None
-        ticker = GLib.timeout_source_new(100)
-        ticker.set_callback(lambda *args: True)   # noqa
-        ticker.attach(context)
 
-        def call(obj, interface, method, params, timeout=10):
-            try:
-                reply = connection.call_sync(PORTAL_BUS, obj, interface, method, params, None, Gio.DBusCallFlags.NONE, int(timeout * 1000), None)
-            except GLib.Error as e:
-                logger.error(f"{method} failed: {e}")
-            return reply.unpack()
-
-        def request(method, signature, args, options, timeout):
-            nonlocal tokens
-            token = variant("s", f"ptt_{os.getpid()}_{tokens}")
-            tokens += 1
-            body = variant(signature, (*args, {"handle_token": token, **options}))
-            handle = call(PORTAL_PATH, PORTAL_IFACE, method, body)[0]
-            deadline = time.monotonic() + timeout
-            while handle not in responses:
-                if time.monotonic() > deadline:
-                    logger.error(f"{method}: no response from the portal after {timeout}s")
-                    return
-                context.iteration(True)
-            code, response = responses.pop(handle)
-            if code:
-                logger.error(f"{method} refused or cancelled (code {code})")
-            return response
-
-        def on_response(conn, sender, obj, interface, member, params):   # noqa
-            responses[obj] = params.unpack()
-
-        def on_shortcut(conn, sender, obj, interface, member, params):   # noqa
-            signal_session, shortcut_id = params.unpack()[:2]
+        def on_shortcut(path, signal, args):   # noqa
+            signal_session, shortcut_id = args[:2]
             if signal_session == session and shortcut_id == SHORTCUT_ID:
-                new_state = member == "Activated"
+                new_state = signal == "Activated"
                 if self.pressed != new_state:
                     self.pressed = new_state
                     self.on_change(new_state)
 
         try:
-            subscriptions.append(connection.signal_subscribe(PORTAL_BUS, "org.freedesktop.portal.Request", "Response", None, None, Gio.DBusSignalFlags.NONE, on_response))
-            if not self.dbus:
+            if not portal.gtk:   # app id must be registered when not using gtk connection
                 try:
-                    call(PORTAL_PATH, "org.freedesktop.host.portal.Registry", "Register", variant("(sa{sv})", (self.app_id, {})))
+                    portal.call(PORTAL_PATH, "org.freedesktop.host.portal.Registry", "Register", "sa{sv}", (self.app_id, {}))
                 except RuntimeError:
                     pass
-            options = {"session_handle_token": variant("s", f"ptt{os.getpid()}")}
-            response = request("CreateSession", "(a{sv})", (), options, 10)
-            if response is None:
-                return
-            session = str(response["session_handle"])
+            options = {"session_handle_token": ("s", f"ptt{os.getpid()}")}
+            session = portal.request(PORTAL_IFACE, "CreateSession", "", (), options)["session_handle"]
             trigger = "+".join([name for mod, name in PORTAL_MODIFIERS if mod in self.mods] + [self.key])
-            shortcut = (SHORTCUT_ID, {"description": variant("s", "Push to talk"), "preferred_trigger": variant("s", trigger)})
-            response = request("BindShortcuts", "(oa(sa{sv})sa{sv})", (session, [shortcut], ""), {}, 120)
+            shortcut = (SHORTCUT_ID, {"description": ("s", "Push to talk"), "preferred_trigger": ("s", trigger)})
+            response = portal.request(PORTAL_IFACE, "BindShortcuts", "oa(sa{sv})s", (session, [shortcut], ""), {}, 120)
             for shortcut_id, props in response.get("shortcuts", []):
                 if shortcut_id == SHORTCUT_ID and "trigger_description" in props:
                     self.trigger = props["trigger_description"]
-            subscriptions.append(connection.signal_subscribe(PORTAL_BUS, PORTAL_IFACE, "Activated", None, None, Gio.DBusSignalFlags.NONE, on_shortcut))
-            subscriptions.append(connection.signal_subscribe(PORTAL_BUS, PORTAL_IFACE, "Deactivated", None, None, Gio.DBusSignalFlags.NONE, on_shortcut))
+            portal.subscribe(PORTAL_IFACE, "Activated", on_shortcut)
+            portal.subscribe(PORTAL_IFACE, "Deactivated", on_shortcut)
         except Exception:
-            for subscription in subscriptions:
-                connection.signal_unsubscribe(subscription)
-            ticker.destroy()
-        finally:
-            context.pop_thread_default()
+            portal.close(session)
+            raise
 
         def close():
-            if session:
-                call(session, "org.freedesktop.portal.Session", "Close", None, timeout=1)
-            for subscription in subscriptions:
-                connection.signal_unsubscribe(subscription)
-            ticker.destroy()
+            portal.close(session)
         self.cleanup = close
-
-        def poll():
-            context.iteration(True)
-        return poll
+        return portal.iterate

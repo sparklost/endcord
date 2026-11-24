@@ -11,7 +11,7 @@ dependencies = [
     "soundcard>=0.4.6",
     "soundfile>=0.14.0",
     "numpy>=2.5.5",
-    "pycryptodome>=4.5.0",
+    "pycryptodome>=4.6.0",
     "pywin32>=312; sys_platform == 'win32'",
     "pywin32-ctypes>=0.2.3; sys_platform == 'win32'",
     "windows-curses>=2.4.2; sys_platform == 'win32'",
@@ -33,6 +33,7 @@ media = [
     "pillow>=13.0.0",
     "pynacl>=1.6.2",
     "pygrabber >= 0.2; sys_platform == 'win32'",
+    "jeepney>=0.9.0; sys_platform == 'linux'",
 ]
 
 [build]

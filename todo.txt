@@ -6,14 +6,14 @@ CORE EASY:
 Add inbox
 Add scheduled messages
 Add reminders
-Add stream calls
+Add system sound recording option to voice call
+Add stream calls (mix mic and system with toggles)
 
 CORE HARD:
+Add option to select individual message
 Make custom json parser - remove orjson
 Add multiline input line
-Add option to select individual message
 Add TUI video calls with call UI
-Add wayland screen capture
 Add localization
 
 GTKCURSES:
