@@ -314,6 +314,7 @@ class Endcord:
         self.cleanup_cache()
         self.formatter = formatter.ChatGenerator(
             self.config,
+            self.guilds,
             self.colors,
             self.colors_formatted,
             self.colors_code,
@@ -2529,11 +2530,9 @@ class Endcord:
                             self.restore_input_text = (input_text, "standard extra")
                             self.view_profile(clicked_id)
                         elif clicked_type == 9:   # channel
-                            if "/" in clicked_id:
-                                message_id = clicked_id.split("/")[1]
-                                clicked_id = clicked_id.split("/")[0]
-                            else:
-                                message_id = None
+                            parts = clicked_id.split("/")   # channel, guild/channel or guild/channel/message
+                            message_id = parts[2] if len(parts) == 3 else None
+                            clicked_id = parts[1] if len(parts) > 1 else parts[0]
                             channel_id, _, guild_id, _, parent_hint = self.find_parents_from_id(clicked_id)
                             if channel_id:
                                 self.switch_channel(channel_id, guild_id, parent_hint=parent_hint)
@@ -3074,11 +3073,9 @@ class Endcord:
                         self.update_status_line()
                         continue
                     object_id = self.going_to_ch[num]
-                    if "/" in object_id:
-                        message_id = object_id.split("/")[1]
-                        object_id = object_id.split("/")[0]
-                    else:
-                        message_id = None
+                    parts = object_id.split("/")   # channel, guild/channel or guild/channel/message
+                    message_id = parts[2] if len(parts) == 3 else None
+                    object_id = parts[1] if len(parts) > 1 else parts[0]
                     channel_id, _, guild_id, _, parent_hint = self.find_parents_from_id(object_id)
                     if channel_id:
                         self.switch_channel(channel_id, guild_id, parent_hint=parent_hint)
@@ -3607,11 +3604,9 @@ class Endcord:
                     select_num = 0
                 select_num = max(min(select_num-1, len(channels)-1), 0)
                 object_id = channels[select_num]
-                if "/" in object_id:
-                    message_id = object_id.split("/")[1]
-                    object_id = object_id.split("/")[0]
-                else:
-                    message_id = None
+                parts = object_id.split("/")   # channel, guild/channel or guild/channel/message
+                message_id = parts[2] if len(parts) == 3 else None
+                object_id = parts[1] if len(parts) > 1 else parts[0]
                 channel_id, _, guild_id, _, parent_hint = self.find_parents_from_id(object_id)
                 if channel_id:
                     if not reset:   # means its from command bindings
@@ -9110,7 +9105,7 @@ class Endcord:
         # get data from gateway
         guilds = self.gateway.get_guilds()
         if guilds:
-            self.guilds = guilds
+            self.guilds[:] = guilds   # keep reference here
         self.all_roles = self.gateway.get_roles()
         self.all_roles = color.convert_role_colors(self.all_roles, default=self.config["color_default"][0])
 

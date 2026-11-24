@@ -707,9 +707,9 @@ def replace_discord_url(text, *ranges_lists):
 
         result.append(left_side)
         if match.group(3):
-            new_text = f"<#{match.group(2)}/{match.group(3)}>>MSG"
+            new_text = f"<#{match.group(1)}/{match.group(2)}/{match.group(3)}>>MSG"
         else:
-            new_text = f"<#{match.group(2)}>"
+            new_text = f"<#{match.group(1)}/{match.group(2)}>"
         result.append(new_text)
         # range is added in replace_channels()
 
@@ -723,11 +723,11 @@ def replace_discord_url(text, *ranges_lists):
     return "".join(result)
 
 
-def replace_channels(text, channels_ids, *ranges_lists):
+def replace_channels(text, current_channels, guilds, *ranges_lists):
     """
     Transform channels string into nicer looking one:
-    `<#channel_id>` --> `#channel_name`
-    And shifts ranges for other range lists.
+    <#channel_id> --> #channel_name and <#guild_id/channel_id> --> guild_name > #channel_name
+    And shifts ranges for other range lists
     """
     result = []
     channel_ranges = []
@@ -737,16 +737,30 @@ def replace_channels(text, channels_ids, *ranges_lists):
         start, end = match.span()
         result.append(text[last_pos:start])
         full_id = match.group(1)
-        if "/" in full_id:
-            channel_id = full_id.split("/")[0]
+        parts = full_id.split("/")
+        if len(parts) == 1:
+            guild_id = None
+            channel_id = parts[0]
         else:
-            channel_id = full_id
-        for channel in channels_ids:
-            if channel_id == channel["id"]:
-                new_text = "#" + channel["name"]
-                break
+            guild_id, channel_id = parts[0], parts[1]
+
+        if guild_id:
+            for guild in guilds:
+                if guild["guild_id"] == guild_id:
+                    for channel in guild["channels"]:
+                        if channel["id"] == channel_id:
+                            new_text = f"{guild["name"]} > #{channel["name"]}"
+                            break
+                    break
+            else:
+                new_text = "#unknown"
         else:
-            new_text = "#unknown"
+            for channel in current_channels:
+                if channel["id"] == channel_id:
+                    new_text = "#" + channel["name"]
+                    break
+            else:
+                new_text = "#unknown"
         result.append(new_text)
 
         new_start = start + offset
@@ -1294,9 +1308,10 @@ def format_poll(poll):
 class ChatGenerator:
     """Chat generator class"""
 
-    def __init__(self, config, colors, colors_formatted, colors_code, my_id, placeholder_emoji, placeholder_images, font_ratio=2.25, dpw=1):
+    def __init__(self, config, guilds, colors, colors_formatted, colors_code, my_id, placeholder_emoji, placeholder_images, font_ratio=2.25, dpw=1):
         # load from config
         self.config = config
+        self.guilds = guilds
         self.format_message = config["format_message"]
         self.format_message_grouped = config["format_message_grouped"]
         self.format_newline = config["format_newline"]
@@ -1799,7 +1814,7 @@ class ChatGenerator:
                     content, _ = replace_mentions(content, ref_message["mentions"], global_name=self.use_global_name, use_nick=self.use_nick)
                     content, _ = replace_roles(content, roles)
                     content = replace_discord_url(content)
-                    content, _ = replace_channels(content, channels)
+                    content, _ = replace_channels(content, channels, self.guilds)
                     content, _ = replace_timestamps(content, self.convert_timezone)
                     content, _ = replace_markdown_urls(content, ())
                     content, _ = replace_escaped_md(content)
@@ -1919,7 +1934,7 @@ class ChatGenerator:
             content, role_ranges = replace_roles(content, roles, emoji_ranges, mention_ranges)
             mention_ranges += role_ranges
             content = replace_discord_url(content, emoji_ranges, mention_ranges)
-            content, channel_ranges = replace_channels(content, channels, emoji_ranges, mention_ranges)
+            content, channel_ranges = replace_channels(content, channels, self.guilds, emoji_ranges, mention_ranges)
             content, timestamp_ranges = replace_timestamps(content, self.convert_timezone, emoji_ranges, mention_ranges, channel_ranges)
             content, code_snippets = replace_code_snippets(content, emoji_ranges, mention_ranges, channel_ranges, timestamp_ranges)
             content, code_blocks = replace_code_blocks(content, emoji_ranges, mention_ranges, channel_ranges, timestamp_ranges, code_snippets)
