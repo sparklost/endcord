@@ -3406,7 +3406,7 @@ def generate_extra_window_summaries(summaries, colors, max_len, channel_name=Non
     return title_line, body, body_format, indexes
 
 
-def generate_extra_window_search(query, messages, roles, channels, blocked, total_msg, config, colors, max_len, limit_lines=3, newline_len=4, pinned=False):
+def generate_extra_window_search(query, messages, roles, channels, guilds, blocked, total_msg, config, colors, max_len, limit_lines=3, newline_len=4, pinned=False):
     """
     Generate extra window title and body for message search view
     Possible options for format_message:
@@ -3471,7 +3471,7 @@ def generate_extra_window_search(query, messages, roles, channels, blocked, tota
                 content, _ = replace_mentions(content, message["mentions"], global_name=use_global_name, use_nick=use_nick)
                 content, _ = replace_roles(content, roles)
                 content = replace_discord_url(content)
-                content, _ = replace_channels(content, channels)
+                content, _ = replace_channels(content, channels, guilds)
                 content, _ = replace_timestamps(content, convert_timezone)
                 content, _ = replace_markdown_urls(content, ())
 
@@ -3810,7 +3810,7 @@ def generate_member_list(member_list_raw, guild_roles, width, use_nick, status_s
     return member_list, member_list_format
 
 
-def generate_message_notification(data, channels, roles, guild_name, my_data, convert_timezone, use_global_name=False, use_nick=False):
+def generate_message_notification(data, channels, guilds, roles, guild_name, my_data, convert_timezone, use_global_name=False, use_nick=False):
     """Generate message notification title and body"""
     if data["guild_id"]:
         # find guild and channel name
@@ -3835,7 +3835,7 @@ def generate_message_notification(data, channels, roles, guild_name, my_data, co
         body, _ = replace_mentions(body, data["mentions"] + [my_data], global_name=use_global_name, use_nick=use_nick)
         body, _ = replace_roles(body, roles)
         body = replace_discord_url(body)
-        body, _ = replace_channels(body, channels)
+        body, _ = replace_channels(body, channels, guilds)
         body, _ = replace_timestamps(body, convert_timezone)
         content, _ = replace_markdown_urls(body, ())
     elif data.get("embeds"):
