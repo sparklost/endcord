@@ -1039,8 +1039,8 @@ def build_libopus(clang):
     ):
         iprint("Libopus is already built")
         return
-    if not shutil.which("make"):
-        iprint("make is missing", color=RED)
+    if not shutil.which("make") and not shutil.which("cmake"):
+        iprint("Cant build libopus: make/cmake is missing", color=RED)
     os.makedirs("build", exist_ok=True)
     setup_compiler(clang, lld=False)
     from tools.build_libopus import build_libopus

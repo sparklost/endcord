@@ -15,14 +15,14 @@ dependencies = [
     "pywin32>=312; sys_platform == 'win32'",
     "pywin32-ctypes>=0.2.3; sys_platform == 'win32'",
     "windows-curses>=2.4.2; sys_platform == 'win32'",
-    "windows-toasts>=1.3.1; sys_platform == 'win32'",
-    "certifi>=2026.10.23; sys_platform == 'darwin'",
+    "windows-toasts>=1.4.0; sys_platform == 'win32'",
+    "certifi>=2026.11.20; sys_platform == 'darwin'",
     "psutil>=7.2.2; sys_platform != 'linux'",
 ]
 
 [dependency-groups]
 build = [
-    "cython>=3.3.1",
+    "cython>=3.3.2",
     "nuitka[onefile]==4.2.2",   # https://github.com/Nuitka/Nuitka/issues/4170
     "pyinstaller>=6.22.3",
     "setuptools>=82.0.0",

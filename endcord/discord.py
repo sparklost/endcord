@@ -1516,8 +1516,6 @@ class Discord():
 
     def upload_attachment(self, upload_url, path):
         """Upload a file to provided url"""
-        # will load whole file into RAM, but discord limits upload size anyways
-        # and this function wont be run if request_attachment_url() is not successful
         header = {
             "Content-Type": "application/octet-stream",
             "Origin": f"{"https" if self.tls else "http"}://{self.host}",

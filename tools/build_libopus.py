@@ -3,9 +3,13 @@
 # Redistribution of modified versions is not permitted.
 
 import os
+import shutil
 import subprocess
+import sys
 import tarfile
 import urllib.request
+
+LIB_NAMES = ("libopus.so", "libopus.dylib", "libopus-0.dll", "libopus.dll", "opus.dll")
 
 
 def download(url, dest_path):
@@ -18,6 +22,33 @@ def download(url, dest_path):
     return dest_path
 
 
+def get_env():
+    """Environment for build commands, without foreign flag variables on windows"""
+    env = os.environ.copy()
+    if sys.platform == "win32":
+        for name in ("CFLAGS", "CXXFLAGS", "CPPFLAGS", "LDFLAGS"):
+            env.pop(name, None)
+    return env
+
+
+def run(cmd, cwd, silent=False):
+    """Run command and show its output on failure"""
+    result = subprocess.run(cmd, cwd=cwd, env=get_env(), capture_output=True, text=True, check=False)
+    if result.returncode != 0 and not silent:
+        print(result.stdout)
+        print(result.stderr)
+        raise subprocess.CalledProcessError(result.returncode, cmd)
+
+
+def find_library(root):
+    """Search directory tree for matching library file"""
+    for folder, _, files in os.walk(root):
+        for filename in files:
+            if filename in LIB_NAMES:
+                return os.path.abspath(os.path.join(folder, filename))
+    return None
+
+
 def build_libopus(build_dir="", opus_version="1.5.2"):
     """Build libopus"""
     print("  Downloading libopus release")
@@ -28,15 +59,23 @@ def build_libopus(build_dir="", opus_version="1.5.2"):
         tar.extractall(path=build_dir, filter="data")
 
     print("  Compiling libopus library")
-    cmd = ["sh", "./configure", "--disable-doc", "--disable-extra-programs"]
-    subprocess.run(cmd, cwd=working_dir, check=True, capture_output=True)
-    subprocess.run(["make", f"-j{os.cpu_count() or 1}"], cwd=working_dir, check=True, capture_output=True)
-
-    for filename in ("libopus.so", "libopus.dll", "libopus.dylib"):
-        path = os.path.abspath(os.path.join(working_dir, ".libs", filename))
-        if os.path.exists(path):
-            return path
-    return None
+    jobs = str(os.cpu_count() or 1)
+    if shutil.which("cmake"):
+        try:
+            run([
+                "cmake", "-S", ".", "-B", "cmake_build", "-G", "Ninja",
+                "-DCMAKE_BUILD_TYPE=Release",
+                "-DBUILD_SHARED_LIBS=ON",
+                "-DOPUS_BUILD_PROGRAMS=OFF",
+                "-DOPUS_BUILD_TESTING=OFF",
+            ], working_dir, silent=True)
+            run(["cmake", "--build", "cmake_build", "--config", "Release", "-j", jobs], working_dir)
+            return find_library(os.path.join(working_dir, "cmake_build"))
+        except (subprocess.CalledProcessError, OSError):
+            print("  Cmake build failed, trying configure/make")
+    run(["sh", "./configure", "--disable-doc", "--disable-extra-programs"], working_dir)
+    run(["make", f"-j{jobs}"], working_dir)
+    return find_library(os.path.join(working_dir, ".libs"))
 
 
 if __name__ == "__main__":
