@@ -153,7 +153,8 @@ PYTHON_FREETHREADED = int(build_config.get("python_freethreaded", "3.14").split(
 PYTHON_LAST_SAFE = int(build_config.get("python_last_safe", "3.13").split(".")[1])
 CURSES_TAG = build_config.get("curses_tag", "v6_6_20260627")
 WINDOWED_DEPS = load_build_config().get("windowed_deps", [])
-GVSBUILD_RELEASE = load_build_config().get("gvsbuild_release", [])
+GVSBUILD_RELEASE = load_build_config().get("gvsbuild_release", "2026.10.0")
+GVSBUILD_RELEASE_OLD = load_build_config().get("gvsbuild_release_old", "2026.8.0")
 APP_NAME = get_app_name()
 APP_VERSION = get_version_number()
 USE_COLOR = supports_color()
@@ -306,7 +307,10 @@ def ensure_gtk():
     if sys.platform == "win32":
         gtk_path = f"{os.path.dirname(os.path.abspath(__file__))}\\.gtk"
         if not os.path.exists(gtk_path):
-            setup_gvsbuild(GVSBUILD_RELEASE)
+            if sys.version_info.minor <= 14:
+                setup_gvsbuild(GVSBUILD_RELEASE_OLD)
+            else:
+                setup_gvsbuild(GVSBUILD_RELEASE)
         if not os.path.exists(gtk_path):
             return False
         os.add_dll_directory(gtk_path)
@@ -1200,17 +1204,9 @@ def build_with_nuitka(level, onedir, clang, mingw, compile_deps, print_cmd=False
         compiler = "--clang"
     elif mingw:
         compiler = "--mingw64"
-    python_flags = [
-        "--python-flag=no_asserts",
-        "--python-flag=no_docstrings",
-        "--python-flag=no_site",
-    ]
-    hidden_imports = ["--include-module=uuid"]
-    exclude_imports = [
-        "--nofollow-import-to=cython",
-        "--nofollow-import-to=tkinter",
-        "--nofollow-import-to=zstandard",
-    ]
+    python_flags = ["no_asserts", "no_docstrings", "no_site", "no_warnings", "no_unraisable"]   # no_annotations
+    hidden_imports = ["uuid"]
+    exclude_imports = ["cython", "tkinter", "zstandard"]
     package_data = []
     add_data = [f"--include-data-files={emoji_path}=emoji.json"]
     if windowed:
@@ -1232,19 +1228,17 @@ def build_with_nuitka(level, onedir, clang, mingw, compile_deps, print_cmd=False
     # options
     options = []
     if level == "FULL":
-        hidden_imports += [
-            "--include-module=av.sidedata.encparams",
-            "--include-module=av.utils",
-            "--include-module=av._cyutil",
-        ]
+        hidden_imports += ["av.sidedata.encparams", "av.utils", "av._cyutil"]
     if level not in ("MINI", "MICRO"):
-        package_data += ["--include-package-data=soundcard"]
+        package_data += ["soundcard"]
+    if windowed:
+        options += ["--gi-version=Gtk=3.0", "--gi-version=Gdk=3.0"]
 
     # platform-specific
     if sys.platform == "linux":
         if windowed:
             options += ["--include-package=gi._enum"]
-            hidden_imports += ["--include-package=ctypes.util"]
+            hidden_imports += ["ctypes.util"]
     elif sys.platform == "win32":
         options += ["--assume-yes-for-downloads"]
         if os.path.exists("tools/icons/endcord.ico"):
@@ -1256,33 +1250,34 @@ def build_with_nuitka(level, onedir, clang, mingw, compile_deps, print_cmd=False
             ]
             options += ["--windows-console-mode=disable"]
         hidden_imports += [
-            "--include-package=winrt.windows.foundation",
-            "--include-package=winrt.windows.ui.notifications",
-            "--include-package=winrt.windows.data.xml.dom",
-            "--include-package=win32timezone",
-        ]
-        package_data += ["--include-package-data=winrt"]
+            "winrt.windows.foundation",
+            "winrt.windows.ui.notifications",
+            "winrt.windows.data.xml.dom",
+            "win32timezone",
+         ]
+        package_data += ["winrt"]
     elif sys.platform == "darwin":
         if not windowed:
             options += ["--macos-app-console-mode=force"]
         options += [
             f"--macos-app-name={APP_NAME}",
             f"--macos-app-version={get_version_number()}",
-            "--macos-app-protected-resource=NSMicrophoneUsageDescription:Microphone access for recording voice message.",
+            "--macos-app-protected-resource=NSMicrophoneUsageDescription:Microphone access for voice calls",
         ]
-        package_data += ["--include-package-data=certifi:cacerts.pem"]
+        package_data += ["certifi:cacerts.pem"]
 
     # prepare command and run it
     cmd = [
         "uv", "run", "python", "-m", "nuitka",
         f"--mode={mode}",
         compiler,
-        *python_flags,
-        *hidden_imports,
-        *exclude_imports,
-        *package_data,
-        *add_data,
         *options,
+        *add_data,
+        "--python-flag=" + ",".join(python_flags),
+        "--include-module=" + ",".join(hidden_imports),
+        "--nofollow-import-to=" + ",".join(exclude_imports),
+        "--include-package-data=" + ",".join(package_data),
+        "--experimental=no-module-globals-deleted",
         "--static-libpython=yes" if static_python else "",
         "--no-deployment-flag=self-execution",   # -c and -m flags are safely handled by argparser
         "--no-prefer-source-code",

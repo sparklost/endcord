@@ -84,15 +84,18 @@ fi
 
 ### PYTHON ###
 
-PYTHON_VERSION="${1:-3.14.6}"
+PYTHON_VERSION="${1:-3.15.2}"
 echo "Building Python ${PYTHON_VERSION}"
 wget -nc "https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tgz" || true
 tar xf "Python-${PYTHON_VERSION}.tgz"
 cd "Python-${PYTHON_VERSION}"
 
-# fix for https://github.com/python/cpython/issues/146207
-wget https://github.com/python/cpython/commit/3364e7e62fa24d0e19133fb0f90b1c24ef1110c5.patch -O openssl4.patch
-patch -p1 < openssl4.patch
+# fix for python 3.14.x https://github.com/python/cpython/issues/146207
+if [[ "$PYTHON_VERSION" == 3.14.* ]]; then
+    echo "Applying openssl4 patch for python 3.14"
+    wget https://github.com/python/cpython/commit/3364e7e62fa24d0e19133fb0f90b1c24ef1110c5.patch -O openssl4.patch
+    patch -p1 < openssl4.patch
+fi
 
 PREFIX="../../.cpython"
 export PREFIX=$(realpath -m "$PREFIX")
@@ -149,6 +152,8 @@ _ctypes_test
 xxlimited
 xxlimited_35
 _multiprocessing
+_interpchannels
+_remote_debugging
 EOF
 
 ./configure ax_cv_c_float_words_bigendian=no \
@@ -157,9 +162,10 @@ EOF
     --enable-ipv6 \
     --enable-optimizations \
     --with-system-libmpdec \
-    --without-ensurepip \
-    --without-doc-strings \
-    --without-remote-debug
+    --with-ensurepip=no \
+    --with-doc-strings=no \
+    --with-remote-debug=no \
+    --enable-test-modules=no
 make -j"$(nproc)"
 make install
 
