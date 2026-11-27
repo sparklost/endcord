@@ -3,6 +3,7 @@
 # Redistribution of modified versions is not permitted.
 
 import curses
+import importlib.util
 import json
 import logging
 import os
@@ -12,6 +13,8 @@ import subprocess
 import sys
 import time
 from datetime import datetime
+
+from endcord import peripherals, utils
 
 if sys.platform == "win32":
     import pywintypes
@@ -344,12 +347,53 @@ def convert_time(unix_time):
     return "Unknown"
 
 
+def load_extensions(host):
+    """Load early extensions and return auth from first matching check_host(host)"""
+    if not host:
+        return None
+    path = os.path.expanduser(os.path.join(peripherals.config_path, "Extensions"))
+    if not os.path.exists(path):
+        os.makedirs(path, exist_ok=True)
+    extensions, invalid = utils.get_extensions(path)
+    for ext_file, ext_name in extensions:
+        if ext_file in invalid or ext_name in invalid:
+            continue
+        ext_dir = os.path.dirname(os.path.abspath(ext_file))
+        if not os.path.exists(os.path.join(ext_dir, "early_load")):
+            continue
+        original_path = list(sys.path)
+        sys.path.insert(0, ext_dir)
+        try:
+            spec = importlib.util.spec_from_file_location(ext_name, ext_file)
+            if not spec or not spec.loader:
+                logger.error(f"Early extension {ext_name}: cannot load spec")
+                continue
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+        except Exception as e:
+            logger.error(f"Early extension {ext_name} failed to load: {e}")
+            continue
+        check_host = getattr(module, "check_host", None)
+        if not callable(check_host):
+            continue
+        try:
+            auth = check_host(host)
+            if auth:
+                logger.info(f"Using extension {ext_name} authentication API")
+                return auth
+        except Exception as e:
+            logger.error(f"Early extension {ext_name} check_host failed: {e}")
+        finally:
+            sys.path[:] = original_path
+    return None
+
+
 def init_auth(config, host=None):
     """Initialize discord authentication API class"""
-    try:
-        from endcord import auth, client_properties
-    except ImportError:
-        return None
+    auth = load_extensions(host)
+    if not auth:
+        from endcord import auth
+    from endcord import client_properties
     if config["client_properties"].lower() == "anonymous":
         client_prop = client_properties.get_anonymous_properties()
     else:
@@ -359,7 +403,7 @@ def init_auth(config, host=None):
     user_agent = client_prop["browser_user_agent"]
     client_prop = client_properties.encode_properties(client_prop)
     logger.debug(f"User-Agent: {user_agent}")
-    return auth.Discord(host, client_prop, user_agent, proxy=config["proxy"])
+    return auth.Discord(host, client_prop, user_agent, proxy=config["proxy"]), auth
 
 
 def main_tui(screen, profiles_enc, profiles_plain, selected, have_keyring, config):
@@ -611,7 +655,7 @@ def manage_profile(screen, have_keyring, config, editing_profile=None):
 
         elif step == 200:   # email login
             if not discord_auth:
-                discord_auth = init_auth(config, profile.get("host", config["custom_host"]))
+                discord_auth, _ = init_auth(config, profile.get("host", config["custom_host"]))
                 if not discord_auth:
                     key_prompt(screen, FAILED_AUTH_INIT_TEXT)
                     set_step(2, mem=False)
@@ -629,6 +673,7 @@ def manage_profile(screen, have_keyring, config, editing_profile=None):
                 email, password = texts
             if proceed:
                 if email and password:
+                    sms_code = ""
                     status, data = discord_auth.login(email, password)
                     if status == 0 and data:   # success
                         profile["token"] = data
@@ -755,12 +800,12 @@ def manage_profile(screen, have_keyring, config, editing_profile=None):
                     break
 
         elif step == 300:   # qr code login
-            discord_auth = init_auth(config, profile.get("host", config["custom_host"]))
+            discord_auth, auth = init_auth(config, profile.get("host", config["custom_host"]))
             if not discord_auth:
                 key_prompt(screen, FAILED_AUTH_INIT_TEXT)
                 set_step(2, mem=False)
                 continue
-            from endcord import auth, client_properties, qr_code
+            from endcord import client_properties, qr_code
             if config["custom_user_agent"]:
                 user_agent = config["custom_user_agent"]
             else:

@@ -2075,7 +2075,7 @@ class Gateway():
             "op": 2,
             "d": {
                 "token": self.token,
-                "capabilities": self.capabilities or DEFAULT_CAPABILITIES,
+                "capabilities": self.capabilities if self.capabilities is not None else DEFAULT_CAPABILITIES,
                 "properties": self.client_prop,
                 "presence": {
                     "activities": [],

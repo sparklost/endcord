@@ -150,6 +150,13 @@ But extension can be configured to modify them (e.g. replacing Discord or Gatewa
 To enable early loading, simply add an `early_load` file to the extension's root directory.  
 **Note:** Early-loaded extensions have much greater impact on initialization time than regular extensions. Use this only when absolutely necessary.  
 
+### Replacing auth.py
+Additionally early loaded extensions can also replace auth.py which is used in profile_manager.py.  
+Simply add `check_host` function to global space of main extension file, this function takes one argument which is "host" that user types when adding new profile in profile manager.  
+This function should check if this host matches replacements and return its own already imported auth module. IF host is not matched, return `None`.  
+First valid early loaded extension to return auth will be used in profile manager.  
+
+
 ## Modifying existing code
 Existing code in endcord `app` class can be modified, by replacing `app` class methods with custom methods.  
 But be warned: replacing method like this will also replace any updates made to it in new endcord version, so extension muss be updated accordingly.  

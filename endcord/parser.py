@@ -712,7 +712,8 @@ def command_string(text):
         if match:
             cmd_args = {"channel_id": match.group(1)}
         elif text_lower.startswith("xyzzy"):
-            cmd_args = {"channel_id": "special"}
+            clear = "clear" if text_lower[5:].strip() == "clear" else ""
+            cmd_args = {"channel_id": "special" + clear}
         else:
             cmd_type = 0
             cmd_args = {"value": 1}

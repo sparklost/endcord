@@ -3684,6 +3684,9 @@ class Endcord:
                 else:
                     object_id = self.checkpoint
                     tp = True
+            elif object_id == "special clear" and self.fun:
+                self.checkpoint = None
+                self.update_extra_line("Teleportation point removed.", color=self.colors[9])
             channel_id, _, guild_id, _, parent_hint = self.find_parents_from_id(object_id)
             if channel_id == guild_id:
                 channel_id = None
