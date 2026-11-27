@@ -270,6 +270,8 @@ def prepare_message(message):
         name = attachment["filename"]
         if attachment.get("title"):
             name = attachment["title"] + os.path.splitext(name)[1]
+        if attachment.get("flags", 0) & 8:   # spoiler flag
+            name = f"SPOILER_{name}"
         data = {
             "type": attachment.get("content_type", "unknown"),
             "name": name,

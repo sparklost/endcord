@@ -63,6 +63,7 @@ class InlineMedia:
         self.box_color = config["inline_image_box_color"]
         self.slow_media = config["media_slow_load_delay"]
         self.mention_color = colors_formatted[12][0][0]
+        self.color_spoiler = config["color_chat_spoiler"][0]
         self.mention_color_esc = f"{ESC}[48;5;{color_mention[1]}m"
         self.draw_box = self.box_color != -1
         self.run = True
@@ -138,7 +139,7 @@ class InlineMedia:
                 if image_id not in self.image_cache:
                     self.force_draw = True
                     self.image_cache[image_id] = [None, rel_y, rel_x, h, w, draw, mention]
-                elif self.image_cache[image_id][1:-2] != [rel_y, rel_x, h, w]:
+                elif self.image_cache[image_id][1:-1] != [rel_y, rel_x, h, w, draw]:
                     if self.image_cache[image_id][3] != h or self.image_cache[image_id][4] != w:
                         # make this one redownload because changed dimensions
                         self.image_cache[image_id][0] = None
@@ -180,7 +181,9 @@ class InlineMedia:
             with self.image_cache_lock:
                 subtitle_line = bool(self.tui.win_subtitle_line)
                 for data, rel_y, rel_x, h, w, draw, mention in self.image_cache.values():
-                    if not draw and (not self.draw_box or data):
+                    if not draw:   # spoiler
+                        data = draw_image_bounding_box(self.color_spoiler, self.color_spoiler, w, h)   # noqa
+                    elif not data and not self.draw_box:
                         continue
                     abs_y = chat_h - (rel_y - self.tui.chat_index - self.tui.have_title - subtitle_line + 1)
                     if abs_y - chat_y <= -h or abs_y > chat_h + 1 + subtitle_line:
@@ -223,8 +226,6 @@ class InlineMedia:
         chat_h = self.tui.chat_hw[0]
         subtitle_line = bool(self.tui.win_subtitle_line)
         for data, rel_y, _, h, w, draw, mention in self.image_cache.values():
-            if not draw and (not self.draw_box or data):
-                continue
             abs_y = chat_h - (rel_y - self.tui.chat_index - self.tui.have_title - subtitle_line + 1)
             cut_h = h
             if abs_y - chat_y <= -h or abs_y >= chat_h:
@@ -354,7 +355,7 @@ class InlineMedia:
             with self.image_cache_lock:
                 if image_id in self.image_cache and not self.image_cache[image_id][0]:
                     draw_box = True
-            if draw_box and self.draw_box:
+            if draw_box and self.draw_box and draw:
                 time.sleep(0.05)
                 data = draw_image_bounding_box(-1, self.box_color, w, h)
                 with self.tui.lock:

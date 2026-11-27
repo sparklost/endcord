@@ -5133,6 +5133,8 @@ class Endcord:
                 spoiler_index = 0
             if not (max_spoiler or spoiler_index):
                 self.messages[msg_index]["spoiled"] = [1000]
+            elif spoiler_index >= 1000:
+                self.messages[msg_index]["spoiled"] = [spoiler_index]
             else:
                 self.messages[msg_index]["spoiled"] = [min(spoiler_index, max_spoiler)]
         self.update_chat(keep_selected=True, scroll=False, change_id=self.messages[msg_index]["id"], change_type=3)

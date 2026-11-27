@@ -36,7 +36,7 @@ env:
   LINUX_USE_NUITKA: "true"
   LINUX_USE_CLANG: "true"
   # Windows
-  WIN_PYTHON_VERSION: "3.14"   # nissing wheels for windows-curses
+  WIN_PYTHON_VERSION: "3.14"   # missing wheels for windows-curses
   WIN_CLANG_VERSION: "21.1.8"
   WIN_USE_NUITKA: "true"
   WIN_USE_CLANG: "false"   # https://github.com/Nuitka/Nuitka/issues/3621

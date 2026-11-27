@@ -111,10 +111,11 @@ class GtkCursesMedia:
         self.inline_draw_list = []   # (abs_y, abs_x, key, w, h, draw)
         self.inline_cache_path = os.path.expanduser(os.path.join(peripherals.cache_path, "images"))
         os.makedirs(self.inline_cache_path, exist_ok=True)
-        self.box_color = app.config["inline_image_box_color"]
-        self.draw_box = self.box_color != -1
+        box_color = app.config["inline_image_box_color"]
+        self.draw_box = box_color != -1
         if self.draw_box:
-            self.box_rgb = gtkcurses.rgb_to_cairo(gtkcurses.xterm_to_rgb(self.box_color))
+            self.box_rgb = gtkcurses.rgb_to_cairo(gtkcurses.xterm_to_rgb(box_color))
+        self.spoiler_rgb = gtkcurses.rgb_to_cairo(gtkcurses.xterm_to_rgb(app.config["color_chat_spoiler"][0]))
         if self.inline:
             app.placeholder_images = True
             app.formatter.placeholder_images = app.config["inline_media_height"]
@@ -190,11 +191,15 @@ class GtkCursesMedia:
 
         # inline images
         for abs_y, abs_x, key, w, h, draw in self.inline_draw_list:
+            if not draw:   # filled spoiler mask
+                cr.set_source_rgb(*self.spoiler_rgb)
+                cr.rectangle(abs_x * char_width, abs_y * char_height, w * char_width, h * char_height)
+                cr.fill()
+                continue
             surface = self.inline_images.get(key)
             if surface:
-                if draw:
-                    cr.set_source_surface(surface, abs_x * char_width, abs_y * char_height)
-                    cr.paint()
+                cr.set_source_surface(surface, abs_x * char_width, abs_y * char_height)
+                cr.paint()
             elif self.draw_box:   # bounding box until image is downloaded
                 cr.set_source_rgb(*self.box_rgb)
                 cr.set_line_width(3)
