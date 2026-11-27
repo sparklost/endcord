@@ -156,9 +156,9 @@ You may not:
      written permission from the copyright holder.
   3. Sublicense or sell the Software or Binaries.
 
- This license applies only to materials owned by the copyright holder.
- Third-party materials included with, distributed alongside, or used by the
- Software remain subject to their respective licenses and terms.
+This license applies only to materials owned by the copyright holder.
+Third-party materials included with, distributed alongside, or used by the
+Software remain subject to their respective licenses and terms.
 
 THIS SOFTWARE IS PROVIDED "AS-IS", WITHOUT ANY WARRANTY, EXPRESS OR IMPLIED,
 INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY,
