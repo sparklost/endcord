@@ -101,6 +101,7 @@ def get_rows(online):
     installed = [row["name"] for row in rows]
     for item in online:
         if item["name"] not in installed:
+            item["description"] = item["description"].replace("An extension for endcord discord TUI client, that ", "").capitalize()
             rows.append({**item, "installed": False, "local": "-", "latest": "-", "invalid": False, "outdated": False})
     return rows
 

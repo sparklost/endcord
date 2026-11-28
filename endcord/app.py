@@ -1717,7 +1717,7 @@ class Endcord:
             self.previous_input_context = self.restore_input_text[1]
             if ephemeral:
                 break
-            if self.editing and not self.command and self.restore_input_text[1][:4] != "edit":
+            if self.editing and not self.command and self.restore_input_text[1] and self.restore_input_text[1][:4] != "edit":
                 self.restore_input_text = (self.restore_input_text[0], "edit")
             if self.reacting["id"]:
                 self.restore_input_text = (self.restore_input_text[0], "react")

@@ -26,26 +26,13 @@ logger = logging.getLogger(__name__)
 status_unpacker = struct.Struct("!H")
 
 
-def log_api_error(response, function_name):
+def log_api_error(status, data, function_name):
     """Add api response error to log"""
-    text = f"{function_name}: Response code {response.status}"
-    data = response.read()
-    if data:
-        try:
-            data = json.loads(data)
-            error_message = data.get("message")
-            error_code = data.get("code")
-            if "captcha_key" in data:
-                error_message = data.get("captcha_key")
-        except json.JSONDecodeError:
-            error_code = "None"
-            error_message = data.decode("utf-8").strip()
-    else:
-        error_code = error_message = None
-    if error_code:
-        text += f"; Error code: {error_code}"
-    if error_message:
-        text += f" - {error_message}"
+    text = f"{function_name}: Response code {status}"
+    if data.get("code"):
+        text += f"; Error code: {data["code"]}"
+    if data.get("message"):
+        text += f" - {data["message"]}"
     logger.warning(text)
 
 
@@ -76,9 +63,27 @@ class Discord():
         self.proxy = proxy
 
 
-    def get_connection(self, timeout=2):
-        """Get api connection object and handle proxying"""
-        return peripherals.get_connection(self.hostname, self.port, timeout=timeout, proxy=self.proxy, tls=self.tls)
+    def request(self, method, path, body=None, headers=None):
+        """Perform request on new connection"""
+        header = self.header.copy()
+        header.update(headers or {})
+        connection = None
+        try:
+            connection = peripherals.get_connection(self.hostname, self.port, timeout=2, proxy=self.proxy, tls=self.tls)
+            connection.request(method, path, body, header)
+            response = connection.getresponse()
+            status = response.status
+            raw = response.read()
+        except (socket.gaierror, TimeoutError, OSError):
+            return None, None
+        finally:
+            if connection:
+                connection.close()
+        try:
+            data = json.loads(raw) if raw else {}
+        except ValueError:
+            data = {}
+        return status, data if isinstance(data, dict) else {}
 
 
     def login(self, email, password):
@@ -97,22 +102,11 @@ class Discord():
         """
         if email.startswith("+"):   # its phone number
             email = email.replace(" ", "").replace("-", "")
-        message_dict = {
-            "login": str(email),
-            "password": str(password),
-        }
-        url = "/api/v9/auth/login"
-        message_data = json.dumps(message_dict)
-        try:
-            connection = self.get_connection()
-            connection.request("POST", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
-            return 7, None
-        if response.status == 200:
-            data = json.loads(response.read())
-            connection.close()
+        message_data = json.dumps({"login": str(email), "password": str(password)})
+        status, data = self.request("POST", "/api/v9/auth/login", message_data)
+        if status is None:
+            return 8, None
+        if status == 200:
             if "token" in data:
                 return 0, data["token"]
             if data.get("mfa"):
@@ -130,11 +124,9 @@ class Discord():
             if "suspended_user_token" in data:
                 return 5, None
             return 8, None
-        if response.status == 400:
-            data = json.loads(response.read())
-            connection.close()
+        if status == 400:
             error_code = data.get("code")
-            log_api_error(response, "login")
+            log_api_error(status, data, "login")
             if "captcha_key" in data:
                 return 7, None
             if error_code == 50035:
@@ -145,97 +137,58 @@ class Discord():
                 return 3, None
             if error_code == 70009:
                 return 4, None
-        log_api_error(response, "login")
-        connection.close()
+        log_api_error(status, data, "login")
         return 8, None
 
 
     def phone_verify(self, phone, code):
         """Verify phone number and receive ip authorization token"""
         phone = phone.replace(" ", "").replace("-", "")
-        message_dict = {
-            "phone": phone,
-            "code": code,
-        }
-        url = "/api/v9/phone-verifications/verify"
-        message_data = json.dumps(message_dict)
-        try:
-            connection = self.get_connection()
-            connection.request("POST", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        message_data = json.dumps({"phone": phone, "code": code})
+        status, data = self.request("POST", "/api/v9/phone-verifications/verify", message_data)
+        if status is None:
             return 2, None
-        if response.status == 200:
-            data = json.loads(response.read())
-            connection.close()
+        if status == 200:
             return 0, data.get("token")
-        log_api_error(response, "phone_verify")
-        connection.close()
+        log_api_error(status, data, "phone_verify")
         return 1, None
 
 
     def send_mfa_sms(self, mfa_ticket):
         """Send mfa code over sms"""
-        url = "/auth/mfa/sms/send"
-        message_data = json.dumps({"ticket": mfa_ticket})
-        try:
-            connection = self.get_connection()
-            connection.request("POST", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        status, data = self.request("POST", "/auth/mfa/sms/send", json.dumps({"ticket": mfa_ticket}))
+        if status is None:
             return 2, None
-        if response.status == 200:
-            data = json.loads(response.read())
-            connection.close()
+        if status == 200:
             return 0, data.get("phone")
-        log_api_error(response, "send_mfa_sms")
-        connection.close()
+        log_api_error(status, data, "send_mfa_sms")
         return 1, None
 
 
     def authorize_ip(self, auth_token):
         """Authorize this ip with token received over email or from phone_verify()"""
-        url = "/api/v9/phone-verifications/verify"
-        message_data = json.dumps({"token": auth_token})
-        try:
-            connection = self.get_connection()
-            connection.request("POST", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        status, data = self.request("POST", "/api/v9/phone-verifications/verify", json.dumps({"token": auth_token}))
+        if status is None:
             return 2
-        if response.status == 204:
-            connection.close()
+        if status == 204:
             return 0
-        log_api_error(response, "authorize_ip")
-        connection.close()
+        log_api_error(status, data, "authorize_ip")
         return 1
 
 
     def verify_mfa(self, auth_type, code, login_instance_id, ticket):
         """Verify multi-factor authentication and get token"""
-        message_dict = {
+        message_data = json.dumps({
             "code": code,
             "login_instance_id": login_instance_id,
             "ticket": ticket,
-        }
-        url = "/api/v9/auth/mfa/" + auth_type
-        message_data = json.dumps(message_dict)
-        try:
-            connection = self.get_connection()
-            connection.request("POST", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        })
+        status, data = self.request("POST", "/api/v9/auth/mfa/" + auth_type, message_data)
+        if status is None:
             return 2, None
-        if response.status == 200:
-            data = json.loads(response.read())
-            connection.close()
+        if status == 200:
             return 0, data.get("token")
-        log_api_error(response, "verify_mfa")
-        connection.close()
+        log_api_error(status, data, "verify_mfa")
         return 1, None
 
 
@@ -244,28 +197,16 @@ class Discord():
         Exchange remote authentication ticket from remote authentication session.
         Return encrypted token that should be decrypted in gateway.
         """
-        message_dict = {"ticket": ticket}
-        url = "/api/v9/users/@me/remote-auth/login"
-        message_data = json.dumps(message_dict)
-        try:
-            connection = self.get_connection()
-            connection.request("POST", url, message_data, self.header)
-            response = connection.getresponse()
-        except (socket.gaierror, TimeoutError):
-            connection.close()
+        status, data = self.request("POST", "/api/v9/users/@me/remote-auth/login", json.dumps({"ticket": ticket}))
+        if status is None:
             return 3, None
-        if response.status == 200:
-            data = json.loads(response.read())
-            connection.close()
+        if status == 200:
             return 0, data.get("encrypted_token")
-        if response.status == 400:
-            data = json.loads(response.read())
-            connection.close()
-            log_api_error(response, "exchange_ticket")
+        if status == 400:
+            log_api_error(status, data, "exchange_ticket")
             if "captcha_key" in data:
                 return 2, None
-        log_api_error(response, "exchange_ticket")
-        connection.close()
+        log_api_error(status, data, "exchange_ticket")
         return 1, None
 
 

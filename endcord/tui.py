@@ -314,7 +314,7 @@ class TUI():
         self.assist_stop_space = config["assist_stop_space"]
 
         # switch thin cursor
-        self.bar_cursor = config["cursor_bar"]
+        self.bar_cursor = config["cursor_bar"] and (sys.platform != "win32" or uses_gtkcurses)
         if self.bar_cursor:
             curses.curs_set(0)
             set_cursor(2 if self.vim_mode else 6)

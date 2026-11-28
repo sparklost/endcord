@@ -45,7 +45,7 @@ match_md_spoiler = re.compile(r"(?<!\\)\|\|.+?\|\|")
 match_md_code_snippet = re.compile(r"(?<!`|\\)`[^`]+`")
 match_md_code_block = re.compile(r"(?s)```(?:([a-zA-Z0-9+#-]+)?[ \t]*\n)?(.*?)```")
 match_md_url = re.compile(r"(?<!\\)\[((?:(?!\]\().)+)\]\(([^)]+)\)")
-match_url = re.compile(r"https?:\/\/[\w.-]+(\.[\w-])+[^\s)\]>]*[^\s).\]>]")
+match_url = re.compile(r"https?:\/\/[\w.-]+(\.[\w-])+[^\s)\]>]*[^\s).\]>*_~|]")
 match_discord_channel_url = re.compile(r"https:\/\/discord(?:app)?\.com\/channels\/(\d*)\/(\d*)(?:\/(\d*))?")
 match_sticker_id = re.compile(r"<;\d+;>")
 match_plain_mention = re.compile(r"@(\w+)")
@@ -3603,7 +3603,16 @@ def generate_extra_window_whkey(keybindings, command_bindings, prefix, colors, m
     for name, data in keybindings.items():
         if not data[0]:
             continue
-        keybinding = data[0].replace(" ", "-")
+        logger.info(data[0])
+        if isinstance(data[0], tuple):   # multiple bindings for same action
+            for bind in data[0]:
+                if " " in bind and len(bind) > 1:
+                    keybinding = bind.replace(" ", "-")
+                    break
+            else:
+                continue
+        else:
+            keybinding = data[0].replace(" ", "-")
         if keybinding.startswith(prefix):
             body.append(f"{keybinding} - {name.replace("_", " ")}"[:max_len])
             body_format.append([(color_standout, None, 0, len(keybinding))])
